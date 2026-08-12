@@ -3,6 +3,14 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<script>
+  /* En móvil la vista de escritorio se lee mucho mejor que las tablas
+     apiladas: se fuerza un ancho de 1024 px y el navegador la escala para
+     que quepa, igual que al pedir "Sitio para ordenador". */
+  if (screen.width < 900) {
+    document.querySelector('meta[name="viewport"]').setAttribute('content', 'width=1024');
+  }
+</script>
 <title>Calculadora Biwenger — Presupuestos de la liga</title>
 <link rel="stylesheet" href="styles.css">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>💰</text></svg>">
@@ -19,6 +27,7 @@
       </div>
     </div>
     <div class="topbar__actions">
+      <span id="last-sync" class="topbar__stamp" role="status" aria-live="polite"></span>
       <button id="btn-sync-top" class="btn btn--primary" type="button">Actualizar</button>
       <button id="btn-toggle-input" class="btn" type="button">Datos</button>
     </div>
@@ -170,9 +179,6 @@
     <p id="moves-empty" class="empty">Aún no hay movimientos: pega el HTML del tablón arriba.</p>
   </section>
 
-  <footer class="foot">
-    <p>Los cálculos se hacen en tu navegador; nada se envía a ningún servidor.</p>
-  </footer>
 </main>
 
 <script src="app.js"></script>

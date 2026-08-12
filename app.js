@@ -25,6 +25,7 @@
   const TEAM_VALUE_SHARE = 0.25;          // fracción del valor de equipo que suma a la puja
   const STORAGE_KEY = 'biwenger-calc-v2';
   const SYNC_KEY = 'biwenger-calc-sync';
+  const AUTO_SYNC_MS = 5 * 60 * 1000;     // refresco automático
 
   /* ---------- Utilidades ---------- */
 
@@ -452,6 +453,8 @@
     warnings: [],
     filters: { text: '', manager: '', type: '' },
     expanded: {},          // mánagers con la ficha de jugadores desplegada
+    syncing: false,
+    lastSync: null,
     // key vacía = orden por defecto de cada tabla (ver más abajo).
     sort: {
       budget: { key: '', dir: -1 },
@@ -779,14 +782,29 @@
     try {
       const raw = localStorage.getItem(SYNC_KEY);
       const data = raw ? JSON.parse(raw) : null;
-      return { url: (data && data.url) || '', key: (data && data.key) || '' };
+      return {
+        url: (data && data.url) || '',
+        key: (data && data.key) || '',
+        lastSync: (data && data.lastSync) || null
+      };
     } catch (error) {
-      return { url: '', key: '' };
+      return { url: '', key: '', lastSync: null };
     }
   }
 
   function saveSyncConfig(config) {
     try { localStorage.setItem(SYNC_KEY, JSON.stringify(config)); } catch (error) { /* sin persistencia */ }
+  }
+
+  /** Sello de «actualizado a las…» en la barra superior. */
+  function renderLastSync(time) {
+    const stamp = $('last-sync');
+    if (!time) { stamp.textContent = ''; return; }
+    const date = new Date(time);
+    const sameDay = new Date().toDateString() === date.toDateString();
+    stamp.textContent = 'Actualizado ' + (sameDay
+      ? date.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })
+      : dateFormat.format(date));
   }
 
   /** Traduce la respuesta del Worker al modelo interno de la calculadora. */
@@ -842,9 +860,17 @@
     return { movements: movements.length, teams: Object.keys(teams).length };
   }
 
-  function syncNow() {
+  /**
+   * @param {boolean} auto  true si la dispara el temporizador: entonces no
+   *                        abre paneles ni roba el foco, solo deja el aviso.
+   */
+  function syncNow(auto) {
+    if (state.syncing) return;
+
     const url = collapse($('sync-url').value);
     const key = $('sync-key').value.trim();
+
+    if (auto && (!url || !key)) return;
 
     if (!url) {
       $('input-panel').hidden = false;
@@ -859,7 +885,8 @@
       return;
     }
 
-    saveSyncConfig({ url: url, key: key });
+    state.syncing = true;
+    saveSyncConfig({ url: url, key: key, lastSync: state.lastSync });
     setStatus('status-sync', 'Consultando Biwenger…');
     $('btn-sync').disabled = true;
     $('btn-sync-top').disabled = true;
@@ -879,6 +906,9 @@
       })
       .then(function (payload) {
         const result = applySync(payload);
+        state.lastSync = Date.now();
+        saveSyncConfig({ url: url, key: key, lastSync: state.lastSync });
+        renderLastSync(state.lastSync);
         setStatus('status-sync', result.movements + ' movimientos y ' + result.teams +
           ' equipos · ' + dateFormat.format(new Date()), 'ok');
       })
@@ -889,9 +919,24 @@
         setStatus('status-sync', message, 'err');
       })
       .then(function () {
+        state.syncing = false;
         $('btn-sync').disabled = false;
         $('btn-sync-top').disabled = false;
       });
+  }
+
+  /* Refresco automático: al abrir y cada AUTO_SYNC_MS, siempre que la pestaña
+     esté a la vista. Biwenger publica los fichajes al cerrar el mercado, así
+     que no tiene sentido consultar más a menudo. */
+  function startAutoSync() {
+    setInterval(function () {
+      if (document.visibilityState === 'visible') syncNow(true);
+    }, AUTO_SYNC_MS);
+
+    document.addEventListener('visibilitychange', function () {
+      if (document.visibilityState !== 'visible') return;
+      if (!state.lastSync || Date.now() - state.lastSync > AUTO_SYNC_MS) syncNow(true);
+    });
   }
 
   function resetAll() {
@@ -987,8 +1032,8 @@
       if (!panel.hidden) $('html-board').focus();
     });
 
-    $('btn-sync').addEventListener('click', syncNow);
-    $('btn-sync-top').addEventListener('click', syncNow);
+    $('btn-sync').addEventListener('click', function () { syncNow(false); });
+    $('btn-sync-top').addEventListener('click', function () { syncNow(false); });
     $('btn-process-board').addEventListener('click', processBoard);
     $('btn-process-standings').addEventListener('click', processStandings);
     $('btn-reset').addEventListener('click', resetAll);
@@ -1017,6 +1062,8 @@
     const sync = loadSyncConfig();
     $('sync-url').value = sync.url;
     $('sync-key').value = sync.key;
+    state.lastSync = sync.lastSync;
+    renderLastSync(state.lastSync);
 
     const hadData = loadStored();
     render();
@@ -1024,6 +1071,12 @@
       $('input-panel').hidden = true;
       setStatus('status-board', '');
       setStatus('status-standings', '');
+    }
+
+    if (sync.url && sync.key) {
+      $('input-panel').hidden = true;
+      syncNow(true);
+      startAutoSync();
     }
   }
 

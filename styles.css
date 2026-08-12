@@ -184,6 +184,10 @@ code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft)
 .sync-fields { display: grid; gap: .5rem; grid-template-columns: 2fr 1fr; }
 .sync-fields .field { width: 100%; }
 .topbar__actions { display: flex; align-items: center; gap: .5rem; }
+.topbar__stamp { font-size: .75rem; color: var(--text-faint); white-space: nowrap; }
+@media (max-width: 560px) {
+  .topbar__stamp { display: none; }
+}
 @media (max-width: 560px) {
   .sync-fields { grid-template-columns: 1fr; }
 }
@@ -396,8 +400,6 @@ code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft)
     white-space: nowrap;
   }
 }
-
-.foot { text-align: center; color: var(--text-faint); font-size: .8rem; padding: 1rem 0 2.5rem; }
 
 /* ---------- Responsive: tablas apiladas ---------- */
 @media (max-width: 940px) {
