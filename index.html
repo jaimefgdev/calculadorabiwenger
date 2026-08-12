@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Calculadora Biwenger — Presupuestos de la liga</title>
+<link rel="stylesheet" href="styles.css">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>💰</text></svg>">
+</head>
+<body>
+
+<header class="topbar">
+  <div class="wrap topbar__inner">
+    <div class="brand">
+      <span class="brand__logo">⚽</span>
+      <div>
+        <h1>Calculadora Biwenger</h1>
+        <p class="brand__sub">Presupuestos y puja máxima</p>
+      </div>
+    </div>
+    <div class="topbar__actions">
+      <button id="btn-sync-top" class="btn btn--primary" type="button">Actualizar</button>
+      <button id="btn-toggle-input" class="btn" type="button">Datos</button>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+
+  <!-- ============ ENTRADA DE DATOS ============ -->
+  <section id="input-panel" class="panel input-panel">
+    <div class="panel__head">
+      <h2>Origen de datos</h2>
+      <p class="muted">Todo empieza en 20.000.000 € por mánager. Los datos solo cambian cuando pegas HTML aquí.</p>
+    </div>
+
+    <article class="source source--sync">
+      <h3 class="source__title">0 · Sincronizar <span class="source__tag">sin pegar nada</span></h3>
+      <p class="muted">Con el Worker desplegado (ver <code>worker/README.md</code>) no hace falta HTML: funciona igual desde el móvil que desde el PC. Trae además el saldo y el valor de equipo oficiales de Biwenger.</p>
+      <div class="sync-fields">
+        <input id="sync-url" class="field" type="url" spellcheck="false" placeholder="https://biwenger-calc.tu-cuenta.workers.dev">
+        <input id="sync-key" class="field" type="password" spellcheck="false" placeholder="Tu CALC_KEY">
+      </div>
+      <div class="source__actions">
+        <button id="btn-sync" class="btn btn--primary btn--sm" type="button">Actualizar desde Biwenger</button>
+        <span id="status-sync" class="parse-status" role="status" aria-live="polite"></span>
+      </div>
+    </article>
+
+    <p class="hint">¿Sin Worker? Puedes seguir pegando el HTML a mano:</p>
+
+    <div class="sources">
+      <article class="source">
+        <h3 class="source__title">1 · Tablón <span class="source__tag">movimientos</span></h3>
+        <p class="muted">En <strong>biwenger.as.com</strong> (Inicio) → clic derecho sobre el tablón → <em>Inspeccionar</em> → clic derecho en <code>&lt;body&gt;</code> → <em>Copy · Copy outerHTML</em>.</p>
+        <textarea id="html-board" spellcheck="false" placeholder="&lt;league-board-post&gt; … &lt;player-card&gt; … Fichado por … 3.670.000 € …"></textarea>
+        <div class="source__actions">
+          <button id="btn-process-board" class="btn btn--primary btn--sm" type="button">Procesar tablón</button>
+          <span id="status-board" class="parse-status" role="status" aria-live="polite"></span>
+        </div>
+      </article>
+
+      <article class="source">
+        <h3 class="source__title">2 · Liga <span class="source__tag">valor de equipo</span></h3>
+        <p class="muted">Pestaña <strong>Liga</strong> → misma operación sobre la tabla de participantes. Opcional: solo se usa para la puja máxima.</p>
+        <textarea id="html-standings" spellcheck="false" placeholder="&lt;user-list-table&gt; … aria-label=&quot;27.090.000 € Valor de Equipo&quot; …"></textarea>
+        <div class="source__actions">
+          <button id="btn-process-standings" class="btn btn--primary btn--sm" type="button">Procesar liga</button>
+          <span id="status-standings" class="parse-status" role="status" aria-live="polite"></span>
+        </div>
+      </article>
+    </div>
+
+    <div class="input-panel__actions">
+      <button id="btn-reset" class="btn btn--ghost btn--sm" type="button">Vaciar todo y volver a 20.000.000 €</button>
+    </div>
+  </section>
+
+  <!-- ============ KPIs ============ -->
+  <section class="kpis" aria-label="Resumen general">
+    <article class="kpi">
+      <span class="kpi__label">Movimientos</span>
+      <strong class="kpi__value" id="kpi-moves">—</strong>
+      <span class="kpi__foot" id="kpi-moves-foot">&nbsp;</span>
+    </article>
+    <article class="kpi kpi--out">
+      <span class="kpi__label">Total gastado</span>
+      <strong class="kpi__value" id="kpi-spent">—</strong>
+      <span class="kpi__foot" id="kpi-spent-foot">&nbsp;</span>
+    </article>
+    <article class="kpi kpi--in">
+      <span class="kpi__label">Total ingresado</span>
+      <strong class="kpi__value" id="kpi-earned">—</strong>
+      <span class="kpi__foot" id="kpi-earned-foot">&nbsp;</span>
+    </article>
+    <article class="kpi">
+      <span class="kpi__label">Saldo total en liga</span>
+      <strong class="kpi__value" id="kpi-balance">—</strong>
+      <span class="kpi__foot" id="kpi-balance-foot">&nbsp;</span>
+    </article>
+  </section>
+
+  <div id="warnings" class="warnings" hidden></div>
+
+  <!-- ============ TABLA DE PRESUPUESTOS ============ -->
+  <section class="panel">
+    <div class="panel__head panel__head--row">
+      <div>
+        <h2>Presupuesto por mánager</h2>
+        <p class="muted">Puja máxima = saldo disponible + 25 % del valor del equipo. Pulsa una cabecera para ordenar y una fila para ver sus jugadores.</p>
+      </div>
+      <button id="btn-csv" class="btn btn--ghost btn--sm" type="button">Exportar CSV</button>
+    </div>
+    <div class="table-scroll">
+      <table class="table table--budget">
+        <thead>
+          <tr>
+            <th class="col-rank">#</th>
+            <th class="sortable" data-sort="name" tabindex="0" aria-sort="none">Mánager</th>
+            <th class="num sortable" data-sort="buys" tabindex="0" aria-sort="none" title="Jugadores fichados">Fichajes</th>
+            <th class="num sortable" data-sort="sells" tabindex="0" aria-sort="none" title="Jugadores vendidos">Ventas</th>
+            <th class="num sortable" data-sort="spent" tabindex="0" aria-sort="none">Gastado</th>
+            <th class="num sortable" data-sort="earned" tabindex="0" aria-sort="none">Ingresado</th>
+            <th class="num sortable" data-sort="balance" tabindex="0" aria-sort="none" title="20.000.000 € iniciales − gastado + ingresado">Saldo</th>
+            <th class="num sortable" data-sort="teamValue" tabindex="0" aria-sort="none">Valor equipo</th>
+            <th class="num sortable" data-sort="maxBid" tabindex="0" aria-sort="none" title="Saldo disponible + 25 % del valor del equipo">Puja máxima</th>
+          </tr>
+        </thead>
+        <tbody id="budget-body"></tbody>
+        <tfoot id="budget-foot"></tfoot>
+      </table>
+    </div>
+    <p id="standings-hint" class="hint">Pega el HTML de la pestaña <strong>Liga</strong> para calcular el valor de equipo y la puja máxima.</p>
+  </section>
+
+  <!-- ============ TIMELINE DE MOVIMIENTOS ============ -->
+  <section class="panel">
+    <div class="panel__head panel__head--row">
+      <div>
+        <h2>Ranking de movimientos</h2>
+        <p class="muted" id="moves-count">&nbsp;</p>
+      </div>
+      <div class="filters">
+        <input id="filter-text" class="field" type="search" placeholder="Buscar jugador o mánager…">
+        <select id="filter-manager" class="field"><option value="">Todos los mánagers</option></select>
+        <select id="filter-type" class="field">
+          <option value="">Compras y ventas</option>
+          <option value="buy">Solo fichajes</option>
+          <option value="sell">Solo ventas</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="table-scroll">
+      <table class="table table--moves">
+        <thead>
+          <tr>
+            <th class="col-rank">#</th>
+            <th class="sortable" data-sort="player" tabindex="0" aria-sort="none">Jugador</th>
+            <th class="sortable" data-sort="type" tabindex="0" aria-sort="none">Acción</th>
+            <th class="sortable" data-sort="manager" tabindex="0" aria-sort="none">Mánager</th>
+            <th class="num sortable" data-sort="amount" tabindex="0" aria-sort="none">Importe</th>
+            <th class="sortable" data-sort="date" tabindex="0" aria-sort="none">Fecha</th>
+          </tr>
+        </thead>
+        <tbody id="moves-body"></tbody>
+      </table>
+    </div>
+
+    <p id="moves-empty" class="empty">Aún no hay movimientos: pega el HTML del tablón arriba.</p>
+  </section>
+
+  <footer class="foot">
+    <p>Los cálculos se hacen en tu navegador; nada se envía a ningún servidor.</p>
+  </footer>
+</main>
+
+<script src="app.js"></script>
+</body>
+</html>
