@@ -534,10 +534,17 @@
     /* La foto se pinta encima de las iniciales: si la URL falla —la del CDN de
        Biwenger devuelve 404 en algunas cuentas— sigue viéndose el círculo de
        color, sin huecos ni imágenes rotas. */
+    /* Siempre se pide primero la foto de Biwenger. Si su CDN la da por perdida
+       —hay cuentas con el avatar roto— se cae al sustituto, y si tampoco hay,
+       quedan las iniciales. El relevo lo hace el listener de 'error'. */
     const team = state.teams[name];
-    const icon = AVATAR_OVERRIDES[normalize(name)] || (team && team.icon);
-    const photo = icon
-      ? '<i class="avatar__pic" style="background-image:url(\'' + escapeHtml(icon) + '\')"></i>'
+    const icon = team && team.icon;
+    const fallback = AVATAR_OVERRIDES[normalize(name)] || '';
+    const source = icon || fallback;
+    const photo = source
+      ? '<img class="avatar__pic" src="' + escapeHtml(source) + '"' +
+        (fallback && fallback !== source ? ' data-fallback="' + escapeHtml(fallback) + '"' : '') +
+        ' alt="">'
       : '';
 
     const custom = AVATAR_STYLES[normalize(name)];
@@ -1763,6 +1770,21 @@
   }
 
   function bindEvents() {
+    /* 'error' no burbujea, así que se escucha en captura: si la foto de un
+       mánager no carga, se prueba el sustituto y, si tampoco, se retira para
+       dejar ver las iniciales. */
+    document.addEventListener('error', function (event) {
+      const img = event.target;
+      if (!img || !img.classList || !img.classList.contains('avatar__pic')) return;
+      const fallback = img.getAttribute('data-fallback');
+      if (fallback && img.getAttribute('src') !== fallback) {
+        img.removeAttribute('data-fallback');
+        img.src = fallback;
+        return;
+      }
+      img.remove();
+    }, true);
+
     bindSorting('budget');
     bindSorting('moves');
 

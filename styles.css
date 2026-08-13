@@ -546,9 +546,9 @@ code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft)
 .avatar__pic {
   position: absolute;
   inset: 0;
+  width: 100%; height: 100%;
   border-radius: 50%;
-  background-size: cover;
-  background-position: center;
+  object-fit: cover;
   box-shadow: inset 0 0 0 1px rgba(0, 0, 0, .18);
 }
 .manager__name { font-weight: 560; }
