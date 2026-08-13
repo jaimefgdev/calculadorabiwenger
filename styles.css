@@ -277,13 +277,24 @@ code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft)
 .pitch__area--top { top: -3px; border-top: 0; }
 .pitch__area--bottom { bottom: -3px; border-bottom: 0; }
 .pitch__line { position: relative; z-index: 1; }
-.pitch__line { display: flex; justify-content: space-evenly; gap: .4rem; }
-.pitch__slot { position: relative; display: flex; flex-direction: column; align-items: center; gap: .2rem; width: 74px; }
-.pitch__face { width: 42px; height: 42px; box-shadow: inset 0 0 0 2px rgba(255,255,255,.55); background-color: rgba(0,0,0,.35); }
-.pitch__face--empty { border: 2px dashed rgba(255, 255, 255, .45); box-shadow: none; }
+.pitch__line { display: flex; justify-content: space-evenly; gap: .25rem; }
+/* El hueco se mide en porcentaje de la línea (cinco caben en la más poblada)
+   y la cara ocupa casi todo el hueco: así crecen con el campo en vez de
+   quedarse en un tamaño fijo. */
+.pitch__slot {
+  position: relative; display: flex; flex-direction: column; align-items: center;
+  gap: .2rem; width: 18%; min-width: 0;
+}
+/* Doble clase a propósito: `.pic-player` fija 24 px más abajo y, a igualdad
+   de peso, ganaría por ir después. */
+.pic-player.pitch__face {
+  width: min(92%, 62px); height: auto; aspect-ratio: 1;
+  box-shadow: inset 0 0 0 2px rgba(255,255,255,.55); background-color: rgba(0,0,0,.35);
+}
+.pic-player.pitch__face--empty { border: 2px dashed rgba(255, 255, 255, .45); box-shadow: none; }
 .pitch__name {
-  font-size: .68rem; font-weight: 600; color: #fff; text-align: center;
-  max-width: 74px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font-size: .7rem; font-weight: 600; color: #fff; text-align: center;
+  max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
   text-shadow: 0 1px 3px rgba(0, 0, 0, .8);
 }
 .pitch__pick { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%; }
