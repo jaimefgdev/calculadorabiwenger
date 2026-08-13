@@ -348,15 +348,17 @@ code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft)
 .picker__meta { font-size: .68rem; color: var(--text-faint); }
 
 .bench__title { font-size: .8rem; text-transform: uppercase; letter-spacing: .04em; color: var(--text-faint); margin: 1rem 0 .5rem; }
-.bench { display: grid; gap: .5rem; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }
+/* Los suplentes se leen igual que el campo: cara redonda y nombre debajo. */
+.bench { display: grid; gap: .7rem; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); }
 .bench__player {
-  display: flex; align-items: center; gap: .5rem; min-width: 0;
-  padding: .35rem .5rem;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
+  display: flex; flex-direction: column; align-items: center; gap: .3rem;
+  min-width: 0; text-align: center;
 }
-.bench__name { font-size: .8rem; font-weight: 560; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.bench__player .sub { margin-left: auto; white-space: nowrap; }
+.pic-player.bench__face { width: 56px; height: 56px; }
+.bench__name {
+  font-size: .78rem; font-weight: 560; max-width: 100%;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
 
 /* ---------- Ficha de mánager ---------- */
 .row-open { background: var(--accent-soft) !important; }

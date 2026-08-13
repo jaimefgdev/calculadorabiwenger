@@ -1647,8 +1647,7 @@
           ? 'Cargando la plantilla…' : 'Sin suplentes.') + '</p>'
       : bench.map(function (player) {
           return '<div class="bench__player">' +
-            '<span class="pic-player" style="background-image:url(\'https://cdn.biwenger.com/i/p/' +
-              encodeURIComponent(player.id) + '.png\')"></span>' +
+            faceOf(player.id, 'bench__face') +
             '<span class="bench__name">' + escapeHtml(player.name) + '</span>' +
           '</div>';
         }).join('');
