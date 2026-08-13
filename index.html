@@ -28,6 +28,12 @@
         <p class="brand__sub">Presupuestos y puja máxima</p>
       </div>
     </div>
+    <nav class="tabs" id="tabs" role="tablist" aria-label="Secciones">
+      <button class="tab" type="button" role="tab" data-tab="inicio" aria-selected="true">Inicio</button>
+      <button class="tab" type="button" role="tab" data-tab="managers" aria-selected="false">Mánagers</button>
+      <button class="tab" type="button" role="tab" data-tab="fichajes" aria-selected="false">Fichajes</button>
+    </nav>
+
     <div class="topbar__actions">
       <span id="last-sync" class="topbar__stamp" role="status" aria-live="polite"></span>
       <button id="btn-sync-top" class="btn btn--primary" type="button">Actualizar</button>
@@ -87,31 +93,35 @@
     </div>
   </section>
 
+  <!-- ============================================================
+       PESTAÑA · INICIO
+       ============================================================ -->
+  <div id="panel-inicio" data-panel="inicio">
+
   <!-- ============ KPIs ============ -->
   <section class="kpis" id="kpis" aria-label="Resumen general">
-    <article class="kpi" data-kpi="moves" role="button" tabindex="0" aria-pressed="false" title="Ver evolución por días">
+    <article class="kpi">
       <span class="kpi__label">Movimientos</span>
       <strong class="kpi__value" id="kpi-moves">—</strong>
       <span class="kpi__foot" id="kpi-moves-foot">&nbsp;</span>
     </article>
-    <article class="kpi kpi--out" data-kpi="spent" role="button" tabindex="0" aria-pressed="false" title="Ver evolución por días">
+    <article class="kpi kpi--out">
       <span class="kpi__label">Total gastado</span>
       <strong class="kpi__value" id="kpi-spent">—</strong>
       <span class="kpi__foot" id="kpi-spent-foot">&nbsp;</span>
     </article>
-    <article class="kpi kpi--in" data-kpi="earned" role="button" tabindex="0" aria-pressed="false" title="Ver evolución por días">
+    <article class="kpi kpi--in">
       <span class="kpi__label">Total ingresado</span>
       <strong class="kpi__value" id="kpi-earned">—</strong>
       <span class="kpi__foot" id="kpi-earned-foot">&nbsp;</span>
     </article>
-    <article class="kpi" data-kpi="balance" role="button" tabindex="0" aria-pressed="false" title="Ver evolución por días">
+    <article class="kpi">
       <span class="kpi__label">Saldo total en liga</span>
       <strong class="kpi__value" id="kpi-balance">—</strong>
       <span class="kpi__foot" id="kpi-balance-foot">&nbsp;</span>
     </article>
   </section>
 
-  <div id="kpi-charts" class="kpi-charts"></div>
 
   <div id="warnings" class="warnings" hidden></div>
 
@@ -146,11 +156,63 @@
     <p id="standings-hint" class="hint">Pega el HTML de la pestaña <strong>Liga</strong> para calcular el valor de equipo y la puja máxima.</p>
   </section>
 
-  <!-- ============ TIMELINE DE MOVIMIENTOS ============ -->
+  <!-- ============ MI MERCADO ============ -->
+  <div class="market-grid">
+    <section id="offers-panel" class="panel" hidden>
+      <div class="panel__head">
+        <h2>Mis pujas y ofertas</h2>
+        <p class="muted" id="offers-count">&nbsp;</p>
+      </div>
+
+      <div class="table-scroll">
+        <table class="table table--offers">
+          <thead>
+            <tr>
+              <th>Jugador</th>
+              <th>Tipo</th>
+              <th>Con</th>
+              <th class="num">Importe</th>
+              <th title="Marca para simular que se cierra">Simular</th>
+            </tr>
+          </thead>
+          <tbody id="offers-body"></tbody>
+        </table>
+      </div>
+
+      <p id="offers-note" class="hint" hidden></p>
+    </section>
+
+    <section id="listings-panel" class="panel" hidden>
+      <div class="panel__head">
+        <h2>Mis jugadores en venta</h2>
+        <p class="muted" id="listings-count">&nbsp;</p>
+      </div>
+
+      <div class="table-scroll">
+        <table class="table table--listings">
+          <thead>
+            <tr>
+              <th>Jugador</th>
+              <th class="num">Precio pedido</th>
+              <th>Ofertas recibidas</th>
+            </tr>
+          </thead>
+          <tbody id="listings-body"></tbody>
+        </table>
+      </div>
+    </section>
+  </div>
+
+  </div><!-- /panel-inicio -->
+
+  <!-- ============================================================
+       PESTAÑA · FICHAJES
+       ============================================================ -->
+  <div id="panel-fichajes" data-panel="fichajes" hidden>
   <section class="panel">
     <div class="panel__head panel__head--row">
       <div>
-        <h2>Ranking de movimientos</h2>
+        <h2>Ranking de fichajes y ventas</h2>
         <p class="muted" id="moves-count">&nbsp;</p>
       </div>
       <div class="filters">
@@ -180,32 +242,26 @@
       </table>
     </div>
 
-    <p id="moves-empty" class="empty">Aún no hay movimientos: pega el HTML del tablón arriba.</p>
+    <p id="moves-empty" class="empty">Aún no hay movimientos: sincroniza o pega el HTML del tablón.</p>
   </section>
+  </div><!-- /panel-fichajes -->
 
-  <!-- ============ PUJAS Y OFERTAS PENDIENTES ============ -->
-  <section id="offers-panel" class="panel" hidden>
-    <div class="panel__head">
-      <h2>Pujas y ofertas activas</h2>
-      <p class="muted" id="offers-count">&nbsp;</p>
-    </div>
+  <!-- ============================================================
+       PESTAÑA · MÁNAGERS
+       ============================================================ -->
+  <div id="panel-managers" data-panel="managers" hidden>
 
-    <div class="table-scroll">
-      <table class="table table--offers">
-        <thead>
-          <tr>
-            <th>Jugador</th>
-            <th>Tipo</th>
-            <th>Con</th>
-            <th class="num">Importe</th>
-          </tr>
-        </thead>
-        <tbody id="offers-body"></tbody>
-      </table>
-    </div>
+    <section class="panel">
+      <div class="panel__head">
+        <h2>Evolución de la liga</h2>
+        <p class="muted">Movimientos, dinero gastado e ingresado de cada día, y el saldo total al cierre.</p>
+      </div>
+      <div class="chips" id="league-chips"></div>
+      <div id="kpi-charts" class="kpi-charts"></div>
+    </section>
 
-    <p id="offers-note" class="hint" hidden></p>
-  </section>
+    <div id="managers-grid" class="managers-grid"></div>
+  </div><!-- /panel-managers -->
 
 </main>
 

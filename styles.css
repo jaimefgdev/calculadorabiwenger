@@ -113,6 +113,91 @@ code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft)
 .brand h1 { font-size: 1.075rem; font-weight: 650; }
 .brand__sub { color: var(--text-faint); font-size: .8rem; }
 
+/* ---------- Pestañas ---------- */
+.tabs { display: flex; gap: .25rem; flex: 1 1 auto; justify-content: center; }
+.tab {
+  font: inherit; font-size: .85rem; font-weight: 560;
+  color: var(--text-soft);
+  background: transparent;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  padding: .5rem .9rem;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.tab:hover { color: var(--text); }
+.tab[aria-selected="true"] { color: var(--accent); border-bottom-color: var(--accent); }
+.tab:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+
+/* ---------- Mi mercado ---------- */
+.market-grid {
+  display: grid; gap: 1.5rem;
+  grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+  align-items: start;
+}
+.market-grid .panel { margin-bottom: 0; }
+
+.switch {
+  width: 34px; height: 19px;
+  padding: 0;
+  border: 1px solid var(--border-strong);
+  border-radius: 100px;
+  background: var(--bg);
+  cursor: pointer;
+  display: inline-flex; align-items: center;
+  transition: background .15s, border-color .15s;
+}
+.switch span {
+  width: 13px; height: 13px;
+  margin-left: 2px;
+  border-radius: 50%;
+  background: var(--text-faint);
+  transition: transform .15s, background .15s;
+}
+.switch[aria-pressed="true"] { background: var(--accent-soft); border-color: var(--accent); }
+.switch[aria-pressed="true"] span { transform: translateX(15px); background: var(--accent); }
+.switch:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.row-sim { background: var(--accent-soft) !important; }
+.bid { display: inline-flex; align-items: center; gap: .4rem; margin-right: .6rem; }
+.bid--on strong { color: var(--accent); }
+
+/* ---------- Tarjetas de mánager ---------- */
+.managers-grid { display: grid; gap: 1.25rem; }
+.manager-card { margin-bottom: 0; }
+.manager-card__head {
+  font: inherit; color: inherit; background: none; border: 0; padding: 0;
+  width: 100%; cursor: pointer;
+  display: flex; align-items: center; gap: .75rem;
+  margin-bottom: .9rem;
+}
+.manager-card__head .manager__name { font-size: 1rem; font-weight: 650; }
+.manager-card__balance { margin-left: auto; font-weight: 650; font-variant-numeric: tabular-nums; }
+.manager-card__head[aria-expanded="true"] .row-toggle__icon { transform: rotate(90deg); color: var(--accent); }
+
+.manager-card__stats {
+  display: grid; gap: .6rem;
+  grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+  margin-bottom: .9rem;
+}
+.stat { display: flex; flex-direction: column; gap: .1rem; }
+.stat__label { font-size: .68rem; text-transform: uppercase; letter-spacing: .04em; color: var(--text-faint); }
+.stat strong { font-size: .95rem; font-variant-numeric: tabular-nums; }
+
+.records {
+  display: grid; gap: .6rem;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  padding: .8rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--accent) 3%, transparent);
+  margin-bottom: .9rem;
+}
+.record { display: flex; flex-direction: column; gap: .1rem; min-width: 0; }
+.record__label { font-size: .66rem; text-transform: uppercase; letter-spacing: .04em; color: var(--text-faint); }
+.record__player { font-weight: 560; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.record__amount { font-size: .88rem; font-variant-numeric: tabular-nums; }
+
 /* ---------- Botones y campos ---------- */
 .btn {
   font: inherit; font-size: .875rem; font-weight: 550;

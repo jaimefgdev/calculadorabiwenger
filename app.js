@@ -455,7 +455,11 @@
     filters: { text: '', manager: '', type: '' },
     expanded: {},          // mánagers con la ficha de jugadores desplegada
     charts: { saldo: true, value: true, bid: true },
-    kpiCharts: { moves: false, spent: false, earned: false, balance: false },
+    kpiCharts: { moves: true, spent: true, earned: true, balance: true },
+    tab: 'inicio',
+    expandedManager: null,
+    listings: [],
+    sim: {},               // operaciones marcadas para simular
     history: {},           // valor de equipo día a día, por mánager
     leagueStart: null,     // primer día del tablón
     offers: [],            // pujas enviadas y ofertas recibidas, pendientes
@@ -803,9 +807,9 @@
   /* Los tres primeros son flujos —lo que pasó ESE día— y van en barras. El
      saldo es un nivel, así que se dibuja como línea con el valor al cierre. */
   const KPI_SERIES = [
-    { key: 'moves',   field: 'movesDay',  label: 'Movimientos',         color: 'var(--viz-1)', count: true, bars: true },
-    { key: 'spent',   field: 'spentDay',  label: 'Gastado',             color: 'var(--viz-4)', bars: true },
-    { key: 'earned',  field: 'earnedDay', label: 'Ingresado',           color: 'var(--viz-2)', bars: true },
+    { key: 'moves',   field: 'movesDay',  label: 'Movimientos',         color: 'var(--viz-1)', count: true },
+    { key: 'spent',   field: 'spentDay',  label: 'Gastado',             color: 'var(--viz-4)' },
+    { key: 'earned',  field: 'earnedDay', label: 'Ingresado',           color: 'var(--viz-2)' },
     { key: 'balance', field: 'balance',   label: 'Saldo total en liga', color: 'var(--viz-3)' }
   ];
 
@@ -873,7 +877,7 @@
     box.hidden = false;
     box.innerHTML = active.map(function (serie) {
       const value = serie.count ? String(last[serie.field]) : money(last[serie.field]);
-      const caption = serie.bars ? serie.label + ' por día' : serie.label + ' al cierre de cada día';
+      const caption = serie.field === 'balance' ? serie.label + ' al cierre de cada día' : serie.label + ' por día';
       return '<figure class="viz panel viz--kpi">' +
         '<figcaption class="viz__head">' + caption + '<strong>' + value + '</strong></figcaption>' +
         lineChart(points, serie.field, serie.color, serie.label, { count: serie.count, bars: serie.bars }) +
@@ -1053,6 +1057,46 @@
           : list.length + ' de ' + state.movements.length + ' movimientos');
   }
 
+  /** Mi mánager, el dueño del token con el que sincronizamos. */
+  function myName() {
+    if (!state.me || !state.me.id) return null;
+    const found = Object.keys(state.teams).filter(function (name) {
+      return state.teams[name] && state.teams[name].id === state.me.id;
+    });
+    return found[0] || null;
+  }
+
+  /** Saldo si se cerrasen las operaciones marcadas: pujas restan, ventas suman. */
+  function simulation() {
+    const name = myName();
+    const rows = computeBudgets(state.movements, state.teams);
+    const mine = rows.filter(function (row) { return row.name === name; })[0];
+    const base = mine ? mine.balance : (state.me && state.me.balance) || 0;
+
+    let delta = 0;
+    let count = 0;
+    state.offers.forEach(function (offer) {
+      if (!state.sim[offer.id]) return;
+      count += 1;
+      delta += offer.direction === 'out' ? -offer.amount : offer.amount;
+    });
+
+    const teamValue = mine ? mine.teamValue : null;
+    return {
+      name: name,
+      base: base,
+      delta: delta,
+      count: count,
+      balance: base + delta,
+      maxBid: teamValue == null ? null : base + delta + teamValue * TEAM_VALUE_SHARE
+    };
+  }
+
+  function simToggle(id, checked) {
+    return '<button type="button" class="switch" data-sim="' + escapeHtml(id) + '" aria-pressed="' +
+      (checked ? 'true' : 'false') + '" title="Simular que se cierra"><span></span></button>';
+  }
+
   /** Pujas enviadas y ofertas recibidas que siguen sin resolverse. */
   function renderOffers() {
     const section = $('offers-panel');
@@ -1066,12 +1110,14 @@
 
     $('offers-body').innerHTML = list.map(function (offer) {
       const out = offer.direction === 'out';
-      return '<tr>' +
+      const on = !!state.sim[offer.id];
+      return '<tr class="' + (on ? 'row-sim' : '') + '">' +
         '<td data-label="Jugador"><span class="player-name">' + escapeHtml(offer.player) + '</span></td>' +
         '<td data-label="Tipo"><span class="tag ' + (out ? 'tag--buy' : 'tag--sell') + '">' +
           (out ? '↗ Puja enviada' : '↘ Oferta recibida') + '</span></td>' +
         '<td data-label="Con">' + escapeHtml(offer.other || 'Mercado') + '</td>' +
-        '<td class="num" data-label="Importe"><strong>' + money(offer.amount) + '</strong></td>' +
+        '<td class="num" data-label="Importe"><strong>' + (out ? '−' : '+') + money(offer.amount) + '</strong></td>' +
+        '<td data-label="Simular">' + simToggle(offer.id, on) + '</td>' +
       '</tr>';
     }).join('');
 
@@ -1087,16 +1133,159 @@
     if (incoming) parts.push(incoming + (incoming === 1 ? ' oferta recibida' : ' ofertas recibidas'));
     $('offers-count').textContent = parts.join(' · ');
 
+    renderSimulation();
+  }
+
+  /** Resumen de cómo quedaría el dinero con lo marcado. */
+  function renderSimulation() {
     const note = $('offers-note');
-    if (state.me && state.me.balance != null) {
-      note.textContent = 'Tu saldo en Biwenger es ' + money(state.me.balance) +
-        (committed > state.me.balance
-          ? '; las pujas enviadas superan ese saldo, así que no podrán resolverse todas.'
-          : '.');
-      note.hidden = false;
-    } else {
-      note.hidden = true;
+    const sim = simulation();
+
+    if (sim.count === 0) {
+      note.hidden = !(state.me && state.me.balance != null);
+      if (!note.hidden) {
+        note.innerHTML = 'Tu saldo es <strong>' + money(sim.base) +
+          '</strong>. Marca pujas u ofertas para simular cómo te quedaría.';
+      }
+      return;
     }
+
+    note.hidden = false;
+    note.innerHTML = 'Con ' + sim.count + (sim.count === 1 ? ' operación marcada' : ' operaciones marcadas') +
+      ': saldo <strong>' + money(sim.base) + '</strong> → ' +
+      '<strong class="' + (sim.balance < 0 ? 'money-neg' : 'money-pos') + '">' + money(sim.balance) + '</strong>' +
+      (sim.maxBid == null ? '' : ' · puja máxima <strong>' + money(sim.maxBid) + '</strong>') +
+      (sim.balance < 0 ? ' — te quedarías en números rojos.' : '');
+  }
+
+  /** Jugadores propios puestos a la venta. */
+  function renderListings() {
+    const section = $('listings-panel');
+    const list = state.listings;
+
+    if (!list || list.length === 0) { section.hidden = true; return; }
+    section.hidden = false;
+
+    $('listings-body').innerHTML = list.map(function (item) {
+      // Ofertas recibidas por ese jugador, para poder aceptarlas en la simulación.
+      const bids = state.offers.filter(function (offer) {
+        return offer.direction === 'in' && offer.playerId && offer.playerId === item.playerId;
+      });
+
+      const offerCell = bids.length === 0
+        ? '<span class="unknown">Sin ofertas</span>'
+        : bids.map(function (offer) {
+            const on = !!state.sim[offer.id];
+            return '<span class="bid' + (on ? ' bid--on' : '') + '">' +
+              '<strong>' + money(offer.amount) + '</strong> ' +
+              '<span class="sub">' + escapeHtml(offer.other || 'Mercado') + '</span> ' +
+              simToggle(offer.id, on) + '</span>';
+          }).join('');
+
+      return '<tr>' +
+        '<td data-label="Jugador"><span class="player-name">' + escapeHtml(item.player) + '</span></td>' +
+        '<td class="num" data-label="Precio"><strong>' + money(item.price) + '</strong></td>' +
+        '<td data-label="Ofertas">' + offerCell + '</td>' +
+      '</tr>';
+    }).join('');
+
+    const total = list.reduce(function (sum, item) { return sum + item.price; }, 0);
+    $('listings-count').textContent = list.length + (list.length === 1 ? ' jugador' : ' jugadores') +
+      ' · ' + money(total) + ' si se vendieran al precio pedido';
+  }
+
+  /* ---------- Pestaña de mánagers ---------- */
+
+  /** Récords de un mánager: sus operaciones extremas. */
+  function managerRecords(name) {
+    const moves = state.movements.filter(function (movement) { return movement.manager === name; });
+    const buys = moves.filter(function (movement) { return movement.type === 'buy'; });
+    const sells = moves.filter(function (movement) { return movement.type === 'sell'; });
+    const top = function (list, sign) {
+      if (list.length === 0) return null;
+      return list.slice().sort(function (a, b) { return sign * (b.amount - a.amount); })[0];
+    };
+    return {
+      buys: buys,
+      sells: sells,
+      costliestBuy: top(buys, 1),
+      cheapestBuy: top(buys, -1),
+      bestSell: top(sells, 1),
+      worstSell: top(sells, -1),
+      avgBuy: buys.length ? buys.reduce(function (s, m) { return s + m.amount; }, 0) / buys.length : null,
+      avgSell: sells.length ? sells.reduce(function (s, m) { return s + m.amount; }, 0) / sells.length : null
+    };
+  }
+
+  function recordCell(label, movement) {
+    if (!movement) return '<div class="record"><span class="record__label">' + label + '</span><span class="unknown">—</span></div>';
+    return '<div class="record"><span class="record__label">' + label + '</span>' +
+      '<span class="record__player">' + escapeHtml(movement.player) + '</span>' +
+      '<strong class="record__amount">' + money(movement.amount) + '</strong></div>';
+  }
+
+  function renderManagers() {
+    const rows = budgetRows();
+
+    $('managers-grid').innerHTML = rows.map(function (row) {
+      const stats = managerRecords(row.name);
+      const open = state.expandedManager === row.name;
+
+      return '<section class="panel manager-card">' +
+        '<button type="button" class="manager-card__head" data-manager-card="' + escapeHtml(row.name) + '"' +
+          ' aria-expanded="' + (open ? 'true' : 'false') + '">' +
+          '<span class="manager">' + avatar(row.name) +
+            '<span class="manager__name">' + escapeHtml(row.name) + '</span></span>' +
+          '<span class="manager-card__balance ' + (row.balance < 0 ? 'money-neg' : '') + '">' + money(row.balance) + '</span>' +
+          '<span class="row-toggle__icon" aria-hidden="true">▸</span>' +
+        '</button>' +
+
+        '<div class="manager-card__stats">' +
+          '<div class="stat"><span class="stat__label">Fichajes</span><strong>' + row.buys + '</strong></div>' +
+          '<div class="stat"><span class="stat__label">Ventas</span><strong>' + row.sells + '</strong></div>' +
+          '<div class="stat"><span class="stat__label">Gastado</span><strong class="money-neg">' + money(row.spent) + '</strong></div>' +
+          '<div class="stat"><span class="stat__label">Ingresado</span><strong class="money-pos">' + money(row.earned) + '</strong></div>' +
+          '<div class="stat"><span class="stat__label">Valor equipo</span><strong>' +
+            (row.teamValue == null ? '—' : money(row.teamValue)) + '</strong></div>' +
+          '<div class="stat"><span class="stat__label">Puja máxima</span><strong>' +
+            (row.maxBid == null ? '—' : money(row.maxBid)) + '</strong></div>' +
+          '<div class="stat"><span class="stat__label">Media por fichaje</span><strong>' +
+            (stats.avgBuy == null ? '—' : money(stats.avgBuy)) + '</strong></div>' +
+          '<div class="stat"><span class="stat__label">Media por venta</span><strong>' +
+            (stats.avgSell == null ? '—' : money(stats.avgSell)) + '</strong></div>' +
+        '</div>' +
+
+        '<div class="records">' +
+          recordCell('Fichaje más caro', stats.costliestBuy) +
+          recordCell('Fichaje más barato', stats.cheapestBuy) +
+          recordCell('Venta más cara', stats.bestSell) +
+          recordCell('Venta más barata', stats.worstSell) +
+        '</div>' +
+
+        (open ? managerCharts(row.name) : '') +
+      '</section>';
+    }).join('');
+  }
+
+  /* ---------- Pestañas ---------- */
+
+  function showTab(name) {
+    state.tab = name;
+    Array.prototype.forEach.call(document.querySelectorAll('#tabs .tab'), function (tab) {
+      tab.setAttribute('aria-selected', tab.getAttribute('data-tab') === name ? 'true' : 'false');
+    });
+    Array.prototype.forEach.call(document.querySelectorAll('[data-panel]'), function (panel) {
+      panel.hidden = panel.getAttribute('data-panel') !== name;
+    });
+    if (name === 'managers') { renderLeagueChips(); renderKpiCharts(); renderManagers(); }
+  }
+
+  function renderLeagueChips() {
+    $('league-chips').innerHTML = KPI_SERIES.map(function (serie) {
+      const on = state.kpiCharts[serie.key];
+      return '<button type="button" class="chip" data-kpi="' + serie.key + '" aria-pressed="' + (on ? 'true' : 'false') + '">' +
+        '<span class="chip__dot" style="background:' + serie.color + '"></span>' + serie.label + '</button>';
+    }).join('');
   }
 
   function renderWarnings() {
@@ -1126,10 +1315,11 @@
     const rows = budgetRows();
     renderKpis(rows);
     renderBudgets(rows);
-    renderKpiCharts();
     renderMovements();
     renderOffers();
+    renderListings();
     renderWarnings();
+    if (state.tab === 'managers') { renderLeagueChips(); renderKpiCharts(); renderManagers(); }
   }
 
   /* ---------- Persistencia ---------- */
@@ -1294,6 +1484,7 @@
     state.movements = movements;
     state.teams = teams;
     state.offers = Array.isArray(payload.offers) ? payload.offers : [];
+    state.listings = Array.isArray(payload.listings) ? payload.listings : [];
     state.me = payload.me || null;
     state.leagueStart = (payload.league && payload.league.startDay) || state.leagueStart;
     state.warnings = warnings;
@@ -1462,23 +1653,43 @@
     bindSorting('budget');
     bindSorting('moves');
 
-    function toggleKpi(card) {
-      const key = card.getAttribute('data-kpi');
-      state.kpiCharts[key] = !state.kpiCharts[key];
-      renderKpiCharts();
-    }
-
-    $('kpis').addEventListener('click', function (event) {
-      const card = event.target.closest('.kpi[data-kpi]');
-      if (card) toggleKpi(card);
+    document.addEventListener('click', function (event) {
+      const toggle = event.target.closest('[data-sim]');
+      if (!toggle) return;
+      const id = toggle.getAttribute('data-sim');
+      if (state.sim[id]) delete state.sim[id];
+      else state.sim[id] = true;
+      renderOffers();
+      renderListings();
     });
 
-    $('kpis').addEventListener('keydown', function (event) {
-      if (event.key !== 'Enter' && event.key !== ' ') return;
-      const card = event.target.closest('.kpi[data-kpi]');
-      if (!card) return;
-      event.preventDefault();
-      toggleKpi(card);
+    $('tabs').addEventListener('click', function (event) {
+      const tab = event.target.closest('.tab');
+      if (tab) showTab(tab.getAttribute('data-tab'));
+    });
+
+    $('league-chips').addEventListener('click', function (event) {
+      const chip = event.target.closest('[data-kpi]');
+      if (!chip) return;
+      const key = chip.getAttribute('data-kpi');
+      state.kpiCharts[key] = !state.kpiCharts[key];
+      renderLeagueChips();
+      renderKpiCharts();
+    });
+
+    $('managers-grid').addEventListener('click', function (event) {
+      const chip = event.target.closest('[data-chart]');
+      if (chip) {
+        const key = chip.getAttribute('data-chart');
+        state.charts[key] = !state.charts[key];
+        renderManagers();
+        return;
+      }
+      const head = event.target.closest('[data-manager-card]');
+      if (!head) return;
+      const name = head.getAttribute('data-manager-card');
+      state.expandedManager = state.expandedManager === name ? null : name;
+      renderManagers();
     });
 
     $('budget-body').addEventListener('click', function (event) {
