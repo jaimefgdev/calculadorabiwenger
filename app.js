@@ -26,6 +26,9 @@
   const STORAGE_KEY = 'biwenger-calc-v2';
   const SYNC_KEY = 'biwenger-calc-sync';
   const HISTORY_KEY = 'biwenger-calc-history';
+  /* Cada jornada, guardada para siempre: Biwenger deja de servir el banquillo
+     en cuanto arranca la siguiente. */
+  const ROUNDS_KEY = 'biwenger-calc-jornadas';
   const AUTO_SYNC_MS = 5 * 60 * 1000;     // refresco automático
 
   /* ---------- Utilidades ---------- */
@@ -475,6 +478,11 @@
     round: null,           // próxima jornada y su hora de inicio
     roundOpen: false,      // lista de partidos desplegada
     picker: null,          // hueco del campo que se está cambiando
+    jornadas: { list: [], actual: null, datos: {} },   // clasificación y alineaciones por jornada
+    jornadaVista: null,    // la que se está mirando
+    jornadaAbierta: null,  // mánager desplegado dentro de esa jornada
+    jornadaEstado: '',     // 'cargando' | 'error' | ''
+    pickerJornada: false,  // menú de jornadas abierto
     xi: null,              // el once del simulador
     squads: null,          // plantillas de todos los jugadores
     expandedSquad: null,
@@ -494,7 +502,8 @@
       squad: { key: '', dir: 1 },
       spend: { key: 'total', dir: -1 },
       income: { key: 'total', dir: -1 },
-      detail: { key: 'amount', dir: -1 }   // dentro de la ficha de cada jugador
+      detail: { key: 'amount', dir: -1 },  // dentro de la ficha de cada jugador
+      rounds: { key: 'points', dir: -1 }
     }
   };
 
@@ -1774,6 +1783,266 @@
     $('lineup-count').textContent = titulares + ' de 11 titulares · ' + money(valor) + ' de valor en el campo';
   }
 
+  /* ---------- Pestaña de jornadas ----------
+     Biwenger solo enseña la alineación de una jornada mientras está en juego y
+     borra el banquillo al empezar la siguiente. Aquí se guarda cada jornada en
+     el navegador y no se pisa lo guardado con una respuesta más pobre. */
+
+  function loadJornadas() {
+    try {
+      const raw = localStorage.getItem(ROUNDS_KEY);
+      const data = raw ? JSON.parse(raw) : null;
+      if (data && data.datos) {
+        state.jornadas.datos = data.datos;
+        state.jornadas.list = data.list || [];
+      }
+    } catch (error) { /* se empieza de cero */ }
+  }
+
+  function persistJornadas() {
+    try {
+      localStorage.setItem(ROUNDS_KEY, JSON.stringify({
+        list: state.jornadas.list,
+        datos: state.jornadas.datos
+      }));
+    } catch (error) { /* sin sitio: se sigue en memoria */ }
+  }
+
+  /** Une lo que llega con lo guardado, quedándose siempre con lo más completo. */
+  function mergeJornada(payload) {
+    const id = payload.round && payload.round.id;
+    if (id == null) return null;
+
+    const previo = state.jornadas.datos[id];
+    const filas = (payload.standings || []).map(function (fila) {
+      const antes = previo && (previo.standings || []).filter(function (x) { return x.id === fila.id; })[0];
+      if (!antes) return fila;
+      return {
+        id: fila.id,
+        name: fila.name || antes.name,
+        icon: fila.icon || antes.icon,
+        position: fila.position != null ? fila.position : antes.position,
+        points: fila.points != null ? fila.points : antes.points,
+        played: fila.played != null ? fila.played : antes.played,
+        type: fila.type || antes.type,
+        // Lo importante: una respuesta vacía nunca borra la alineación guardada.
+        xi: fila.xi && fila.xi.length ? fila.xi : (antes.xi || []),
+        bench: fila.bench && fila.bench.length ? fila.bench : (antes.bench || []),
+        xiValue: fila.xiValue || antes.xiValue || 0
+      };
+    });
+
+    state.jornadas.datos[id] = {
+      round: payload.round,
+      standings: filas,
+      savedAt: new Date().toISOString()
+    };
+    if (payload.rounds && payload.rounds.length) state.jornadas.list = payload.rounds;
+    state.jornadas.actual = id;
+    persistJornadas();
+    return id;
+  }
+
+  /** Pide una jornada al Worker; 'actual' es la que esté en juego. */
+  function ensureJornada(cual, forzar) {
+    const config = loadSyncConfig();
+    if (!config.url || !config.key) return;
+
+    const guardada = cual !== 'actual' && state.jornadas.datos[cual];
+    if (guardada && !forzar) { state.jornadaVista = cual; return; }
+    if (state.jornadaEstado === 'cargando') return;
+
+    state.jornadaEstado = 'cargando';
+    renderJornadas();
+
+    fetch(config.url.replace(/\/+$/, '') + '/?key=' + encodeURIComponent(config.key) +
+      '&jornada=' + encodeURIComponent(cual), { headers: { 'accept': 'application/json' } })
+      .then(function (response) { return response.json(); })
+      .then(function (payload) {
+        if (payload.error) throw new Error(payload.error);
+        const id = mergeJornada(payload);
+        state.jornadaEstado = '';
+        if (id != null) state.jornadaVista = id;
+        renderJornadas();
+      })
+      .catch(function () {
+        state.jornadaEstado = 'error';
+        renderJornadas();
+      });
+  }
+
+  /** La jornada que se está mirando, ya sea recién traída o guardada. */
+  function jornadaActiva() {
+    const id = state.jornadaVista != null ? state.jornadaVista : state.jornadas.actual;
+    return id != null ? state.jornadas.datos[id] : null;
+  }
+
+  const ROUND_VALUES = {
+    name: function (row) { return (row.name || '').toLowerCase(); },
+    points: function (row) { return row.points == null ? -Infinity : row.points; },
+    xiValue: function (row) { return row.xiValue || 0; }
+  };
+
+  function sortJornada(filas) {
+    const sort = state.sort.rounds;
+    const valor = ROUND_VALUES[sort.key] || ROUND_VALUES.points;
+    return filas.slice().sort(function (a, b) {
+      const x = valor(a);
+      const y = valor(b);
+      if (x === y) return (a.name || '').localeCompare(b.name || '');
+      if (typeof x === 'string') return sort.dir * x.localeCompare(y);
+      return sort.dir * (x < y ? -1 : 1);
+    });
+  }
+
+  /* Campo de solo lectura: las mismas líneas que el simulador, sin botones. */
+  function staticPitch(type, jugadores) {
+    const porLinea = { 1: [], 2: [], 3: [], 4: [] };
+    jugadores.forEach(function (jugador) {
+      const pos = jugador.position || 3;
+      (porLinea[pos] || porLinea[3]).push(jugador);
+    });
+
+    const filas = [4, 3, 2, 1].map(function (pos) {
+      const huecos = porLinea[pos].map(function (jugador) {
+        return '<div class="pitch__slot">' +
+          crestOf(jugador, 'crest--ghost') +
+          faceOf(jugador.id, 'pitch__face') +
+          '<span class="pitch__name">' + escapeHtml(jugador.name) + '</span>' +
+          (jugador.points == null ? '' :
+            '<span class="pitch__points">' + jugador.points + '</span>') +
+        '</div>';
+      }).join('');
+      return '<div class="pitch__line">' + huecos + '</div>';
+    }).join('');
+
+    return '<div class="pitch pitch--static">' +
+      '<span class="pitch__area pitch__area--top" aria-hidden="true"></span>' +
+      '<span class="pitch__area pitch__area--bottom" aria-hidden="true"></span>' +
+      filas + '</div>';
+  }
+
+  function jornadaDetalle(fila) {
+    if (!fila.xi.length && !fila.bench.length) {
+      return '<p class="muted">De esta jornada no hay alineación guardada. Se guarda sola mientras la jornada está en juego.</p>';
+    }
+
+    const banquillo = fila.bench.length === 0
+      ? '<p class="muted">Sin suplentes guardados.</p>'
+      : '<div class="bench">' + fila.bench.map(function (jugador) {
+          return '<div class="bench__player">' +
+            crestOf(jugador, 'crest--ghost') +
+            faceOf(jugador.id, 'bench__face') +
+            '<span class="bench__name">' + escapeHtml(jugador.name) + '</span>' +
+            (jugador.points == null ? '' :
+              '<span class="bench__points">' + jugador.points + ' pts</span>') +
+          '</div>';
+        }).join('') + '</div>';
+
+    return '<div class="lineup-grid">' +
+      '<div class="pitch-wrap">' + staticPitch(fila.type, fila.xi) + '</div>' +
+      '<div class="lineup-bench"><h3 class="bench__title">Suplentes</h3>' + banquillo + '</div>' +
+    '</div>';
+  }
+
+  function renderJornadas() {
+    const cuerpo = $('rounds-body');
+    const boton = $('jornada-pick');
+    const jornada = jornadaActiva();
+
+    boton.textContent = jornada && jornada.round
+      ? (jornada.round.name || ('Jornada ' + jornada.round.number))
+      : '—';
+
+    if (state.jornadaEstado === 'cargando' && !jornada) {
+      cuerpo.innerHTML = '<tr><td colspan="4" class="muted">Cargando la jornada…</td></tr>';
+      return;
+    }
+    if (!jornada) {
+      cuerpo.innerHTML = '<tr><td colspan="4" class="muted">' +
+        (state.jornadaEstado === 'error'
+          ? 'No se ha podido traer la jornada.'
+          : 'Sincroniza para traer la jornada.') + '</td></tr>';
+      return;
+    }
+
+    const filas = sortJornada(jornada.standings || []);
+    if (filas.length === 0) {
+      cuerpo.innerHTML = '<tr><td colspan="4" class="muted">Esta jornada todavía no tiene clasificación.</td></tr>';
+      return;
+    }
+
+    cuerpo.innerHTML = filas.map(function (fila, indice) {
+      const abierta = state.jornadaAbierta === fila.id;
+      const detalle = !abierta ? '' :
+        '<tr class="detail-row"><td class="detail-cell" colspan="4"><div class="detail">' +
+          jornadaDetalle(fila) + '</div></td></tr>';
+
+      return '<tr class="' + (abierta ? 'row-open' : '') + '">' +
+        '<td class="col-rank">' + (indice + 1) + '</td>' +
+        '<td>' +
+          '<button type="button" class="row-toggle" data-jornada-manager="' + escapeHtml(fila.id) + '"' +
+            ' aria-expanded="' + (abierta ? 'true' : 'false') + '">' +
+            '<span class="row-toggle__icon" aria-hidden="true">▸</span>' +
+            '<span class="manager">' + avatar(fila.name) +
+              '<span class="manager__name">' + escapeHtml(fila.name) + '</span></span>' +
+          '</button></td>' +
+        '<td class="num" data-label="Puntos"><strong>' +
+          (fila.points == null ? '—' : fila.points) + '</strong></td>' +
+        '<td class="num" data-label="Valor del once">' +
+          (fila.xiValue ? money(fila.xiValue) : '<span class="sub">—</span>') + '</td>' +
+      '</tr>' + detalle;
+    }).join('');
+
+    updateRoundHeaders();
+  }
+
+  function updateRoundHeaders() {
+    const sort = state.sort.rounds;
+    Array.prototype.forEach.call(document.querySelectorAll('[data-round-sort]'), function (th) {
+      const key = th.getAttribute('data-round-sort');
+      th.setAttribute('aria-sort', key !== sort.key ? 'none' : (sort.dir === 1 ? 'ascending' : 'descending'));
+    });
+  }
+
+  /** Menú de jornadas, con el mismo formato que el del campo. */
+  function renderJornadaPicker() {
+    const caja = $('jornada-picker');
+    if (!state.pickerJornada) { caja.hidden = true; caja.innerHTML = ''; return; }
+
+    const lista = state.jornadas.list.length
+      ? state.jornadas.list
+      : Object.keys(state.jornadas.datos).map(function (id) {
+          return state.jornadas.datos[id].round;
+        });
+
+    const vista = jornadaActiva();
+    const actual = vista && vista.round ? vista.round.id : null;
+
+    const cartas = lista.map(function (round) {
+      const guardada = !!state.jornadas.datos[round.id];
+      const jugada = guardada && (state.jornadas.datos[round.id].standings || [])
+        .some(function (fila) { return (fila.xi || []).length; });
+      return '<button type="button" class="picker__player jornada-card' +
+        (String(round.id) === String(actual) ? ' is-current' : '') + '"' +
+        ' data-jornada="' + escapeHtml(String(round.id)) + '">' +
+        '<span class="jornada-card__num">J' + (round.number || '?') + '</span>' +
+        '<span class="picker__meta">' + (jugada ? 'guardada' : (round.status === 'pending' ? 'pendiente' : '—')) + '</span>' +
+      '</button>';
+    }).join('');
+
+    caja.hidden = false;
+    caja.innerHTML =
+      '<div class="picker__backdrop" data-picker-close></div>' +
+      '<div class="picker__card" role="dialog" aria-modal="true" aria-label="Elegir jornada">' +
+        '<div class="picker__head"><strong>Jornada</strong>' +
+          '<button type="button" class="btn btn--ghost btn--sm" data-picker-close>Cerrar</button>' +
+        '</div>' +
+        (cartas ? '<div class="picker__grid picker__grid--rounds">' + cartas + '</div>'
+                : '<p class="muted">Todavía no hay jornadas: sincroniza primero.</p>') +
+      '</div>';
+  }
+
   /* ---------- Pestaña de jugadores ---------- */
 
   /** Récords de un jugador: sus operaciones extremas. */
@@ -2063,6 +2332,7 @@
     });
     if (name === 'managers') { renderManagers(); renderSquads(); }
     if (name === 'datos') { renderDataKpis(); renderKpiCharts(); renderSpending(); }
+    if (name === 'jornadas') { ensureJornada(state.jornadaVista || 'actual'); renderJornadas(); }
   }
 
   function renderWarnings() {
@@ -2277,6 +2547,9 @@
     state.warnings = warnings;
     persist();
     recordSnapshot();
+    /* Mientras la jornada está viva es el único momento en que Biwenger da el
+       banquillo: se captura en cada sincronización, se mire o no la pestaña. */
+    ensureJornada('actual', true);
     render();
 
     return { movements: movements.length, teams: Object.keys(teams).length };
@@ -2552,10 +2825,49 @@
     });
 
     document.addEventListener('keydown', function (event) {
-      if (event.key === 'Escape' && state.picker) {
-        state.picker = null;
-        renderPicker();
+      if (event.key !== 'Escape') return;
+      if (state.picker) { state.picker = null; renderPicker(); }
+      if (state.pickerJornada) { state.pickerJornada = false; renderJornadaPicker(); }
+    });
+
+    $('jornada-pick').addEventListener('click', function () {
+      state.pickerJornada = true;
+      renderJornadaPicker();
+    });
+
+    $('jornada-picker').addEventListener('click', function (event) {
+      if (event.target.closest('[data-picker-close]')) {
+        state.pickerJornada = false;
+        renderJornadaPicker();
+        return;
       }
+      const carta = event.target.closest('[data-jornada]');
+      if (!carta) return;
+      state.pickerJornada = false;
+      state.jornadaAbierta = null;
+      const id = carta.getAttribute('data-jornada');
+      state.jornadaVista = state.jornadas.datos[id] ? id : null;
+      renderJornadaPicker();
+      ensureJornada(id);
+      renderJornadas();
+    });
+
+    $('rounds-body').addEventListener('click', function (event) {
+      const fila = event.target.closest('[data-jornada-manager]');
+      if (!fila) return;
+      const id = fila.getAttribute('data-jornada-manager');
+      state.jornadaAbierta = state.jornadaAbierta === id ? null : id;
+      renderJornadas();
+    });
+
+    document.querySelector('.table--rounds thead').addEventListener('click', function (event) {
+      const th = event.target.closest('[data-round-sort]');
+      if (!th) return;
+      const key = th.getAttribute('data-round-sort');
+      const sort = state.sort.rounds;
+      if (sort.key === key) sort.dir = -sort.dir;
+      else { sort.key = key; sort.dir = key === 'name' ? 1 : -1; }
+      renderJornadas();
     });
 
     $('squads-body').addEventListener('click', function (event) {
@@ -2688,6 +3000,7 @@
     renderLastSync(state.lastSync);
 
     const hadData = loadStored();
+    loadJornadas();
     render();
 
     let saved = null;

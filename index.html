@@ -16,7 +16,7 @@
 <title>Calculadora Biwenger — Presupuestos de la liga</title>
 <!-- El ?v= se sube en cada publicación: obliga al navegador a bajar el archivo
      nuevo en vez de reutilizar el que tenga en caché. -->
-<link rel="stylesheet" href="styles.css?v=22">
+<link rel="stylesheet" href="styles.css?v=23">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>💰</text></svg>">
 </head>
 <body>
@@ -35,6 +35,7 @@
       <button class="tab" type="button" role="tab" data-tab="managers" aria-selected="false">Liga</button>
       <button class="tab" type="button" role="tab" data-tab="fichajes" aria-selected="false">Fichajes</button>
       <button class="tab" type="button" role="tab" data-tab="datos" aria-selected="false">Datos</button>
+      <button class="tab" type="button" role="tab" data-tab="jornadas" aria-selected="false">Jornadas</button>
     </nav>
 
     <div class="topbar__actions">
@@ -377,8 +378,42 @@
     </div>
   </div><!-- /panel-datos -->
 
+  <!-- ============================================================
+       PESTAÑA · JORNADAS
+       ============================================================ -->
+  <div id="panel-jornadas" data-panel="jornadas" hidden>
+    <section class="panel jornadas-wrap">
+      <div class="panel__head panel__head--row">
+        <div>
+          <h2>Jornadas</h2>
+          <p class="muted" id="jornada-note">Cada jornada se guarda aquí para siempre: Biwenger borra los suplentes en cuanto empieza la siguiente.</p>
+        </div>
+        <span class="field-label">Jornada
+          <button type="button" id="jornada-pick" class="field field--pick" aria-haspopup="dialog">—</button>
+        </span>
+      </div>
+
+      <div class="table-scroll">
+        <table class="table table--rounds">
+          <thead>
+            <tr>
+              <th class="col-rank">#</th>
+              <th class="sortable" data-round-sort="name" tabindex="0" aria-sort="none">Jugador</th>
+              <th class="num sortable" data-round-sort="points" tabindex="0" aria-sort="none">Puntos</th>
+              <th class="num sortable" data-round-sort="xiValue" tabindex="0" aria-sort="none" title="Valor de mercado del once">Valor del once</th>
+            </tr>
+          </thead>
+          <tbody id="rounds-body"></tbody>
+        </table>
+      </div>
+
+      <!-- Selector de jornada, con el mismo formato que el del campo. -->
+      <div id="jornada-picker" class="picker picker--panel" hidden></div>
+    </section>
+  </div><!-- /panel-jornadas -->
+
 </main>
 
-<script src="app.js?v=22"></script>
+<script src="app.js?v=23"></script>
 </body>
 </html>

@@ -376,9 +376,11 @@ code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft)
   align-items: start;
 }
 .lineup-bench .bench__title { margin-top: 0; }
-/* Con menos de 720 px no caben las dos cosas al lado: el banquillo baja. */
+/* Con menos de 720 px no caben las dos cosas al lado: el banquillo baja.
+   `minmax(0, 1fr)` y no `1fr`: sin el mínimo en cero la columna se queda con el
+   ancho del contenido y desborda la tabla en pantallas estrechas. */
 @media (max-width: 720px) {
-  .lineup-grid { grid-template-columns: 1fr; }
+  .lineup-grid { grid-template-columns: minmax(0, 1fr); }
 }
 
 /* Los suplentes se leen igual que el campo: cara redonda y nombre debajo. */
@@ -937,3 +939,23 @@ code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft)
 .table--listings td[data-label="Ofertas"] { white-space: normal; }
 .table--listings .bid { flex-wrap: wrap; row-gap: .1rem; margin-right: .35rem; }
 .table--offers td[data-label="Operación"] { white-space: normal; }
+
+/* ---------- Jornadas ---------- */
+.jornadas-wrap { position: relative; }
+/* El menú de jornadas se dibuja sobre su propio panel. */
+.picker--panel { position: absolute; }
+.picker__grid--rounds { grid-template-columns: repeat(auto-fill, minmax(74px, 1fr)); }
+.jornada-card__num { font-size: 1rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+.jornada-card { padding: .5rem .3rem; }
+
+/* Puntos de cada jugador en la alineación guardada. */
+.pitch__points {
+  position: absolute; top: -2px; right: 4px; z-index: 2;
+  min-width: 20px; padding: 0 4px;
+  font-size: .7rem; font-weight: 700; text-align: center;
+  color: #fff; background: rgba(0, 0, 0, .7);
+  border-radius: 100px;
+}
+.bench__points { font-size: .7rem; color: var(--text-faint); }
+/* Sin selector: el campo guardado no se toca. */
+.pitch--static .pitch__slot { cursor: default; }
