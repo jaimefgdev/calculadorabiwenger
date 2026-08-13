@@ -172,18 +172,22 @@ code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft)
 .bid { display: inline-flex; align-items: center; gap: .4rem; margin-right: .6rem; }
 .bid--on strong { color: var(--accent); }
 
-/* ---------- Tarjetas de mánager ---------- */
-.managers-grid { display: grid; gap: 1.25rem; }
-.manager-card { margin-bottom: 0; }
-.manager-card__head {
-  font: inherit; color: inherit; background: none; border: 0; padding: 0;
-  width: 100%; cursor: pointer;
-  display: flex; align-items: center; gap: .75rem;
-  margin-bottom: .9rem;
+/* ---------- Ficha de mánager ---------- */
+.row-open { background: var(--accent-soft) !important; }
+.detail--manager { border-left-color: var(--accent); }
+.bid-amount { color: #a87400; }
+@media (prefers-color-scheme: dark) {
+  .bid-amount { color: #ffc233; }
 }
-.manager-card__head .manager__name { font-size: 1rem; font-weight: 650; }
-.manager-card__balance { margin-left: auto; font-weight: 650; font-variant-numeric: tabular-nums; }
-.manager-card__head[aria-expanded="true"] .row-toggle__icon { transform: rotate(90deg); color: var(--accent); }
+
+/* Foto del futbolista junto a su nombre. */
+.player { display: inline-flex; align-items: center; gap: .45rem; min-width: 0; }
+.pic-player {
+  width: 24px; height: 24px; flex: none;
+  border-radius: 50%;
+  background: var(--bg-surface) center / cover no-repeat;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, .18);
+}
 
 /* Las ocho cifras van siempre en una sola fila: columnas fijas y tipografía
    que se encoge con el ancho, en vez de dejar caer la última abajo. */
@@ -545,6 +549,12 @@ code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft)
   color: var(--accent);
   font-weight: 700;
   cursor: help;
+}
+
+/* Ámbar: no es una oferta real, es el valor de mercado del jugador. */
+.money-market { color: #a87400; }
+@media (prefers-color-scheme: dark) {
+  .money-market { color: #ffc233; }
 }
 
 .money-pos { color: var(--pos); }

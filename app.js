@@ -347,6 +347,7 @@
         sells: 0,
         teamValue: teams[name] ? teams[name].value : null,
         players: teams[name] ? teams[name].players : null,
+        points: teams[name] && teams[name].points != null ? teams[name].points : null,
         // Saldo tal cual lo da Biwenger; incluye cesiones, bonus y cláusulas.
         officialBalance: teams[name] && teams[name].balance != null ? teams[name].balance : null
       };
@@ -392,6 +393,14 @@
       players:   function (row) { return row.players; },
       maxBid:    function (row) { return row.maxBid; }
     },
+    managers: {
+      name:      function (row) { return row.name; },
+      points:    function (row) { return row.points; },
+      teamValue: function (row) { return row.teamValue; },
+      players:   function (row) { return row.players; },
+      balance:   function (row) { return row.balance; },
+      maxBid:    function (row) { return row.maxBid; }
+    },
     moves: {
       player:  function (m) { return m.player; },
       type:    function (m) { return m.type === 'buy' ? 'Fichado' : 'Vendido'; },
@@ -411,7 +420,7 @@
   const TEXT_COLUMNS = { name: true, player: true, type: true, manager: true };
   const defaultDir = (key) => (TEXT_COLUMNS[key] ? 1 : -1);
 
-  const SORT_TABLES = { budget: '.table--budget', moves: '.table--moves' };
+  const SORT_TABLES = { budget: '.table--budget', moves: '.table--moves', managers: '.table--managers' };
 
   /** Copia ordenada de `rows`. Empates y nulos conservan el orden de origen. */
   function sortRows(rows, table, sort) {
@@ -473,6 +482,7 @@
     sort: {
       budget: { key: '', dir: -1 },
       moves:  { key: '', dir: -1 },
+      managers: { key: '', dir: -1 },
       detail: { key: 'amount', dir: -1 }   // dentro de la ficha de cada mánager
     }
   };
@@ -530,6 +540,17 @@
     const index = MANAGERS.indexOf(name);
     const color = AVATAR_COLORS[(index === -1 ? name.length : index) % AVATAR_COLORS.length];
     return '<span class="avatar" style="background:' + color + '" aria-hidden="true">' + initials + photo + '</span>';
+  }
+
+  /** Nombre del futbolista con su foto del CDN de Biwenger. */
+  function playerName(movement) {
+    const id = movement.playerId;
+    const pic = id
+      ? '<span class="pic-player" style="background-image:url(\'https://cdn.biwenger.com/i/p/' +
+        encodeURIComponent(id) + '.png\')" aria-hidden="true"></span>'
+      : '';
+    return '<span class="player">' + pic + '<span class="player-name">' +
+      escapeHtml(movement.player) + '</span></span>';
   }
 
   function escapeHtml(value) {
@@ -953,7 +974,7 @@
           const buy = movement.type === 'buy';
           return '<tr>' +
             '<td class="detail-rank">' + (index + 1) + '</td>' +
-            '<td class="player-name">' + escapeHtml(movement.player) + '</td>' +
+            '<td>' + playerName(movement) + '</td>' +
             '<td><span class="tag ' + (buy ? 'tag--buy' : 'tag--sell') + '">' +
               (buy ? '↓ Fichado' : '↑ Vendido') + '</span></td>' +
             '<td class="num">' + (buy
@@ -1059,7 +1080,7 @@
         : '<span class="unknown">Sin identificar</span>';
       return '<tr>' +
         '<td class="col-rank">' + (index + 1) + '</td>' +
-        '<td data-label="Jugador"><span class="player-name">' + escapeHtml(movement.player) + '</span></td>' +
+        '<td data-label="Jugador">' + playerName(movement) + '</td>' +
         '<td data-label="Acción"><span class="tag ' + (buy ? 'tag--buy' : 'tag--sell') + '">' +
           (buy ? '↓ Fichado' : '↑ Vendido') + '</span></td>' +
         '<td data-label="Mánager">' + managerCell + '</td>' +
@@ -1101,7 +1122,7 @@
 
     let delta = 0;
     let count = 0;
-    state.offers.forEach(function (offer) {
+    state.offers.concat(marketSales()).forEach(function (offer) {
       if (!state.sim[offer.id]) return;
       count += 1;
       delta += offer.direction === 'out' ? -offer.amount : offer.amount;
@@ -1138,7 +1159,7 @@
       const out = offer.direction === 'out';
       const on = !!state.sim[offer.id];
       return '<tr class="' + (on ? 'row-sim' : '') + '">' +
-        '<td data-label="Jugador"><span class="player-name">' + escapeHtml(offer.player) + '</span></td>' +
+        '<td data-label="Jugador">' + playerName(offer) + '</td>' +
         '<td data-label="Tipo"><span class="tag ' + (out ? 'tag--buy' : 'tag--sell') + '">' +
           (out ? '↗ Puja enviada' : '↘ Oferta recibida') + '</span></td>' +
         '<td data-label="Con">' + escapeHtml(offer.other || 'Mercado') + '</td>' +
@@ -1184,6 +1205,24 @@
       (sim.balance < 0 ? ' — te quedarías en números rojos.' : '');
   }
 
+  /* Valor de mercado del jugador; si Biwenger no lo diera, se cae al precio
+     que pediste por él. */
+  const listingValue = (item) => (item.marketValue != null ? item.marketValue : item.price);
+  const marketSaleId = (item) => 'mkt:' + (item.playerId || item.player);
+
+  /** Venta al valor de mercado de los que no tienen oferta, para simularla. */
+  function marketSales() {
+    return state.listings
+      .filter(function (item) {
+        return !state.offers.some(function (offer) {
+          return offer.direction === 'in' && offer.playerId && offer.playerId === item.playerId;
+        });
+      })
+      .map(function (item) {
+        return { id: marketSaleId(item), amount: listingValue(item), direction: 'in' };
+      });
+  }
+
   /** Jugadores propios puestos a la venta. */
   function renderListings() {
     const section = $('listings-panel');
@@ -1193,31 +1232,44 @@
     section.hidden = false;
 
     $('listings-body').innerHTML = list.map(function (item) {
+      const market = listingValue(item);
+
       // Ofertas recibidas por ese jugador, para poder aceptarlas en la simulación.
       const bids = state.offers.filter(function (offer) {
         return offer.direction === 'in' && offer.playerId && offer.playerId === item.playerId;
       });
 
+      /* Sin ofertas se ofrece simular la venta al valor de mercado, en ámbar
+         para distinguirla de una oferta real. */
       const offerCell = bids.length === 0
-        ? '<span class="unknown">Sin ofertas</span>'
+        ? (function () {
+            const id = marketSaleId(item);
+            const on = !!state.sim[id];
+            return '<span class="bid' + (on ? ' bid--on' : '') + '">' +
+              '<strong class="money-market">' + money(market) + '</strong> ' +
+              '<span class="sub">valor de mercado</span> ' + simToggle(id, on) + '</span>';
+          })()
         : bids.map(function (offer) {
             const on = !!state.sim[offer.id];
+            // Verde si mejora el valor de mercado, rojo si lo empeora.
+            const tone = offer.amount > market ? 'money-pos' : (offer.amount < market ? 'money-neg' : '');
             return '<span class="bid' + (on ? ' bid--on' : '') + '">' +
-              '<strong>' + money(offer.amount) + '</strong> ' +
+              '<strong class="' + tone + '">' + money(offer.amount) + '</strong> ' +
               '<span class="sub">' + escapeHtml(offer.other || 'Mercado') + '</span> ' +
               simToggle(offer.id, on) + '</span>';
           }).join('');
 
       return '<tr>' +
-        '<td data-label="Jugador"><span class="player-name">' + escapeHtml(item.player) + '</span></td>' +
-        '<td class="num" data-label="Precio"><strong>' + money(item.price) + '</strong></td>' +
+        '<td data-label="Jugador">' + playerName(item) + '</td>' +
+        '<td class="num" data-label="Valor de mercado"><strong>' + money(market) + '</strong></td>' +
+        '<td class="num" data-label="Precio pedido"><span class="sub">' + money(item.price) + '</span></td>' +
         '<td data-label="Ofertas">' + offerCell + '</td>' +
       '</tr>';
     }).join('');
 
-    const total = list.reduce(function (sum, item) { return sum + item.price; }, 0);
-    $('listings-count').textContent = list.length + (list.length === 1 ? ' jugador' : ' jugadores') +
-      ' · ' + money(total) + ' si se vendieran al precio pedido';
+    const total = list.reduce(function (sum, item) { return sum + listingValue(item); }, 0);
+    $('listings-count').textContent = list.length + (list.length === 1 ? ' jugador en venta' : ' jugadores en venta') +
+      ' · ' + money(total) + ' de valor de mercado';
   }
 
   /* ---------- Pestaña de mánagers ---------- */
@@ -1250,22 +1302,51 @@
       '<strong class="record__amount">' + money(movement.amount) + '</strong></div>';
   }
 
+  const MANAGER_COLUMNS = 7;
+
+  /** Clasificación: por puntos y, a igualdad, por valor de equipo. */
+  function managerRows() {
+    const sort = state.sort.managers;
+    const rows = computeBudgets(state.movements, state.teams);
+    if (sort.key) return sortRows(rows, 'managers', sort);
+    return rows.slice().sort(function (a, b) {
+      const points = (b.points || 0) - (a.points || 0);
+      return points || (b.teamValue || 0) - (a.teamValue || 0);
+    });
+  }
+
   function renderManagers() {
-    const rows = budgetRows();
+    updateSortHeaders('managers', state.sort.managers);
 
-    $('managers-grid').innerHTML = rows.map(function (row) {
-      const stats = managerRecords(row.name);
+    $('managers-body').innerHTML = managerRows().map(function (row, index) {
       const open = state.expandedManager === row.name;
+      return '<tr class="' + (open ? 'row-open' : '') + '">' +
+        '<td class="col-rank">' + (index + 1) + '</td>' +
+        '<td data-label="Mánager">' +
+          '<button type="button" class="row-toggle" data-manager-card="' + escapeHtml(row.name) + '"' +
+            ' aria-expanded="' + (open ? 'true' : 'false') + '">' +
+            '<span class="row-toggle__icon" aria-hidden="true">▸</span>' +
+            '<span class="manager">' + avatar(row.name) +
+              '<span class="manager__name">' + escapeHtml(row.name) + '</span></span>' +
+          '</button></td>' +
+        '<td class="num" data-label="Puntos"><strong>' + (row.points == null ? '—' : row.points) + '</strong></td>' +
+        '<td class="num" data-label="Valor equipo">' +
+          (row.teamValue == null ? '<span class="unknown">—</span>' : money(row.teamValue)) + '</td>' +
+        '<td class="num" data-label="Jug.">' + (row.players == null ? '—' : row.players) + '</td>' +
+        '<td class="num" data-label="Saldo"><span class="' + (row.balance < 0 ? 'money-neg' : '') + '">' +
+          money(row.balance) + '</span></td>' +
+        '<td class="num" data-label="Puja máxima"><strong class="bid-amount">' +
+          (row.maxBid == null ? '—' : money(row.maxBid)) + '</strong></td>' +
+      '</tr>' + (open ? managerPanel(row) : '');
+    }).join('');
+  }
 
-      return '<section class="panel manager-card">' +
-        '<button type="button" class="manager-card__head" data-manager-card="' + escapeHtml(row.name) + '"' +
-          ' aria-expanded="' + (open ? 'true' : 'false') + '">' +
-          '<span class="manager">' + avatar(row.name) +
-            '<span class="manager__name">' + escapeHtml(row.name) + '</span></span>' +
-          '<span class="manager-card__balance ' + (row.balance < 0 ? 'money-neg' : '') + '">' + money(row.balance) + '</span>' +
-          '<span class="row-toggle__icon" aria-hidden="true">▸</span>' +
-        '</button>' +
+  /** Ficha completa de un mánager: cifras, récords y gráficos. */
+  function managerPanel(row) {
+    const stats = managerRecords(row.name);
 
+    return '<tr class="detail-row"><td class="detail-cell" colspan="' + MANAGER_COLUMNS + '">' +
+      '<div class="detail detail--manager">' +
         '<div class="manager-card__stats">' +
           '<div class="stat"><span class="stat__label">Fichajes</span><strong>' + row.buys + '</strong></div>' +
           '<div class="stat"><span class="stat__label">Ventas</span><strong>' + row.sells + '</strong></div>' +
@@ -1288,9 +1369,8 @@
           recordCell('Venta más barata', stats.worstSell) +
         '</div>' +
 
-        (open ? managerCharts(row.name) : '') +
-      '</section>';
-    }).join('');
+        managerCharts(row.name) +
+      '</div></td></tr>';
   }
 
   /* ---------- Pestañas ---------- */
@@ -1657,6 +1737,7 @@
         sort.dir = defaultDir(key);
       }
       if (table === 'budget') renderBudgets(budgetRows());
+      else if (table === 'managers') renderManagers();
       else renderMovements();
     }
 
@@ -1726,7 +1807,9 @@
       toggleKpi(card.getAttribute('data-kpi'));
     });
 
-    $('managers-grid').addEventListener('click', function (event) {
+    bindSorting('managers');
+
+    $('managers-body').addEventListener('click', function (event) {
       const chip = event.target.closest('[data-chart]');
       if (chip) {
         const key = chip.getAttribute('data-chart');

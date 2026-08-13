@@ -172,7 +172,8 @@
           <thead>
             <tr>
               <th>Jugador</th>
-              <th class="num">Precio pedido</th>
+              <th class="num">Valor de mercado</th>
+              <th class="num" title="El precio al que lo tienes publicado; coincide con su cláusula">Precio pedido</th>
               <th>Ofertas recibidas</th>
             </tr>
           </thead>
@@ -229,7 +230,28 @@
        PESTAÑA · MÁNAGERS
        ============================================================ -->
   <div id="panel-managers" data-panel="managers" hidden>
-    <div id="managers-grid" class="managers-grid"></div>
+    <section class="panel">
+      <div class="panel__head">
+        <h2>Clasificación</h2>
+        <p class="muted">Ordenada por puntos y, a igualdad, por valor de equipo. Pulsa un mánager para ver sus cifras y sus gráficos.</p>
+      </div>
+      <div class="table-scroll">
+        <table class="table table--managers">
+          <thead>
+            <tr>
+              <th class="col-rank">#</th>
+              <th class="sortable" data-sort="name" tabindex="0" aria-sort="none">Mánager</th>
+              <th class="num sortable" data-sort="points" tabindex="0" aria-sort="none">Puntos</th>
+              <th class="num sortable" data-sort="teamValue" tabindex="0" aria-sort="none">Valor equipo</th>
+              <th class="num sortable" data-sort="players" tabindex="0" aria-sort="none" title="Jugadores en plantilla">Jug.</th>
+              <th class="num sortable" data-sort="balance" tabindex="0" aria-sort="none">Saldo</th>
+              <th class="num sortable" data-sort="maxBid" tabindex="0" aria-sort="none">Puja máxima</th>
+            </tr>
+          </thead>
+          <tbody id="managers-body"></tbody>
+        </table>
+      </div>
+    </section>
   </div><!-- /panel-managers -->
 
   <!-- ============================================================
