@@ -408,12 +408,18 @@ code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft)
    Mismo tratamiento en el campo y en el banquillo. */
 .crest--ghost {
   position: absolute; z-index: 0; pointer-events: none;
-  top: 50%; left: 42%; width: 58%; height: 62px;
+  /* Medidas fijas y ancladas al centro de la cara, no al ancho de la ficha:
+     el hueco del campo es más estrecho que la ficha del banquillo y, en
+     porcentaje, el escudo salía más pequeño y más a la izquierda. */
+  top: 50%; left: calc(50% - 9px); width: 63px; height: 62px;
   transform: translateY(-58%);
   opacity: .6; filter: blur(.4px);
   -webkit-mask-image: linear-gradient(to right, #000 0 45%, transparent 96%);
   mask-image: linear-gradient(to right, #000 0 45%, transparent 96%);
 }
+/* La cara del campo mide 62 px y la del banquillo 56, así que el centro cae
+   2 px más arriba: se compensa para que el escudo quede exactamente igual. */
+.pitch__slot .crest--ghost { transform: translateY(calc(-58% + 2px)); }
 .pitch__slot .pic-player, .bench__player .pic-player, .pitch__name, .bench__name { position: relative; z-index: 1; }
 
 /* Las ocho cifras van siempre en una sola fila: columnas fijas y tipografía
