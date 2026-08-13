@@ -503,6 +503,15 @@
 
   const AVATAR_COLORS = ['#ff0033', '#ff7a00', '#c99700', '#00b37a', '#0091b3', '#7c5cff', '#ff3d9a', '#6b7785'];
 
+  /* Biwenger devuelve 404 en el avatar de esta cuenta —está roto en su CDN—,
+     así que se sustituye por otra imagen para no dejar el hueco. */
+  const AVATAR_OVERRIDES = [
+    { name: 'José Mário dos Santos Mourinho', url: 'https://github.com/jaimefgdev.png' }
+  ].reduce(function (map, item) {
+    map[normalize(item.name)] = item.url;
+    return map;
+  }, {});
+
   /* Colores propios de algunos mánagers; el resto tira de la paleta automática. */
   const AVATAR_STYLES = [
     { name: 'José Mário dos Santos Mourinho', bg: '#ffffff', fg: '#7c3aed' },
@@ -526,8 +535,9 @@
        Biwenger devuelve 404 en algunas cuentas— sigue viéndose el círculo de
        color, sin huecos ni imágenes rotas. */
     const team = state.teams[name];
-    const photo = team && team.icon
-      ? '<i class="avatar__pic" style="background-image:url(\'' + escapeHtml(team.icon) + '\')"></i>'
+    const icon = AVATAR_OVERRIDES[normalize(name)] || (team && team.icon);
+    const photo = icon
+      ? '<i class="avatar__pic" style="background-image:url(\'' + escapeHtml(icon) + '\')"></i>'
       : '';
 
     const custom = AVATAR_STYLES[normalize(name)];
@@ -1122,20 +1132,25 @@
 
     let delta = 0;
     let count = 0;
+    let squadDelta = 0;
     state.offers.concat(marketSales()).forEach(function (offer) {
       if (!state.sim[offer.id]) return;
       count += 1;
-      delta += offer.direction === 'out' ? -offer.amount : offer.amount;
+      // Una puja ganada suma un jugador; una venta aceptada resta uno.
+      if (offer.direction === 'out') { delta -= offer.amount; squadDelta += 1; }
+      else { delta += offer.amount; squadDelta -= 1; }
     });
 
     const teamValue = mine ? mine.teamValue : null;
+    const squad = mine && mine.players != null ? mine.players : null;
     return {
       name: name,
       base: base,
       delta: delta,
       count: count,
       balance: base + delta,
-      maxBid: teamValue == null ? null : base + delta + teamValue * TEAM_VALUE_SHARE
+      maxBid: teamValue == null ? null : base + delta + teamValue * TEAM_VALUE_SHARE,
+      squad: squad == null ? null : squad + squadDelta
     };
   }
 
@@ -1161,9 +1176,9 @@
       const on = !!state.sim[offer.id];
       return '<tr class="' + (on ? 'row-sim' : '') + '">' +
         '<td data-label="Jugador">' + playerName(offer) + '</td>' +
-        '<td data-label="Tipo"><span class="tag ' + (out ? 'tag--buy' : 'tag--sell') + '">' +
-          (out ? '↗ Puja enviada' : '↘ Oferta recibida') + '</span></td>' +
-        '<td data-label="Con">' + escapeHtml(offer.other || 'Mercado') + '</td>' +
+        '<td data-label="Operación"><span class="tag ' + (out ? 'tag--buy' : 'tag--sell') + '">' +
+          (out ? '↗ Puja' : '↘ Oferta') + '</span> ' +
+          '<span class="sub">' + escapeHtml(offer.other || 'Mercado') + '</span></td>' +
         '<td class="num" data-label="Importe"><strong class="' + (out ? 'money-neg' : 'money-pos') + '">' +
           (out ? '−' : '+') + money(offer.amount) + '</strong></td>' +
         '<td data-label="Simular">' + simToggle(offer.id, on, out ? 'out' : 'in') + '</td>' +
@@ -1171,13 +1186,11 @@
     }).join('');
 
     const outgoing = list.filter(function (offer) { return offer.direction === 'out'; });
-    const committed = outgoing.reduce(function (sum, offer) { return sum + offer.amount; }, 0);
     const incoming = list.length - outgoing.length;
 
     const parts = [];
     if (outgoing.length) {
-      parts.push(outgoing.length + (outgoing.length === 1 ? ' puja enviada' : ' pujas enviadas') +
-        ' · ' + money(committed) + ' comprometidos');
+      parts.push(outgoing.length + (outgoing.length === 1 ? ' puja enviada' : ' pujas enviadas'));
     }
     if (incoming) parts.push(incoming + (incoming === 1 ? ' oferta recibida' : ' ofertas recibidas'));
     $('offers-count').textContent = parts.join(' · ');
@@ -1185,26 +1198,18 @@
     renderSimulation();
   }
 
-  /** Resumen de cómo quedaría el dinero con lo marcado. */
+  /** Cómo quedarías si se cerrasen las operaciones marcadas: saldo y plantilla. */
   function renderSimulation() {
     const note = $('offers-note');
     const sim = simulation();
 
-    if (sim.count === 0) {
-      note.hidden = !(state.me && state.me.balance != null);
-      if (!note.hidden) {
-        note.innerHTML = 'Tu saldo es <strong>' + money(sim.base) +
-          '</strong>. Marca pujas u ofertas para simular cómo te quedaría.';
-      }
-      return;
-    }
+    if (!state.me || state.me.balance == null) { note.hidden = true; return; }
 
     note.hidden = false;
-    note.innerHTML = 'Con ' + sim.count + (sim.count === 1 ? ' operación marcada' : ' operaciones marcadas') +
-      ': saldo <strong>' + money(sim.base) + '</strong> → ' +
-      '<strong class="' + (sim.balance < 0 ? 'money-neg' : 'money-pos') + '">' + money(sim.balance) + '</strong>' +
-      (sim.maxBid == null ? '' : ' · puja máxima <strong>' + money(sim.maxBid) + '</strong>') +
-      (sim.balance < 0 ? ' — te quedarías en números rojos.' : '');
+    note.innerHTML = 'Saldo <strong class="' + (sim.balance < 0 ? 'money-neg' : '') + '">' +
+      money(sim.balance) + '</strong>' +
+      (sim.squad == null ? '' : ' · <strong>' + sim.squad +
+        (sim.squad === 1 ? ' jugador' : ' jugadores') + '</strong>');
   }
 
   /* Valor de mercado del jugador; si Biwenger no lo diera, se cae al precio
@@ -1247,18 +1252,18 @@
         ? (function () {
             const id = marketSaleId(item);
             const on = !!state.sim[id];
-            return '<span class="bid' + (on ? ' bid--on' : '') + '">' +
+            return '<span class="bid' + (on ? ' bid--on' : '') + '" title="Sin ofertas: simula venderlo a su valor de mercado">' +
               '<strong class="money-market">' + money(market) + '</strong> ' +
-              '<span class="sub">valor de mercado</span> ' + simToggle(id, on) + '</span>';
+              simToggle(id, on, 'in') + '</span>';
           })()
         : bids.map(function (offer) {
             const on = !!state.sim[offer.id];
             // Verde si mejora el valor de mercado, rojo si lo empeora.
             const tone = offer.amount > market ? 'money-pos' : (offer.amount < market ? 'money-neg' : '');
-            return '<span class="bid' + (on ? ' bid--on' : '') + '">' +
+            return '<span class="bid' + (on ? ' bid--on' : '') + '" title="Oferta de ' +
+              escapeHtml(offer.other || 'Mercado') + '">' +
               '<strong class="' + tone + '">' + money(offer.amount) + '</strong> ' +
-              '<span class="sub">' + escapeHtml(offer.other || 'Mercado') + '</span> ' +
-              simToggle(offer.id, on) + '</span>';
+              simToggle(offer.id, on, 'in') + '</span>';
           }).join('');
 
       return '<tr>' +

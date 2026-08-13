@@ -143,14 +143,14 @@ code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft)
 /* ---------- Mi mercado ---------- */
 .market-grid {
   display: grid; gap: 1.5rem;
-  grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   align-items: start;
 }
-.market-grid .panel { margin-bottom: 0; }
-/* Por debajo de esto las dos tablas no caben una al lado de otra. */
-@media (max-width: 1240px) {
+/* Apiladas solo cuando la pantalla es de verdad estrecha. */
+@media (max-width: 720px) {
   .market-grid { grid-template-columns: 1fr; }
 }
+.market-grid .panel { margin-bottom: 0; }
 
 .switch {
   width: 34px; height: 19px;
@@ -169,8 +169,12 @@ code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft)
   background: var(--text-faint);
   transition: transform .15s, background .15s;
 }
-.switch[aria-pressed="true"] { background: var(--accent-soft); border-color: var(--accent); }
-.switch[aria-pressed="true"] span { transform: translateX(15px); background: var(--accent); }
+.switch[aria-pressed="true"] span { transform: translateX(15px); }
+/* Verde para lo que entra (ventas y ofertas), rojo para lo que sale (pujas). */
+.switch--in[aria-pressed="true"] { background: var(--pos-soft); border-color: var(--pos); }
+.switch--in[aria-pressed="true"] span { background: var(--pos); }
+.switch--out[aria-pressed="true"] { background: var(--neg-soft); border-color: var(--neg); }
+.switch--out[aria-pressed="true"] span { background: var(--neg); }
 .switch:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
 .row-sim { background: var(--accent-soft) !important; }
@@ -597,6 +601,13 @@ code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft)
   .table thead th { font-size: .62rem; letter-spacing: .01em; }
   .avatar { width: 22px; height: 22px; font-size: .62rem; }
   .manager { gap: .4rem; min-width: 0; }
+  /* En las tablas de mi mercado cada píxel cuenta: van de dos en dos. */
+  .market-grid .table { font-size: .7rem; }
+  .market-grid .table th, .market-grid .table td { padding: .4rem .25rem; }
+  .market-grid .pic-player { width: 20px; height: 20px; }
+  .market-grid .switch { width: 30px; height: 17px; }
+  .market-grid .switch span { width: 11px; }
+  .market-grid .switch[aria-pressed="true"] span { transform: translateX(13px); }
   .manager__name {
     max-width: 128px;
     overflow: hidden;
