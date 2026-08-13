@@ -453,6 +453,8 @@
     warnings: [],
     filters: { text: '', manager: '', type: '' },
     expanded: {},          // mánagers con la ficha de jugadores desplegada
+    offers: [],            // pujas enviadas y ofertas recibidas, pendientes
+    me: null,              // saldo y puja máxima oficiales del usuario
     syncing: false,
     lastSync: null,
     // key vacía = orden por defecto de cada tabla (ver más abajo).
@@ -483,7 +485,8 @@
   const AVATAR_STYLES = [
     { name: 'José Mário dos Santos Mourinho', bg: '#ffffff', fg: '#7c3aed' },
     { name: 'Atlético Jordaan FC',            bg: '#d80030', fg: '#ffffff' },
-    { name: 'Izaskun V',                      bg: '#ffffff', fg: '#8e0020' }
+    { name: 'Izaskun V',                      bg: '#8e0020', fg: '#ffffff' },
+    { name: 'Eneko',                          bg: '#1e6bff', fg: '#ffffff' }
   ].reduce(function (map, item) {
     map[normalize(item.name)] = item;
     return map;
@@ -497,16 +500,24 @@
       .slice(0, 2)
       .map(function (word) { return word[0].toUpperCase(); })
       .join('');
+    /* La foto se pinta encima de las iniciales: si la URL falla —la del CDN de
+       Biwenger devuelve 404 en algunas cuentas— sigue viéndose el círculo de
+       color, sin huecos ni imágenes rotas. */
+    const team = state.teams[name];
+    const photo = team && team.icon
+      ? '<i class="avatar__pic" style="background-image:url(\'' + escapeHtml(team.icon) + '\')"></i>'
+      : '';
+
     const custom = AVATAR_STYLES[normalize(name)];
     if (custom) {
       // El aro sutil evita que los fondos claros desaparezcan en modo claro.
       return '<span class="avatar avatar--ring" style="background:' + custom.bg + ';color:' + custom.fg +
-        '" aria-hidden="true">' + initials + '</span>';
+        '" aria-hidden="true">' + initials + photo + '</span>';
     }
 
     const index = MANAGERS.indexOf(name);
     const color = AVATAR_COLORS[(index === -1 ? name.length : index) % AVATAR_COLORS.length];
-    return '<span class="avatar" style="background:' + color + '" aria-hidden="true">' + initials + '</span>';
+    return '<span class="avatar" style="background:' + color + '" aria-hidden="true">' + initials + photo + '</span>';
   }
 
   function escapeHtml(value) {
@@ -721,6 +732,52 @@
           : list.length + ' de ' + state.movements.length + ' movimientos');
   }
 
+  /** Pujas enviadas y ofertas recibidas que siguen sin resolverse. */
+  function renderOffers() {
+    const section = $('offers-panel');
+    const list = state.offers;
+
+    if (!list || list.length === 0) {
+      section.hidden = true;
+      return;
+    }
+    section.hidden = false;
+
+    $('offers-body').innerHTML = list.map(function (offer) {
+      const out = offer.direction === 'out';
+      return '<tr>' +
+        '<td data-label="Jugador"><span class="player-name">' + escapeHtml(offer.player) + '</span></td>' +
+        '<td data-label="Tipo"><span class="tag ' + (out ? 'tag--buy' : 'tag--sell') + '">' +
+          (out ? '↗ Puja enviada' : '↘ Oferta recibida') + '</span></td>' +
+        '<td data-label="Con">' + escapeHtml(offer.other || 'Mercado') + '</td>' +
+        '<td class="num" data-label="Importe"><strong>' + money(offer.amount) + '</strong></td>' +
+      '</tr>';
+    }).join('');
+
+    const outgoing = list.filter(function (offer) { return offer.direction === 'out'; });
+    const committed = outgoing.reduce(function (sum, offer) { return sum + offer.amount; }, 0);
+    const incoming = list.length - outgoing.length;
+
+    const parts = [];
+    if (outgoing.length) {
+      parts.push(outgoing.length + (outgoing.length === 1 ? ' puja enviada' : ' pujas enviadas') +
+        ' · ' + money(committed) + ' comprometidos');
+    }
+    if (incoming) parts.push(incoming + (incoming === 1 ? ' oferta recibida' : ' ofertas recibidas'));
+    $('offers-count').textContent = parts.join(' · ');
+
+    const note = $('offers-note');
+    if (state.me && state.me.balance != null) {
+      note.textContent = 'Tu saldo en Biwenger es ' + money(state.me.balance) +
+        (committed > state.me.balance
+          ? '; las pujas enviadas superan ese saldo, así que no podrán resolverse todas.'
+          : '.');
+      note.hidden = false;
+    } else {
+      note.hidden = true;
+    }
+  }
+
   function renderWarnings() {
     const box = $('warnings');
     if (state.warnings.length === 0) {
@@ -749,6 +806,7 @@
     renderKpis(rows);
     renderBudgets(rows);
     renderMovements();
+    renderOffers();
     renderWarnings();
   }
 
@@ -896,7 +954,8 @@
         value: item.teamValue != null ? item.teamValue : null,
         players: item.teamSize != null ? item.teamSize : null,
         points: item.points != null ? item.points : null,
-        balance: item.balance != null ? item.balance : null
+        balance: item.balance != null ? item.balance : null,
+        icon: item.icon || null
       };
     });
 
@@ -911,6 +970,8 @@
 
     state.movements = movements;
     state.teams = teams;
+    state.offers = Array.isArray(payload.offers) ? payload.offers : [];
+    state.me = payload.me || null;
     state.warnings = warnings;
     persist();
     render();

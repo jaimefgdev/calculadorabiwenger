@@ -3,6 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<!-- Sin esto, Google devuelve 403 en los avatares al ver un referer ajeno. -->
+<meta name="referrer" content="no-referrer">
 <script>
   /* En móvil la vista de escritorio se lee mucho mejor que las tablas
      apiladas: se fuerza un ancho de 1024 px y el navegador la escala para
@@ -177,6 +179,31 @@
     </div>
 
     <p id="moves-empty" class="empty">Aún no hay movimientos: pega el HTML del tablón arriba.</p>
+  </section>
+
+  <!-- ============ PUJAS Y OFERTAS PENDIENTES ============ -->
+  <section id="offers-panel" class="panel" hidden>
+    <div class="panel__head">
+      <h2>Pujas y ofertas activas</h2>
+      <p class="muted" id="offers-count">&nbsp;</p>
+    </div>
+
+    <div class="table-scroll">
+      <table class="table table--offers">
+        <thead>
+          <tr>
+            <th>Jugador</th>
+            <th>Tipo</th>
+            <th>Con</th>
+            <th class="num">Importe</th>
+          </tr>
+        </thead>
+        <tbody id="offers-body"></tbody>
+      </table>
+    </div>
+
+    <p id="offers-note" class="hint" hidden></p>
+    <p class="hint">Biwenger solo publica las pujas en las que participas tú. Las de los demás mánagers son secretas hasta que el mercado se resuelve, así que no hay forma de traerlas.</p>
   </section>
 
 </main>

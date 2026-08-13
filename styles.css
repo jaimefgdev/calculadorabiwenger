@@ -355,7 +355,17 @@ code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft)
   border-radius: 50%;
   font-size: .72rem; font-weight: 700; color: #fff;
 }
+.avatar { position: relative; overflow: hidden; }
 .avatar--ring { box-shadow: inset 0 0 0 1px rgba(0, 0, 0, .18); }
+/* Foto sobre las iniciales; si la imagen no carga, no pinta nada y se ven ellas. */
+.avatar__pic {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background-size: cover;
+  background-position: center;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, .18);
+}
 .manager__name { font-weight: 560; }
 
 /* Marca cuando el saldo calculado no cuadra con el que publica Biwenger. */
