@@ -21,6 +21,11 @@
   font-display: swap;
 }
 
+/* El `display` del navegador para [hidden] lo pisa cualquier clase propia que
+   traiga su propio display (grid, flex…). Sin esto, un panel "oculto" sigue
+   ocupando sitio y, si va en position:fixed, se traga todos los clics. */
+[hidden] { display: none !important; }
+
 /* Paleta heredada de styles1.css: negro casi puro + acento rojo #ff0033.
    El tema oscuro es el de partida; el claro llega por prefers-color-scheme. */
 :root {
