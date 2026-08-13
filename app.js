@@ -1163,7 +1163,8 @@
         : '<span class="unknown">Sin identificar</span>';
       return '<tr>' +
         '<td class="col-rank">' + (index + 1) + '</td>' +
-        '<td data-label="Futbolista">' + playerName(movement) + '</td>' +
+        '<td data-label="Futbolista"><span class="with-crest">' + playerName(movement) +
+          crestOf(movement, 'crest--badge') + '</span></td>' +
         '<td data-label="Acción"><span class="tag ' + (buy ? 'tag--buy' : 'tag--sell') + '">' +
           (buy ? '↓ Fichado' : '↑ Vendido') + '</span></td>' +
         '<td data-label="Futbolista">' + managerCell + '</td>' +
@@ -2129,7 +2130,9 @@
         amount: Math.round(item.amount || 0),
         date: isNaN(time) ? '' : dateFormat.format(new Date(time)),
         timestamp: isNaN(time) ? null : time,
-        source: item.source || ''
+        source: item.source || '',
+        team: item.team != null ? item.team : null,
+        teamName: item.teamName || null
       };
     });
 

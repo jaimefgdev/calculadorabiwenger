@@ -294,7 +294,7 @@ code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft)
    de peso, ganaría por ir después. */
 .pic-player.pitch__face {
   width: min(92%, 62px); height: auto; aspect-ratio: 1;
-  box-shadow: inset 0 0 0 2px rgba(255,255,255,.55); background-color: rgba(0,0,0,.35);
+  box-shadow: none; background-color: rgba(0,0,0,.35);
 }
 .pic-player.pitch__face--empty { border: 2px dashed rgba(255, 255, 255, .45); box-shadow: none; }
 .pitch__name {
@@ -404,14 +404,15 @@ code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft)
 /* Junto al nombre, en las plantillas. */
 .crest--badge { width: 16px; height: 16px; flex: none; opacity: .9; }
 .with-crest { display: inline-flex; align-items: center; gap: .4rem; min-width: 0; }
-/* Marca de agua: detrás del jugador, asomando por la derecha y desvaneciéndose. */
+/* Marca de agua: detrás del jugador, asomando por la derecha y desvaneciéndose.
+   Mismo tratamiento en el campo y en el banquillo. */
 .crest--ghost {
   position: absolute; z-index: 0; pointer-events: none;
   top: 50%; left: 42%; width: 58%; height: 62px;
   transform: translateY(-58%);
-  opacity: .28; filter: blur(1px);
-  -webkit-mask-image: linear-gradient(to right, #000 0 25%, transparent 92%);
-  mask-image: linear-gradient(to right, #000 0 25%, transparent 92%);
+  opacity: .6; filter: blur(.4px);
+  -webkit-mask-image: linear-gradient(to right, #000 0 45%, transparent 96%);
+  mask-image: linear-gradient(to right, #000 0 45%, transparent 96%);
 }
 .pitch__slot .pic-player, .bench__player .pic-player, .pitch__name, .bench__name { position: relative; z-index: 1; }
 
