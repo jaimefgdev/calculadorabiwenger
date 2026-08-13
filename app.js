@@ -471,6 +471,11 @@
     tab: 'inicio',
     expandedManager: null,
     listings: [],
+    lineup: null,          // mi alineación en Biwenger
+    xi: null,              // el once del simulador
+    squads: null,          // plantillas de todos los mánagers
+    expandedSquad: null,
+    expandedSpend: null,
     sim: {},               // operaciones marcadas para simular
     history: {},           // valor de equipo día a día, por mánager
     leagueStart: null,     // primer día del tablón
@@ -1291,6 +1296,166 @@
       ' · ' + money(total) + ' de valor de mercado';
   }
 
+  /* ---------- Alineación (simulador) ---------- */
+
+  /* Los siete sistemas de Biwenger. El portero va aparte, siempre uno. */
+  const FORMATIONS = ['3-4-3', '3-5-2', '4-3-3', '4-4-2', '4-5-1', '5-3-2', '5-4-1'];
+  const POSITION_NAMES = { 1: 'POR', 2: 'DEF', 3: 'MED', 4: 'DEL' };
+
+  /** Pide al Worker las plantillas de todos: hacen falta aquí y en Mánagers. */
+  function ensureSquads() {
+    if (state.squads) return;
+    const config = loadSyncConfig();
+    if (!config.url || !config.key) return;
+
+    state.squads = { status: 'loading', list: [] };
+    fetch(config.url.replace(/\/+$/, '') + '/?key=' + encodeURIComponent(config.key) + '&squads=1',
+      { headers: { 'accept': 'application/json' } })
+      .then(function (response) { return response.json(); })
+      .then(function (payload) {
+        if (payload.error) throw new Error(payload.error);
+        state.squads = { status: 'ok', list: payload.squads || [] };
+        render();
+      })
+      .catch(function () {
+        state.squads = { status: 'error', list: [] };
+        render();
+      });
+  }
+
+  const squadList = () => (state.squads && state.squads.list) || [];
+
+  /** Mi plantilla completa, sacada de las plantillas de la liga. */
+  function mySquad() {
+    const id = state.me && state.me.id;
+    const mine = squadList().filter(function (squad) { return squad.id === id; })[0];
+    return mine ? mine.players : [];
+  }
+
+  /** Cuántos jugadores pide cada línea del sistema elegido. */
+  function formationLines(type) {
+    const parts = String(type || '4-4-2').split('-').map(Number);
+    return { 2: parts[0] || 4, 3: parts[1] || 4, 4: parts[2] || 2 };
+  }
+
+  /* El once del simulador arranca con lo que tengas puesto en Biwenger y se
+     puede cambiar libremente; no se envía a ningún sitio. */
+  function ensureXi() {
+    if (state.xi) return;
+    const lineup = state.lineup;
+    const type = (lineup && lineup.type) || '4-4-2';
+    const slots = {};
+
+    if (lineup && lineup.players) {
+      const lines = formationLines(type);
+      const used = { 1: 0, 2: 0, 3: 0, 4: 0 };
+      lineup.players.forEach(function (player) {
+        const pos = player.position || 3;
+        const limit = pos === 1 ? 1 : lines[pos];
+        if (used[pos] < limit) {
+          slots[pos + '-' + used[pos]] = String(player.id);
+          used[pos] += 1;
+        }
+      });
+    }
+    state.xi = { type: type, slots: slots };
+  }
+
+  function playerById(id) {
+    const found = mySquad().filter(function (player) { return player.id === String(id); })[0];
+    if (found) return found;
+    const inLineup = ((state.lineup && state.lineup.players) || [])
+      .filter(function (player) { return player.id === String(id); })[0];
+    return inLineup || null;
+  }
+
+  /** Posición de un jugador según su plantilla o su ficha de alineación. */
+  function playerPosition(id) {
+    const inLineup = ((state.lineup && state.lineup.players) || [])
+      .filter(function (player) { return player.id === String(id); })[0];
+    return inLineup ? inLineup.position : null;
+  }
+
+  function pitchSlot(key, position) {
+    const id = state.xi.slots[key];
+    const player = id ? playerById(id) : null;
+    const chosen = {};
+    Object.keys(state.xi.slots).forEach(function (slot) { chosen[state.xi.slots[slot]] = slot; });
+
+    const options = ['<option value="">— vacío —</option>'].concat(mySquad().map(function (candidate) {
+      const taken = chosen[candidate.id] && chosen[candidate.id] !== key;
+      const pos = playerPosition(candidate.id);
+      return '<option value="' + candidate.id + '"' + (candidate.id === id ? ' selected' : '') +
+        (taken ? ' disabled' : '') + '>' +
+        escapeHtml(candidate.name) + (pos ? ' · ' + POSITION_NAMES[pos] : '') + '</option>';
+    })).join('');
+
+    const face = player
+      ? '<span class="pic-player pitch__face" style="background-image:url(\'https://cdn.biwenger.com/i/p/' +
+        encodeURIComponent(player.id) + '.png\')"></span>'
+      : '<span class="pic-player pitch__face pitch__face--empty"></span>';
+
+    return '<div class="pitch__slot">' + face +
+      '<span class="pitch__name">' + (player ? escapeHtml(player.name) : '—') + '</span>' +
+      '<select class="pitch__pick" data-slot="' + key + '" aria-label="Jugador en ' +
+        POSITION_NAMES[position] + '">' + options + '</select>' +
+    '</div>';
+  }
+
+  function renderLineup() {
+    const section = $('lineup-panel');
+    if (!state.me || !state.lineup) { section.hidden = true; return; }
+
+    ensureSquads();
+    ensureXi();
+    section.hidden = false;
+
+    const lines = formationLines(state.xi.type);
+    const rows = [
+      { position: 4, count: lines[4] },
+      { position: 3, count: lines[3] },
+      { position: 2, count: lines[2] },
+      { position: 1, count: 1 }
+    ];
+
+    $('lineup-formation').innerHTML = FORMATIONS.map(function (formation) {
+      return '<option value="' + formation + '"' +
+        (formation === state.xi.type ? ' selected' : '') + '>' + formation + '</option>';
+    }).join('');
+
+    $('pitch').innerHTML = rows.map(function (row) {
+      const slots = [];
+      for (let i = 0; i < row.count; i++) slots.push(pitchSlot(row.position + '-' + i, row.position));
+      return '<div class="pitch__line">' + slots.join('') + '</div>';
+    }).join('');
+
+    // Suplentes: los de la plantilla que no estén en el once.
+    const inXi = {};
+    Object.keys(state.xi.slots).forEach(function (key) { inXi[state.xi.slots[key]] = true; });
+    const bench = mySquad().filter(function (player) { return !inXi[player.id]; });
+
+    $('bench').innerHTML = bench.length === 0
+      ? '<p class="muted">' + (state.squads && state.squads.status === 'loading'
+          ? 'Cargando la plantilla…' : 'Sin suplentes.') + '</p>'
+      : bench.map(function (player) {
+          const pos = playerPosition(player.id);
+          return '<div class="bench__player">' +
+            '<span class="pic-player" style="background-image:url(\'https://cdn.biwenger.com/i/p/' +
+              encodeURIComponent(player.id) + '.png\')"></span>' +
+            '<span class="bench__name">' + escapeHtml(player.name) + '</span>' +
+            '<span class="sub">' + (pos ? POSITION_NAMES[pos] + ' · ' : '') +
+              (player.marketValue == null ? '' : money(player.marketValue)) + '</span>' +
+          '</div>';
+        }).join('');
+
+    const titulares = Object.keys(state.xi.slots).filter(function (key) { return state.xi.slots[key]; }).length;
+    const valor = Object.keys(state.xi.slots).reduce(function (sum, key) {
+      const player = playerById(state.xi.slots[key]);
+      return sum + ((player && player.marketValue) || 0);
+    }, 0);
+    $('lineup-count').textContent = titulares + ' de 11 titulares · ' + money(valor) + ' de valor en el campo';
+  }
+
   /* ---------- Pestaña de mánagers ---------- */
 
   /** Récords de un mánager: sus operaciones extremas. */
@@ -1392,6 +1557,109 @@
       '</div></td></tr>';
   }
 
+  /* ---------- Plantillas ---------- */
+
+  function renderSquads() {
+    ensureSquads();
+    const body = $('squads-body');
+    const list = squadList();
+
+    if (list.length === 0) {
+      body.innerHTML = '<tr><td colspan="4" class="empty">' +
+        (state.squads && state.squads.status === 'loading'
+          ? 'Cargando plantillas…' : 'Sincroniza para ver las plantillas.') + '</td></tr>';
+      return;
+    }
+
+    body.innerHTML = list.map(function (squad) {
+      const open = state.expandedSquad === squad.id;
+      const value = squad.players.reduce(function (sum, p) { return sum + (p.marketValue || 0); }, 0);
+      const paid = squad.players.reduce(function (sum, p) { return sum + (p.paid || 0); }, 0);
+
+      const detail = !open ? '' :
+        '<tr class="detail-row"><td class="detail-cell" colspan="4"><div class="detail">' +
+        '<table class="detail-table"><thead><tr>' +
+          '<th class="detail-rank"></th><th>Jugador</th><th>Desde</th>' +
+          '<th class="num">Pagado</th><th class="num">Valor de mercado</th><th class="num">Diferencia</th>' +
+        '</tr></thead><tbody>' +
+        squad.players.map(function (player, index) {
+          const diff = player.paid == null || player.marketValue == null
+            ? null : player.marketValue - player.paid;
+          return '<tr>' +
+            '<td class="detail-rank">' + (index + 1) + '</td>' +
+            '<td>' + playerName({ playerId: player.id, player: player.name }) + '</td>' +
+            '<td class="detail-date">' + shortDay(player.since) + '</td>' +
+            '<td class="num">' + (player.paid == null
+              ? '<span class="sub">reparto inicial</span>'
+              : money(player.paid) + ' <span class="sub">' + escapeHtml(player.from || '') + '</span>') + '</td>' +
+            '<td class="num"><strong>' + (player.marketValue == null ? '—' : money(player.marketValue)) + '</strong></td>' +
+            '<td class="num">' + (diff == null ? '<span class="sub">—</span>' :
+              '<span class="delta ' + (diff >= 0 ? 'delta--up' : 'delta--down') + '">' +
+              (diff >= 0 ? '▲ +' : '▼ −') + money(Math.abs(diff)) + '</span>') + '</td>' +
+          '</tr>';
+        }).join('') + '</tbody></table></div></td></tr>';
+
+      return '<tr class="' + (open ? 'row-open' : '') + '">' +
+        '<td data-label="Mánager">' +
+          '<button type="button" class="row-toggle" data-squad="' + escapeHtml(squad.id) + '"' +
+            ' aria-expanded="' + (open ? 'true' : 'false') + '">' +
+            '<span class="row-toggle__icon" aria-hidden="true">▸</span>' +
+            '<span class="manager">' + avatar(squad.name) +
+              '<span class="manager__name">' + escapeHtml(squad.name) + '</span></span>' +
+          '</button></td>' +
+        '<td class="num" data-label="Jugadores">' + squad.players.length + '</td>' +
+        '<td class="num" data-label="Pagado">' + (paid ? money(paid) : '<span class="sub">—</span>') + '</td>' +
+        '<td class="num" data-label="Valor de mercado"><strong>' + money(value) + '</strong></td>' +
+      '</tr>' + detail;
+    }).join('');
+  }
+
+  /* ---------- Rankings de gasto e ingresos ---------- */
+
+  function renderSpending() {
+    ['spend', 'income'].forEach(function (kind) {
+      const buys = kind === 'spend';
+      const rows = MANAGERS.map(function (name) {
+        const moves = state.movements.filter(function (movement) {
+          return movement.manager === name && movement.type === (buys ? 'buy' : 'sell');
+        }).sort(function (a, b) { return b.amount - a.amount; });
+        return {
+          name: name,
+          moves: moves,
+          total: moves.reduce(function (sum, movement) { return sum + movement.amount; }, 0)
+        };
+      }).sort(function (a, b) { return b.total - a.total; });
+
+      $(kind + '-body').innerHTML = rows.map(function (row, index) {
+        const key = kind + ':' + row.name;
+        const open = state.expandedSpend === key;
+        const detail = !open || row.moves.length === 0 ? '' :
+          '<tr class="detail-row"><td class="detail-cell" colspan="4"><div class="detail">' +
+          '<table class="detail-table"><tbody>' + row.moves.map(function (movement, i) {
+            return '<tr><td class="detail-rank">' + (i + 1) + '</td>' +
+              '<td>' + playerName(movement) + '</td>' +
+              '<td class="num"><strong class="' + (buys ? 'money-neg' : 'money-pos') + '">' +
+                (buys ? '−' : '+') + money(movement.amount) + '</strong></td>' +
+              '<td class="detail-date">' + escapeHtml(movement.date || '—') + '</td></tr>';
+          }).join('') + '</tbody></table></div></td></tr>';
+
+        return '<tr class="' + (open ? 'row-open' : '') + '">' +
+          '<td class="col-rank">' + (index + 1) + '</td>' +
+          '<td data-label="Mánager">' +
+            '<button type="button" class="row-toggle" data-spend="' + escapeHtml(key) + '"' +
+              ' aria-expanded="' + (open ? 'true' : 'false') + '">' +
+              '<span class="row-toggle__icon" aria-hidden="true">▸</span>' +
+              '<span class="manager">' + avatar(row.name) +
+                '<span class="manager__name">' + escapeHtml(row.name) + '</span></span>' +
+            '</button></td>' +
+          '<td class="num" data-label="Operaciones">' + row.moves.length + '</td>' +
+          '<td class="num" data-label="Total"><strong class="' + (buys ? 'money-neg' : 'money-pos') + '">' +
+            money(row.total) + '</strong></td>' +
+        '</tr>' + detail;
+      }).join('');
+    });
+  }
+
   /* ---------- Pestañas ---------- */
 
   const TAB_KEY = 'biwenger-calc-tab';
@@ -1407,8 +1675,8 @@
     Array.prototype.forEach.call(document.querySelectorAll('[data-panel]'), function (panel) {
       panel.hidden = panel.getAttribute('data-panel') !== name;
     });
-    if (name === 'managers') renderManagers();
-    if (name === 'datos') { renderDataKpis(); renderKpiCharts(); }
+    if (name === 'managers') { renderManagers(); renderSquads(); }
+    if (name === 'datos') { renderDataKpis(); renderKpiCharts(); renderSpending(); }
   }
 
   function renderWarnings() {
@@ -1441,9 +1709,10 @@
     renderMovements();
     renderOffers();
     renderListings();
+    renderLineup();
     renderWarnings();
-    if (state.tab === 'managers') renderManagers();
-    if (state.tab === 'datos') { renderDataKpis(); renderKpiCharts(); }
+    if (state.tab === 'managers') { renderManagers(); renderSquads(); }
+    if (state.tab === 'datos') { renderDataKpis(); renderKpiCharts(); renderSpending(); }
   }
 
   /* ---------- Persistencia ---------- */
@@ -1610,6 +1879,7 @@
     state.teams = teams;
     state.offers = Array.isArray(payload.offers) ? payload.offers : [];
     state.listings = Array.isArray(payload.listings) ? payload.listings : [];
+    state.lineup = payload.lineup || null;
     state.me = payload.me || null;
     state.leagueStart = (payload.league && payload.league.startDay) || state.leagueStart;
     state.warnings = warnings;
@@ -1835,6 +2105,55 @@
     });
 
     bindSorting('managers');
+
+    $('lineup-formation').addEventListener('change', function (event) {
+      ensureXi();
+      state.xi.type = event.target.value;
+      // Se recolocan los que quepan en la nueva distribución.
+      const lines = formationLines(state.xi.type);
+      const kept = {};
+      const used = { 1: 0, 2: 0, 3: 0, 4: 0 };
+      Object.keys(state.xi.slots).sort().forEach(function (key) {
+        const id = state.xi.slots[key];
+        if (!id) return;
+        const pos = Number(key.split('-')[0]);
+        const limit = pos === 1 ? 1 : lines[pos];
+        if (used[pos] < limit) { kept[pos + '-' + used[pos]] = id; used[pos] += 1; }
+      });
+      state.xi.slots = kept;
+      renderLineup();
+    });
+
+    $('pitch').addEventListener('change', function (event) {
+      const pick = event.target.closest('[data-slot]');
+      if (!pick) return;
+      const slot = pick.getAttribute('data-slot');
+      // Un jugador no puede estar en dos sitios: se libera su hueco anterior.
+      Object.keys(state.xi.slots).forEach(function (key) {
+        if (state.xi.slots[key] === pick.value) delete state.xi.slots[key];
+      });
+      if (pick.value) state.xi.slots[slot] = pick.value;
+      else delete state.xi.slots[slot];
+      renderLineup();
+    });
+
+    $('squads-body').addEventListener('click', function (event) {
+      const button = event.target.closest('[data-squad]');
+      if (!button) return;
+      const id = button.getAttribute('data-squad');
+      state.expandedSquad = state.expandedSquad === id ? null : id;
+      renderSquads();
+    });
+
+    ['spend-body', 'income-body'].forEach(function (id) {
+      $(id).addEventListener('click', function (event) {
+        const button = event.target.closest('[data-spend]');
+        if (!button) return;
+        const key = button.getAttribute('data-spend');
+        state.expandedSpend = state.expandedSpend === key ? null : key;
+        renderSpending();
+      });
+    });
 
     $('managers-body').addEventListener('click', function (event) {
       const chip = event.target.closest('[data-chart]');

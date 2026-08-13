@@ -188,6 +188,26 @@
     </section>
   </div>
 
+  <!-- ============ ALINEACIÓN ============ -->
+  <section id="lineup-panel" class="panel" hidden>
+    <div class="panel__head panel__head--row">
+      <div>
+        <h2>Mi alineación</h2>
+        <p class="muted" id="lineup-count">&nbsp;</p>
+      </div>
+      <label class="field-label">Sistema
+        <select id="lineup-formation" class="field"></select>
+      </label>
+    </div>
+
+    <div id="pitch" class="pitch"></div>
+
+    <h3 class="bench__title">Suplentes</h3>
+    <div id="bench" class="bench"></div>
+
+    <p class="hint">Es un simulador: lo que cambies aquí no se envía a Biwenger. Arranca con la alineación que tienes puesta.</p>
+  </section>
+
   </div><!-- /panel-inicio -->
 
   <!-- ============================================================
@@ -257,6 +277,25 @@
         </table>
       </div>
     </section>
+    <section class="panel">
+      <div class="panel__head">
+        <h2>Plantillas</h2>
+        <p class="muted">Pulsa un mánager para ver sus jugadores: desde cuándo los tiene, lo que pagó y lo que valen hoy.</p>
+      </div>
+      <div class="table-scroll">
+        <table class="table table--squads">
+          <thead>
+            <tr>
+              <th>Mánager</th>
+              <th class="num">Jugadores</th>
+              <th class="num">Pagado</th>
+              <th class="num">Valor de mercado</th>
+            </tr>
+          </thead>
+          <tbody id="squads-body"></tbody>
+        </table>
+      </div>
+    </section>
   </div><!-- /panel-managers -->
 
   <!-- ============================================================
@@ -283,6 +322,38 @@
     </section>
 
     <div id="kpi-charts" class="kpi-charts"></div>
+
+    <div class="market-grid">
+      <section class="panel">
+        <div class="panel__head">
+          <h2>Quién más gasta</h2>
+          <p class="muted">Pulsa un mánager para ver en qué se lo ha gastado.</p>
+        </div>
+        <div class="table-scroll">
+          <table class="table table--spend">
+            <thead>
+              <tr><th class="col-rank">#</th><th>Mánager</th><th class="num">Fichajes</th><th class="num">Total</th></tr>
+            </thead>
+            <tbody id="spend-body"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="panel__head">
+          <h2>Quién más ingresa</h2>
+          <p class="muted">Pulsa un mánager para ver qué ha vendido.</p>
+        </div>
+        <div class="table-scroll">
+          <table class="table table--income">
+            <thead>
+              <tr><th class="col-rank">#</th><th>Mánager</th><th class="num">Ventas</th><th class="num">Total</th></tr>
+            </thead>
+            <tbody id="income-body"></tbody>
+          </table>
+        </div>
+      </section>
+    </div>
   </div><!-- /panel-datos -->
 
 </main>
