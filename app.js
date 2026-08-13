@@ -1395,18 +1395,20 @@
     const chosen = {};
     Object.keys(state.xi.slots).forEach(function (slot) { chosen[state.xi.slots[slot]] = slot; });
 
-    /* Solo se ofrecen los que pueden jugar en esa demarcación, contando las
-       posiciones alternativas. */
+    /* Solo los que pueden jugar en esa demarcación —contando la posición
+       alternativa— y que estén libres. Los ya alineados no se listan; el de
+       este hueco sí, para poder verlo seleccionado. */
     const options = ['<option value="">— vacío —</option>'].concat(mySquad()
-      .filter(function (candidate) { return playsAs(candidate.id, position); })
+      .filter(function (candidate) {
+        if (!playsAs(candidate.id, position)) return false;
+        return !chosen[candidate.id] || chosen[candidate.id] === key;
+      })
       .map(function (candidate) {
-        const taken = chosen[candidate.id] && chosen[candidate.id] !== key;
         const main = playerPosition(candidate.id);
         const alt = (candidate.altPositions || []).length
           ? '/' + candidate.altPositions.map(function (p) { return POSITION_NAMES[p]; }).join('/')
           : '';
-        return '<option value="' + candidate.id + '"' + (candidate.id === id ? ' selected' : '') +
-          (taken ? ' disabled' : '') + '>' +
+        return '<option value="' + candidate.id + '"' + (candidate.id === id ? ' selected' : '') + '>' +
           escapeHtml(candidate.name) + (main ? ' · ' + POSITION_NAMES[main] + alt : '') + '</option>';
       })).join('');
 
