@@ -1950,8 +1950,10 @@
     const boton = $('jornada-pick');
     const jornada = jornadaActiva();
 
+    /* El número manda: así el rótulo es «Jornada 3» aunque la API conteste en
+       inglés. */
     boton.textContent = jornada && jornada.round
-      ? (jornada.round.name || ('Jornada ' + jornada.round.number))
+      ? (jornada.round.number ? 'Jornada ' + jornada.round.number : (jornada.round.name || '—'))
       : '—';
 
     if (state.jornadaEstado === 'cargando' && !jornada) {
