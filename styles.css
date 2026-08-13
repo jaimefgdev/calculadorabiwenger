@@ -108,10 +108,21 @@ code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft)
   display: grid; place-items: center;
   font-size: 1.35rem;
   background: var(--accent-soft);
+  border: 0;
   border-radius: 12px;
+  cursor: pointer;
+  transition: transform .12s, background .15s;
 }
+.brand__logo:hover { transform: scale(1.08); background: color-mix(in srgb, var(--accent) 18%, transparent); }
+.brand__logo:active { transform: scale(.96); }
+.brand__logo:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .brand h1 { font-size: 1.075rem; font-weight: 650; }
 .brand__sub { color: var(--text-faint); font-size: .8rem; }
+/* Tu firma, con el morado de tu avatar. */
+.brand__sub--me { color: #7c3aed; font-weight: 650; letter-spacing: .01em; font-family: var(--mono); }
+@media (prefers-color-scheme: dark) {
+  .brand__sub--me { color: #9b7cff; }
+}
 
 /* ---------- Pestañas ---------- */
 .tabs { display: flex; gap: .25rem; flex: 1 1 auto; justify-content: center; }

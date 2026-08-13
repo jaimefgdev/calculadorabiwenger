@@ -1668,6 +1668,11 @@
       if (tab) showTab(tab.getAttribute('data-tab'));
     });
 
+    $('brand-home').addEventListener('click', function () {
+      showTab('inicio');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    });
+
     $('league-chips').addEventListener('click', function (event) {
       const chip = event.target.closest('[data-kpi]');
       if (!chip) return;
