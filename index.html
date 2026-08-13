@@ -30,7 +30,7 @@
     </div>
     <nav class="tabs" id="tabs" role="tablist" aria-label="Secciones">
       <button class="tab" type="button" role="tab" data-tab="inicio" aria-selected="true">Inicio</button>
-      <button class="tab" type="button" role="tab" data-tab="managers" aria-selected="false">Mánagers</button>
+      <button class="tab" type="button" role="tab" data-tab="managers" aria-selected="false">Liga</button>
       <button class="tab" type="button" role="tab" data-tab="fichajes" aria-selected="false">Fichajes</button>
       <button class="tab" type="button" role="tab" data-tab="datos" aria-selected="false">Datos</button>
     </nav>
@@ -56,7 +56,7 @@
   <section id="input-panel" class="panel input-panel">
     <div class="panel__head">
       <h2>Origen de datos</h2>
-      <p class="muted">Todo empieza en 20.000.000 € por mánager. Los datos solo cambian cuando pegas HTML aquí.</p>
+      <p class="muted">Todo empieza en 20.000.000 € por jugador. Los datos solo cambian cuando pegas HTML aquí.</p>
     </div>
 
     <article class="source source--sync">
@@ -106,6 +106,16 @@
        ============================================================ -->
   <div id="panel-inicio" data-panel="inicio">
 
+  <!-- ============ CUENTA ATRÁS DE LA JORNADA ============ -->
+  <section id="round-panel" class="panel round" hidden>
+    <div>
+      <span class="round__label">Inicio de la</span>
+      <strong class="round__name" id="round-name">—</strong>
+      <span class="round__when" id="round-when"></span>
+    </div>
+    <div class="round__clock" id="round-clock" role="timer" aria-live="off"></div>
+  </section>
+
 
 
   <div id="warnings" class="warnings" hidden></div>
@@ -114,8 +124,8 @@
   <section class="panel">
     <div class="panel__head panel__head--row">
       <div>
-        <h2>Presupuesto por mánager</h2>
-        <p class="muted">Puja máxima = saldo disponible + 25 % del valor del equipo. Pulsa una cabecera para ordenar y un mánager para ver sus jugadores.</p>
+        <h2>Presupuesto por jugador</h2>
+        <p class="muted">Puja máxima = saldo disponible + 25 % del valor del equipo. Pulsa una cabecera para ordenar y un jugador para ver sus fichajes.</p>
       </div>
       <button id="btn-csv" class="btn btn--ghost btn--sm" type="button">Exportar CSV</button>
     </div>
@@ -124,7 +134,7 @@
         <thead>
           <tr>
             <th class="col-rank">#</th>
-            <th class="sortable" data-sort="name" tabindex="0" aria-sort="none">Mánager</th>
+            <th class="sortable" data-sort="name" tabindex="0" aria-sort="none">Jugador</th>
             <th class="num sortable" data-sort="buys" tabindex="0" aria-sort="none" title="Jugadores fichados">Fichajes</th>
             <th class="num sortable" data-sort="sells" tabindex="0" aria-sort="none" title="Jugadores vendidos">Ventas</th>
             <th class="num sortable" data-sort="spent" tabindex="0" aria-sort="none">Gastado</th>
@@ -154,7 +164,7 @@
         <table class="table table--offers">
           <thead>
             <tr>
-              <th>Jugador</th>
+              <th>Futbolista</th>
               <th>Operación</th>
               <th class="num">Importe</th>
               <th title="Marca para simular que se cierra">Simular</th>
@@ -177,7 +187,7 @@
         <table class="table table--listings">
           <thead>
             <tr>
-              <th>Jugador</th>
+              <th>Futbolista</th>
               <th class="num">Valor de mercado</th>
               <th>Ofertas recibidas</th>
             </tr>
@@ -219,8 +229,8 @@
         <p class="muted" id="moves-count">&nbsp;</p>
       </div>
       <div class="filters">
-        <input id="filter-text" class="field" type="search" placeholder="Buscar jugador o mánager…">
-        <select id="filter-manager" class="field"><option value="">Todos los mánagers</option></select>
+        <input id="filter-text" class="field" type="search" placeholder="Buscar futbolista o jugador…">
+        <select id="filter-manager" class="field"><option value="">Todos los jugadores</option></select>
         <select id="filter-type" class="field">
           <option value="">Compras y ventas</option>
           <option value="buy">Solo fichajes</option>
@@ -234,9 +244,9 @@
         <thead>
           <tr>
             <th class="col-rank">#</th>
-            <th class="sortable" data-sort="player" tabindex="0" aria-sort="none">Jugador</th>
+            <th class="sortable" data-sort="player" tabindex="0" aria-sort="none">Futbolista</th>
             <th class="sortable" data-sort="type" tabindex="0" aria-sort="none">Acción</th>
-            <th class="sortable" data-sort="manager" tabindex="0" aria-sort="none">Mánager</th>
+            <th class="sortable" data-sort="manager" tabindex="0" aria-sort="none">Jugador</th>
             <th class="num sortable" data-sort="amount" tabindex="0" aria-sort="none">Importe</th>
             <th class="sortable" data-sort="date" tabindex="0" aria-sort="none">Fecha</th>
           </tr>
@@ -256,14 +266,14 @@
     <section class="panel">
       <div class="panel__head">
         <h2>Clasificación</h2>
-        <p class="muted">Ordenada por puntos y, a igualdad, por valor de equipo. Pulsa un mánager para ver sus cifras y sus gráficos.</p>
+        <p class="muted">Ordenada por puntos y, a igualdad, por valor de equipo. Pulsa un jugador para ver sus cifras y sus gráficos.</p>
       </div>
       <div class="table-scroll">
         <table class="table table--managers">
           <thead>
             <tr>
               <th class="col-rank">#</th>
-              <th class="sortable" data-sort="name" tabindex="0" aria-sort="none">Mánager</th>
+              <th class="sortable" data-sort="name" tabindex="0" aria-sort="none">Jugador</th>
               <th class="num sortable" data-sort="points" tabindex="0" aria-sort="none">Puntos</th>
               <th class="num sortable" data-sort="teamValue" tabindex="0" aria-sort="none">Valor equipo</th>
               <th class="num sortable" data-sort="players" tabindex="0" aria-sort="none" title="Jugadores en plantilla">Jug.</th>
@@ -278,13 +288,13 @@
     <section class="panel">
       <div class="panel__head">
         <h2>Plantillas</h2>
-        <p class="muted">Pulsa un mánager para ver sus jugadores: desde cuándo los tiene, lo que pagó y lo que valen hoy.</p>
+        <p class="muted">Pulsa un jugador para ver su plantilla: desde cuándo tiene a cada futbolista, lo que pagó y lo que vale hoy.</p>
       </div>
       <div class="table-scroll">
         <table class="table table--squads">
           <thead>
             <tr>
-              <th>Mánager</th>
+              <th>Futbolista</th>
               <th class="num">Jugadores</th>
               <th class="num">Pagado</th>
               <th class="num">Valor de mercado</th>
@@ -324,14 +334,12 @@
     <div class="market-grid">
       <section class="panel">
         <div class="panel__head">
-          <h2>Quién más gasta</h2>
-          <p class="muted">Pulsa un mánager para ver en qué se lo ha gastado.</p>
+          <h2>Quién ficha más</h2>
+          <p class="muted">Pulsa un jugador para ver a quién ha fichado.</p>
         </div>
         <div class="table-scroll">
           <table class="table table--spend">
-            <thead>
-              <tr><th class="col-rank">#</th><th>Mánager</th><th class="num">Fichajes</th><th class="num">Total</th></tr>
-            </thead>
+            <thead id="spend-head"></thead>
             <tbody id="spend-body"></tbody>
           </table>
         </div>
@@ -339,14 +347,12 @@
 
       <section class="panel">
         <div class="panel__head">
-          <h2>Quién más ingresa</h2>
-          <p class="muted">Pulsa un mánager para ver qué ha vendido.</p>
+          <h2>Quién vende más</h2>
+          <p class="muted">Pulsa un jugador para ver qué ha vendido.</p>
         </div>
         <div class="table-scroll">
           <table class="table table--income">
-            <thead>
-              <tr><th class="col-rank">#</th><th>Mánager</th><th class="num">Ventas</th><th class="num">Total</th></tr>
-            </thead>
+            <thead id="income-head"></thead>
             <tbody id="income-body"></tbody>
           </table>
         </div>

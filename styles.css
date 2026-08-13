@@ -186,6 +186,31 @@ code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft)
 .btn--icon { display: inline-grid; place-items: center; padding: .45rem .55rem; line-height: 0; }
 .bid { display: inline-flex; align-items: center; gap: .4rem; margin-right: .6rem; }
 
+/* ---------- Cuenta atrás de la jornada ---------- */
+.round {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 1rem; flex-wrap: wrap;
+  border-left: 3px solid var(--accent);
+}
+.round__label { font-size: .78rem; text-transform: uppercase; letter-spacing: .04em; color: var(--text-faint); }
+.round__name { font-size: 1.05rem; margin: 0 .35rem; }
+.round__when { font-size: .82rem; color: var(--text-soft); }
+.round__clock {
+  display: flex; gap: .5rem;
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+}
+.round__unit {
+  display: flex; flex-direction: column; align-items: center;
+  min-width: 52px;
+  padding: .35rem .5rem;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--accent-soft);
+}
+.round__value { font-size: 1.25rem; font-weight: 700; line-height: 1.1; }
+.round__unit small { font-size: .62rem; text-transform: uppercase; letter-spacing: .06em; color: var(--text-faint); }
+
 /* ---------- El campo ---------- */
 .field-label { display: flex; align-items: center; gap: .5rem; font-size: .8rem; color: var(--text-soft); }
 .field-label .field { min-width: 110px; }
@@ -591,6 +616,9 @@ code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft)
 .viz__dot { stroke: var(--bg-elev); stroke-width: 2; vector-effect: non-scaling-stroke; }
 .viz__bar { stroke: var(--bg-elev); stroke-width: 2; vector-effect: non-scaling-stroke; }
 .viz__empty { color: var(--text-faint); font-size: .78rem; margin-bottom: .5rem; }
+/* Con dos series el color no basta: siempre leyenda. */
+.viz__legend { display: flex; gap: .8rem; margin-bottom: .3rem; }
+.viz__key { display: inline-flex; align-items: center; gap: .35rem; font-size: .72rem; color: var(--text-soft); }
 
 .detail-table thead th {
   position: static;

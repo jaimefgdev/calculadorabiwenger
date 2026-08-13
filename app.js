@@ -86,7 +86,7 @@
   }
 
   /**
-   * Localiza un mánager de la liga dentro de un texto. La búsqueda arranca en
+   * Localiza un jugador de la liga dentro de un texto. La búsqueda arranca en
    * la acción ("Fichado por" / "Vendido por") para no confundirse con
    * menciones anteriores del mismo bloque.
    */
@@ -163,7 +163,7 @@
     const post = closestPost(card);
     const context = postContext(post);
 
-    // El mánager viene en la tarjeta (fichajes) o en el title / autor del post
+    // El jugador viene en la tarjeta (fichajes) o en el title / autor del post
     // (ventas al mercado, donde la tarjeta solo lleva el importe).
     let manager = findManager(haystack, keyword);
     if (!manager && post) {
@@ -177,7 +177,7 @@
       return null;
     }
     if (!manager) {
-      warnings.push('No se ha identificado al mánager en el movimiento de «' + player + '» (' + money(amount) + ').');
+      warnings.push('No se ha identificado al jugador en el movimiento de «' + player + '» (' + money(amount) + ').');
     }
 
     return {
@@ -411,7 +411,7 @@
   };
 
   /* Desempate cuando la columna no tiene valor (p. ej. sin valor de equipo):
-     entre mánagers empatados manda el saldo más alto. */
+     entre jugadores empatados manda el saldo más alto. */
   const SORT_FALLBACK = {
     budget: function (row) { return row.balance; }
   };
@@ -463,7 +463,7 @@
     teams: {},
     warnings: [],
     filters: { text: '', manager: '', type: '' },
-    expanded: {},          // mánagers con la ficha de jugadores desplegada
+    expanded: {},          // jugadores con la ficha de jugadores desplegada
     charts: { saldo: true, value: true },
     kpiCharts: { moves: false, spent: false, earned: false, balance: false },
     kpiOpen: [],           // orden de apertura, para cerrar el más antiguo
@@ -472,12 +472,13 @@
     expandedManager: null,
     listings: [],
     lineup: null,          // mi alineación en Biwenger
+    round: null,           // próxima jornada y su hora de inicio
     xi: null,              // el once del simulador
-    squads: null,          // plantillas de todos los mánagers
+    squads: null,          // plantillas de todos los jugadores
     expandedSquad: null,
     expandedSpend: null,
     sim: {},               // operaciones marcadas para simular
-    history: {},           // valor de equipo día a día, por mánager
+    history: {},           // valor de equipo día a día, por jugador
     leagueStart: null,     // primer día del tablón
     offers: [],            // pujas enviadas y ofertas recibidas, pendientes
     me: null,              // saldo y puja máxima oficiales del usuario
@@ -489,7 +490,9 @@
       moves:  { key: '', dir: -1 },
       managers: { key: '', dir: -1 },
       squad: { key: '', dir: 1 },
-      detail: { key: 'amount', dir: -1 }   // dentro de la ficha de cada mánager
+      spend: { key: 'total', dir: -1 },
+      income: { key: 'total', dir: -1 },
+      detail: { key: 'amount', dir: -1 }   // dentro de la ficha de cada jugador
     }
   };
 
@@ -521,7 +524,7 @@
     return map;
   }, {});
 
-  /* Colores propios de algunos mánagers; el resto tira de la paleta automática. */
+  /* Colores propios de algunos jugadores; el resto tira de la paleta automática. */
   const AVATAR_STYLES = [
     { name: 'José Mário dos Santos Mourinho', bg: '#ffffff', fg: '#7c3aed' },
     { name: 'Atlético Jordaan FC',            bg: '#d80030', fg: '#ffffff' },
@@ -607,18 +610,18 @@
         foot: state.movements.length === 0 ? 'Sin datos del tablón' : buys + ' fichajes · ' + sells + ' ventas'
       },
       spent: {
-        label: 'Total gastado', value: money(spent), modifier: 'kpi--out',
+        label: 'Gastado en fichajes', value: money(spent), modifier: 'kpi--out',
         foot: buys > 0 ? 'Media por fichaje: ' + money(spent / buys) : 'Sin fichajes'
       },
       earned: {
-        label: 'Total ingresado', value: money(earned), modifier: 'kpi--in',
+        label: 'Ingresado por ventas', value: money(earned), modifier: 'kpi--in',
         foot: sells > 0 ? 'Media por venta: ' + money(earned / sells) : 'Sin ventas'
       },
       balance: {
         label: 'Saldo total en liga', value: money(balance), modifier: '',
         foot: negatives > 0
-          ? negatives + (negatives === 1 ? ' mánager en números rojos' : ' mánagers en números rojos')
-          : 'Ningún mánager en números rojos'
+          ? negatives + (negatives === 1 ? ' jugador en números rojos' : ' jugadores en números rojos')
+          : 'Ningún jugador en números rojos'
       }
     };
   }
@@ -665,7 +668,7 @@
     }
   }
 
-  /** Guarda el valor de equipo de hoy de cada mánager (una foto por día). */
+  /** Guarda el valor de equipo de hoy de cada jugador (una foto por día). */
   function recordSnapshot() {
     const history = loadHistory();
     const today = dayKey(Date.now());
@@ -685,7 +688,7 @@
   ];
 
   /**
-   * Pide al Worker el valor de equipo día a día de un mánager. Se reconstruye
+   * Pide al Worker el valor de equipo día a día de un jugador. Se reconstruye
    * allí a partir de su plantilla y del histórico de precios, así que tarda un
    * poco: se hace solo al desplegar su ficha y se guarda en memoria.
    */
@@ -719,7 +722,7 @@
       });
   }
 
-  /** Serie diaria de saldo, valor de equipo y puja máxima de un mánager. */
+  /** Serie diaria de saldo, valor de equipo y puja máxima de un jugador. */
   function managerSeries(name) {
     const history = loadHistory();
     const remote = (state.history[name] && state.history[name].days) || {};
@@ -756,19 +759,30 @@
    * Gráfico de líneas en SVG, sin librerías. Ancho fijo en el viewBox y
    * escalado por CSS; el trazo se mantiene a 2 px reales.
    */
+  /**
+   * @param {Array} [options.series] Varias líneas en el mismo gráfico, cada
+   *        una con su campo y color; entonces `key` solo fija la escala.
+   */
   function lineChart(points, key, color, label, options) {
     const opts = options || {};
     const isCount = !!opts.count;
     const isBars = !!opts.bars;
+    const multi = opts.series && opts.series.length ? opts.series : null;
     const fmtTick = isCount ? function (v) { return String(Math.round(v)); } : shortMoney;
     const fmtFull = isCount ? function (v) { return Math.round(v) + (v === 1 ? ' movimiento' : ' movimientos'); } : money;
-    const valid = points.filter(function (point) { return point[key] != null; });
+    const fields = multi ? multi.map(function (s) { return s.field; }) : [key];
+    const valid = points.filter(function (point) {
+      return fields.some(function (field) { return point[field] != null; });
+    });
     if (valid.length === 0) {
       return '<p class="viz__empty">Sin datos todavía de ' + escapeHtml(label.toLowerCase()) + '.</p>';
     }
 
     const W = 600, H = 130, padX = 46, padTop = 14, padBottom = 22;
-    const values = valid.map(function (point) { return point[key]; });
+    const values = [];
+    valid.forEach(function (point) {
+      fields.forEach(function (field) { if (point[field] != null) values.push(point[field]); });
+    });
     let min = Math.min.apply(null, values);
     let max = Math.max.apply(null, values);
     // Las barras arrancan siempre en cero: si no, exageran diferencias pequeñas.
@@ -830,6 +844,32 @@
         escapeHtml(label) + ' por día">' + grid + bars + firstLabel + lastLabel + '</svg>';
     }
 
+    /* Varias líneas: se dibuja cada serie con su color y se acompaña de una
+       leyenda, que el color por sí solo no basta para identificarlas. */
+    if (multi) {
+      const body = multi.map(function (serie) {
+        const points2 = points
+          .map(function (point, i) {
+            return point[serie.field] == null ? null : { x: x(i), y: y(point[serie.field]), point: point };
+          })
+          .filter(Boolean);
+        if (points2.length === 0) return '';
+        const d = points2.map(function (c, i) {
+          return (i ? 'L' : 'M') + c.x.toFixed(1) + ' ' + c.y.toFixed(1);
+        }).join(' ');
+        return '<path class="viz__line" d="' + d + '" stroke="' + serie.color + '"></path>' +
+          points2.map(function (c) {
+            return '<circle class="viz__dot" cx="' + c.x.toFixed(1) + '" cy="' + c.y.toFixed(1) +
+              '" r="4" fill="' + serie.color + '"><title>' + shortDay(c.point.day) + ' · ' +
+              serie.label + ': ' + (isCount ? String(c.point[serie.field]) : money(c.point[serie.field])) +
+              '</title></circle>';
+          }).join('');
+      }).join('');
+
+      return '<svg class="viz__svg" viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="' +
+        escapeHtml(label) + ' por día">' + grid + body + firstLabel + lastLabel + '</svg>';
+    }
+
     const dots = coords.map(function (c) {
       return '<circle class="viz__dot" cx="' + c.x.toFixed(1) + '" cy="' + c.y.toFixed(1) + '" r="4" fill="' + color +
         '"><title>' + shortDay(c.point.day) + ' · ' + fmtFull(c.point[key]) + '</title></circle>';
@@ -878,9 +918,15 @@
   /* Los tres primeros son flujos —lo que pasó ESE día— y van en barras. El
      saldo es un nivel, así que se dibuja como línea con el valor al cierre. */
   const KPI_SERIES = [
-    { key: 'moves',   field: 'movesDay',  label: 'Movimientos',         color: 'var(--viz-1)', count: true },
-    { key: 'spent',   field: 'spentDay',  label: 'Gastado',             color: 'var(--viz-4)' },
-    { key: 'earned',  field: 'earnedDay', label: 'Ingresado',           color: 'var(--viz-2)' },
+    /* Los movimientos se desglosan en dos líneas para ver de dónde vienen:
+       ámbar lo que se ficha, verde lo que se vende. */
+    { key: 'moves',   field: 'movesDay',  label: 'Movimientos',         color: 'var(--viz-1)', count: true,
+      series: [
+        { field: 'buysDay',  color: 'var(--viz-4)', label: 'Fichajes' },
+        { field: 'sellsDay', color: 'var(--viz-2)', label: 'Ventas' }
+      ] },
+    { key: 'spent',   field: 'spentDay',  label: 'Gastado en fichajes',  color: 'var(--viz-4)' },
+    { key: 'earned',  field: 'earnedDay', label: 'Ingresado por ventas', color: 'var(--viz-2)' },
     { key: 'balance', field: 'balance',   label: 'Saldo total en liga', color: 'var(--viz-3)' }
   ];
 
@@ -912,11 +958,11 @@
     let spent = 0, earned = 0, index = 0;
 
     return daysRange(startDay()).map(function (day) {
-      let movesDay = 0, spentDay = 0, earnedDay = 0;
+      let movesDay = 0, buysDay = 0, sellsDay = 0, spentDay = 0, earnedDay = 0;
       while (index < moves.length && dayKey(moves[index].timestamp) <= day) {
         movesDay += 1;
-        if (moves[index].type === 'buy') spentDay += moves[index].amount;
-        else earnedDay += moves[index].amount;
+        if (moves[index].type === 'buy') { buysDay += 1; spentDay += moves[index].amount; }
+        else { sellsDay += 1; earnedDay += moves[index].amount; }
         index += 1;
       }
       spent += spentDay;
@@ -924,6 +970,8 @@
       return {
         day: day,
         movesDay: movesDay,
+        buysDay: buysDay,
+        sellsDay: sellsDay,
         spentDay: spentDay,
         earnedDay: earnedDay,
         balance: initial - spent + earned
@@ -945,15 +993,22 @@
     box.innerHTML = active.map(function (serie) {
       const value = serie.count ? String(last[serie.field]) : money(last[serie.field]);
       const caption = serie.field === 'balance' ? serie.label + ' al cierre de cada día' : serie.label + ' por día';
+      const legend = !serie.series ? '' :
+        '<div class="viz__legend">' + serie.series.map(function (line) {
+          return '<span class="viz__key"><span class="chip__dot" style="background:' + line.color + '"></span>' +
+            line.label + '</span>';
+        }).join('') + '</div>';
       return '<figure class="viz panel viz--kpi">' +
         '<figcaption class="viz__head">' + caption + '<strong>' + value + '</strong></figcaption>' +
-        lineChart(points, serie.field, serie.color, serie.label, { count: serie.count, bars: serie.bars }) +
+        legend +
+        lineChart(points, serie.field, serie.color, serie.label,
+          { count: serie.count, bars: serie.bars, series: serie.series }) +
       '</figure>';
     }).join('');
   }
 
   /**
-   * Orden dentro de la ficha de un mánager. Por «Acción» agrupa compras y
+   * Orden dentro de la ficha de un jugador. Por «Acción» agrupa compras y
    * ventas, y dentro de cada grupo ordena del más caro al más barato; con
    * cualquier otra columna manda esa columna sin agrupar.
    */
@@ -986,7 +1041,7 @@
     }).join('') + '</tr></thead>';
   }
 
-  /** Ficha desplegable de un mánager con sus jugadores. */
+  /** Ficha desplegable de un jugador con sus jugadores. */
   function managerDetail(name) {
     const moves = sortDetail(
       state.movements.filter(function (movement) { return movement.manager === name; }),
@@ -994,7 +1049,7 @@
     );
 
     const inner = moves.length === 0
-      ? '<p class="muted">Este mánager no tiene movimientos en el tablón.</p>'
+      ? '<p class="muted">Este jugador no tiene movimientos en el tablón.</p>'
       : '<table class="detail-table">' + detailHead() + '<tbody>' + moves.map(function (movement, index) {
           const buy = movement.type === 'buy';
           return '<tr>' +
@@ -1010,7 +1065,7 @@
         }).join('') + '</tbody></table>';
 
     /* Aquí solo la lista de jugadores: los gráficos viven en la pestaña
-       Mánagers, dentro de la ficha de cada uno. */
+       Jugadores, dentro de la ficha de cada uno. */
     return '<tr class="detail-row"><td class="detail-cell" colspan="' + BUDGET_COLUMNS + '">' +
       '<div class="detail">' + inner + '</div></td></tr>';
   }
@@ -1023,7 +1078,7 @@
       const expanded = state.expanded[row.name] === true;
       return '<tr class="' + (negative ? 'row-neg' : '') + '">' +
         '<td class="col-rank">' + (index + 1) + '</td>' +
-        '<td data-label="Mánager">' +
+        '<td data-label="Futbolista">' +
           '<button type="button" class="row-toggle" data-manager="' + escapeHtml(row.name) + '"' +
             ' aria-expanded="' + (expanded ? 'true' : 'false') + '">' +
             '<span class="row-toggle__icon" aria-hidden="true">▸</span>' +
@@ -1105,10 +1160,10 @@
         : '<span class="unknown">Sin identificar</span>';
       return '<tr>' +
         '<td class="col-rank">' + (index + 1) + '</td>' +
-        '<td data-label="Jugador">' + playerName(movement) + '</td>' +
+        '<td data-label="Futbolista">' + playerName(movement) + '</td>' +
         '<td data-label="Acción"><span class="tag ' + (buy ? 'tag--buy' : 'tag--sell') + '">' +
           (buy ? '↓ Fichado' : '↑ Vendido') + '</span></td>' +
-        '<td data-label="Mánager">' + managerCell + '</td>' +
+        '<td data-label="Futbolista">' + managerCell + '</td>' +
         '<td class="num" data-label="Importe">' +
           (buy ? '<span class="money-neg">−' + money(movement.amount) + '</span>'
                : '<span class="money-pos">+' + money(movement.amount) + '</span>') + '</td>' +
@@ -1129,7 +1184,7 @@
           : list.length + ' de ' + state.movements.length + ' movimientos');
   }
 
-  /** Mi mánager, el dueño del token con el que sincronizamos. */
+  /** Mi jugador, el dueño del token con el que sincronizamos. */
   function myName() {
     if (!state.me || !state.me.id) return null;
     const found = Object.keys(state.teams).filter(function (name) {
@@ -1190,7 +1245,7 @@
       const out = offer.direction === 'out';
       const on = !!state.sim[offer.id];
       return '<tr class="' + (on ? 'row-sim' : '') + '">' +
-        '<td data-label="Jugador">' + playerName(offer) + '</td>' +
+        '<td data-label="Futbolista">' + playerName(offer) + '</td>' +
         '<td data-label="Operación"><span class="tag ' + (out ? 'tag--buy' : 'tag--sell') + '">' +
           (out ? '↗ Puja' : '↘ Oferta') + '</span> ' +
           '<span class="sub">' + escapeHtml(offer.other || 'Mercado') + '</span></td>' +
@@ -1286,7 +1341,7 @@
           }).join('');
 
       return '<tr>' +
-        '<td data-label="Jugador">' + playerName(item) + '</td>' +
+        '<td data-label="Futbolista">' + playerName(item) + '</td>' +
         '<td class="num" data-label="Valor de mercado"><strong>' + money(market) + '</strong></td>' +
         '<td data-label="Ofertas">' + offerCell + '</td>' +
       '</tr>';
@@ -1297,13 +1352,57 @@
       ' · ' + money(total) + ' de valor de mercado';
   }
 
+  /* ---------- Cuenta atrás de la jornada ---------- */
+
+  function renderRound() {
+    const section = $('round-panel');
+    const round = state.round;
+    if (!round || !round.start) { section.hidden = true; return; }
+
+    section.hidden = false;
+    $('round-name').textContent = 'Jornada ' + (round.number || '');
+    $('round-when').textContent = dateFormat.format(new Date(round.start)) +
+      (round.games ? ' · ' + round.games + ' partidos' : '');
+    tickRound();
+  }
+
+  /** Actualiza el reloj; se llama cada segundo. */
+  function tickRound() {
+    const clock = $('round-clock');
+    const round = state.round;
+    if (!clock || !round || !round.start) return;
+
+    let left = Math.floor((Date.parse(round.start) - Date.now()) / 1000);
+    if (left <= 0) {
+      clock.innerHTML = '<span class="round__unit"><span class="round__value">¡Ya!</span>' +
+        '<small>en juego</small></span>';
+      return;
+    }
+
+    const days = Math.floor(left / 86400); left -= days * 86400;
+    const hours = Math.floor(left / 3600); left -= hours * 3600;
+    const minutes = Math.floor(left / 60);
+    const seconds = left - minutes * 60;
+    const pad = (n) => (n < 10 ? '0' + n : String(n));
+
+    clock.innerHTML = [
+      { value: days, label: days === 1 ? 'día' : 'días' },
+      { value: pad(hours), label: 'horas' },
+      { value: pad(minutes), label: 'min' },
+      { value: pad(seconds), label: 'seg' }
+    ].map(function (unit) {
+      return '<span class="round__unit"><span class="round__value">' + unit.value + '</span>' +
+        '<small>' + unit.label + '</small></span>';
+    }).join('');
+  }
+
   /* ---------- Alineación (simulador) ---------- */
 
   /* Los siete sistemas de Biwenger. El portero va aparte, siempre uno. */
   const FORMATIONS = ['3-4-3', '3-5-2', '4-3-3', '4-4-2', '4-5-1', '5-3-2', '5-4-1'];
   const POSITION_NAMES = { 1: 'POR', 2: 'DEF', 3: 'MED', 4: 'DEL' };
 
-  /** Pide al Worker las plantillas de todos: hacen falta aquí y en Mánagers. */
+  /** Pide al Worker las plantillas de todos: hacen falta aquí y en Jugadores. */
   function ensureSquads() {
     if (state.squads) return;
     const config = loadSyncConfig();
@@ -1402,10 +1501,10 @@
       .filter(function (candidate) {
         if (!playsAs(candidate.id, position)) return false;
         const slot = chosen[candidate.id];
-        if (!slot || slot === key) return true;
-        /* Ya alineado en otra línea: solo se ofrece si sirve para esta, que es
-           el caso de los polivalentes (un DEF/MED puesto atrás puede subir al
-           centro). En su propia línea no se repite. */
+        if (!slot) return true;
+        /* Fuera los que ya ocupan un hueco de esta misma línea, incluido el
+           que está en este. Los polivalentes alineados en otra línea sí valen:
+           un DEF/MED puesto atrás puede subir al centro. */
         return Number(slot.split('-')[0]) !== position;
       })
       .map(function (candidate) {
@@ -1414,10 +1513,8 @@
           ? '/' + candidate.altPositions.map(function (p) { return POSITION_NAMES[p]; }).join('/')
           : '';
         const slot = chosen[candidate.id];
-        const moving = slot && slot !== key
-          ? ' · ahora en ' + POSITION_NAMES[Number(slot.split('-')[0])]
-          : '';
-        return '<option value="' + candidate.id + '"' + (candidate.id === id ? ' selected' : '') + '>' +
+        const moving = slot ? ' · ahora en ' + POSITION_NAMES[Number(slot.split('-')[0])] : '';
+        return '<option value="' + candidate.id + '">' +
           escapeHtml(candidate.name) + (main ? ' · ' + POSITION_NAMES[main] + alt : '') + moving + '</option>';
       })).join('');
 
@@ -1428,8 +1525,9 @@
 
     return '<div class="pitch__slot">' + face +
       '<span class="pitch__name">' + (player ? escapeHtml(player.name) : '—') + '</span>' +
-      '<select class="pitch__pick" data-slot="' + key + '" aria-label="Jugador en ' +
-        POSITION_NAMES[position] + '">' + options + '</select>' +
+      '<select class="pitch__pick" data-slot="' + key + '" aria-label="Cambiar el ' +
+        POSITION_NAMES[position] + (player ? ': ahora ' + escapeHtml(player.name) : '') + '">' +
+        options + '</select>' +
     '</div>';
   }
 
@@ -1487,9 +1585,9 @@
     $('lineup-count').textContent = titulares + ' de 11 titulares · ' + money(valor) + ' de valor en el campo';
   }
 
-  /* ---------- Pestaña de mánagers ---------- */
+  /* ---------- Pestaña de jugadores ---------- */
 
-  /** Récords de un mánager: sus operaciones extremas. */
+  /** Récords de un jugador: sus operaciones extremas. */
   function managerRecords(name) {
     const moves = state.movements.filter(function (movement) { return movement.manager === name; });
     const buys = moves.filter(function (movement) { return movement.type === 'buy'; });
@@ -1537,7 +1635,7 @@
       const open = state.expandedManager === row.name;
       return '<tr class="' + (open ? 'row-open' : '') + '">' +
         '<td class="col-rank">' + (index + 1) + '</td>' +
-        '<td data-label="Mánager">' +
+        '<td data-label="Futbolista">' +
           '<button type="button" class="row-toggle" data-manager-card="' + escapeHtml(row.name) + '"' +
             ' aria-expanded="' + (open ? 'true' : 'false') + '">' +
             '<span class="row-toggle__icon" aria-hidden="true">▸</span>' +
@@ -1556,7 +1654,7 @@
     }).join('');
   }
 
-  /** Ficha completa de un mánager: cifras, récords y gráficos. */
+  /** Ficha completa de un jugador: cifras, récords y gráficos. */
   function managerPanel(row) {
     const stats = managerRecords(row.name);
 
@@ -1651,7 +1749,7 @@
         '<tr class="detail-row"><td class="detail-cell" colspan="4"><div class="detail">' +
         '<table class="detail-table"><thead><tr>' +
           squadColumn('position', 'Pos.', '') +
-          squadColumn('name', 'Jugador', '') +
+          squadColumn('name', 'Futbolista', '') +
           squadColumn('since', 'Desde', '') +
           squadColumn('paid', 'Pagado', 'num') +
           squadColumn('marketValue', 'Valor de mercado', 'num') +
@@ -1674,7 +1772,7 @@
         }).join('') + '</tbody></table></div></td></tr>';
 
       return '<tr class="' + (open ? 'row-open' : '') + '">' +
-        '<td data-label="Mánager">' +
+        '<td data-label="Futbolista">' +
           '<button type="button" class="row-toggle" data-squad="' + escapeHtml(squad.id) + '"' +
             ' aria-expanded="' + (open ? 'true' : 'false') + '">' +
             '<span class="row-toggle__icon" aria-hidden="true">▸</span>' +
@@ -1693,6 +1791,8 @@
   function renderSpending() {
     ['spend', 'income'].forEach(function (kind) {
       const buys = kind === 'spend';
+      const sort = state.sort[kind];
+
       const rows = MANAGERS.map(function (name) {
         const moves = state.movements.filter(function (movement) {
           return movement.manager === name && movement.type === (buys ? 'buy' : 'sell');
@@ -1700,9 +1800,29 @@
         return {
           name: name,
           moves: moves,
+          count: moves.length,
           total: moves.reduce(function (sum, movement) { return sum + movement.amount; }, 0)
         };
-      }).sort(function (a, b) { return b.total - a.total; });
+      }).sort(function (a, b) {
+        if (sort.key === 'name') return a.name.localeCompare(b.name, 'es') * sort.dir;
+        const diff = (a[sort.key] - b[sort.key]) * sort.dir;
+        return diff || b.total - a.total;
+      });
+
+      // Cabeceras con su flecha, según por dónde se esté ordenando.
+      const headers = [
+        { key: '', label: '#', cls: 'col-rank' },
+        { key: 'name', label: 'Jugador', cls: '' },
+        { key: 'count', label: buys ? 'Fichajes' : 'Ventas', cls: 'num' },
+        { key: 'total', label: 'Total', cls: 'num' }
+      ];
+      $(kind + '-head').innerHTML = '<tr>' + headers.map(function (column) {
+        if (!column.key) return '<th class="' + column.cls + '">' + column.label + '</th>';
+        return '<th class="' + column.cls + ' sortable" data-spend-sort="' + kind + ':' + column.key +
+          '" tabindex="0" aria-sort="' +
+          (sort.key === column.key ? (sort.dir === 1 ? 'ascending' : 'descending') : 'none') + '">' +
+          column.label + '</th>';
+      }).join('') + '</tr>';
 
       $(kind + '-body').innerHTML = rows.map(function (row, index) {
         const key = kind + ':' + row.name;
@@ -1719,14 +1839,14 @@
 
         return '<tr class="' + (open ? 'row-open' : '') + '">' +
           '<td class="col-rank">' + (index + 1) + '</td>' +
-          '<td data-label="Mánager">' +
+          '<td data-label="Futbolista">' +
             '<button type="button" class="row-toggle" data-spend="' + escapeHtml(key) + '"' +
               ' aria-expanded="' + (open ? 'true' : 'false') + '">' +
               '<span class="row-toggle__icon" aria-hidden="true">▸</span>' +
               '<span class="manager">' + avatar(row.name) +
                 '<span class="manager__name">' + escapeHtml(row.name) + '</span></span>' +
             '</button></td>' +
-          '<td class="num" data-label="Operaciones">' + row.moves.length + '</td>' +
+          '<td class="num" data-label="Operaciones">' + row.count + '</td>' +
           '<td class="num" data-label="Total"><strong class="' + (buys ? 'money-neg' : 'money-pos') + '">' +
             money(row.total) + '</strong></td>' +
         '</tr>' + detail;
@@ -1769,7 +1889,7 @@
   function renderManagerFilter() {
     const select = $('filter-manager');
     const current = select.value;
-    select.innerHTML = '<option value="">Todos los mánagers</option>' +
+    select.innerHTML = '<option value="">Todos los jugadores</option>' +
       MANAGERS.map(function (name) {
         return '<option value="' + escapeHtml(name) + '">' + escapeHtml(name) + '</option>';
       }).join('');
@@ -1783,6 +1903,7 @@
     renderMovements();
     renderOffers();
     renderListings();
+    renderRound();
     renderLineup();
     renderWarnings();
     if (state.tab === 'managers') { renderManagers(); renderSquads(); }
@@ -1954,6 +2075,7 @@
     state.offers = Array.isArray(payload.offers) ? payload.offers : [];
     state.listings = Array.isArray(payload.listings) ? payload.listings : [];
     state.lineup = payload.lineup || null;
+    state.round = payload.round || state.round;
     state.me = payload.me || null;
     state.leagueStart = (payload.league && payload.league.startDay) || state.leagueStart;
     state.warnings = warnings;
@@ -2058,7 +2180,7 @@
 
   function exportCsv() {
     const rows = budgetRows();
-    const header = ['Mánager', 'Fichajes', 'Ventas', 'Inicial', 'Gastado', 'Ingresado', 'Saldo disponible', 'Valor equipo', 'Puja máxima'];
+    const header = ['Jugador', 'Fichajes', 'Ventas', 'Inicial', 'Gastado', 'Ingresado', 'Saldo disponible', 'Valor equipo', 'Puja máxima'];
     const lines = [header.join(';')].concat(rows.map(function (row) {
       return [
         row.name,
@@ -2121,7 +2243,7 @@
 
   function bindEvents() {
     /* 'error' no burbujea, así que se escucha en captura: si la foto de un
-       mánager no carga, se prueba el sustituto y, si tampoco, se retira para
+       jugador no carga, se prueba el sustituto y, si tampoco, se retira para
        dejar ver las iniciales. */
     document.addEventListener('error', function (event) {
       const img = event.target;
@@ -2239,6 +2361,18 @@
       });
     });
 
+    ['spend-head', 'income-head'].forEach(function (id) {
+      $(id).addEventListener('click', function (event) {
+        const header = event.target.closest('[data-spend-sort]');
+        if (!header) return;
+        const parts = header.getAttribute('data-spend-sort').split(':');
+        const sort = state.sort[parts[0]];
+        if (sort.key === parts[1]) sort.dir = -sort.dir;
+        else { sort.key = parts[1]; sort.dir = parts[1] === 'name' ? 1 : -1; }
+        renderSpending();
+      });
+    });
+
     $('managers-body').addEventListener('click', function (event) {
       const chip = event.target.closest('[data-chart]');
       if (chip) {
@@ -2345,6 +2479,8 @@
       syncNow(true);
       startAutoSync();
     }
+
+    setInterval(tickRound, 1000);   // la cuenta atrás corre sola
   }
 
   document.addEventListener('DOMContentLoaded', init);
