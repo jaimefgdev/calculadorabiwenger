@@ -203,6 +203,12 @@ code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft)
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
+/* La puja máxima destaca en ámbar; en claro hace falta un tono más oscuro
+   para que se lea sobre el fondo blanco. */
+.stat--bid strong { color: #a87400; }
+@media (prefers-color-scheme: dark) {
+  .stat--bid strong { color: #ffc233; }
+}
 
 .records {
   display: grid; gap: .6rem;
@@ -369,7 +375,9 @@ code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft)
 }
 /* Columnas de recuento: estrechas, el número manda. */
 .table--budget th[data-sort="buys"], .table--budget th[data-sort="sells"],
-.table--budget td[data-label="Fichajes"], .table--budget td[data-label="Ventas"] { width: 1%; }
+.table--budget th[data-sort="players"],
+.table--budget td[data-label="Fichajes"], .table--budget td[data-label="Ventas"],
+.table--budget td[data-label="Jug."] { width: 1%; }
 .table thead th {
   font-size: .68rem; font-weight: 620;
   text-transform: uppercase; letter-spacing: .03em;

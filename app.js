@@ -389,6 +389,7 @@
       earned:    function (row) { return row.earned; },
       balance:   function (row) { return row.balance; },
       teamValue: function (row) { return row.teamValue; },
+      players:   function (row) { return row.players; },
       maxBid:    function (row) { return row.maxBid; }
     },
     moves: {
@@ -575,17 +576,7 @@
     };
   }
 
-  function renderKpis(rows) {
-    const kpi = kpiValues(rows);
-    state.kpi = kpi;
-
-    ['moves', 'spent', 'earned', 'balance'].forEach(function (key) {
-      $('kpi-' + key).textContent = kpi[key].value;
-      $('kpi-' + key + '-foot').textContent = kpi[key].foot;
-    });
-  }
-
-  /** Las mismas tarjetas en la pestaña Datos, pero pulsables. */
+  /** Las tarjetas de la pestaña Datos, pulsables para abrir su gráfico. */
   function renderDataKpis() {
     const kpi = state.kpi || kpiValues(budgetRows());
 
@@ -601,7 +592,7 @@
     }).join('');
   }
 
-  const BUDGET_COLUMNS = 9;
+  const BUDGET_COLUMNS = 10;
 
   /* ---------- Histórico y gráficos ---------- */
 
@@ -1008,8 +999,9 @@
               '. La diferencia sale de movimientos que el tablón no detalla: cesiones, bonus de jornada o cláusulas.">≠</span>'
             : '') + '</td>' +
         '<td class="num" data-label="Valor equipo">' +
-          (row.teamValue == null ? '<span class="unknown">—</span>' : money(row.teamValue) +
-            (row.players ? ' <span class="sub">· ' + row.players + ' jug.</span>' : '')) + '</td>' +
+          (row.teamValue == null ? '<span class="unknown">—</span>' : money(row.teamValue)) + '</td>' +
+        '<td class="num" data-label="Jug.">' +
+          (row.players == null ? '<span class="unknown">—</span>' : row.players) + '</td>' +
         '<td class="num col-bid" data-label="Puja máxima">' +
           (row.maxBid == null ? '<span class="unknown">—</span>' : '<strong>' + signedCell(row.maxBid) + '</strong>') + '</td>' +
       '</tr>' + (expanded ? managerDetail(row.name) : '');
@@ -1023,8 +1015,9 @@
       acc.buys += row.buys;
       acc.sells += row.sells;
       if (row.teamValue != null) acc.teamValue += row.teamValue;
+      if (row.players != null) acc.players += row.players;
       return acc;
-    }, { initial: 0, spent: 0, earned: 0, balance: 0, teamValue: 0, buys: 0, sells: 0 });
+    }, { initial: 0, spent: 0, earned: 0, balance: 0, teamValue: 0, buys: 0, sells: 0, players: 0 });
 
     $('budget-foot').innerHTML = '<tr>' +
       '<td class="col-rank"></td>' +
@@ -1035,6 +1028,7 @@
       '<td class="num" data-label="Ingresado">' + (totals.earned ? '+' + money(totals.earned) : money(0)) + '</td>' +
       '<td class="num" data-label="Saldo">' + money(totals.balance) + '</td>' +
       '<td class="num" data-label="Valor equipo">' + (totals.teamValue ? money(totals.teamValue) : '<span class="unknown">—</span>') + '</td>' +
+      '<td class="num" data-label="Jug.">' + (totals.players || '') + '</td>' +
       '<td class="num" data-label="Puja máxima"></td>' +
     '</tr>';
 
@@ -1279,7 +1273,7 @@
           '<div class="stat"><span class="stat__label">Ingresado</span><strong class="money-pos">' + money(row.earned) + '</strong></div>' +
           '<div class="stat"><span class="stat__label">Valor equipo</span><strong>' +
             (row.teamValue == null ? '—' : money(row.teamValue)) + '</strong></div>' +
-          '<div class="stat"><span class="stat__label">Puja máxima</span><strong>' +
+          '<div class="stat stat--bid"><span class="stat__label">Puja máxima</span><strong>' +
             (row.maxBid == null ? '—' : money(row.maxBid)) + '</strong></div>' +
           '<div class="stat" title="Media por fichaje"><span class="stat__label">Media fichaje</span><strong>' +
             (stats.avgBuy == null ? '—' : money(stats.avgBuy)) + '</strong></div>' +
@@ -1343,7 +1337,7 @@
 
   function render() {
     const rows = budgetRows();
-    renderKpis(rows);
+    state.kpi = kpiValues(rows);   // los usa la pestaña Datos
     renderBudgets(rows);
     renderMovements();
     renderOffers();
