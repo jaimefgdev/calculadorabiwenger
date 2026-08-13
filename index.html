@@ -14,7 +14,9 @@
   }
 </script>
 <title>Calculadora Biwenger — Presupuestos de la liga</title>
-<link rel="stylesheet" href="styles.css">
+<!-- El ?v= se sube en cada publicación: obliga al navegador a bajar el archivo
+     nuevo en vez de reutilizar el que tenga en caché. -->
+<link rel="stylesheet" href="styles.css?v=9">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>💰</text></svg>">
 </head>
 <body>
@@ -294,7 +296,7 @@
         <table class="table table--squads">
           <thead>
             <tr>
-              <th>Futbolista</th>
+              <th></th>
               <th class="num">Jugadores</th>
               <th class="num">Pagado</th>
               <th class="num">Valor de mercado</th>
@@ -362,6 +364,6 @@
 
 </main>
 
-<script src="app.js"></script>
+<script src="app.js?v=9"></script>
 </body>
 </html>

@@ -918,10 +918,11 @@
   /* Los tres primeros son flujos —lo que pasó ESE día— y van en barras. El
      saldo es un nivel, así que se dibuja como línea con el valor al cierre. */
   const KPI_SERIES = [
-    /* Los movimientos se desglosan en dos líneas para ver de dónde vienen:
+    /* El total va acompañado de su desglose: azul todo lo que se movió,
        ámbar lo que se ficha, verde lo que se vende. */
     { key: 'moves',   field: 'movesDay',  label: 'Movimientos',         color: 'var(--viz-1)', count: true,
       series: [
+        { field: 'movesDay', color: 'var(--viz-1)', label: 'Total' },
         { field: 'buysDay',  color: 'var(--viz-4)', label: 'Fichajes' },
         { field: 'sellsDay', color: 'var(--viz-2)', label: 'Ventas' }
       ] },
@@ -1772,7 +1773,7 @@
         }).join('') + '</tbody></table></div></td></tr>';
 
       return '<tr class="' + (open ? 'row-open' : '') + '">' +
-        '<td data-label="Futbolista">' +
+        '<td>' +
           '<button type="button" class="row-toggle" data-squad="' + escapeHtml(squad.id) + '"' +
             ' aria-expanded="' + (open ? 'true' : 'false') + '">' +
             '<span class="row-toggle__icon" aria-hidden="true">▸</span>' +
