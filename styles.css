@@ -336,6 +336,12 @@ code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft)
   padding: .6rem .9rem;
 }
 .detail-table { width: 100%; border-collapse: collapse; font-size: .86rem; }
+.detail-table thead th {
+  position: static;
+  background: transparent;
+  padding: .2rem .5rem .35rem;
+  font-size: .66rem;
+}
 .detail-table td { padding: .3rem .5rem; border-bottom: 1px solid var(--border); white-space: nowrap; }
 .detail-table tr:last-child td { border-bottom: 0; }
 .detail-table .num { text-align: right; font-variant-numeric: tabular-nums; }
@@ -448,6 +454,8 @@ code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft)
   .detail-cell { display: block !important; padding: 0 !important; }
   .detail { border-radius: var(--radius-sm); }
   .detail-table { display: table; width: 100%; }
+  .detail-table thead { display: table-header-group; }
+  .detail-table thead th { display: table-cell; width: auto; border: 0; border-radius: 0; padding: .2rem .4rem; }
   .detail-table tbody { display: table-row-group; }
   .detail-table tr { display: table-row; border: 0; margin: 0; padding: 0; }
   .detail-table td { display: table-cell; padding: .3rem .4rem; white-space: normal; }

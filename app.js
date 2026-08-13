@@ -458,7 +458,8 @@
     // key vacía = orden por defecto de cada tabla (ver más abajo).
     sort: {
       budget: { key: '', dir: -1 },
-      moves:  { key: '', dir: -1 }
+      moves:  { key: '', dir: -1 },
+      detail: { key: 'amount', dir: -1 }   // dentro de la ficha de cada mánager
     }
   };
 
@@ -548,16 +549,50 @@
 
   const BUDGET_COLUMNS = 9;
 
-  /** Ficha desplegable de un mánager: sus jugadores, del más caro al más barato. */
+  /**
+   * Orden dentro de la ficha de un mánager. Por «Acción» agrupa compras y
+   * ventas, y dentro de cada grupo ordena del más caro al más barato; con
+   * cualquier otra columna manda esa columna sin agrupar.
+   */
+  function sortDetail(moves, sort) {
+    if (sort.key !== 'type') return sortRows(moves, 'moves', sort);
+    return moves.slice().sort(function (a, b) {
+      const groupA = a.type === 'buy' ? 0 : 1;
+      const groupB = b.type === 'buy' ? 0 : 1;
+      if (groupA !== groupB) return sort.dir === 1 ? groupA - groupB : groupB - groupA;
+      return b.amount - a.amount;
+    });
+  }
+
+  const DETAIL_COLUMNS = [
+    { key: '',       label: '#',       cls: 'detail-rank' },
+    { key: 'player', label: 'Jugador', cls: '' },
+    { key: 'type',   label: 'Acción',  cls: '', title: 'Agrupa compras y ventas, cada grupo por precio' },
+    { key: 'amount', label: 'Importe', cls: 'num' },
+    { key: 'date',   label: 'Fecha',   cls: 'detail-date' }
+  ];
+
+  function detailHead() {
+    const sort = state.sort.detail;
+    return '<thead><tr>' + DETAIL_COLUMNS.map(function (column) {
+      if (!column.key) return '<th class="' + column.cls + '"></th>';
+      const active = sort.key === column.key;
+      return '<th class="' + column.cls + ' sortable" data-detail-sort="' + column.key + '"' +
+        ' tabindex="0" aria-sort="' + (active ? (sort.dir === 1 ? 'ascending' : 'descending') : 'none') + '"' +
+        (column.title ? ' title="' + column.title + '"' : '') + '>' + column.label + '</th>';
+    }).join('') + '</tr></thead>';
+  }
+
+  /** Ficha desplegable de un mánager con sus jugadores. */
   function managerDetail(name) {
-    const moves = state.movements
-      .filter(function (movement) { return movement.manager === name; })
-      .slice()
-      .sort(function (a, b) { return b.amount - a.amount; });
+    const moves = sortDetail(
+      state.movements.filter(function (movement) { return movement.manager === name; }),
+      state.sort.detail
+    );
 
     const inner = moves.length === 0
       ? '<p class="muted">Este mánager no tiene movimientos en el tablón.</p>'
-      : '<table class="detail-table"><tbody>' + moves.map(function (movement, index) {
+      : '<table class="detail-table">' + detailHead() + '<tbody>' + moves.map(function (movement, index) {
           const buy = movement.type === 'buy';
           return '<tr>' +
             '<td class="detail-rank">' + (index + 1) + '</td>' +
@@ -1042,12 +1077,30 @@
     bindSorting('moves');
 
     $('budget-body').addEventListener('click', function (event) {
+      const header = event.target.closest('th[data-detail-sort]');
+      if (header) {
+        const key = header.getAttribute('data-detail-sort');
+        const sort = state.sort.detail;
+        if (sort.key === key) sort.dir = -sort.dir;
+        else { sort.key = key; sort.dir = defaultDir(key); }
+        renderBudgets(budgetRows());
+        return;
+      }
+
       const button = event.target.closest('.row-toggle');
       if (!button) return;
       const name = button.getAttribute('data-manager');
       if (state.expanded[name]) delete state.expanded[name];
       else state.expanded[name] = true;
       renderBudgets(budgetRows());
+    });
+
+    $('budget-body').addEventListener('keydown', function (event) {
+      if (event.key !== 'Enter' && event.key !== ' ') return;
+      const header = event.target.closest('th[data-detail-sort]');
+      if (!header) return;
+      event.preventDefault();
+      header.click();
     });
 
     $('btn-toggle-input').addEventListener('click', function () {
