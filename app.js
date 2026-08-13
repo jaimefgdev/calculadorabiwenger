@@ -474,6 +474,7 @@
     lineup: null,          // mi alineación en Biwenger
     round: null,           // próxima jornada y su hora de inicio
     roundOpen: false,      // lista de partidos desplegada
+    picker: null,          // hueco del campo que se está cambiando
     xi: null,              // el once del simulador
     squads: null,          // plantillas de todos los jugadores
     expandedSquad: null,
@@ -1518,47 +1519,92 @@
     return alt.indexOf(position) !== -1;
   }
 
-  function pitchSlot(key, position) {
-    const id = state.xi.slots[key];
-    const player = id ? playerById(id) : null;
+  /** Foto de un futbolista como fondo; `extra` son clases del sitio donde va. */
+  function faceOf(id, extra) {
+    return '<span class="pic-player ' + extra + '" style="background-image:url(\'' +
+      'https://cdn.biwenger.com/i/p/' + encodeURIComponent(id) + '.png\')"></span>';
+  }
+
+  /* Quién puede entrar en ese hueco: solo los que juegan en esa demarcación
+     —contando la posición alternativa— y no ocupan ya un sitio de la misma
+     línea. Los polivalentes alineados en otra línea sí valen: un DEF/MED
+     puesto atrás puede subir al centro. */
+  function slotCandidates(position) {
     const chosen = {};
     Object.keys(state.xi.slots).forEach(function (slot) { chosen[state.xi.slots[slot]] = slot; });
 
-    /* Solo los que pueden jugar en esa demarcación —contando la posición
-       alternativa— y que estén libres. Los ya alineados no se listan; el de
-       este hueco sí, para poder verlo seleccionado. */
-    const options = ['<option value="">— vacío —</option>'].concat(mySquad()
-      .filter(function (candidate) {
-        if (!playsAs(candidate.id, position)) return false;
-        const slot = chosen[candidate.id];
-        if (!slot) return true;
-        /* Fuera los que ya ocupan un hueco de esta misma línea, incluido el
-           que está en este. Los polivalentes alineados en otra línea sí valen:
-           un DEF/MED puesto atrás puede subir al centro. */
-        return Number(slot.split('-')[0]) !== position;
-      })
-      .map(function (candidate) {
-        const main = playerPosition(candidate.id);
-        const alt = (candidate.altPositions || []).length
-          ? '/' + candidate.altPositions.map(function (p) { return POSITION_NAMES[p]; }).join('/')
-          : '';
-        const slot = chosen[candidate.id];
-        const moving = slot ? ' · ahora en ' + POSITION_NAMES[Number(slot.split('-')[0])] : '';
-        return '<option value="' + candidate.id + '">' +
-          escapeHtml(candidate.name) + (main ? ' · ' + POSITION_NAMES[main] + alt : '') + moving + '</option>';
-      })).join('');
+    return mySquad().filter(function (candidate) {
+      if (!playsAs(candidate.id, position)) return false;
+      const slot = chosen[candidate.id];
+      if (!slot) return true;
+      return Number(slot.split('-')[0]) !== position;
+    }).map(function (candidate) {
+      const main = playerPosition(candidate.id);
+      const alt = (candidate.altPositions || []).length
+        ? '/' + candidate.altPositions.map(function (p) { return POSITION_NAMES[p]; }).join('/')
+        : '';
+      const slot = chosen[candidate.id];
+      return {
+        id: candidate.id,
+        name: candidate.name,
+        role: (main ? POSITION_NAMES[main] + alt : ''),
+        moving: slot ? 'ahora en ' + POSITION_NAMES[Number(slot.split('-')[0])] : ''
+      };
+    });
+  }
 
+  function pitchSlot(key, position) {
+    const id = state.xi.slots[key];
+    const player = id ? playerById(id) : null;
     const face = player
-      ? '<span class="pic-player pitch__face" style="background-image:url(\'https://cdn.biwenger.com/i/p/' +
-        encodeURIComponent(player.id) + '.png\')"></span>'
+      ? faceOf(player.id, 'pitch__face')
       : '<span class="pic-player pitch__face pitch__face--empty"></span>';
 
     return '<div class="pitch__slot">' + face +
       '<span class="pitch__name">' + (player ? escapeHtml(player.name) : '—') + '</span>' +
-      '<select class="pitch__pick" data-slot="' + key + '" aria-label="Cambiar el ' +
-        POSITION_NAMES[position] + (player ? ': ahora ' + escapeHtml(player.name) : '') + '">' +
-        options + '</select>' +
+      '<button type="button" class="pitch__pick" data-slot="' + key + '" data-position="' + position + '"' +
+        ' aria-label="Cambiar el ' + POSITION_NAMES[position] +
+        (player ? ': ahora ' + escapeHtml(player.name) : '') + '"></button>' +
     '</div>';
+  }
+
+  /* El cambio se elige por la cara, no en una lista desplegable. */
+  function renderPicker() {
+    const box = $('lineup-picker');
+    const open = state.picker;
+    if (!open || !state.xi) { box.hidden = true; box.innerHTML = ''; return; }
+
+    /* Los de esta misma línea —incluido quien ocupa el hueco— no se listan:
+       ahí no hay cambio que hacer. */
+    const cards = slotCandidates(open.position).map(function (candidate) {
+      return '<button type="button" class="picker__player"' +
+        ' data-pick="' + escapeHtml(String(candidate.id)) + '">' +
+        faceOf(candidate.id, 'picker__face') +
+        '<span class="picker__name">' + escapeHtml(candidate.name) + '</span>' +
+        '<span class="picker__meta">' + escapeHtml(candidate.role) +
+          (candidate.moving ? ' · ' + escapeHtml(candidate.moving) : '') + '</span>' +
+      '</button>';
+    }).join('');
+
+    const empty = '<button type="button" class="picker__player picker__player--empty" data-pick="">' +
+      '<span class="pic-player picker__face picker__face--empty"></span>' +
+      '<span class="picker__name">Dejar vacío</span>' +
+      '<span class="picker__meta">sin jugador</span>' +
+    '</button>';
+
+    box.hidden = false;
+    box.innerHTML =
+      '<div class="picker__backdrop" data-picker-close></div>' +
+      '<div class="picker__card" role="dialog" aria-modal="true" aria-label="Elegir ' +
+        POSITION_NAMES[open.position] + '">' +
+        '<div class="picker__head">' +
+          '<strong>' + POSITION_NAMES[open.position] + ' · elige quién juega</strong>' +
+          '<button type="button" class="btn btn--ghost btn--sm" data-picker-close>Cerrar</button>' +
+        '</div>' +
+        (cards
+          ? '<div class="picker__grid">' + cards + empty + '</div>'
+          : '<p class="muted">No queda nadie disponible para esta posición.</p>') +
+      '</div>';
   }
 
   function renderLineup() {
@@ -2354,20 +2400,50 @@
         if (used[pos] < limit) { kept[pos + '-' + used[pos]] = id; used[pos] += 1; }
       });
       state.xi.slots = kept;
+      // Al cambiar de sistema, el hueco que se estaba eligiendo puede no existir.
+      state.picker = null;
       renderLineup();
+      renderPicker();
     });
 
-    $('pitch').addEventListener('change', function (event) {
+    $('pitch').addEventListener('click', function (event) {
       const pick = event.target.closest('[data-slot]');
       if (!pick) return;
-      const slot = pick.getAttribute('data-slot');
+      state.picker = {
+        slot: pick.getAttribute('data-slot'),
+        position: Number(pick.getAttribute('data-position'))
+      };
+      renderPicker();
+    });
+
+    $('lineup-picker').addEventListener('click', function (event) {
+      if (event.target.closest('[data-picker-close]')) {
+        state.picker = null;
+        renderPicker();
+        return;
+      }
+      const card = event.target.closest('[data-pick]');
+      if (!card || !state.picker) return;
+
+      const id = card.getAttribute('data-pick');
+      const slot = state.picker.slot;
       // Un jugador no puede estar en dos sitios: se libera su hueco anterior.
       Object.keys(state.xi.slots).forEach(function (key) {
-        if (state.xi.slots[key] === pick.value) delete state.xi.slots[key];
+        if (state.xi.slots[key] === id) delete state.xi.slots[key];
       });
-      if (pick.value) state.xi.slots[slot] = pick.value;
+      if (id) state.xi.slots[slot] = id;
       else delete state.xi.slots[slot];
+
+      state.picker = null;
       renderLineup();
+      renderPicker();
+    });
+
+    document.addEventListener('keydown', function (event) {
+      if (event.key === 'Escape' && state.picker) {
+        state.picker = null;
+        renderPicker();
+      }
     });
 
     $('squads-body').addEventListener('click', function (event) {
