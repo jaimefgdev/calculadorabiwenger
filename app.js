@@ -478,6 +478,16 @@
 
   const AVATAR_COLORS = ['#ff0033', '#ff7a00', '#c99700', '#00b37a', '#0091b3', '#7c5cff', '#ff3d9a', '#6b7785'];
 
+  /* Colores propios de algunos mánagers; el resto tira de la paleta automática. */
+  const AVATAR_STYLES = [
+    { name: 'José Mário dos Santos Mourinho', bg: '#ffffff', fg: '#7c3aed' },
+    { name: 'Atlético Jordaan FC',            bg: '#d80030', fg: '#ffffff' },
+    { name: 'Izaskun V',                      bg: '#ffffff', fg: '#8e0020' }
+  ].reduce(function (map, item) {
+    map[normalize(item.name)] = item;
+    return map;
+  }, {});
+
   function avatar(name) {
     const initials = name
       .replace(/[^\p{L}\p{N}\s]/gu, '')
@@ -486,6 +496,13 @@
       .slice(0, 2)
       .map(function (word) { return word[0].toUpperCase(); })
       .join('');
+    const custom = AVATAR_STYLES[normalize(name)];
+    if (custom) {
+      // El aro sutil evita que los fondos claros desaparezcan en modo claro.
+      return '<span class="avatar avatar--ring" style="background:' + custom.bg + ';color:' + custom.fg +
+        '" aria-hidden="true">' + initials + '</span>';
+    }
+
     const index = MANAGERS.indexOf(name);
     const color = AVATAR_COLORS[(index === -1 ? name.length : index) % AVATAR_COLORS.length];
     return '<span class="avatar" style="background:' + color + '" aria-hidden="true">' + initials + '</span>';
