@@ -313,23 +313,26 @@ code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft)
 }
 .pitch__pick:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
 
-/* ---------- Selector de jugador (cambios en el campo) ---------- */
-.picker { position: fixed; inset: 0; z-index: 50; display: grid; place-items: center; padding: 1rem; }
-.picker__backdrop { position: absolute; inset: 0; background: rgba(0, 0, 0, .6); }
+/* ---------- Selector de jugador (cambios en el campo) ----------
+   Va encima del campo, no en mitad de la pantalla: el cambio se elige donde
+   se está mirando. */
+.pitch-wrap { position: relative; width: min(100%, 460px); margin: 0 auto; }
+.picker { position: absolute; inset: 0; z-index: 5; display: grid; place-items: center; padding: .5rem; }
+.picker__backdrop { position: absolute; inset: 0; background: rgba(0, 0, 0, .55); border-radius: 6px; }
 .picker__card {
   position: relative;
-  width: min(100%, 640px); max-height: 80vh; overflow-y: auto;
-  padding: 1rem;
+  width: 100%; max-height: 100%; overflow-y: auto;
+  padding: .8rem;
   background: var(--bg-elev);
   border: 1px solid var(--border-strong);
   border-radius: var(--radius);
-  box-shadow: 0 18px 48px rgba(0, 0, 0, .45);
+  box-shadow: 0 18px 48px rgba(0, 0, 0, .55);
 }
 .picker__head {
   display: flex; align-items: center; justify-content: space-between;
   gap: 1rem; margin-bottom: .8rem;
 }
-.picker__grid { display: grid; gap: .5rem; grid-template-columns: repeat(auto-fill, minmax(112px, 1fr)); }
+.picker__grid { display: grid; gap: .5rem; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); }
 .picker__player {
   display: flex; flex-direction: column; align-items: center; gap: .3rem;
   padding: .6rem .35rem;
@@ -348,6 +351,20 @@ code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft)
   font-size: .8rem; font-weight: 600; max-width: 100%;
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
+.picker__player.is-current { border-color: var(--accent); background: var(--accent-soft); }
+
+/* El botón que abre el menú de sistemas, con pinta de campo. */
+.field--pick { cursor: pointer; text-align: center; font-variant-numeric: tabular-nums; }
+.field--pick::after { content: ' ▾'; color: var(--text-faint); }
+.formation__pitch {
+  display: flex; flex-direction: column; justify-content: space-around;
+  width: 100%; height: 54px; padding: .25rem .2rem; margin-bottom: .15rem;
+  border-radius: 4px;
+  background: linear-gradient(170deg, #12643c 0%, #0b4429 100%);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .28);
+}
+.formation__line { display: flex; justify-content: space-evenly; gap: 2px; min-height: 6px; }
+.formation__line i { width: 6px; height: 6px; border-radius: 50%; background: #fff; }
 .picker__meta { font-size: .68rem; color: var(--text-faint); }
 
 .bench__title { font-size: .8rem; text-transform: uppercase; letter-spacing: .04em; color: var(--text-faint); margin: 1rem 0 .5rem; }

@@ -1590,11 +1590,41 @@
     '</div>';
   }
 
-  /* El cambio se elige por la cara, no en una lista desplegable. */
+  /* Cuadro del sistema: un dibujo de puntos por línea, para reconocerlo de un
+     vistazo sin leer los números. */
+  function formationCard(type) {
+    const lines = formationLines(type);
+    const dots = [lines[4], lines[3], lines[2], 1].map(function (count) {
+      let row = '';
+      for (let i = 0; i < count; i++) row += '<i></i>';
+      return '<span class="formation__line">' + row + '</span>';
+    }).join('');
+    return '<button type="button" class="picker__player formation' +
+      (type === state.xi.type ? ' is-current' : '') + '" data-formation="' + type + '"' +
+      (type === state.xi.type ? ' aria-pressed="true"' : '') + '>' +
+      '<span class="formation__pitch">' + dots + '</span>' +
+      '<span class="picker__name">' + type + '</span>' +
+    '</button>';
+  }
+
+  /* Todo se elige en el mismo panel sobre el campo: ni listas ni desplegables. */
   function renderPicker() {
     const box = $('lineup-picker');
     const open = state.picker;
     if (!open || !state.xi) { box.hidden = true; box.innerHTML = ''; return; }
+
+    if (open.kind === 'formation') {
+      box.hidden = false;
+      box.innerHTML =
+        '<div class="picker__backdrop" data-picker-close></div>' +
+        '<div class="picker__card" role="dialog" aria-modal="true" aria-label="Elegir sistema">' +
+          '<div class="picker__head"><strong>Sistema</strong>' +
+            '<button type="button" class="btn btn--ghost btn--sm" data-picker-close>Cerrar</button>' +
+          '</div>' +
+          '<div class="picker__grid">' + FORMATIONS.map(formationCard).join('') + '</div>' +
+        '</div>';
+      return;
+    }
 
     /* Los de esta misma línea —incluido quien ocupa el hueco— no se listan:
        ahí no hay cambio que hacer. */
@@ -1629,6 +1659,28 @@
       '</div>';
   }
 
+  /** Cambia de sistema y recoloca a los que quepan en la nueva distribución. */
+  function applyFormation(type) {
+    ensureXi();
+    state.xi.type = type;
+
+    const lines = formationLines(type);
+    const kept = {};
+    const used = { 1: 0, 2: 0, 3: 0, 4: 0 };
+    Object.keys(state.xi.slots).sort().forEach(function (key) {
+      const id = state.xi.slots[key];
+      if (!id) return;
+      const pos = Number(key.split('-')[0]);
+      const limit = pos === 1 ? 1 : lines[pos];
+      if (used[pos] < limit) { kept[pos + '-' + used[pos]] = id; used[pos] += 1; }
+    });
+    state.xi.slots = kept;
+
+    state.picker = null;
+    renderLineup();
+    renderPicker();
+  }
+
   function renderLineup() {
     const section = $('lineup-panel');
     if (!state.me || !state.lineup) { section.hidden = true; return; }
@@ -1645,10 +1697,7 @@
       { position: 1, count: 1 }
     ];
 
-    $('lineup-formation').innerHTML = FORMATIONS.map(function (formation) {
-      return '<option value="' + formation + '"' +
-        (formation === state.xi.type ? ' selected' : '') + '>' + formation + '</option>';
-    }).join('');
+    $('lineup-formation').textContent = state.xi.type;
 
     $('pitch').innerHTML =
       '<span class="pitch__area pitch__area--top" aria-hidden="true"></span>' +
@@ -2412,24 +2461,10 @@
 
     bindSorting('managers');
 
-    $('lineup-formation').addEventListener('change', function (event) {
+    /* El botón del sistema abre el mismo panel que los cambios. */
+    $('lineup-formation').addEventListener('click', function () {
       ensureXi();
-      state.xi.type = event.target.value;
-      // Se recolocan los que quepan en la nueva distribución.
-      const lines = formationLines(state.xi.type);
-      const kept = {};
-      const used = { 1: 0, 2: 0, 3: 0, 4: 0 };
-      Object.keys(state.xi.slots).sort().forEach(function (key) {
-        const id = state.xi.slots[key];
-        if (!id) return;
-        const pos = Number(key.split('-')[0]);
-        const limit = pos === 1 ? 1 : lines[pos];
-        if (used[pos] < limit) { kept[pos + '-' + used[pos]] = id; used[pos] += 1; }
-      });
-      state.xi.slots = kept;
-      // Al cambiar de sistema, el hueco que se estaba eligiendo puede no existir.
-      state.picker = null;
-      renderLineup();
+      state.picker = { kind: 'formation' };
       renderPicker();
     });
 
@@ -2437,6 +2472,7 @@
       const pick = event.target.closest('[data-slot]');
       if (!pick) return;
       state.picker = {
+        kind: 'player',
         slot: pick.getAttribute('data-slot'),
         position: Number(pick.getAttribute('data-position'))
       };
@@ -2449,6 +2485,13 @@
         renderPicker();
         return;
       }
+
+      const sistema = event.target.closest('[data-formation]');
+      if (sistema) {
+        applyFormation(sistema.getAttribute('data-formation'));
+        return;
+      }
+
       const card = event.target.closest('[data-pick]');
       if (!card || !state.picker) return;
 

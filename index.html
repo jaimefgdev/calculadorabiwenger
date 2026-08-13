@@ -16,7 +16,7 @@
 <title>Calculadora Biwenger — Presupuestos de la liga</title>
 <!-- El ?v= se sube en cada publicación: obliga al navegador a bajar el archivo
      nuevo en vez de reutilizar el que tenga en caché. -->
-<link rel="stylesheet" href="styles.css?v=19">
+<link rel="stylesheet" href="styles.css?v=20">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>💰</text></svg>">
 </head>
 <body>
@@ -211,22 +211,24 @@
         <h2>Mi alineación</h2>
         <p class="muted" id="lineup-count">&nbsp;</p>
       </div>
-      <label class="field-label">Sistema
-        <select id="lineup-formation" class="field"></select>
-      </label>
+      <span class="field-label">Sistema
+        <button type="button" id="lineup-formation" class="field field--pick"
+          aria-haspopup="dialog">4-4-2</button>
+      </span>
     </div>
 
     <!-- Campo a la izquierda, suplentes a la derecha. -->
     <div class="lineup-grid">
-      <div id="pitch" class="pitch"></div>
+      <!-- El selector de cambios se dibuja sobre el propio campo. -->
+      <div class="pitch-wrap">
+        <div id="pitch" class="pitch"></div>
+        <div id="lineup-picker" class="picker" hidden></div>
+      </div>
       <div class="lineup-bench">
         <h3 class="bench__title">Suplentes</h3>
         <div id="bench" class="bench"></div>
       </div>
     </div>
-
-    <!-- Elegir el cambio: las caras de quienes pueden jugar en ese hueco. -->
-    <div id="lineup-picker" class="picker" hidden></div>
   </section>
 
   </div><!-- /panel-inicio -->
@@ -375,6 +377,6 @@
 
 </main>
 
-<script src="app.js?v=19"></script>
+<script src="app.js?v=20"></script>
 </body>
 </html>
