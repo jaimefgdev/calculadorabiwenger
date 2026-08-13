@@ -1401,15 +1401,24 @@
     const options = ['<option value="">— vacío —</option>'].concat(mySquad()
       .filter(function (candidate) {
         if (!playsAs(candidate.id, position)) return false;
-        return !chosen[candidate.id] || chosen[candidate.id] === key;
+        const slot = chosen[candidate.id];
+        if (!slot || slot === key) return true;
+        /* Ya alineado en otra línea: solo se ofrece si sirve para esta, que es
+           el caso de los polivalentes (un DEF/MED puesto atrás puede subir al
+           centro). En su propia línea no se repite. */
+        return Number(slot.split('-')[0]) !== position;
       })
       .map(function (candidate) {
         const main = playerPosition(candidate.id);
         const alt = (candidate.altPositions || []).length
           ? '/' + candidate.altPositions.map(function (p) { return POSITION_NAMES[p]; }).join('/')
           : '';
+        const slot = chosen[candidate.id];
+        const moving = slot && slot !== key
+          ? ' · ahora en ' + POSITION_NAMES[Number(slot.split('-')[0])]
+          : '';
         return '<option value="' + candidate.id + '"' + (candidate.id === id ? ' selected' : '') + '>' +
-          escapeHtml(candidate.name) + (main ? ' · ' + POSITION_NAMES[main] + alt : '') + '</option>';
+          escapeHtml(candidate.name) + (main ? ' · ' + POSITION_NAMES[main] + alt : '') + moving + '</option>';
       })).join('');
 
     const face = player
