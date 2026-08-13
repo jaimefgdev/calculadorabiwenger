@@ -25,6 +25,7 @@
   const TEAM_VALUE_SHARE = 0.25;          // fracción del valor de equipo que suma a la puja
   const STORAGE_KEY = 'biwenger-calc-v2';
   const SYNC_KEY = 'biwenger-calc-sync';
+  const HISTORY_KEY = 'biwenger-calc-history';
   const AUTO_SYNC_MS = 5 * 60 * 1000;     // refresco automático
 
   /* ---------- Utilidades ---------- */
@@ -453,6 +454,9 @@
     warnings: [],
     filters: { text: '', manager: '', type: '' },
     expanded: {},          // mánagers con la ficha de jugadores desplegada
+    charts: { saldo: true, value: true, bid: true },
+    kpiCharts: { moves: false, spent: false, earned: false, balance: false },
+    history: {},           // valor de equipo día a día, por mánager
     offers: [],            // pujas enviadas y ofertas recibidas, pendientes
     me: null,              // saldo y puja máxima oficiales del usuario
     syncing: false,
@@ -560,6 +564,282 @@
 
   const BUDGET_COLUMNS = 9;
 
+  /* ---------- Histórico y gráficos ---------- */
+
+  /* Biwenger no publica la evolución del valor de equipo: solo el dato de hoy.
+     Así que el saldo se reconstruye día a día desde los movimientos (eso sí es
+     exacto desde el primer día) y del valor de equipo se guarda una foto diaria
+     a partir de la primera sincronización. */
+
+  const dayKey = (time) => new Date(time).toISOString().slice(0, 10);
+
+  function loadHistory() {
+    try {
+      const raw = localStorage.getItem(HISTORY_KEY);
+      const data = raw ? JSON.parse(raw) : null;
+      return data && typeof data === 'object' ? data : {};
+    } catch (error) {
+      return {};
+    }
+  }
+
+  /** Guarda el valor de equipo de hoy de cada mánager (una foto por día). */
+  function recordSnapshot() {
+    const history = loadHistory();
+    const today = dayKey(Date.now());
+    const snapshot = {};
+    Object.keys(state.teams).forEach(function (name) {
+      const team = state.teams[name];
+      if (team && team.value != null) snapshot[name] = team.value;
+    });
+    if (Object.keys(snapshot).length === 0) return;
+    history[today] = snapshot;
+    try { localStorage.setItem(HISTORY_KEY, JSON.stringify(history)); } catch (error) { /* sin espacio */ }
+  }
+
+  const CHART_SERIES = [
+    { key: 'saldo',  label: 'Saldo',        color: 'var(--viz-1)' },
+    { key: 'value',  label: 'Valor equipo', color: 'var(--viz-2)' },
+    { key: 'bid',    label: 'Puja máxima',  color: 'var(--viz-3)' }
+  ];
+
+  /**
+   * Pide al Worker el valor de equipo día a día de un mánager. Se reconstruye
+   * allí a partir de su plantilla y del histórico de precios, así que tarda un
+   * poco: se hace solo al desplegar su ficha y se guarda en memoria.
+   */
+  function ensureHistory(name) {
+    const team = state.teams[name];
+    if (!team || !team.id) return;
+    if (state.history[name]) return;
+
+    const config = loadSyncConfig();
+    if (!config.url || !config.key) return;
+
+    state.history[name] = { status: 'loading', days: {} };
+
+    const endpoint = config.url.replace(/\/+$/, '') + '/?key=' + encodeURIComponent(config.key) +
+      '&history=' + encodeURIComponent(team.id);
+
+    fetch(endpoint, { headers: { 'accept': 'application/json' } })
+      .then(function (response) { return response.json(); })
+      .then(function (payload) {
+        if (payload.error) throw new Error(payload.error);
+        const days = {};
+        (payload.days || []).forEach(function (entry) {
+          if (entry.teamValue != null) days[entry.day] = entry.teamValue;
+        });
+        state.history[name] = { status: 'ok', days: days };
+        renderBudgets(budgetRows());
+      })
+      .catch(function () {
+        state.history[name] = { status: 'error', days: {} };
+        renderBudgets(budgetRows());
+      });
+  }
+
+  /** Serie diaria de saldo, valor de equipo y puja máxima de un mánager. */
+  function managerSeries(name) {
+    const history = loadHistory();
+    const remote = (state.history[name] && state.history[name].days) || {};
+    const moves = state.movements
+      .filter(function (movement) { return movement.manager === name && movement.timestamp; })
+      .sort(function (a, b) { return a.timestamp - b.timestamp; });
+
+    const stamps = moves.map(function (movement) { return dayKey(movement.timestamp); })
+      .concat(Object.keys(history))
+      .concat(Object.keys(remote));
+    const today = dayKey(Date.now());
+    const first = stamps.length ? stamps.slice().sort()[0] : today;
+
+    const days = [];
+    for (let time = Date.parse(first); time <= Date.parse(today); time += 86400000) {
+      days.push(dayKey(time));
+    }
+    if (days.length === 0) days.push(today);
+
+    const team = state.teams[name];
+    let balance = INITIAL_BUDGET;
+    let index = 0;
+
+    return days.map(function (day, position) {
+      while (index < moves.length && dayKey(moves[index].timestamp) <= day) {
+        balance += moves[index].type === 'buy' ? -moves[index].amount : moves[index].amount;
+        index += 1;
+      }
+      /* Prioridad: reconstrucción del Worker, luego la foto local, y para el
+         último día el valor recién sincronizado, que es el más fresco. */
+      const stored = history[day] && history[day][name];
+      let value = remote[day] != null ? remote[day] : (stored != null ? stored : null);
+      if (position === days.length - 1 && team && team.value != null) value = team.value;
+
+      return {
+        day: day,
+        saldo: balance,
+        value: value,
+        bid: value != null ? balance + value * TEAM_VALUE_SHARE : null
+      };
+    });
+  }
+
+  const shortDay = (day) => day.slice(8, 10) + '/' + day.slice(5, 7);
+  const shortMoney = (n) => (Math.round(n / 100000) / 10).toFixed(1).replace('.', ',') + 'M';
+
+  /**
+   * Gráfico de líneas en SVG, sin librerías. Ancho fijo en el viewBox y
+   * escalado por CSS; el trazo se mantiene a 2 px reales.
+   */
+  function lineChart(points, key, color, label, isCount) {
+    const fmtTick = isCount ? function (v) { return String(Math.round(v)); } : shortMoney;
+    const fmtFull = isCount ? function (v) { return Math.round(v) + (v === 1 ? ' movimiento' : ' movimientos'); } : money;
+    const valid = points.filter(function (point) { return point[key] != null; });
+    if (valid.length === 0) {
+      return '<p class="viz__empty">Sin datos todavía de ' + escapeHtml(label.toLowerCase()) + '.</p>';
+    }
+
+    const W = 600, H = 130, padX = 46, padTop = 14, padBottom = 22;
+    const values = valid.map(function (point) { return point[key]; });
+    let min = Math.min.apply(null, values);
+    let max = Math.max.apply(null, values);
+    // Serie plana: se abre un margen proporcional para que la línea quede centrada.
+    if (min === max) {
+      const pad = isCount ? Math.max(1, Math.abs(min) * 0.2) : Math.max(500000, Math.abs(min) * 0.05);
+      min -= pad;
+      max += pad;
+    }
+    const span = max - min;
+
+    const x = (i) => points.length === 1
+      ? W / 2
+      : padX + (i * (W - padX - 12)) / (points.length - 1);
+    const y = (v) => padTop + (1 - (v - min) / span) * (H - padTop - padBottom);
+
+    const coords = points
+      .map(function (point, i) { return point[key] == null ? null : { x: x(i), y: y(point[key]), point: point }; })
+      .filter(Boolean);
+
+    const path = coords.map(function (c, i) { return (i ? 'L' : 'M') + c.x.toFixed(1) + ' ' + c.y.toFixed(1); }).join(' ');
+    const area = coords.length > 1
+      ? '<path class="viz__area" d="' + path + ' L' + coords[coords.length - 1].x.toFixed(1) + ' ' + (H - padBottom) +
+        ' L' + coords[0].x.toFixed(1) + ' ' + (H - padBottom) + ' Z" fill="' + color + '"></path>'
+      : '';
+
+    const grid = [min, min + span / 2, max].map(function (v) {
+      return '<line class="viz__grid" x1="' + padX + '" x2="' + (W - 12) + '" y1="' + y(v).toFixed(1) +
+        '" y2="' + y(v).toFixed(1) + '"></line>' +
+        '<text class="viz__tick" x="' + (padX - 6) + '" y="' + (y(v) + 3).toFixed(1) + '" text-anchor="end">' +
+        fmtTick(v) + '</text>';
+    }).join('');
+
+    const dots = coords.map(function (c) {
+      return '<circle class="viz__dot" cx="' + c.x.toFixed(1) + '" cy="' + c.y.toFixed(1) + '" r="4" fill="' + color +
+        '"><title>' + shortDay(c.point.day) + ' · ' + fmtFull(c.point[key]) + '</title></circle>';
+    }).join('');
+
+    const firstLabel = '<text class="viz__tick" x="' + padX + '" y="' + (H - 6) + '">' + shortDay(points[0].day) + '</text>';
+    const lastLabel = points.length > 1
+      ? '<text class="viz__tick" x="' + (W - 12) + '" y="' + (H - 6) + '" text-anchor="end">' +
+        shortDay(points[points.length - 1].day) + '</text>'
+      : '';
+
+    return '<svg class="viz__svg" viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="Evolución de ' +
+      escapeHtml(label.toLowerCase()) + '">' + grid + area +
+      '<path class="viz__line" d="' + path + '" stroke="' + color + '"></path>' + dots +
+      firstLabel + lastLabel + '</svg>';
+  }
+
+  /** Bloque de gráficos de la ficha, con sus interruptores. */
+  function managerCharts(name) {
+    ensureHistory(name);
+
+    const loading = state.history[name] && state.history[name].status === 'loading';
+    const points = managerSeries(name);
+    const last = points[points.length - 1];
+
+    const chips = CHART_SERIES.map(function (serie) {
+      const on = state.charts[serie.key];
+      return '<button type="button" class="chip" data-chart="' + serie.key + '" aria-pressed="' + (on ? 'true' : 'false') + '">' +
+        '<span class="chip__dot" style="background:' + serie.color + '"></span>' + serie.label + '</button>';
+    }).join('');
+
+    const charts = CHART_SERIES.filter(function (serie) { return state.charts[serie.key]; })
+      .map(function (serie) {
+        const current = last ? last[serie.key] : null;
+        return '<figure class="viz">' +
+          '<figcaption class="viz__head">' + serie.label +
+            '<strong>' + (current == null ? '—' : money(current)) + '</strong></figcaption>' +
+          lineChart(points, serie.key, serie.color, serie.label) +
+        '</figure>';
+      }).join('');
+
+    const note = loading
+      ? '<p class="viz__empty">Reconstruyendo el valor de equipo día a día…</p>'
+      : '';
+
+    return '<div class="viz-block"><div class="chips">' + chips + '</div>' + note +
+      (charts || '<p class="viz__empty">Activa alguna serie para ver su evolución.</p>') + '</div>';
+  }
+
+  /* ---------- Gráficos de la liga (los KPI) ---------- */
+
+  const KPI_SERIES = [
+    { key: 'moves',   label: 'Movimientos',        color: 'var(--viz-1)', count: true },
+    { key: 'spent',   label: 'Total gastado',      color: 'var(--viz-4)' },
+    { key: 'earned',  label: 'Total ingresado',    color: 'var(--viz-2)' },
+    { key: 'balance', label: 'Saldo total en liga', color: 'var(--viz-3)' }
+  ];
+
+  /** Acumulado diario de toda la liga desde el primer movimiento. */
+  function leagueSeries() {
+    const moves = state.movements
+      .filter(function (movement) { return movement.timestamp; })
+      .sort(function (a, b) { return a.timestamp - b.timestamp; });
+    if (moves.length === 0) return [];
+
+    const today = dayKey(Date.now());
+    const days = [];
+    for (let time = Date.parse(dayKey(moves[0].timestamp)); time <= Date.parse(today); time += 86400000) {
+      days.push(dayKey(time));
+    }
+
+    const initial = INITIAL_BUDGET * MANAGERS.length;
+    let count = 0, spent = 0, earned = 0, index = 0;
+
+    return days.map(function (day) {
+      while (index < moves.length && dayKey(moves[index].timestamp) <= day) {
+        count += 1;
+        if (moves[index].type === 'buy') spent += moves[index].amount;
+        else earned += moves[index].amount;
+        index += 1;
+      }
+      return { day: day, moves: count, spent: spent, earned: earned, balance: initial - spent + earned };
+    });
+  }
+
+  function renderKpiCharts() {
+    const box = $('kpi-charts');
+    const active = KPI_SERIES.filter(function (serie) { return state.kpiCharts[serie.key]; });
+
+    Array.prototype.forEach.call(document.querySelectorAll('#kpis .kpi'), function (card) {
+      card.setAttribute('aria-pressed', state.kpiCharts[card.getAttribute('data-kpi')] ? 'true' : 'false');
+    });
+
+    if (active.length === 0) { box.hidden = true; box.innerHTML = ''; return; }
+
+    const points = leagueSeries();
+    if (points.length === 0) { box.hidden = true; box.innerHTML = ''; return; }
+
+    const last = points[points.length - 1];
+    box.hidden = false;
+    box.innerHTML = active.map(function (serie) {
+      const value = serie.count ? String(last[serie.key]) : money(last[serie.key]);
+      return '<figure class="viz panel viz--kpi">' +
+        '<figcaption class="viz__head">' + serie.label + ' · día a día<strong>' + value + '</strong></figcaption>' +
+        lineChart(points, serie.key, serie.color, serie.label, serie.count) +
+      '</figure>';
+    }).join('');
+  }
+
   /**
    * Orden dentro de la ficha de un mánager. Por «Acción» agrupa compras y
    * ventas, y dentro de cada grupo ordena del más caro al más barato; con
@@ -618,7 +898,7 @@
         }).join('') + '</tbody></table>';
 
     return '<tr class="detail-row"><td class="detail-cell" colspan="' + BUDGET_COLUMNS + '">' +
-      '<div class="detail">' + inner + '</div></td></tr>';
+      '<div class="detail">' + managerCharts(name) + inner + '</div></td></tr>';
   }
 
   function renderBudgets(rows) {
@@ -805,6 +1085,7 @@
     const rows = budgetRows();
     renderKpis(rows);
     renderBudgets(rows);
+    renderKpiCharts();
     renderMovements();
     renderOffers();
     renderWarnings();
@@ -951,6 +1232,7 @@
         return;
       }
       teams[manager] = {
+        id: item.id != null ? String(item.id) : null,
         value: item.teamValue != null ? item.teamValue : null,
         players: item.teamSize != null ? item.teamSize : null,
         points: item.points != null ? item.points : null,
@@ -974,6 +1256,7 @@
     state.me = payload.me || null;
     state.warnings = warnings;
     persist();
+    recordSnapshot();
     render();
 
     return { movements: movements.length, teams: Object.keys(teams).length };
@@ -1137,7 +1420,34 @@
     bindSorting('budget');
     bindSorting('moves');
 
+    function toggleKpi(card) {
+      const key = card.getAttribute('data-kpi');
+      state.kpiCharts[key] = !state.kpiCharts[key];
+      renderKpiCharts();
+    }
+
+    $('kpis').addEventListener('click', function (event) {
+      const card = event.target.closest('.kpi[data-kpi]');
+      if (card) toggleKpi(card);
+    });
+
+    $('kpis').addEventListener('keydown', function (event) {
+      if (event.key !== 'Enter' && event.key !== ' ') return;
+      const card = event.target.closest('.kpi[data-kpi]');
+      if (!card) return;
+      event.preventDefault();
+      toggleKpi(card);
+    });
+
     $('budget-body').addEventListener('click', function (event) {
+      const chip = event.target.closest('[data-chart]');
+      if (chip) {
+        const key = chip.getAttribute('data-chart');
+        state.charts[key] = !state.charts[key];
+        renderBudgets(budgetRows());
+        return;
+      }
+
       const header = event.target.closest('th[data-detail-sort]');
       if (header) {
         const key = header.getAttribute('data-detail-sort');

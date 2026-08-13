@@ -88,28 +88,30 @@
   </section>
 
   <!-- ============ KPIs ============ -->
-  <section class="kpis" aria-label="Resumen general">
-    <article class="kpi">
+  <section class="kpis" id="kpis" aria-label="Resumen general">
+    <article class="kpi" data-kpi="moves" role="button" tabindex="0" aria-pressed="false" title="Ver evolución por días">
       <span class="kpi__label">Movimientos</span>
       <strong class="kpi__value" id="kpi-moves">—</strong>
       <span class="kpi__foot" id="kpi-moves-foot">&nbsp;</span>
     </article>
-    <article class="kpi kpi--out">
+    <article class="kpi kpi--out" data-kpi="spent" role="button" tabindex="0" aria-pressed="false" title="Ver evolución por días">
       <span class="kpi__label">Total gastado</span>
       <strong class="kpi__value" id="kpi-spent">—</strong>
       <span class="kpi__foot" id="kpi-spent-foot">&nbsp;</span>
     </article>
-    <article class="kpi kpi--in">
+    <article class="kpi kpi--in" data-kpi="earned" role="button" tabindex="0" aria-pressed="false" title="Ver evolución por días">
       <span class="kpi__label">Total ingresado</span>
       <strong class="kpi__value" id="kpi-earned">—</strong>
       <span class="kpi__foot" id="kpi-earned-foot">&nbsp;</span>
     </article>
-    <article class="kpi">
+    <article class="kpi" data-kpi="balance" role="button" tabindex="0" aria-pressed="false" title="Ver evolución por días">
       <span class="kpi__label">Saldo total en liga</span>
       <strong class="kpi__value" id="kpi-balance">—</strong>
       <span class="kpi__foot" id="kpi-balance-foot">&nbsp;</span>
     </article>
   </section>
+
+  <div id="kpi-charts" class="kpi-charts"></div>
 
   <div id="warnings" class="warnings" hidden></div>
 
@@ -203,7 +205,6 @@
     </div>
 
     <p id="offers-note" class="hint" hidden></p>
-    <p class="hint">Biwenger solo publica las pujas en las que participas tú. Las de los demás mánagers son secretas hasta que el mercado se resuelve, así que no hay forma de traerlas.</p>
   </section>
 
 </main>
