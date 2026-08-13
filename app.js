@@ -464,7 +464,7 @@
     warnings: [],
     filters: { text: '', manager: '', type: '' },
     expanded: {},          // mánagers con la ficha de jugadores desplegada
-    charts: { saldo: true, value: true, bid: true },
+    charts: { saldo: true, value: true },
     kpiCharts: { moves: false, spent: false, earned: false, balance: false },
     kpiOpen: [],           // orden de apertura, para cerrar el más antiguo
     kpi: null,             // últimos valores de cabecera
@@ -739,12 +739,7 @@
       let value = remote[day] != null ? remote[day] : (stored != null ? stored : null);
       if (position === days.length - 1 && team && team.value != null) value = team.value;
 
-      return {
-        day: day,
-        saldo: balance,
-        value: value,
-        bid: value != null ? balance + value * TEAM_VALUE_SHARE : null
-      };
+      return { day: day, saldo: balance, value: value };
     });
   }
 
