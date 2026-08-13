@@ -457,6 +457,7 @@
     charts: { saldo: true, value: true, bid: true },
     kpiCharts: { moves: false, spent: false, earned: false, balance: false },
     history: {},           // valor de equipo día a día, por mánager
+    leagueStart: null,     // primer día del tablón
     offers: [],            // pujas enviadas y ofertas recibidas, pendientes
     me: null,              // saldo y puja máxima oficiales del usuario
     syncing: false,
@@ -646,17 +647,8 @@
       .filter(function (movement) { return movement.manager === name && movement.timestamp; })
       .sort(function (a, b) { return a.timestamp - b.timestamp; });
 
-    const stamps = moves.map(function (movement) { return dayKey(movement.timestamp); })
-      .concat(Object.keys(history))
-      .concat(Object.keys(remote));
-    const today = dayKey(Date.now());
-    const first = stamps.length ? stamps.slice().sort()[0] : today;
-
-    const days = [];
-    for (let time = Date.parse(first); time <= Date.parse(today); time += 86400000) {
-      days.push(dayKey(time));
-    }
-    if (days.length === 0) days.push(today);
+    const stamps = Object.keys(history).concat(Object.keys(remote)).concat([startDay()]);
+    const days = daysRange(stamps.sort()[0]);
 
     const team = state.teams[name];
     let balance = INITIAL_BUDGET;
@@ -689,7 +681,10 @@
    * Gráfico de líneas en SVG, sin librerías. Ancho fijo en el viewBox y
    * escalado por CSS; el trazo se mantiene a 2 px reales.
    */
-  function lineChart(points, key, color, label, isCount) {
+  function lineChart(points, key, color, label, options) {
+    const opts = options || {};
+    const isCount = !!opts.count;
+    const isBars = !!opts.bars;
     const fmtTick = isCount ? function (v) { return String(Math.round(v)); } : shortMoney;
     const fmtFull = isCount ? function (v) { return Math.round(v) + (v === 1 ? ' movimiento' : ' movimientos'); } : money;
     const valid = points.filter(function (point) { return point[key] != null; });
@@ -701,8 +696,11 @@
     const values = valid.map(function (point) { return point[key]; });
     let min = Math.min.apply(null, values);
     let max = Math.max.apply(null, values);
+    // Las barras arrancan siempre en cero: si no, exageran diferencias pequeñas.
+    if (isBars) { min = Math.min(0, min); max = Math.max(max, min + 1); }
+
     // Serie plana: se abre un margen proporcional para que la línea quede centrada.
-    if (min === max) {
+    if (!isBars && min === max) {
       const pad = isCount ? Math.max(1, Math.abs(min) * 0.2) : Math.max(500000, Math.abs(min) * 0.05);
       min -= pad;
       max += pad;
@@ -731,16 +729,36 @@
         fmtTick(v) + '</text>';
     }).join('');
 
-    const dots = coords.map(function (c) {
-      return '<circle class="viz__dot" cx="' + c.x.toFixed(1) + '" cy="' + c.y.toFixed(1) + '" r="4" fill="' + color +
-        '"><title>' + shortDay(c.point.day) + ' · ' + fmtFull(c.point[key]) + '</title></circle>';
-    }).join('');
-
     const firstLabel = '<text class="viz__tick" x="' + padX + '" y="' + (H - 6) + '">' + shortDay(points[0].day) + '</text>';
     const lastLabel = points.length > 1
       ? '<text class="viz__tick" x="' + (W - 12) + '" y="' + (H - 6) + '" text-anchor="end">' +
         shortDay(points[points.length - 1].day) + '</text>'
       : '';
+
+    /* Un día es un cubo, no un continuo: los flujos diarios van en barras, con
+       hueco entre ellas y las esquinas redondeadas. */
+    if (isBars) {
+      const slot = points.length > 1 ? (x(1) - x(0)) : (W - padX - 12);
+      const width = Math.max(3, Math.min(38, slot * 0.62));
+      const base = y(Math.max(0, min));
+      const bars = points.map(function (point, i) {
+        const value = point[key];
+        if (value == null) return '';
+        const top = y(value);
+        const height = Math.max(1, base - top);
+        return '<rect class="viz__bar" x="' + (x(i) - width / 2).toFixed(1) + '" y="' + top.toFixed(1) +
+          '" width="' + width.toFixed(1) + '" height="' + height.toFixed(1) + '" rx="3" fill="' + color + '">' +
+          '<title>' + shortDay(point.day) + ' · ' + fmtFull(value) + '</title></rect>';
+      }).join('');
+
+      return '<svg class="viz__svg" viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="' +
+        escapeHtml(label) + ' por día">' + grid + bars + firstLabel + lastLabel + '</svg>';
+    }
+
+    const dots = coords.map(function (c) {
+      return '<circle class="viz__dot" cx="' + c.x.toFixed(1) + '" cy="' + c.y.toFixed(1) + '" r="4" fill="' + color +
+        '"><title>' + shortDay(c.point.day) + ' · ' + fmtFull(c.point[key]) + '</title></circle>';
+    }).join('');
 
     return '<svg class="viz__svg" viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="Evolución de ' +
       escapeHtml(label.toLowerCase()) + '">' + grid + area +
@@ -782,37 +800,59 @@
 
   /* ---------- Gráficos de la liga (los KPI) ---------- */
 
+  /* Los tres primeros son flujos —lo que pasó ESE día— y van en barras. El
+     saldo es un nivel, así que se dibuja como línea con el valor al cierre. */
   const KPI_SERIES = [
-    { key: 'moves',   label: 'Movimientos',        color: 'var(--viz-1)', count: true },
-    { key: 'spent',   label: 'Total gastado',      color: 'var(--viz-4)' },
-    { key: 'earned',  label: 'Total ingresado',    color: 'var(--viz-2)' },
-    { key: 'balance', label: 'Saldo total en liga', color: 'var(--viz-3)' }
+    { key: 'moves',   field: 'movesDay',  label: 'Movimientos',         color: 'var(--viz-1)', count: true, bars: true },
+    { key: 'spent',   field: 'spentDay',  label: 'Gastado',             color: 'var(--viz-4)', bars: true },
+    { key: 'earned',  field: 'earnedDay', label: 'Ingresado',           color: 'var(--viz-2)', bars: true },
+    { key: 'balance', field: 'balance',   label: 'Saldo total en liga', color: 'var(--viz-3)' }
   ];
 
-  /** Acumulado diario de toda la liga desde el primer movimiento. */
+  /** Primer día del que tiene sentido pintar: el arranque de la liga. */
+  function startDay() {
+    const candidates = state.movements
+      .filter(function (movement) { return movement.timestamp; })
+      .map(function (movement) { return dayKey(movement.timestamp); });
+    if (state.leagueStart) candidates.push(state.leagueStart);
+    if (candidates.length === 0) return dayKey(Date.now());
+    return candidates.sort()[0];
+  }
+
+  function daysRange(from) {
+    const days = [];
+    const today = dayKey(Date.now());
+    for (let time = Date.parse(from); time <= Date.parse(today); time += 86400000) days.push(dayKey(time));
+    return days.length ? days : [today];
+  }
+
+  /** Serie diaria de toda la liga: movimientos, gasto e ingreso de cada día. */
   function leagueSeries() {
     const moves = state.movements
       .filter(function (movement) { return movement.timestamp; })
       .sort(function (a, b) { return a.timestamp - b.timestamp; });
     if (moves.length === 0) return [];
 
-    const today = dayKey(Date.now());
-    const days = [];
-    for (let time = Date.parse(dayKey(moves[0].timestamp)); time <= Date.parse(today); time += 86400000) {
-      days.push(dayKey(time));
-    }
-
     const initial = INITIAL_BUDGET * MANAGERS.length;
-    let count = 0, spent = 0, earned = 0, index = 0;
+    let spent = 0, earned = 0, index = 0;
 
-    return days.map(function (day) {
+    return daysRange(startDay()).map(function (day) {
+      let movesDay = 0, spentDay = 0, earnedDay = 0;
       while (index < moves.length && dayKey(moves[index].timestamp) <= day) {
-        count += 1;
-        if (moves[index].type === 'buy') spent += moves[index].amount;
-        else earned += moves[index].amount;
+        movesDay += 1;
+        if (moves[index].type === 'buy') spentDay += moves[index].amount;
+        else earnedDay += moves[index].amount;
         index += 1;
       }
-      return { day: day, moves: count, spent: spent, earned: earned, balance: initial - spent + earned };
+      spent += spentDay;
+      earned += earnedDay;
+      return {
+        day: day,
+        movesDay: movesDay,
+        spentDay: spentDay,
+        earnedDay: earnedDay,
+        balance: initial - spent + earned
+      };
     });
   }
 
@@ -832,10 +872,11 @@
     const last = points[points.length - 1];
     box.hidden = false;
     box.innerHTML = active.map(function (serie) {
-      const value = serie.count ? String(last[serie.key]) : money(last[serie.key]);
+      const value = serie.count ? String(last[serie.field]) : money(last[serie.field]);
+      const caption = serie.bars ? serie.label + ' por día' : serie.label + ' al cierre de cada día';
       return '<figure class="viz panel viz--kpi">' +
-        '<figcaption class="viz__head">' + serie.label + ' · día a día<strong>' + value + '</strong></figcaption>' +
-        lineChart(points, serie.key, serie.color, serie.label, serie.count) +
+        '<figcaption class="viz__head">' + caption + '<strong>' + value + '</strong></figcaption>' +
+        lineChart(points, serie.field, serie.color, serie.label, { count: serie.count, bars: serie.bars }) +
       '</figure>';
     }).join('');
   }
@@ -1254,6 +1295,7 @@
     state.teams = teams;
     state.offers = Array.isArray(payload.offers) ? payload.offers : [];
     state.me = payload.me || null;
+    state.leagueStart = (payload.league && payload.league.startDay) || state.leagueStart;
     state.warnings = warnings;
     persist();
     recordSnapshot();
