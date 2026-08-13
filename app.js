@@ -797,9 +797,15 @@
   }
 
   /** Sello de «actualizado a las…» en la barra superior. */
-  function renderLastSync(time) {
+  function renderLastSync(time, message) {
     const stamp = $('last-sync');
-    if (!time) { stamp.textContent = ''; return; }
+    if (!stamp) return;
+    if (message) { stamp.textContent = message; return; }
+    if (!time) {
+      const sync = loadSyncConfig();
+      stamp.textContent = sync.url && sync.key ? 'Sin actualizar aún' : 'Sin configurar';
+      return;
+    }
     const date = new Date(time);
     const sameDay = new Date().toDateString() === date.toDateString();
     stamp.textContent = 'Actualizado ' + (sameDay
@@ -917,6 +923,7 @@
           ? 'No se ha podido contactar con el Worker: revisa la URL y que esté desplegado.'
           : String(error.message || error);
         setStatus('status-sync', message, 'err');
+        renderLastSync(state.lastSync, state.lastSync ? null : 'Error al actualizar');
       })
       .then(function () {
         state.syncing = false;
