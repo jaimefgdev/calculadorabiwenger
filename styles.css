@@ -920,3 +920,20 @@ code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft)
   .detail-date { display: none; }
   .filters .field { max-width: none; flex: 1 1 100%; }
 }
+
+/* Cuenta atrás de cada puja y de cada venta. */
+.deadline {
+  font-family: var(--mono); font-size: .76rem;
+  color: var(--text-soft); white-space: nowrap;
+}
+.deadline--soon { color: var(--accent); font-weight: 600; }
+
+/* Las dos tablas del mercado van en media pantalla y ahora llevan una columna
+   más. Se aprieta el interlineado y, sobre todo, se deja que la celda de
+   ofertas parta en dos líneas: si no, su ancho fijo obliga a un desplazable. */
+.table--offers th, .table--offers td,
+.table--listings th, .table--listings td { padding-inline: .45rem; }
+.table--offers .tag, .table--listings .tag { font-size: .7rem; }
+.table--listings td[data-label="Ofertas"] { white-space: normal; }
+.table--listings .bid { flex-wrap: wrap; row-gap: .1rem; margin-right: .35rem; }
+.table--offers td[data-label="Operación"] { white-space: normal; }

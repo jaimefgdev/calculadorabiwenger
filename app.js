@@ -1257,6 +1257,7 @@
           '<span class="sub">' + escapeHtml(offer.other || 'Mercado') + '</span></td>' +
         '<td class="num" data-label="Importe"><strong class="' + (out ? 'money-neg' : 'money-pos') + '">' +
           (out ? '−' : '+') + money(offer.amount) + '</strong></td>' +
+        '<td data-label="Queda">' + deadlineCell(offer.until) + '</td>' +
         '<td data-label="Simular">' + simToggle(offer.id, on, out ? 'out' : 'in') + '</td>' +
       '</tr>';
     }).join('');
@@ -1349,7 +1350,8 @@
       return '<tr>' +
         '<td data-label="Futbolista"><span class="with-crest">' + playerName(item) +
           crestOf(item, 'crest--badge') + '</span></td>' +
-        '<td class="num" data-label="Valor de mercado"><strong>' + money(market) + '</strong></td>' +
+        '<td class="num" data-label="Valor"><strong>' + money(market) + '</strong></td>' +
+        '<td data-label="Queda">' + deadlineCell(item.until) + '</td>' +
         '<td data-label="Ofertas">' + offerCell + '</td>' +
       '</tr>';
     }).join('');
@@ -1403,6 +1405,7 @@
 
   /** Actualiza el reloj; se llama cada segundo. */
   function tickRound() {
+    tickDeadlines();
     const clock = $('round-clock');
     const round = state.round;
     if (!clock || !round || !round.start) return;
@@ -1431,15 +1434,54 @@
     }).join('');
   }
 
+  /* ---------- Cuenta atrás de pujas y ventas ---------- */
+
+  /** Lo que queda hasta `until`, en el detalle justo para cada escala. */
+  function timeLeft(until) {
+    if (!until) return null;
+    const left = Date.parse(until) - Date.now();
+    if (isNaN(left)) return null;
+    if (left <= 0) return { text: 'vencida', urgent: true };
+
+    /* Formato corto para que la columna no ensanche la tabla. */
+    const minutes = Math.floor(left / 60000);
+    const hours = Math.floor(minutes / 60);
+    const days = Math.floor(hours / 24);
+    if (days >= 1) return { text: days + 'd ' + (hours - days * 24) + 'h', urgent: false };
+    if (hours >= 1) return { text: hours + 'h ' + (minutes - hours * 60) + 'm', urgent: hours < 2 };
+    return { text: minutes + 'm', urgent: true };
+  }
+
+  /** Celda con el tiempo restante; `tickDeadlines` la refresca cada segundo. */
+  function deadlineCell(until) {
+    const left = timeLeft(until);
+    if (!left) return '<span class="sub">—</span>';
+    return '<span class="deadline' + (left.urgent ? ' deadline--soon' : '') + '"' +
+      ' data-until="' + escapeHtml(until) + '"' +
+      ' title="' + escapeHtml(dateFormat.format(new Date(until))) + '">' +
+      escapeHtml(left.text) + '</span>';
+  }
+
+  /* Se actualizan en el sitio, sin repintar las tablas enteras. */
+  function tickDeadlines() {
+    const marcas = document.querySelectorAll('[data-until]');
+    for (let i = 0; i < marcas.length; i++) {
+      const left = timeLeft(marcas[i].getAttribute('data-until'));
+      if (!left) continue;
+      marcas[i].textContent = left.text;
+      marcas[i].classList.toggle('deadline--soon', left.urgent);
+    }
+  }
+
   /* ---------- Alineación (simulador) ---------- */
 
   /* Los siete sistemas de Biwenger. El portero va aparte, siempre uno. */
-  /* Los siete de siempre más los cinco que Biwenger reserva a las ligas de
-     pago (los saca de competition.sport.lineups.premiumTypes). */
+  /* Los catorce sistemas de Biwenger: los siete básicos y los siete que la
+     aplicación marca en azul, reservados a las ligas de pago. */
   const FORMATIONS = [
-    '3-3-4', '3-4-3', '3-5-2', '3-6-1',
+    '3-2-5', '3-3-4', '3-4-3', '3-5-2', '3-6-1',
     '4-2-4', '4-3-3', '4-4-2', '4-5-1', '4-6-0',
-    '5-2-3', '5-3-2', '5-4-1'
+    '5-1-4', '5-2-3', '5-3-2', '5-4-1'
   ];
   const POSITION_NAMES = { 1: 'POR', 2: 'DEF', 3: 'MED', 4: 'DEL' };
 
