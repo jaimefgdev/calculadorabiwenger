@@ -1525,6 +1525,15 @@
       'https://cdn.biwenger.com/i/p/' + encodeURIComponent(id) + '.png\')"></span>';
   }
 
+  /** Escudo del club del futbolista. `extra` decide si va como marca de agua. */
+  function crestOf(player, extra) {
+    if (!player || player.team == null) return '';
+    return '<span class="crest ' + extra + '" aria-hidden="true"' +
+      (player.teamName ? ' title="' + escapeHtml(player.teamName) + '"' : '') +
+      ' style="background-image:url(\'https://cdn.biwenger.com/i/t/' +
+      encodeURIComponent(player.team) + '.png\')"></span>';
+  }
+
   /* Quién puede entrar en ese hueco: solo los que juegan en esa demarcación
      —contando la posición alternativa— y no ocupan ya un sitio de la misma
      línea. Los polivalentes alineados en otra línea sí valen: un DEF/MED
@@ -1560,7 +1569,7 @@
       ? faceOf(player.id, 'pitch__face')
       : '<span class="pic-player pitch__face pitch__face--empty"></span>';
 
-    return '<div class="pitch__slot">' + face +
+    return '<div class="pitch__slot">' + crestOf(player, 'crest--ghost') + face +
       '<span class="pitch__name">' + (player ? escapeHtml(player.name) : '—') + '</span>' +
       '<button type="button" class="pitch__pick" data-slot="' + key + '" data-position="' + position + '"' +
         ' aria-label="Cambiar el ' + POSITION_NAMES[position] +
@@ -1647,6 +1656,7 @@
           ? 'Cargando la plantilla…' : 'Sin suplentes.') + '</p>'
       : bench.map(function (player) {
           return '<div class="bench__player">' +
+            crestOf(player, 'crest--ghost') +
             faceOf(player.id, 'bench__face') +
             '<span class="bench__name">' + escapeHtml(player.name) + '</span>' +
           '</div>';
@@ -1835,7 +1845,9 @@
             ? null : player.marketValue - player.paid;
           return '<tr>' +
             '<td class="detail-rank">' + (player.position ? POSITION_NAMES[player.position] : '—') + '</td>' +
-            '<td>' + playerName({ playerId: player.id, player: player.name }) + '</td>' +
+            '<td><span class="with-crest">' +
+              playerName({ playerId: player.id, player: player.name }) +
+              crestOf(player, 'crest--badge') + '</span></td>' +
             '<td class="detail-date">' + shortDay(player.since) + '</td>' +
             '<td class="num">' + (player.paid == null
               ? '<span class="sub">reparto inicial</span>' : money(player.paid)) + '</td>' +
