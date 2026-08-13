@@ -110,12 +110,16 @@
 
   <!-- ============ CUENTA ATRÁS DE LA JORNADA ============ -->
   <section id="round-panel" class="panel round" hidden>
-    <div>
-      <span class="round__label">Inicio de la</span>
-      <strong class="round__name" id="round-name">—</strong>
-      <span class="round__when" id="round-when"></span>
+    <div class="round__top">
+      <button type="button" class="round__toggle" id="round-toggle" aria-expanded="false" aria-controls="round-games">
+        <span class="round__label">Inicio de la</span>
+        <strong class="round__name" id="round-name">—</strong>
+        <span class="round__when" id="round-when"></span>
+        <span class="round__caret" aria-hidden="true">▸</span>
+      </button>
+      <div class="round__clock" id="round-clock" role="timer" aria-live="off"></div>
     </div>
-    <div class="round__clock" id="round-clock" role="timer" aria-live="off"></div>
+    <div class="round__games" id="round-games" hidden></div>
   </section>
 
 

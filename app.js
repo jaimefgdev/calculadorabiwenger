@@ -473,6 +473,7 @@
     listings: [],
     lineup: null,          // mi alineación en Biwenger
     round: null,           // próxima jornada y su hora de inicio
+    roundOpen: false,      // lista de partidos desplegada
     xi: null,              // el once del simulador
     squads: null,          // plantillas de todos los jugadores
     expandedSquad: null,
@@ -1362,9 +1363,37 @@
 
     section.hidden = false;
     $('round-name').textContent = 'Jornada ' + (round.number || '');
-    $('round-when').textContent = dateFormat.format(new Date(round.start)) +
-      (round.games ? ' · ' + round.games + ' partidos' : '');
+    $('round-when').textContent = dateFormat.format(new Date(round.start));
+
+    const matches = round.matches || [];
+    const toggle = $('round-toggle');
+    toggle.hidden = false;
+    toggle.setAttribute('aria-expanded', state.roundOpen && matches.length ? 'true' : 'false');
+    toggle.disabled = matches.length === 0;
+
+    const box = $('round-games');
+    box.hidden = !(state.roundOpen && matches.length);
+    if (!box.hidden) box.innerHTML = roundGames(matches);
     tickRound();
+  }
+
+  /** Los diez partidos, agrupados por día: hora, equipos y dónde se ve. */
+  function roundGames(matches) {
+    let day = '';
+    return matches.map(function (match) {
+      const when = new Date(match.start);
+      const key = dayFormat.format(when);
+      const header = key === day ? '' :
+        '<p class="round__day">' + escapeHtml(key) + '</p>';
+      day = key;
+      return header +
+        '<div class="round__game">' +
+          '<span class="round__hour">' + timeFormat.format(when) + '</span>' +
+          '<span class="round__teams">' + escapeHtml(match.home) +
+            '<span class="round__vs">–</span>' + escapeHtml(match.away) + '</span>' +
+          '<span class="round__tv">' + (match.tv ? escapeHtml(match.tv) : '—') + '</span>' +
+        '</div>';
+    }).join('');
   }
 
   /** Actualiza el reloj; se llama cada segundo. */
@@ -1988,6 +2017,8 @@
   const dateFormat = new Intl.DateTimeFormat('es-ES', {
     day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit'
   });
+  const dayFormat = new Intl.DateTimeFormat('es-ES', { weekday: 'long', day: 'numeric', month: 'long' });
+  const timeFormat = new Intl.DateTimeFormat('es-ES', { hour: '2-digit', minute: '2-digit' });
 
   function loadSyncConfig() {
     try {
@@ -2279,6 +2310,11 @@
     $('brand-home').addEventListener('click', function () {
       showTab('inicio');
       window.scrollTo({ top: 0, behavior: 'smooth' });
+    });
+
+    $('round-toggle').addEventListener('click', function () {
+      state.roundOpen = !state.roundOpen;
+      renderRound();
     });
 
     /* Máximo dos gráficos a la vez: al abrir un tercero se cierra el más

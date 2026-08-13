@@ -187,29 +187,51 @@ code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft)
 .bid { display: inline-flex; align-items: center; gap: .4rem; margin-right: .6rem; }
 
 /* ---------- Cuenta atrás de la jornada ---------- */
-.round {
+.round { border-left: 3px solid var(--accent); }
+.round__top {
   display: flex; align-items: center; justify-content: space-between;
   gap: 1rem; flex-wrap: wrap;
-  border-left: 3px solid var(--accent);
 }
+.round__toggle {
+  display: flex; align-items: baseline; gap: .35rem; flex-wrap: wrap;
+  background: none; border: 0; padding: 0; margin: 0;
+  color: inherit; font: inherit; text-align: left; cursor: pointer;
+}
+.round__toggle:disabled { cursor: default; }
+.round__toggle:disabled .round__caret { display: none; }
 .round__label { font-size: .78rem; text-transform: uppercase; letter-spacing: .04em; color: var(--text-faint); }
-.round__name { font-size: 1.05rem; margin: 0 .35rem; }
+.round__name { font-size: 1.05rem; }
 .round__when { font-size: .82rem; color: var(--text-soft); }
+.round__caret { font-size: .7rem; color: var(--text-faint); transition: transform .15s ease; }
+.round__toggle[aria-expanded="true"] .round__caret { transform: rotate(90deg); }
+
+/* El reloj es texto, no una fila de cajas: números algo mayores y en el
+   color de acento; la unidad, discreta al lado. */
 .round__clock {
-  display: flex; gap: .5rem;
+  display: flex; align-items: baseline; gap: .9rem;
   font-family: var(--mono);
   font-variant-numeric: tabular-nums;
 }
-.round__unit {
-  display: flex; flex-direction: column; align-items: center;
-  min-width: 52px;
-  padding: .35rem .5rem;
-  border: 1px solid var(--border-strong);
-  border-radius: var(--radius-sm);
-  background: var(--accent-soft);
+.round__unit { display: inline-flex; align-items: baseline; gap: .18rem; }
+.round__value { font-size: 1.18rem; font-weight: 700; line-height: 1; color: var(--accent); }
+.round__unit small { font-size: .68rem; color: var(--text-faint); }
+
+/* Los partidos de la jornada, agrupados por día. */
+.round__games { margin-top: .9rem; border-top: 1px solid var(--border); padding-top: .3rem; }
+.round__day {
+  margin: .7rem 0 .25rem; font-size: .72rem; text-transform: uppercase;
+  letter-spacing: .05em; color: var(--text-faint);
 }
-.round__value { font-size: 1.25rem; font-weight: 700; line-height: 1.1; }
-.round__unit small { font-size: .62rem; text-transform: uppercase; letter-spacing: .06em; color: var(--text-faint); }
+.round__game {
+  display: grid; grid-template-columns: 3.4rem 1fr auto;
+  align-items: baseline; gap: .6rem;
+  padding: .3rem 0; font-size: .86rem;
+  border-bottom: 1px solid var(--border);
+}
+.round__game:last-child { border-bottom: 0; }
+.round__hour { font-family: var(--mono); color: var(--text-soft); }
+.round__vs { margin: 0 .35rem; color: var(--text-faint); }
+.round__tv { font-size: .78rem; color: var(--accent); text-align: right; }
 
 /* ---------- El campo ---------- */
 .field-label { display: flex; align-items: center; gap: .5rem; font-size: .8rem; color: var(--text-soft); }
