@@ -25,13 +25,14 @@
       <button type="button" class="brand__logo" id="brand-home" title="Ir a Inicio" aria-label="Ir a Inicio">⚽</button>
       <div>
         <h1>Calculadora Biwenger</h1>
-        <p class="brand__sub brand__sub--me">jaimefgdev</p>
+        <p class="brand__sub brand__sub--me">jaime<span>fgdev</span></p>
       </div>
     </div>
     <nav class="tabs" id="tabs" role="tablist" aria-label="Secciones">
       <button class="tab" type="button" role="tab" data-tab="inicio" aria-selected="true">Inicio</button>
       <button class="tab" type="button" role="tab" data-tab="managers" aria-selected="false">Mánagers</button>
       <button class="tab" type="button" role="tab" data-tab="fichajes" aria-selected="false">Fichajes</button>
+      <button class="tab" type="button" role="tab" data-tab="datos" aria-selected="false">Datos</button>
     </nav>
 
     <div class="topbar__actions">
@@ -250,18 +251,23 @@
        PESTAÑA · MÁNAGERS
        ============================================================ -->
   <div id="panel-managers" data-panel="managers" hidden>
+    <div id="managers-grid" class="managers-grid"></div>
+  </div><!-- /panel-managers -->
 
+  <!-- ============================================================
+       PESTAÑA · DATOS
+       ============================================================ -->
+  <div id="panel-datos" data-panel="datos" hidden>
     <section class="panel">
       <div class="panel__head">
         <h2>Evolución de la liga</h2>
-        <p class="muted">Movimientos, dinero gastado e ingresado de cada día, y el saldo total al cierre.</p>
+        <p class="muted">Pulsa una tarjeta para ver su evolución día a día. Puedes tener dos gráficos abiertos a la vez.</p>
       </div>
-      <div class="chips" id="league-chips"></div>
-      <div id="kpi-charts" class="kpi-charts"></div>
+      <div class="kpis" id="data-kpis"></div>
     </section>
 
-    <div id="managers-grid" class="managers-grid"></div>
-  </div><!-- /panel-managers -->
+    <div id="kpi-charts" class="kpi-charts"></div>
+  </div><!-- /panel-datos -->
 
 </main>
 

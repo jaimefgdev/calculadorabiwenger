@@ -455,7 +455,9 @@
     filters: { text: '', manager: '', type: '' },
     expanded: {},          // mánagers con la ficha de jugadores desplegada
     charts: { saldo: true, value: true, bid: true },
-    kpiCharts: { moves: true, spent: true, earned: true, balance: true },
+    kpiCharts: { moves: false, spent: false, earned: false, balance: false },
+    kpiOpen: [],           // orden de apertura, para cerrar el más antiguo
+    kpi: null,             // últimos valores de cabecera
     tab: 'inicio',
     expandedManager: null,
     listings: [],
@@ -542,7 +544,8 @@
     return '<span class="' + (value < 0 ? 'money-neg' : 'money-pos') + '">' + money(value) + '</span>';
   }
 
-  function renderKpis(rows) {
+  /** Los cuatro números de cabecera, compartidos por Inicio y Datos. */
+  function kpiValues(rows) {
     const spent = rows.reduce(function (sum, row) { return sum + row.spent; }, 0);
     const earned = rows.reduce(function (sum, row) { return sum + row.earned; }, 0);
     const balance = rows.reduce(function (sum, row) { return sum + row.balance; }, 0);
@@ -550,21 +553,52 @@
     const sells = state.movements.length - buys;
     const negatives = rows.filter(function (row) { return row.balance < 0; }).length;
 
-    $('kpi-moves').textContent = String(state.movements.length);
-    $('kpi-moves-foot').textContent = state.movements.length === 0
-      ? 'Sin datos del tablón'
-      : buys + ' fichajes · ' + sells + ' ventas';
+    return {
+      moves: {
+        label: 'Movimientos', value: String(state.movements.length), modifier: '',
+        foot: state.movements.length === 0 ? 'Sin datos del tablón' : buys + ' fichajes · ' + sells + ' ventas'
+      },
+      spent: {
+        label: 'Total gastado', value: money(spent), modifier: 'kpi--out',
+        foot: buys > 0 ? 'Media por fichaje: ' + money(spent / buys) : 'Sin fichajes'
+      },
+      earned: {
+        label: 'Total ingresado', value: money(earned), modifier: 'kpi--in',
+        foot: sells > 0 ? 'Media por venta: ' + money(earned / sells) : 'Sin ventas'
+      },
+      balance: {
+        label: 'Saldo total en liga', value: money(balance), modifier: '',
+        foot: negatives > 0
+          ? negatives + (negatives === 1 ? ' mánager en números rojos' : ' mánagers en números rojos')
+          : 'Ningún mánager en números rojos'
+      }
+    };
+  }
 
-    $('kpi-spent').textContent = money(spent);
-    $('kpi-spent-foot').textContent = buys > 0 ? 'Media por fichaje: ' + money(spent / buys) : 'Sin fichajes';
+  function renderKpis(rows) {
+    const kpi = kpiValues(rows);
+    state.kpi = kpi;
 
-    $('kpi-earned').textContent = money(earned);
-    $('kpi-earned-foot').textContent = sells > 0 ? 'Media por venta: ' + money(earned / sells) : 'Sin ventas';
+    ['moves', 'spent', 'earned', 'balance'].forEach(function (key) {
+      $('kpi-' + key).textContent = kpi[key].value;
+      $('kpi-' + key + '-foot').textContent = kpi[key].foot;
+    });
+  }
 
-    $('kpi-balance').textContent = money(balance);
-    $('kpi-balance-foot').textContent = negatives > 0
-      ? negatives + (negatives === 1 ? ' mánager en números rojos' : ' mánagers en números rojos')
-      : 'Ningún mánager en números rojos';
+  /** Las mismas tarjetas en la pestaña Datos, pero pulsables. */
+  function renderDataKpis() {
+    const kpi = state.kpi || kpiValues(budgetRows());
+
+    $('data-kpis').innerHTML = KPI_SERIES.map(function (serie) {
+      const info = kpi[serie.key];
+      const on = state.kpiCharts[serie.key];
+      return '<article class="kpi ' + info.modifier + '" data-kpi="' + serie.key + '" role="button" tabindex="0"' +
+        ' aria-pressed="' + (on ? 'true' : 'false') + '" title="Ver evolución por días">' +
+        '<span class="kpi__label">' + info.label + '</span>' +
+        '<strong class="kpi__value">' + info.value + '</strong>' +
+        '<span class="kpi__foot">' + info.foot + '</span>' +
+      '</article>';
+    }).join('');
   }
 
   const BUDGET_COLUMNS = 9;
@@ -864,10 +898,6 @@
     const box = $('kpi-charts');
     const active = KPI_SERIES.filter(function (serie) { return state.kpiCharts[serie.key]; });
 
-    Array.prototype.forEach.call(document.querySelectorAll('#kpis .kpi'), function (card) {
-      card.setAttribute('aria-pressed', state.kpiCharts[card.getAttribute('data-kpi')] ? 'true' : 'false');
-    });
-
     if (active.length === 0) { box.hidden = true; box.innerHTML = ''; return; }
 
     const points = leagueSeries();
@@ -942,8 +972,10 @@
           '</tr>';
         }).join('') + '</tbody></table>';
 
+    /* Aquí solo la lista de jugadores: los gráficos viven en la pestaña
+       Mánagers, dentro de la ficha de cada uno. */
     return '<tr class="detail-row"><td class="detail-cell" colspan="' + BUDGET_COLUMNS + '">' +
-      '<div class="detail">' + managerCharts(name) + inner + '</div></td></tr>';
+      '<div class="detail">' + inner + '</div></td></tr>';
   }
 
   function renderBudgets(rows) {
@@ -1249,9 +1281,9 @@
             (row.teamValue == null ? '—' : money(row.teamValue)) + '</strong></div>' +
           '<div class="stat"><span class="stat__label">Puja máxima</span><strong>' +
             (row.maxBid == null ? '—' : money(row.maxBid)) + '</strong></div>' +
-          '<div class="stat"><span class="stat__label">Media por fichaje</span><strong>' +
+          '<div class="stat" title="Media por fichaje"><span class="stat__label">Media fichaje</span><strong>' +
             (stats.avgBuy == null ? '—' : money(stats.avgBuy)) + '</strong></div>' +
-          '<div class="stat"><span class="stat__label">Media por venta</span><strong>' +
+          '<div class="stat" title="Media por venta"><span class="stat__label">Media venta</span><strong>' +
             (stats.avgSell == null ? '—' : money(stats.avgSell)) + '</strong></div>' +
         '</div>' +
 
@@ -1269,23 +1301,21 @@
 
   /* ---------- Pestañas ---------- */
 
+  const TAB_KEY = 'biwenger-calc-tab';
+
   function showTab(name) {
     state.tab = name;
+    // Se recuerda para que al recargar (o al tirar hacia abajo en el móvil)
+    // sigas en la pestaña donde estabas.
+    try { localStorage.setItem(TAB_KEY, name); } catch (error) { /* sin persistencia */ }
     Array.prototype.forEach.call(document.querySelectorAll('#tabs .tab'), function (tab) {
       tab.setAttribute('aria-selected', tab.getAttribute('data-tab') === name ? 'true' : 'false');
     });
     Array.prototype.forEach.call(document.querySelectorAll('[data-panel]'), function (panel) {
       panel.hidden = panel.getAttribute('data-panel') !== name;
     });
-    if (name === 'managers') { renderLeagueChips(); renderKpiCharts(); renderManagers(); }
-  }
-
-  function renderLeagueChips() {
-    $('league-chips').innerHTML = KPI_SERIES.map(function (serie) {
-      const on = state.kpiCharts[serie.key];
-      return '<button type="button" class="chip" data-kpi="' + serie.key + '" aria-pressed="' + (on ? 'true' : 'false') + '">' +
-        '<span class="chip__dot" style="background:' + serie.color + '"></span>' + serie.label + '</button>';
-    }).join('');
+    if (name === 'managers') renderManagers();
+    if (name === 'datos') { renderDataKpis(); renderKpiCharts(); }
   }
 
   function renderWarnings() {
@@ -1319,7 +1349,8 @@
     renderOffers();
     renderListings();
     renderWarnings();
-    if (state.tab === 'managers') { renderLeagueChips(); renderKpiCharts(); renderManagers(); }
+    if (state.tab === 'managers') renderManagers();
+    if (state.tab === 'datos') { renderDataKpis(); renderKpiCharts(); }
   }
 
   /* ---------- Persistencia ---------- */
@@ -1673,13 +1704,32 @@
       window.scrollTo({ top: 0, behavior: 'smooth' });
     });
 
-    $('league-chips').addEventListener('click', function (event) {
-      const chip = event.target.closest('[data-kpi]');
-      if (!chip) return;
-      const key = chip.getAttribute('data-kpi');
-      state.kpiCharts[key] = !state.kpiCharts[key];
-      renderLeagueChips();
+    /* Máximo dos gráficos a la vez: al abrir un tercero se cierra el más
+       antiguo, así la comparación siempre es de dos en dos. */
+    function toggleKpi(key) {
+      if (state.kpiCharts[key]) {
+        state.kpiCharts[key] = false;
+        state.kpiOpen = state.kpiOpen.filter(function (open) { return open !== key; });
+      } else {
+        state.kpiOpen.push(key);
+        state.kpiCharts[key] = true;
+        while (state.kpiOpen.length > 2) state.kpiCharts[state.kpiOpen.shift()] = false;
+      }
+      renderDataKpis();
       renderKpiCharts();
+    }
+
+    $('data-kpis').addEventListener('click', function (event) {
+      const card = event.target.closest('[data-kpi]');
+      if (card) toggleKpi(card.getAttribute('data-kpi'));
+    });
+
+    $('data-kpis').addEventListener('keydown', function (event) {
+      if (event.key !== 'Enter' && event.key !== ' ') return;
+      const card = event.target.closest('[data-kpi]');
+      if (!card) return;
+      event.preventDefault();
+      toggleKpi(card.getAttribute('data-kpi'));
     });
 
     $('managers-grid').addEventListener('click', function (event) {
@@ -1773,6 +1823,10 @@
 
     const hadData = loadStored();
     render();
+
+    let saved = null;
+    try { saved = localStorage.getItem(TAB_KEY); } catch (error) { /* sin persistencia */ }
+    showTab(document.querySelector('[data-panel="' + saved + '"]') ? saved : 'inicio');
     if (hadData) {
       $('input-panel').hidden = true;
       setStatus('status-board', '');
