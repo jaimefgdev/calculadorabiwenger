@@ -302,9 +302,12 @@ code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft)
   max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
   text-shadow: 0 1px 3px rgba(0, 0, 0, .8);
 }
-/* Toda la ficha del campo es el botón que abre el selector. */
+/* Toda la ficha del campo es el botón que abre el selector: va por encima de
+   la foto y del nombre (que se elevaron para tapar el escudo), o si no solo
+   respondería el hueco entre ellos. */
 .pitch__pick {
   position: absolute; inset: 0; width: 100%; height: 100%;
+  z-index: 2;
   background: none; border: 0; padding: 0; cursor: pointer;
   border-radius: 8px;
 }
@@ -362,11 +365,11 @@ code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft)
 }
 
 /* Los suplentes se leen igual que el campo: cara redonda y nombre debajo. */
-/* Columnas con techo: si no, cinco suplentes se reparten por todo el ancho
-   del panel y quedan desperdigados. */
+/* Cuatro por fila, fijos: con columnas automáticas el número bailaba según el
+   ancho que le quedara al lado del campo. */
 .bench {
-  display: grid; gap: .7rem; justify-content: start;
-  grid-template-columns: repeat(auto-fill, minmax(84px, 108px));
+  display: grid; gap: .7rem;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
 }
 .bench__player {
   position: relative; overflow: hidden;
@@ -418,8 +421,10 @@ code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft)
   mask-image: linear-gradient(to right, #000 0 45%, transparent 96%);
 }
 /* La cara del campo mide 62 px y la del banquillo 56, así que el centro cae
-   2 px más arriba: se compensa para que el escudo quede exactamente igual. */
-.pitch__slot .crest--ghost { transform: translateY(calc(-58% + 2px)); }
+   2 px más arriba: se compensa para que el escudo quede exactamente igual.
+   Sobre el verde del campo el escudo pierde fuerza, así que allí sube de
+   opacidad hasta que se lee igual que sobre el fondo del banquillo. */
+.pitch__slot .crest--ghost { transform: translateY(calc(-58% + 2px)); opacity: .85; }
 .pitch__slot .pic-player, .bench__player .pic-player, .pitch__name, .bench__name { position: relative; z-index: 1; }
 
 /* Las ocho cifras van siempre en una sola fila: columnas fijas y tipografía

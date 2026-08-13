@@ -1057,7 +1057,8 @@
           const buy = movement.type === 'buy';
           return '<tr>' +
             '<td class="detail-rank">' + (index + 1) + '</td>' +
-            '<td>' + playerName(movement) + '</td>' +
+            '<td><span class="with-crest">' + playerName(movement) +
+              crestOf(movement, 'crest--badge') + '</span></td>' +
             '<td><span class="tag ' + (buy ? 'tag--buy' : 'tag--sell') + '">' +
               (buy ? '↓ Fichado' : '↑ Vendido') + '</span></td>' +
             '<td class="num">' + (buy
@@ -1249,7 +1250,8 @@
       const out = offer.direction === 'out';
       const on = !!state.sim[offer.id];
       return '<tr class="' + (on ? 'row-sim' : '') + '">' +
-        '<td data-label="Futbolista">' + playerName(offer) + '</td>' +
+        '<td data-label="Futbolista"><span class="with-crest">' + playerName(offer) +
+          crestOf(offer, 'crest--badge') + '</span></td>' +
         '<td data-label="Operación"><span class="tag ' + (out ? 'tag--buy' : 'tag--sell') + '">' +
           (out ? '↗ Puja' : '↘ Oferta') + '</span> ' +
           '<span class="sub">' + escapeHtml(offer.other || 'Mercado') + '</span></td>' +
@@ -1345,7 +1347,8 @@
           }).join('');
 
       return '<tr>' +
-        '<td data-label="Futbolista">' + playerName(item) + '</td>' +
+        '<td data-label="Futbolista"><span class="with-crest">' + playerName(item) +
+          crestOf(item, 'crest--badge') + '</span></td>' +
         '<td class="num" data-label="Valor de mercado"><strong>' + money(market) + '</strong></td>' +
         '<td data-label="Ofertas">' + offerCell + '</td>' +
       '</tr>';
@@ -1431,7 +1434,13 @@
   /* ---------- Alineación (simulador) ---------- */
 
   /* Los siete sistemas de Biwenger. El portero va aparte, siempre uno. */
-  const FORMATIONS = ['3-4-3', '3-5-2', '4-3-3', '4-4-2', '4-5-1', '5-3-2', '5-4-1'];
+  /* Los siete de siempre más los cinco que Biwenger reserva a las ligas de
+     pago (los saca de competition.sport.lineups.premiumTypes). */
+  const FORMATIONS = [
+    '3-3-4', '3-4-3', '3-5-2', '3-6-1',
+    '4-2-4', '4-3-3', '4-4-2', '4-5-1', '4-6-0',
+    '5-2-3', '5-3-2', '5-4-1'
+  ];
   const POSITION_NAMES = { 1: 'POR', 2: 'DEF', 3: 'MED', 4: 'DEL' };
 
   /** Pide al Worker las plantillas de todos: hacen falta aquí y en Jugadores. */
@@ -1467,7 +1476,10 @@
   /** Cuántos jugadores pide cada línea del sistema elegido. */
   function formationLines(type) {
     const parts = String(type || '4-4-2').split('-').map(Number);
-    return { 2: parts[0] || 4, 3: parts[1] || 4, 4: parts[2] || 2 };
+    /* Ojo con el cero: en el 4-6-0 no hay delanteros, y un `|| 2` lo
+       convertiría en dos. */
+    const linea = (valor, porDefecto) => (isNaN(valor) ? porDefecto : valor);
+    return { 2: linea(parts[0], 4), 3: linea(parts[1], 4), 4: linea(parts[2], 2) };
   }
 
   /* El once del simulador arranca con lo que tengas puesto en Biwenger y se
@@ -1919,7 +1931,8 @@
           '<tr class="detail-row"><td class="detail-cell" colspan="4"><div class="detail">' +
           '<table class="detail-table"><tbody>' + row.moves.map(function (movement, i) {
             return '<tr><td class="detail-rank">' + (i + 1) + '</td>' +
-              '<td>' + playerName(movement) + '</td>' +
+              '<td><span class="with-crest">' + playerName(movement) +
+                crestOf(movement, 'crest--badge') + '</span></td>' +
               '<td class="num"><strong class="' + (buys ? 'money-neg' : 'money-pos') + '">' +
                 (buys ? '−' : '+') + money(movement.amount) + '</strong></td>' +
               '<td class="detail-date">' + escapeHtml(movement.date || '—') + '</td></tr>';
