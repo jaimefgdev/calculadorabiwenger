@@ -16,7 +16,7 @@
 <title>Calculadora Biwenger — Presupuestos de la liga</title>
 <!-- El ?v= se sube en cada publicación: obliga al navegador a bajar el archivo
      nuevo en vez de reutilizar el que tenga en caché. -->
-<link rel="stylesheet" href="styles.css?v=13">
+<link rel="stylesheet" href="styles.css?v=14">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>💰</text></svg>">
 </head>
 <body>
@@ -216,10 +216,14 @@
       </label>
     </div>
 
-    <div id="pitch" class="pitch"></div>
-
-    <h3 class="bench__title">Suplentes</h3>
-    <div id="bench" class="bench"></div>
+    <!-- Campo a la izquierda, suplentes a la derecha. -->
+    <div class="lineup-grid">
+      <div id="pitch" class="pitch"></div>
+      <div class="lineup-bench">
+        <h3 class="bench__title">Suplentes</h3>
+        <div id="bench" class="bench"></div>
+      </div>
+    </div>
 
     <!-- Elegir el cambio: las caras de quienes pueden jugar en ese hueco. -->
     <div id="lineup-picker" class="picker" hidden></div>
@@ -371,6 +375,6 @@
 
 </main>
 
-<script src="app.js?v=13"></script>
+<script src="app.js?v=14"></script>
 </body>
 </html>

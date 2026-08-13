@@ -348,8 +348,26 @@ code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft)
 .picker__meta { font-size: .68rem; color: var(--text-faint); }
 
 .bench__title { font-size: .8rem; text-transform: uppercase; letter-spacing: .04em; color: var(--text-faint); margin: 1rem 0 .5rem; }
+/* El campo manda el ancho (460 px como mucho) y los suplentes ocupan lo que
+   quede a su derecha. En pantalla estrecha bajan debajo. */
+.lineup-grid {
+  display: grid; gap: 1.2rem;
+  grid-template-columns: minmax(0, 460px) minmax(0, 1fr);
+  align-items: start;
+}
+.lineup-bench .bench__title { margin-top: 0; }
+/* Con menos de 720 px no caben las dos cosas al lado: el banquillo baja. */
+@media (max-width: 720px) {
+  .lineup-grid { grid-template-columns: 1fr; }
+}
+
 /* Los suplentes se leen igual que el campo: cara redonda y nombre debajo. */
-.bench { display: grid; gap: .7rem; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); }
+/* Columnas con techo: si no, cinco suplentes se reparten por todo el ancho
+   del panel y quedan desperdigados. */
+.bench {
+  display: grid; gap: .7rem; justify-content: start;
+  grid-template-columns: repeat(auto-fill, minmax(84px, 108px));
+}
 .bench__player {
   display: flex; flex-direction: column; align-items: center; gap: .3rem;
   min-width: 0; text-align: center;
