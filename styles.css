@@ -101,6 +101,7 @@ code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft)
 .topbar__inner {
   display: flex; align-items: center; justify-content: space-between;
   gap: 1rem; padding: .85rem 0;
+  flex-wrap: wrap;   /* en ventanas muy estrechas las pestañas bajan de línea */
 }
 .brand { display: flex; align-items: center; gap: .75rem; }
 .brand__logo {
@@ -146,6 +147,10 @@ code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft)
   align-items: start;
 }
 .market-grid .panel { margin-bottom: 0; }
+/* Por debajo de esto las dos tablas no caben una al lado de otra. */
+@media (max-width: 1240px) {
+  .market-grid { grid-template-columns: 1fr; }
+}
 
 .switch {
   width: 34px; height: 19px;
@@ -305,6 +310,8 @@ code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft)
 }
 @media (max-width: 560px) {
   .sync-fields { grid-template-columns: 1fr; }
+  .tabs { flex: 1 1 100%; order: 3; justify-content: flex-start; overflow-x: auto; }
+  .brand h1 { font-size: .95rem; }
 }
 .source textarea { min-height: 150px; }
 

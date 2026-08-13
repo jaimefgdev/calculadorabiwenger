@@ -1139,8 +1139,9 @@
     };
   }
 
-  function simToggle(id, checked) {
-    return '<button type="button" class="switch" data-sim="' + escapeHtml(id) + '" aria-pressed="' +
+  /** @param {string} tone 'in' para ventas (verde) y 'out' para pujas (rojo). */
+  function simToggle(id, checked, tone) {
+    return '<button type="button" class="switch switch--' + tone + '" data-sim="' + escapeHtml(id) + '" aria-pressed="' +
       (checked ? 'true' : 'false') + '" title="Simular que se cierra"><span></span></button>';
   }
 
@@ -1163,8 +1164,9 @@
         '<td data-label="Tipo"><span class="tag ' + (out ? 'tag--buy' : 'tag--sell') + '">' +
           (out ? '↗ Puja enviada' : '↘ Oferta recibida') + '</span></td>' +
         '<td data-label="Con">' + escapeHtml(offer.other || 'Mercado') + '</td>' +
-        '<td class="num" data-label="Importe"><strong>' + (out ? '−' : '+') + money(offer.amount) + '</strong></td>' +
-        '<td data-label="Simular">' + simToggle(offer.id, on) + '</td>' +
+        '<td class="num" data-label="Importe"><strong class="' + (out ? 'money-neg' : 'money-pos') + '">' +
+          (out ? '−' : '+') + money(offer.amount) + '</strong></td>' +
+        '<td data-label="Simular">' + simToggle(offer.id, on, out ? 'out' : 'in') + '</td>' +
       '</tr>';
     }).join('');
 
@@ -1262,7 +1264,6 @@
       return '<tr>' +
         '<td data-label="Jugador">' + playerName(item) + '</td>' +
         '<td class="num" data-label="Valor de mercado"><strong>' + money(market) + '</strong></td>' +
-        '<td class="num" data-label="Precio pedido"><span class="sub">' + money(item.price) + '</span></td>' +
         '<td data-label="Ofertas">' + offerCell + '</td>' +
       '</tr>';
     }).join('');
@@ -1550,6 +1551,7 @@
       if (!manager && item.manager) unknown[item.manager] = true;
       const time = item.date ? Date.parse(item.date) : NaN;
       return {
+        playerId: item.playerId || null,
         player: item.player || 'Jugador desconocido',
         type: item.type === 'sell' ? 'sell' : 'buy',
         manager: manager,
