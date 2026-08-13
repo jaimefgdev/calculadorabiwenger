@@ -488,6 +488,7 @@
       budget: { key: '', dir: -1 },
       moves:  { key: '', dir: -1 },
       managers: { key: '', dir: -1 },
+      squad: { key: '', dir: 1 },
       detail: { key: 'amount', dir: -1 }   // dentro de la ficha de cada mánager
     }
   };
@@ -1371,9 +1372,21 @@
 
   /** Posición de un jugador según su plantilla o su ficha de alineación. */
   function playerPosition(id) {
+    const inSquad = playerById(id);
+    if (inSquad && inSquad.position) return inSquad.position;
     const inLineup = ((state.lineup && state.lineup.players) || [])
       .filter(function (player) { return player.id === String(id); })[0];
     return inLineup ? inLineup.position : null;
+  }
+
+  /* Hay jugadores que valen para dos demarcaciones (Djené de defensa o medio,
+     Pere Milla de delantero o medio): Biwenger las guarda en altPositions. */
+  function playsAs(id, position) {
+    const player = playerById(id);
+    const main = playerPosition(id);
+    if (main === position) return true;
+    const alt = (player && player.altPositions) || [];
+    return alt.indexOf(position) !== -1;
   }
 
   function pitchSlot(key, position) {
@@ -1382,13 +1395,20 @@
     const chosen = {};
     Object.keys(state.xi.slots).forEach(function (slot) { chosen[state.xi.slots[slot]] = slot; });
 
-    const options = ['<option value="">— vacío —</option>'].concat(mySquad().map(function (candidate) {
-      const taken = chosen[candidate.id] && chosen[candidate.id] !== key;
-      const pos = playerPosition(candidate.id);
-      return '<option value="' + candidate.id + '"' + (candidate.id === id ? ' selected' : '') +
-        (taken ? ' disabled' : '') + '>' +
-        escapeHtml(candidate.name) + (pos ? ' · ' + POSITION_NAMES[pos] : '') + '</option>';
-    })).join('');
+    /* Solo se ofrecen los que pueden jugar en esa demarcación, contando las
+       posiciones alternativas. */
+    const options = ['<option value="">— vacío —</option>'].concat(mySquad()
+      .filter(function (candidate) { return playsAs(candidate.id, position); })
+      .map(function (candidate) {
+        const taken = chosen[candidate.id] && chosen[candidate.id] !== key;
+        const main = playerPosition(candidate.id);
+        const alt = (candidate.altPositions || []).length
+          ? '/' + candidate.altPositions.map(function (p) { return POSITION_NAMES[p]; }).join('/')
+          : '';
+        return '<option value="' + candidate.id + '"' + (candidate.id === id ? ' selected' : '') +
+          (taken ? ' disabled' : '') + '>' +
+          escapeHtml(candidate.name) + (main ? ' · ' + POSITION_NAMES[main] + alt : '') + '</option>';
+      })).join('');
 
     const face = player
       ? '<span class="pic-player pitch__face" style="background-image:url(\'https://cdn.biwenger.com/i/p/' +
@@ -1423,11 +1443,14 @@
         (formation === state.xi.type ? ' selected' : '') + '>' + formation + '</option>';
     }).join('');
 
-    $('pitch').innerHTML = rows.map(function (row) {
-      const slots = [];
-      for (let i = 0; i < row.count; i++) slots.push(pitchSlot(row.position + '-' + i, row.position));
-      return '<div class="pitch__line">' + slots.join('') + '</div>';
-    }).join('');
+    $('pitch').innerHTML =
+      '<span class="pitch__area pitch__area--top" aria-hidden="true"></span>' +
+      '<span class="pitch__area pitch__area--bottom" aria-hidden="true"></span>' +
+      rows.map(function (row) {
+        const slots = [];
+        for (let i = 0; i < row.count; i++) slots.push(pitchSlot(row.position + '-' + i, row.position));
+        return '<div class="pitch__line">' + slots.join('') + '</div>';
+      }).join('');
 
     // Suplentes: los de la plantilla que no estén en el once.
     const inXi = {};
@@ -1438,13 +1461,10 @@
       ? '<p class="muted">' + (state.squads && state.squads.status === 'loading'
           ? 'Cargando la plantilla…' : 'Sin suplentes.') + '</p>'
       : bench.map(function (player) {
-          const pos = playerPosition(player.id);
           return '<div class="bench__player">' +
             '<span class="pic-player" style="background-image:url(\'https://cdn.biwenger.com/i/p/' +
               encodeURIComponent(player.id) + '.png\')"></span>' +
             '<span class="bench__name">' + escapeHtml(player.name) + '</span>' +
-            '<span class="sub">' + (pos ? POSITION_NAMES[pos] + ' · ' : '') +
-              (player.marketValue == null ? '' : money(player.marketValue)) + '</span>' +
           '</div>';
         }).join('');
 
@@ -1559,6 +1579,46 @@
 
   /* ---------- Plantillas ---------- */
 
+  /* La plantilla se ordena por demarcación (portero, defensas, medios,
+     delanteros) salvo que pulses otra cabecera. */
+  function sortSquad(players) {
+    const sort = state.sort.squad;
+    const list = players.slice();
+
+    if (!sort.key || sort.key === 'position') {
+      const dir = sort.key === 'position' ? sort.dir : 1;
+      return list.sort(function (a, b) {
+        const diff = ((a.position || 9) - (b.position || 9)) * dir;
+        return diff || (b.marketValue || 0) - (a.marketValue || 0);
+      });
+    }
+
+    return list.sort(function (a, b) {
+      const value = function (player) {
+        if (sort.key === 'name') return player.name;
+        if (sort.key === 'since') return player.since;
+        if (sort.key === 'diff') {
+          return player.paid == null || player.marketValue == null ? null : player.marketValue - player.paid;
+        }
+        return player[sort.key];
+      };
+      const x = value(a);
+      const y = value(b);
+      if (x == null && y == null) return 0;
+      if (x == null) return 1;
+      if (y == null) return -1;
+      const cmp = typeof x === 'string' ? String(x).localeCompare(String(y), 'es') : x - y;
+      return cmp * sort.dir;
+    });
+  }
+
+  function squadColumn(key, label, cls) {
+    const sort = state.sort.squad;
+    const active = sort.key === key || (!sort.key && key === 'position');
+    return '<th class="' + cls + ' sortable" data-squad-sort="' + key + '" tabindex="0" aria-sort="' +
+      (active ? (sort.dir === 1 || !sort.key ? 'ascending' : 'descending') : 'none') + '">' + label + '</th>';
+  }
+
   function renderSquads() {
     ensureSquads();
     const body = $('squads-body');
@@ -1579,19 +1639,22 @@
       const detail = !open ? '' :
         '<tr class="detail-row"><td class="detail-cell" colspan="4"><div class="detail">' +
         '<table class="detail-table"><thead><tr>' +
-          '<th class="detail-rank"></th><th>Jugador</th><th>Desde</th>' +
-          '<th class="num">Pagado</th><th class="num">Valor de mercado</th><th class="num">Diferencia</th>' +
+          squadColumn('position', 'Pos.', '') +
+          squadColumn('name', 'Jugador', '') +
+          squadColumn('since', 'Desde', '') +
+          squadColumn('paid', 'Pagado', 'num') +
+          squadColumn('marketValue', 'Valor de mercado', 'num') +
+          squadColumn('diff', 'Diferencia', 'num') +
         '</tr></thead><tbody>' +
-        squad.players.map(function (player, index) {
+        sortSquad(squad.players).map(function (player) {
           const diff = player.paid == null || player.marketValue == null
             ? null : player.marketValue - player.paid;
           return '<tr>' +
-            '<td class="detail-rank">' + (index + 1) + '</td>' +
+            '<td class="detail-rank">' + (player.position ? POSITION_NAMES[player.position] : '—') + '</td>' +
             '<td>' + playerName({ playerId: player.id, player: player.name }) + '</td>' +
             '<td class="detail-date">' + shortDay(player.since) + '</td>' +
             '<td class="num">' + (player.paid == null
-              ? '<span class="sub">reparto inicial</span>'
-              : money(player.paid) + ' <span class="sub">' + escapeHtml(player.from || '') + '</span>') + '</td>' +
+              ? '<span class="sub">reparto inicial</span>' : money(player.paid)) + '</td>' +
             '<td class="num"><strong>' + (player.marketValue == null ? '—' : money(player.marketValue)) + '</strong></td>' +
             '<td class="num">' + (diff == null ? '<span class="sub">—</span>' :
               '<span class="delta ' + (diff >= 0 ? 'delta--up' : 'delta--down') + '">' +
@@ -2138,6 +2201,16 @@
     });
 
     $('squads-body').addEventListener('click', function (event) {
+      const header = event.target.closest('[data-squad-sort]');
+      if (header) {
+        const key = header.getAttribute('data-squad-sort');
+        const sort = state.sort.squad;
+        if (sort.key === key) sort.dir = -sort.dir;
+        else { sort.key = key; sort.dir = key === 'name' || key === 'position' ? 1 : -1; }
+        renderSquads();
+        return;
+      }
+
       const button = event.target.closest('[data-squad]');
       if (!button) return;
       const id = button.getAttribute('data-squad');
