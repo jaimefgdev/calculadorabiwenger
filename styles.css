@@ -178,8 +178,13 @@ code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft)
 .switch:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
 .row-sim { background: var(--accent-soft) !important; }
+/* Cuánto mejora o empeora la oferta respecto al valor de mercado. */
+.delta { font-size: .72rem; font-weight: 640; white-space: nowrap; }
+.delta--up { color: var(--pos); }
+.delta--down { color: var(--neg); }
+
+.btn--icon { display: inline-grid; place-items: center; padding: .45rem .55rem; line-height: 0; }
 .bid { display: inline-flex; align-items: center; gap: .4rem; margin-right: .6rem; }
-.bid--on strong { color: var(--accent); }
 
 /* ---------- Ficha de mánager ---------- */
 .row-open { background: var(--accent-soft) !important; }

@@ -617,19 +617,24 @@
     };
   }
 
-  /** Las tarjetas de la pestaña Datos, pulsables para abrir su gráfico. */
+  /** La pestaña Datos: una fila por métrica, y al pulsar se abre su gráfico. */
   function renderDataKpis() {
     const kpi = state.kpi || kpiValues(budgetRows());
 
     $('data-kpis').innerHTML = KPI_SERIES.map(function (serie) {
       const info = kpi[serie.key];
       const on = state.kpiCharts[serie.key];
-      return '<article class="kpi ' + info.modifier + '" data-kpi="' + serie.key + '" role="button" tabindex="0"' +
-        ' aria-pressed="' + (on ? 'true' : 'false') + '" title="Ver evolución por días">' +
-        '<span class="kpi__label">' + info.label + '</span>' +
-        '<strong class="kpi__value">' + info.value + '</strong>' +
-        '<span class="kpi__foot">' + info.foot + '</span>' +
-      '</article>';
+      return '<tr class="' + (on ? 'row-open' : '') + '">' +
+        '<td data-label="Métrica">' +
+          '<button type="button" class="row-toggle" data-kpi="' + serie.key + '"' +
+            ' aria-expanded="' + (on ? 'true' : 'false') + '" title="Ver evolución por días">' +
+            '<span class="row-toggle__icon" aria-hidden="true">▸</span>' +
+            '<span class="chip__dot" style="background:' + serie.color + '"></span>' +
+            '<span class="manager__name">' + info.label + '</span>' +
+          '</button></td>' +
+        '<td class="num" data-label="Total"><strong>' + info.value + '</strong></td>' +
+        '<td data-label="Detalle"><span class="sub">' + info.foot + '</span></td>' +
+      '</tr>';
     }).join('');
   }
 
@@ -670,8 +675,7 @@
 
   const CHART_SERIES = [
     { key: 'saldo',  label: 'Saldo',        color: 'var(--viz-1)' },
-    { key: 'value',  label: 'Valor equipo', color: 'var(--viz-2)' },
-    { key: 'bid',    label: 'Puja máxima',  color: 'var(--viz-3)' }
+    { key: 'value',  label: 'Valor equipo', color: 'var(--viz-2)' }
   ];
 
   /**
@@ -1263,17 +1267,21 @@
             const id = marketSaleId(item);
             const on = !!state.sim[id];
             return '<span class="bid' + (on ? ' bid--on' : '') + '" title="Sin ofertas: simula venderlo a su valor de mercado">' +
-              '<strong class="money-market">' + money(market) + '</strong> ' +
+              '<strong class="' + (on ? 'money-pos' : 'money-market') + '">' + money(market) + '</strong> ' +
               simToggle(id, on, 'in') + '</span>';
           })()
         : bids.map(function (offer) {
             const on = !!state.sim[offer.id];
-            // Verde si mejora el valor de mercado, rojo si lo empeora.
-            const tone = offer.amount > market ? 'money-pos' : (offer.amount < market ? 'money-neg' : '');
+            const diff = offer.amount - market;
+            /* Triángulo arriba en verde si la oferta mejora el valor de
+               mercado, abajo en rojo si lo empeora, con la diferencia. */
+            const delta = diff === 0 ? '' :
+              '<span class="delta ' + (diff > 0 ? 'delta--up' : 'delta--down') + '">' +
+              (diff > 0 ? '▲ +' : '▼ −') + money(Math.abs(diff)) + '</span>';
             return '<span class="bid' + (on ? ' bid--on' : '') + '" title="Oferta de ' +
               escapeHtml(offer.other || 'Mercado') + '">' +
-              '<strong class="' + tone + '">' + money(offer.amount) + '</strong> ' +
-              simToggle(offer.id, on, 'in') + '</span>';
+              '<strong class="' + (on ? 'money-pos' : '') + '">' + money(offer.amount) + '</strong> ' +
+              delta + ' ' + simToggle(offer.id, on, 'in') + '</span>';
           }).join('');
 
       return '<tr>' +
@@ -1827,16 +1835,8 @@
     }
 
     $('data-kpis').addEventListener('click', function (event) {
-      const card = event.target.closest('[data-kpi]');
-      if (card) toggleKpi(card.getAttribute('data-kpi'));
-    });
-
-    $('data-kpis').addEventListener('keydown', function (event) {
-      if (event.key !== 'Enter' && event.key !== ' ') return;
-      const card = event.target.closest('[data-kpi]');
-      if (!card) return;
-      event.preventDefault();
-      toggleKpi(card.getAttribute('data-kpi'));
+      const row = event.target.closest('[data-kpi]');
+      if (row) toggleKpi(row.getAttribute('data-kpi'));
     });
 
     bindSorting('managers');

@@ -38,7 +38,14 @@
     <div class="topbar__actions">
       <span id="last-sync" class="topbar__stamp" role="status" aria-live="polite"></span>
       <button id="btn-sync-top" class="btn btn--primary" type="button">Actualizar</button>
-      <button id="btn-toggle-input" class="btn" type="button">Datos</button>
+      <button id="btn-toggle-input" class="btn btn--icon" type="button" title="Ajustes y origen de datos" aria-label="Ajustes y origen de datos">
+        <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+          <path d="M3 6h11M17 6h4M3 12h5M11 12h10M3 18h11M17 18h4"></path>
+          <circle cx="15.5" cy="6" r="2" fill="currentColor" stroke="none"></circle>
+          <circle cx="9.5" cy="12" r="2" fill="currentColor" stroke="none"></circle>
+          <circle cx="15.5" cy="18" r="2" fill="currentColor" stroke="none"></circle>
+        </svg>
+      </button>
     </div>
   </div>
 </header>
@@ -261,7 +268,18 @@
         <h2>Evolución de la liga</h2>
         <p class="muted">Pulsa una tarjeta para ver su evolución día a día. Puedes tener dos gráficos abiertos a la vez.</p>
       </div>
-      <div class="kpis" id="data-kpis"></div>
+      <div class="table-scroll">
+        <table class="table table--datos">
+          <thead>
+            <tr>
+              <th>Métrica</th>
+              <th class="num">Total</th>
+              <th>Detalle</th>
+            </tr>
+          </thead>
+          <tbody id="data-kpis"></tbody>
+        </table>
+      </div>
     </section>
 
     <div id="kpi-charts" class="kpi-charts"></div>
