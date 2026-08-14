@@ -2806,7 +2806,7 @@
 
       /* Justo en el día de la llegada se cuenta la historia completa. */
       tip.innerHTML = (llegada && dato.day === llegada.day)
-        ? '<span class="viz-tip__llegada">' + escapeHtml(llegada.texto) + '</span>'
+        ? '<span class="viz-tip__llegada">' + llegada.texto + '</span>'
         : '<span class="viz-tip__day">' + escapeHtml(shortDay(dato.day)) + '</span>' +
           '<strong>' + money(dato.price) + '</strong>';
       tip.classList.toggle('viz-tip--llegada', !!(llegada && dato.day === llegada.day));
@@ -2876,12 +2876,15 @@
             '</div>') +
       '</div>';
 
-    /* Corto y al grano: qué día llegó, por cuánto y cuánto valía entonces. */
+    /* Corto y al grano: qué día llegó, por cuánto y cuánto valía entonces.
+       El valor de mercado de ese día va en amarillo, como la marca. */
     const textoLlegada = !llegada ? null
       : (llegada.paid == null
-          ? 'reparto ' + shortDay(diaLlegada)
-          : 'fichado ' + shortDay(diaLlegada) + ' por ' + money(llegada.paid)) +
-        (precioEseDia != null ? ' · ' + money(precioEseDia) : '');
+          ? 'reparto ' + escapeHtml(shortDay(diaLlegada))
+          : 'fichado ' + escapeHtml(shortDay(diaLlegada)) + ' por ' + money(llegada.paid)) +
+        (precioEseDia != null
+          ? ' · <span class="viz-tip__valor">' + money(precioEseDia) + '</span>'
+          : '');
 
     bindChartHover(caja.querySelector('.viz-hover'), puntos,
       diaLlegada ? { day: diaLlegada, texto: textoLlegada } : null);

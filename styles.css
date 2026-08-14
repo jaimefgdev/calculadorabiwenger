@@ -1187,3 +1187,5 @@ main.wrap { padding-bottom: 3.5rem; }
 .viz__line--antes { stroke: var(--text-faint); opacity: .45; }
 .viz-tip--llegada { border-color: var(--marca); }
 .viz-tip__llegada { color: var(--text); font-weight: 560; }
+/* El valor de mercado del día de la llegada, del color de la marca. */
+.viz-tip__valor { color: var(--marca); font-weight: 700; }
