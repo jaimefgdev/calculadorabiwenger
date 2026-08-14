@@ -452,6 +452,9 @@ code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft)
    aire alrededor) y otros verticales muy ajustados (118×149). Con `cover`,
    estos últimos se amplían casi un 50 % y la cara se sale del círculo. */
 .pic-player {
+  /* En línea el ancho y el alto no se aplican: dentro de un flex se convierte
+     solo, pero suelto (como en la lista de subidas) se quedaba en cero. */
+  display: inline-block;
   width: 24px; height: 24px; flex: none;
   border-radius: 50%;
   background: var(--bg-surface) center bottom / contain no-repeat;
@@ -1024,14 +1027,16 @@ code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft)
 .movers__list { display: flex; flex-direction: column; }
 .mover {
   display: grid; align-items: center; gap: .4rem;
-  grid-template-columns: 32px 15px minmax(0, 1fr) 24px auto auto;
+  grid-template-columns: 34px 22px minmax(0, 1fr) 24px auto auto;
   padding: .3rem 0;
   border-bottom: 1px solid var(--border);
   font-size: .82rem;
 }
 .mover:last-child { border-bottom: 0; }
-.mover__face { position: relative; display: block; width: 32px; height: 32px; }
-.pic-player.mover__pic { width: 32px; height: 32px; }
+.mover__face { position: relative; display: block; width: 34px; height: 34px; }
+.pic-player.mover__pic { width: 34px; height: 34px; }
+/* El escudo, del tamaño suficiente para reconocer el equipo de un vistazo. */
+.mover .crest--badge { width: 22px; height: 22px; opacity: 1; }
 .mover__name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 560; }
 .mover__owner { display: inline-flex; align-items: center; justify-content: center; }
 .mover__owner .avatar { width: 24px; height: 24px; font-size: .58rem; }
@@ -1048,7 +1053,6 @@ main.wrap { padding-bottom: 3.5rem; }
 .viz-block .panel__head { margin-bottom: .6rem; }
 
 /* Cabecera de la alineación: el botón de reinicio junto al sistema. */
-.lineup-actions { display: flex; align-items: center; gap: .6rem; flex-wrap: wrap; }
 
 /* Número de pujas rivales, junto al tiempo restante. */
 .bids {

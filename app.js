@@ -1561,14 +1561,6 @@
     } catch (error) { /* se empieza con la de Biwenger */ }
   }
 
-  /** Vuelve a la alineación que tengas puesta en Biwenger. */
-  function resetXi() {
-    state.xi = null;
-    try { localStorage.removeItem(XI_KEY); } catch (error) { /* nada */ }
-    ensureXi();
-    renderLineup();
-  }
-
   function ensureXi() {
     /* Lo guardado manda, pero se limpian los que ya no estén en la plantilla
        (vendidos desde la última vez). */
@@ -1909,7 +1901,7 @@
     const pinta = function (id, lista) {
       $(id).innerHTML = lista.length === 0
         ? '<p class="muted">Sin cambios todavía.</p>'
-        : lista.slice(0, 10).map(moverRow).join('');
+        : lista.slice(0, 25).map(moverRow).join('');
     };
     pinta('movers-up', datos.up || []);
     pinta('movers-down', datos.down || []);
@@ -3070,8 +3062,6 @@
       renderLineup();
       renderPicker();
     });
-
-    $('lineup-reset').addEventListener('click', resetXi);
 
     document.addEventListener('keydown', function (event) {
       if (event.key !== 'Escape') return;
