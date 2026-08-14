@@ -1822,8 +1822,10 @@
       ? faceOf(player.id, 'pitch__face')
       : '<span class="pic-player pitch__face pitch__face--empty"></span>';
 
-    return '<div class="pitch__slot">' + crestOf(player, 'crest--ghost') + face +
-      statusMark(player, 'mark--pitch') + pointsBadge(player, 'pts--pitch') +
+    return '<div class="pitch__slot">' + crestOf(player, 'crest--ghost') +
+      '<span class="face-box">' + face +
+        statusMark(player, 'mark--esquina') + pointsBadge(player, 'pts--esquina') +
+      '</span>' +
       '<span class="pitch__name">' + (player ? escapeHtml(player.name) : '—') + '</span>' +
       '<button type="button" class="pitch__pick" data-slot="' + key + '" data-position="' + position + '"' +
         ' aria-label="Cambiar el ' + POSITION_NAMES[position] +
@@ -1963,8 +1965,9 @@
       : bench.map(function (player) {
           return '<div class="bench__player">' +
             crestOf(player, 'crest--ghost') +
-            faceOf(player.id, 'bench__face') +
-            statusMark(player, 'mark--bench') + pointsBadge(player, 'pts--bench') +
+            '<span class="face-box">' + faceOf(player.id, 'bench__face') +
+              statusMark(player, 'mark--esquina') + pointsBadge(player, 'pts--esquina') +
+            '</span>' +
             '<span class="bench__name">' + escapeHtml(player.name) + '</span>' +
           '</div>';
         }).join('');

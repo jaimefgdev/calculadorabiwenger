@@ -341,8 +341,11 @@ code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft)
 }
 /* Doble clase a propósito: `.pic-player` fija 24 px más abajo y, a igualdad
    de peso, ganaría por ir después. */
+/* La medida la lleva la caja; la foto la rellena. Si el ancho fuera un
+   porcentaje de un contenedor que se ajusta a ella, saldría cero. */
+.pitch__slot .face-box { display: block; width: min(92%, 62px); margin: 0 auto; }
 .pic-player.pitch__face {
-  width: min(92%, 62px); height: auto; aspect-ratio: 1;
+  width: 100%; height: auto; aspect-ratio: 1;
   box-shadow: none; background-color: rgba(0,0,0,.35);
 }
 .pic-player.pitch__face--empty { border: 2px dashed rgba(255, 255, 255, .45); box-shadow: none; }
@@ -1034,6 +1037,8 @@ code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft)
 
 /* ---------- Lesionado · sancionado · duda ---------- */
 .mark {
+  /* Nunca se comen un clic: el hueco del campo se pulsa entero. */
+  pointer-events: none;
   position: absolute; z-index: 3;
   display: grid; place-items: center;
   width: 18px; height: 18px;
@@ -1047,9 +1052,10 @@ code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft)
 .mark--doubt      { color: #a87400; }
 .mark--out        { color: #444; }
 /* Pegado al borde izquierdo de la foto y por delante de ella. */
-/* El aviso, arriba a la izquierda de la cara; los puntos, abajo. */
-.mark--pitch  { left: 12%; top: 50%; transform: translate(-50%, -175%); }
-.mark--bench  { left: 50%; top: 16px; margin-left: -36px; transform: translate(0, -50%); }
+/* Los dos círculos se anclan a la foto, no a la ficha entera: en el campo la
+   ficha es más alta por el nombre y quedaban descolgados. */
+.face-box { position: relative; display: inline-block; line-height: 0; }
+.mark--esquina { top: 0; left: 0; transform: translate(-38%, -22%); }
 .mark--picker { left: 50%; top: 34px; margin-left: -36px; transform: translate(0, -50%); width: 17px; height: 17px; }
 
 /* ---------- Suben y bajan ---------- */
@@ -1133,6 +1139,7 @@ main.wrap { padding-bottom: 3.5rem; }
 
 /* Puntos del futbolista, abajo a la izquierda de su foto. */
 .pts {
+  pointer-events: none;
   position: absolute; z-index: 3;
   display: grid; place-items: center;
   min-width: 19px; height: 19px; padding: 0 4px;
@@ -1142,8 +1149,7 @@ main.wrap { padding-bottom: 3.5rem; }
   border-radius: 100px;
   box-shadow: 0 1px 3px rgba(0, 0, 0, .5);
 }
-.pts--pitch { left: 12%; top: 50%; transform: translate(-50%, 75%); }
-.pts--bench { left: 50%; top: 48px; margin-left: -36px; transform: translate(0, -50%); }
+.pts--esquina { bottom: 0; left: 0; transform: translate(-38%, 22%); }
 
 /* Cómo llegó cada futbolista a la plantilla: procedencia en pequeño e importe
    al tamaño normal, en una sola línea. */
