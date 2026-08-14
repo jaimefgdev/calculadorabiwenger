@@ -2022,12 +2022,6 @@
     };
     pinta('movers-up', datos.up || []);
     pinta('movers-down', datos.down || []);
-
-    const mios = (datos.up || []).concat(datos.down || [])
-      .filter(function (p) { return ownerOf(p.id); }).length;
-    $('movers-note').textContent = mios
-      ? 'Lo que más se mueve hoy · ' + mios + ' de estos jugadores tienen dueño en la liga.'
-      : 'Lo que más se mueve hoy en toda la competición.';
   }
 
   /* ---------- Pestaña de jornadas ----------
