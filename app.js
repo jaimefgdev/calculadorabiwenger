@@ -34,7 +34,7 @@
   const XI_KEY = 'biwenger-calc-xi';
   /* El estado del futbolista cuando se hizo cada fichaje. Se guarda la primera
      vez que se ve el movimiento y ya no se toca: Biwenger solo da el de hoy. */
-  const MOVE_STATUS_KEY = 'biwenger-calc-estado-fichajes';
+  const MOVE_STATUS_KEY = 'biwenger-calc-estado-fichajes-v2';
   /* Media hora: el mercado solo se renueva una vez al día y las pujas duran
      24 h, así que no hay nada que mirar cada pocos minutos. Con el botón
      Actualizar se fuerza cuando quieras. */
@@ -1201,7 +1201,7 @@
         '<td data-label="Futbolista"><span class="with-crest">' + playerName(movement) +
           crestOf(movement, 'crest--badge') + '</span></td>' +
         '<td class="estado-cell" data-label="Estado">' +
-          statusCell({ status: state.moveStatus[moveKey(movement)] }) + '</td>' +
+          statusCell({ status: state.moveStatus[moveKey(movement)] || movement.status }) + '</td>' +
         '<td data-label="Acción"><span class="tag ' + (buy ? 'tag--buy' : 'tag--sell') + '">' +
           (buy ? '↓ Fichado' : '↑ Vendido') + '</span></td>' +
         '<td data-label="Futbolista">' + managerCell + '</td>' +
@@ -2113,9 +2113,12 @@
   function freezeMoveStatus(movements) {
     let nuevos = 0;
     movements.forEach(function (movement) {
+      /* Sin dato no se congela nada: si se guarda un «ok» a ciegas, ese
+         fichaje se queda sano para siempre aunque el jugador esté lesionado. */
+      if (!movement.status) return;
       const clave = moveKey(movement);
       if (state.moveStatus[clave] === undefined) {
-        state.moveStatus[clave] = movement.status || 'ok';
+        state.moveStatus[clave] = movement.status;
         nuevos += 1;
       }
     });
