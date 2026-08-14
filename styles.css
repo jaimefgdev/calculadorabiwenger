@@ -1144,5 +1144,16 @@ main.wrap { padding-bottom: 3.5rem; }
 
 /* Cómo llegó cada futbolista a la plantilla: procedencia en pequeño e importe
    al tamaño normal, en una sola línea. */
-.metodo { white-space: nowrap; font-variant-numeric: tabular-nums; }
+.detail-table td.metodo { white-space: nowrap; font-variant-numeric: tabular-nums; text-align: center; }
+.detail-table th[data-squad-sort="paid"] { text-align: center; }
 .metodo .sub { font-size: .72rem; }
+
+/* En el gráfico ampliado las cifras completas necesitan más sitio a la izquierda. */
+.modal__card .viz__tick { font-size: .62rem; }
+
+/* Aspa para cerrar el gráfico ampliado. */
+.btn--close {
+  display: grid; place-items: center;
+  width: 30px; height: 30px; padding: 0;
+  font-size: .9rem; line-height: 1; border-radius: 50%;
+}

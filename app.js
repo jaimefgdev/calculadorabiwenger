@@ -802,7 +802,10 @@
     const isCount = !!opts.count;
     const isBars = !!opts.bars;
     const multi = opts.series && opts.series.length ? opts.series : null;
-    const fmtTick = isCount ? function (v) { return String(Math.round(v)); } : shortMoney;
+    /* En el detalle ampliado las cifras van completas: «0,5M» no sirve para
+       comparar precios de verdad. */
+    const fmtTick = isCount ? function (v) { return String(Math.round(v)); }
+      : (opts.fullTicks ? function (v) { return money(Math.round(v)); } : shortMoney);
     const fmtFull = isCount ? function (v) { return Math.round(v) + (v === 1 ? ' movimiento' : ' movimientos'); } : money;
     const fields = multi ? multi.map(function (s) { return s.field; }) : [key];
     const valid = points.filter(function (point) {
@@ -812,7 +815,8 @@
       return '<p class="viz__empty">Sin datos todavía de ' + escapeHtml(label.toLowerCase()) + '.</p>';
     }
 
-    const W = 600, H = 130, padX = 46, padTop = 14, padBottom = 22;
+    /* Con las cifras completas hace falta más margen a la izquierda o se salen. */
+    const W = 600, H = opts.height || 130, padX = opts.padX || 46, padTop = 14, padBottom = 22;
     const values = [];
     valid.forEach(function (point) {
       fields.forEach(function (field) { if (point[field] != null) values.push(point[field]); });
@@ -845,7 +849,12 @@
         ' L' + coords[0].x.toFixed(1) + ' ' + (H - padBottom) + ' Z" fill="' + color + '"></path>'
       : '';
 
-    const grid = [min, min + span / 2, max].map(function (v) {
+    /* Por defecto tres líneas de referencia; el detalle ampliado pide más. */
+    const cuantas = opts.ticks || 3;
+    const escalones = [];
+    for (let i = 0; i < cuantas; i++) escalones.push(min + (span * i) / (cuantas - 1));
+
+    const grid = escalones.map(function (v) {
       return '<line class="viz__grid" x1="' + padX + '" x2="' + (W - 12) + '" y1="' + y(v).toFixed(1) +
         '" y2="' + y(v).toFixed(1) + '"></line>' +
         '<text class="viz__tick" x="' + (padX - 6) + '" y="' + (y(v) + 3).toFixed(1) + '" text-anchor="end">' +
@@ -2724,14 +2733,16 @@
         escapeHtml(abierto.name) + '">' +
         '<div class="picker__head">' +
           '<strong>' + escapeHtml(abierto.name) + '</strong>' +
-          '<button type="button" class="btn btn--ghost btn--sm" data-price-close>Cerrar</button>' +
+          '<button type="button" class="btn btn--ghost btn--close" data-price-close' +
+            ' title="Cerrar" aria-label="Cerrar">✕</button>' +
         '</div>' +
         (puntos.length < 2
           ? '<p class="viz__empty">Todavía no hay evolución de este futbolista.</p>'
-          : '<p class="muted">' + puntos.length + ' días · de ' + money(primero) + ' a ' + money(ultimo) +
+          : '<p class="muted">De ' + money(primero) + ' a <strong>' + money(ultimo) + '</strong>' +
             ' · <span class="delta ' + (sube ? 'delta--up' : 'delta--down') + '">' +
             (sube ? '▲ +' : '▼ −') + money(Math.abs(salto)) + '</span></p>' +
-            lineChart(puntos, 'price', sube ? 'var(--pos)' : 'var(--neg)', 'Valor de mercado')) +
+            lineChart(puntos, 'price', sube ? 'var(--pos)' : 'var(--neg)', 'Valor de mercado',
+              { height: 260, ticks: 7, fullTicks: true, padX: 96 })) +
       '</div>';
   }
 
@@ -2782,9 +2793,9 @@
               /* Cómo llegó a la plantilla y por cuánto. El importe, siempre en el
                  mismo tamaño; la procedencia, en pequeño al lado. */
               if (player.paid == null) {
+                /* No se pagó nada por él, así que el importe va discreto. */
                 const valia = state.startPrices[player.id];
-                return '<span class="sub">reparto</span>' +
-                  (valia ? ' <span class="sub">·</span> ' + money(valia) : '');
+                return '<span class="sub">reparto' + (valia ? ' · ' + money(valia) : '') + '</span>';
               }
               const quien = !player.from || player.from === 'Mercado' ? 'mercado' : player.from;
               return '<span class="sub">compra ' + escapeHtml(quien) + '</span>' +
