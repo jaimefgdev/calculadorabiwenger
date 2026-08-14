@@ -16,7 +16,7 @@
 <title>Calculadora Biwenger — Presupuestos de la liga</title>
 <!-- El ?v= se sube en cada publicación: obliga al navegador a bajar el archivo
      nuevo en vez de reutilizar el que tenga en caché. -->
-<link rel="stylesheet" href="styles.css?v=27">
+<link rel="stylesheet" href="styles.css?v=29">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>💰</text></svg>">
 </head>
 <body>
@@ -214,10 +214,14 @@
         <h2>Mi alineación</h2>
         <p class="muted" id="lineup-count">&nbsp;</p>
       </div>
-      <span class="field-label">Sistema
-        <button type="button" id="lineup-formation" class="field field--pick"
-          aria-haspopup="dialog">4-4-2</button>
-      </span>
+      <div class="lineup-actions">
+        <button type="button" id="lineup-reset" class="btn btn--ghost btn--sm"
+          title="Descartar los cambios y traer la alineación que tienes en Biwenger">Traer la de Biwenger</button>
+        <span class="field-label">Sistema
+          <button type="button" id="lineup-formation" class="field field--pick"
+            aria-haspopup="dialog">4-4-2</button>
+        </span>
+      </div>
     </div>
 
     <!-- Campo a la izquierda, suplentes a la derecha. -->
@@ -365,6 +369,21 @@
 
       <section class="panel">
         <div class="panel__head">
+          <h2>Quién vende más</h2>
+          <p class="muted">Pulsa un jugador para ver qué ha vendido.</p>
+        </div>
+        <div class="table-scroll">
+          <table class="table table--income">
+            <thead id="income-head"></thead>
+            <tbody id="income-body"></tbody>
+          </table>
+        </div>
+      </section>
+    </div>
+
+    <!-- A lo ancho y debajo del par, que estas filas piden sitio. -->
+    <section class="panel">
+        <div class="panel__head">
           <h2>Suben y bajan hoy</h2>
           <p class="muted" id="movers-note">Lo que ha cambiado de valor hoy. Si el jugador es de alguien de la liga, sale su foto al lado.</p>
         </div>
@@ -378,21 +397,7 @@
             <div id="movers-down" class="movers__list"></div>
           </div>
         </div>
-      </section>
-
-      <section class="panel">
-        <div class="panel__head">
-          <h2>Quién vende más</h2>
-          <p class="muted">Pulsa un jugador para ver qué ha vendido.</p>
-        </div>
-        <div class="table-scroll">
-          <table class="table table--income">
-            <thead id="income-head"></thead>
-            <tbody id="income-body"></tbody>
-          </table>
-        </div>
-      </section>
-    </div>
+    </section>
   </div><!-- /panel-datos -->
 
   <!-- ============================================================
@@ -434,6 +439,6 @@
 
 </main>
 
-<script src="app.js?v=27"></script>
+<script src="app.js?v=29"></script>
 </body>
 </html>

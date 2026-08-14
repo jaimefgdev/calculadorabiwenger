@@ -155,7 +155,10 @@ code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft)
 @media (max-width: 720px) {
   .market-grid { grid-template-columns: 1fr; }
 }
+/* La rejilla le quita el margen a sus paneles: hay que reponerlo abajo o el
+   bloque siguiente queda pegado. */
 .market-grid .panel { margin-bottom: 0; }
+.market-grid { margin-bottom: 1.5rem; }
 
 .switch {
   width: 34px; height: 19px;
@@ -1015,9 +1018,9 @@ code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft)
 
 /* ---------- Suben y bajan ---------- */
 .movers { display: grid; gap: 1.5rem; grid-template-columns: repeat(2, minmax(0, 1fr)); }
-/* Cada fila necesita unos 250 px; en media pantalla no caben por debajo de
-   1200, así que las dos listas pasan a ir una debajo de la otra. */
-@media (max-width: 1200px) { .movers { grid-template-columns: 1fr; } }
+/* Ahora el bloque va a lo ancho, así que las dos listas caben al lado hasta
+   pantallas bastante estrechas. */
+@media (max-width: 640px) { .movers { grid-template-columns: 1fr; } }
 .movers__list { display: flex; flex-direction: column; }
 .mover {
   display: grid; align-items: center; gap: .4rem;
@@ -1043,3 +1046,30 @@ code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft)
 main.wrap { padding-bottom: 3.5rem; }
 #jornada-chart { margin-top: 1.5rem; }
 .viz-block .panel__head { margin-bottom: .6rem; }
+
+/* Cabecera de la alineación: el botón de reinicio junto al sistema. */
+.lineup-actions { display: flex; align-items: center; gap: .6rem; flex-wrap: wrap; }
+
+/* Número de pujas rivales, junto al tiempo restante. */
+.bids {
+  display: inline-block; margin-left: .3rem;
+  padding: 0 .35rem;
+  font-size: .68rem; font-weight: 640;
+  color: var(--accent); background: var(--accent-soft);
+  border-radius: 100px; white-space: nowrap;
+}
+
+/* Las ocho pastillas del gráfico de puntos, en una sola fila. */
+.viz-block .chips {
+  display: grid; gap: .35rem;
+  grid-template-columns: repeat(8, minmax(0, 1fr));
+}
+.viz-block .chip {
+  min-width: 0; padding: .3rem .4rem; gap: .3rem;
+  font-size: .72rem;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  display: flex; align-items: center;
+}
+@media (max-width: 560px) {
+  .viz-block .chips { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+}

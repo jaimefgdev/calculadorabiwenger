@@ -29,6 +29,9 @@
   /* Cada jornada, guardada para siempre: Biwenger deja de servir el banquillo
      en cuanto arranca la siguiente. */
   const ROUNDS_KEY = 'biwenger-calc-jornadas';
+  /* El once del simulador se guarda aparte: es tuyo, no el que tenga puesto
+     Biwenger, y no debe perderse al recargar. */
+  const XI_KEY = 'biwenger-calc-xi';
   const AUTO_SYNC_MS = 5 * 60 * 1000;     // refresco automático
 
   /* ---------- Utilidades ---------- */
@@ -479,6 +482,7 @@
     roundOpen: false,      // lista de partidos desplegada
     picker: null,          // hueco del campo que se está cambiando
     movers: null,          // los que más suben y bajan hoy
+    startPrices: {},       // lo que valía cada jugador el día que lo recibió
     jornadas: { list: [], actual: null, datos: {} },   // clasificación y alineaciones por jornada
     jornadaVista: null,    // la que se está mirando
     jornadaAbierta: null,  // mánager desplegado dentro de esa jornada
@@ -1270,7 +1274,11 @@
           '<span class="sub">' + escapeHtml(offer.other || 'Mercado') + '</span></td>' +
         '<td class="num" data-label="Importe"><strong class="' + (out ? 'money-neg' : 'money-pos') + '">' +
           (out ? '−' : '+') + money(offer.amount) + '</strong></td>' +
-        '<td data-label="Queda">' + deadlineCell(offer.until) + '</td>' +
+        '<td data-label="Queda">' + deadlineCell(offer.until) +
+          (offer.bids != null
+            ? ' <span class="bids" title="Pujas por este jugador en toda la liga">' +
+              offer.bids + (offer.bids === 1 ? ' puja' : ' pujas') + '</span>'
+            : '') + '</td>' +
         '<td data-label="Simular">' + simToggle(offer.id, on, out ? 'out' : 'in') + '</td>' +
       '</tr>';
     }).join('');
@@ -1539,8 +1547,42 @@
 
   /* El once del simulador arranca con lo que tengas puesto en Biwenger y se
      puede cambiar libremente; no se envía a ningún sitio. */
+  function persistXi() {
+    try {
+      if (state.xi) localStorage.setItem(XI_KEY, JSON.stringify(state.xi));
+    } catch (error) { /* sin persistencia */ }
+  }
+
+  function loadXi() {
+    try {
+      const raw = localStorage.getItem(XI_KEY);
+      const data = raw ? JSON.parse(raw) : null;
+      if (data && data.slots) state.xi = { type: data.type || '4-4-2', slots: data.slots };
+    } catch (error) { /* se empieza con la de Biwenger */ }
+  }
+
+  /** Vuelve a la alineación que tengas puesta en Biwenger. */
+  function resetXi() {
+    state.xi = null;
+    try { localStorage.removeItem(XI_KEY); } catch (error) { /* nada */ }
+    ensureXi();
+    renderLineup();
+  }
+
   function ensureXi() {
-    if (state.xi) return;
+    /* Lo guardado manda, pero se limpian los que ya no estén en la plantilla
+       (vendidos desde la última vez). */
+    if (state.xi) {
+      const squad = mySquad();
+      if (squad.length) {
+        const tengo = {};
+        squad.forEach(function (player) { tengo[player.id] = true; });
+        Object.keys(state.xi.slots).forEach(function (key) {
+          if (!tengo[state.xi.slots[key]]) delete state.xi.slots[key];
+        });
+      }
+      return;
+    }
     const lineup = state.lineup;
     const type = (lineup && lineup.type) || '4-4-2';
     const slots = {};
@@ -1558,6 +1600,7 @@
       });
     }
     state.xi = { type: type, slots: slots };
+    persistXi();
   }
 
   function playerById(id) {
@@ -1771,6 +1814,7 @@
     state.xi.slots = kept;
 
     state.picker = null;
+    persistXi();
     renderLineup();
     renderPicker();
   }
@@ -2074,6 +2118,7 @@
       const on = state.jornadaChart.indexOf(id) !== -1;
       const color = SERIE_COLORS[state.jornadaChart.indexOf(id)] || 'var(--border-strong)';
       return '<button type="button" class="chip" data-jornada-serie="' + escapeHtml(id) + '"' +
+        ' title="' + escapeHtml(datos.managers[id]) + '"' +
         ' aria-pressed="' + (on ? 'true' : 'false') + '">' +
         '<span class="chip__dot" style="background:' + color + '"></span>' +
         escapeHtml(datos.managers[id]) + '</button>';
@@ -2351,6 +2396,36 @@
       (active ? (sort.dir === 1 || !sort.key ? 'ascending' : 'descending') : 'none') + '">' + label + '</th>';
   }
 
+  /* Los jugadores del reparto inicial no tienen precio de compra, así que para
+     saber cuánto se han revalorizado hay que preguntar qué valían aquel día.
+     Se pide solo de la plantilla que se abre, para no cargar de golpe. */
+  function ensureStartPrices(squad) {
+    const config = loadSyncConfig();
+    if (!config.url || !config.key || !squad) return;
+
+    const faltan = (squad.players || []).filter(function (player) {
+      return player.paid == null && player.since && state.startPrices[player.id] === undefined;
+    });
+    if (faltan.length === 0) return;
+
+    // Se marcan como pedidos para no repetir la consulta en cada repintado.
+    faltan.forEach(function (player) { state.startPrices[player.id] = null; });
+
+    const dia = faltan[0].since;
+    const ids = faltan.map(function (player) { return player.id; }).join(',');
+
+    fetch(config.url.replace(/\/+$/, '') + '/?key=' + encodeURIComponent(config.key) +
+      '&precios=' + encodeURIComponent(ids) + '&dia=' + encodeURIComponent(dia),
+      { headers: { 'accept': 'application/json' } })
+      .then(function (response) { return response.json(); })
+      .then(function (payload) {
+        if (!payload || payload.error) return;
+        Object.keys(payload).forEach(function (id) { state.startPrices[id] = payload[id]; });
+        renderSquads();
+      })
+      .catch(function () { /* se queda sin dato */ });
+  }
+
   function renderSquads() {
     ensureSquads();
     const body = $('squads-body');
@@ -2379,8 +2454,10 @@
           squadColumn('diff', 'Diferencia', 'num') +
         '</tr></thead><tbody>' +
         sortSquad(squad.players).map(function (player) {
-          const diff = player.paid == null || player.marketValue == null
-            ? null : player.marketValue - player.paid;
+          /* Sin precio de compra se compara con lo que valía el día del reparto. */
+          const base = player.paid != null ? player.paid : state.startPrices[player.id];
+          const diff = base == null || player.marketValue == null
+            ? null : player.marketValue - base;
           return '<tr>' +
             '<td class="detail-rank">' + (player.position ? POSITION_NAMES[player.position] : '—') + '</td>' +
             '<td><span class="with-crest">' +
@@ -2388,7 +2465,10 @@
               crestOf(player, 'crest--badge') + '</span></td>' +
             '<td class="detail-date">' + shortDay(player.since) + '</td>' +
             '<td class="num">' + (player.paid == null
-              ? '<span class="sub">reparto inicial</span>' : money(player.paid)) + '</td>' +
+              ? '<span class="sub">reparto' +
+                (state.startPrices[player.id] ? ' · valía ' + money(state.startPrices[player.id]) : '') +
+                '</span>'
+              : money(player.paid)) + '</td>' +
             '<td class="num"><strong>' + (player.marketValue == null ? '—' : money(player.marketValue)) + '</strong></td>' +
             '<td class="num">' + (diff == null ? '<span class="sub">—</span>' :
               '<span class="delta ' + (diff >= 0 ? 'delta--up' : 'delta--down') + '">' +
@@ -2986,9 +3066,12 @@
       else delete state.xi.slots[slot];
 
       state.picker = null;
+      persistXi();
       renderLineup();
       renderPicker();
     });
+
+    $('lineup-reset').addEventListener('click', resetXi);
 
     document.addEventListener('keydown', function (event) {
       if (event.key !== 'Escape') return;
@@ -3065,6 +3148,9 @@
       if (!button) return;
       const id = button.getAttribute('data-squad');
       state.expandedSquad = state.expandedSquad === id ? null : id;
+      if (state.expandedSquad) {
+        ensureStartPrices(squadList().filter(function (s) { return s.id === id; })[0]);
+      }
       renderSquads();
     });
 
@@ -3181,6 +3267,7 @@
 
     const hadData = loadStored();
     loadJornadas();
+    loadXi();
     render();
 
     let saved = null;
