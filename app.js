@@ -2012,11 +2012,20 @@
     const caja = $('jornada-picker');
     if (!state.pickerJornada) { caja.hidden = true; caja.innerHTML = ''; return; }
 
-    const lista = state.jornadas.list.length
+    /* La liga tiene 38 jornadas. Biwenger añade una entrada más por cada
+       jornada aplazada (su segunda parte); esas solo se muestran si hay algo
+       guardado de ellas, para no perder nada ni inflar el calendario. */
+    const todas = state.jornadas.list.length
       ? state.jornadas.list
       : Object.keys(state.jornadas.datos).map(function (id) {
           return state.jornadas.datos[id].round;
         });
+    const lista = todas.filter(function (round) {
+      return (round.part || 1) === 1 || state.jornadas.datos[round.id];
+    /* Biwenger no las manda en orden: las aplazadas se cuelan en medio. */
+    }).sort(function (a, b) {
+      return (a.number || 0) - (b.number || 0) || (a.part || 1) - (b.part || 1);
+    });
 
     const vista = jornadaActiva();
     const actual = vista && vista.round ? vista.round.id : null;
@@ -2029,7 +2038,8 @@
         (String(round.id) === String(actual) ? ' is-current' : '') + '"' +
         ' data-jornada="' + escapeHtml(String(round.id)) + '">' +
         '<span class="jornada-card__num">J' + (round.number || '?') + '</span>' +
-        '<span class="picker__meta">' + (jugada ? 'guardada' : (round.status === 'pending' ? 'pendiente' : '—')) + '</span>' +
+        '<span class="picker__meta">' + ((round.part || 1) > 1 ? 'aplazada'
+          : (jugada ? 'guardada' : (round.status === 'pending' ? 'pendiente' : '—'))) + '</span>' +
       '</button>';
     }).join('');
 
