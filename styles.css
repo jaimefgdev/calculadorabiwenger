@@ -1115,3 +1115,6 @@ main.wrap { padding-bottom: 3.5rem; }
 
 /* Jugador libre en el mercado, sin dueño. */
 .tag--free { background: var(--bg-surface); color: var(--text-soft); }
+
+/* Botón pequeño para consultar las pujas de un jugador (gasta 1 crédito). */
+.btn--mini { padding: .15rem .4rem; font-size: .7rem; line-height: 1.2; }
