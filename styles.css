@@ -1177,5 +1177,8 @@ main.wrap { padding-bottom: 3.5rem; }
 /* El día en que el futbolista llegó a una plantilla. */
 .viz__mark { stroke: var(--viz-1); stroke-width: 1.5; stroke-dasharray: 4 3; opacity: .9; }
 .viz__markdot { fill: none; stroke: var(--viz-1); stroke-width: 2.5; }
-.viz__marktext { fill: var(--viz-1); font-size: 9px; font-weight: 700; }
-.viz-llegada { margin-top: .3rem; }
+
+/* Antes de tenerlo, el trazo va apagado; desde ese día, con su color. */
+.viz__line--antes { stroke: var(--text-faint); opacity: .45; }
+.viz-tip--llegada { border-color: var(--viz-1); }
+.viz-tip__llegada { color: var(--text); font-weight: 560; }

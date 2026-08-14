@@ -844,6 +844,23 @@
       .filter(Boolean);
 
     const path = coords.map(function (c, i) { return (i ? 'L' : 'M') + c.x.toFixed(1) + ' ' + c.y.toFixed(1); }).join(' ');
+
+    /* Si se sabe cuándo pasó a ser de alguien, lo anterior se pinta apagado y
+       lo posterior con el color del gráfico: se ve de un vistazo desde cuándo
+       es suyo. */
+    const corte = opts.mark && opts.mark.day
+      ? coords.map(function (c) { return c.point.day; }).indexOf(opts.mark.day)
+      : -1;
+    const trazo = corte > 0
+      ? '<path class="viz__line viz__line--antes" d="' +
+          coords.slice(0, corte + 1).map(function (c, i) {
+            return (i ? 'L' : 'M') + c.x.toFixed(1) + ' ' + c.y.toFixed(1);
+          }).join(' ') + '"></path>' +
+        '<path class="viz__line" d="' +
+          coords.slice(corte).map(function (c, i) {
+            return (i ? 'L' : 'M') + c.x.toFixed(1) + ' ' + c.y.toFixed(1);
+          }).join(' ') + '" stroke="' + color + '"></path>'
+      : '<path class="viz__line" d="' + path + '" stroke="' + color + '"></path>';
     const area = coords.length > 1
       ? '<path class="viz__area" d="' + path + ' L' + coords[coords.length - 1].x.toFixed(1) + ' ' + (H - padBottom) +
         ' L' + coords[0].x.toFixed(1) + ' ' + (H - padBottom) + ' Z" fill="' + color + '"></path>'
@@ -933,8 +950,7 @@
         marca = '<line class="viz__mark" x1="' + mx.toFixed(1) + '" x2="' + mx.toFixed(1) +
             '" y1="' + padTop + '" y2="' + (H - padBottom) + '"></line>' +
           '<circle class="viz__markdot" cx="' + mx.toFixed(1) + '" cy="' + my.toFixed(1) + '" r="6"></circle>' +
-          '<text class="viz__marktext" x="' + mx.toFixed(1) + '" y="' + (padTop - 3) +
-            '" text-anchor="middle">' + escapeHtml(opts.mark.label || '') + '</text>';
+          '';
       }
     }
 
@@ -946,8 +962,7 @@
     return '<svg class="viz__svg" viewBox="0 0 ' + W + ' ' + H + '" role="img"' +
       ' data-padx="' + padX + '" data-w="' + W + '"' +
       ' aria-label="Evolución de ' + escapeHtml(label.toLowerCase()) + '">' + grid + area +
-      '<path class="viz__line" d="' + path + '" stroke="' + color + '"></path>' + dots +
-      marca + cursor + firstLabel + lastLabel + '</svg>';
+      trazo + dots + marca + cursor + firstLabel + lastLabel + '</svg>';
   }
 
   /** Bloque de gráficos de la ficha, con sus interruptores. */
@@ -2757,7 +2772,7 @@
    * Sigue el ratón por el gráfico y va cantando el precio de cada día: con 45
    * puntos, dar con el círculo exacto es imposible.
    */
-  function bindChartHover(caja, puntos) {
+  function bindChartHover(caja, puntos, llegada) {
     if (!caja || puntos.length < 2) return;
     const svg = caja.querySelector('svg');
     const tip = caja.querySelector('.viz-tip');
@@ -2789,8 +2804,12 @@
       bola.setAttribute('cy', punto.getAttribute('cy'));
       bola.hidden = false;
 
-      tip.innerHTML = '<span class="viz-tip__day">' + escapeHtml(shortDay(dato.day)) + '</span>' +
-        '<strong>' + money(dato.price) + '</strong>';
+      /* Justo en el día de la llegada se cuenta la historia completa. */
+      tip.innerHTML = (llegada && dato.day === llegada.day)
+        ? '<span class="viz-tip__llegada">' + escapeHtml(llegada.texto) + '</span>'
+        : '<span class="viz-tip__day">' + escapeHtml(shortDay(dato.day)) + '</span>' +
+          '<strong>' + money(dato.price) + '</strong>';
+      tip.classList.toggle('viz-tip--llegada', !!(llegada && dato.day === llegada.day));
       tip.hidden = false;
 
       const enPantalla = (Number(cx) / W) * marco.width;
@@ -2849,18 +2868,6 @@
           : '<p class="muted">De ' + money(primero) + ' a <strong>' + money(ultimo) + '</strong>' +
             ' · <span class="delta ' + (sube ? 'delta--up' : 'delta--down') + '">' +
             (sube ? '▲ +' : '▼ −') + money(Math.abs(salto)) + '</span></p>' +
-            (llegada
-              ? '<p class="muted viz-llegada">' +
-                (llegada.paid == null
-                  ? 'Le tocó a <strong>' + escapeHtml(llegada.owner) + '</strong> en el reparto del ' +
-                    escapeHtml(shortDay(diaLlegada))
-                  : '<strong>' + escapeHtml(llegada.owner) + '</strong> lo fichó el ' +
-                    escapeHtml(shortDay(diaLlegada)) +
-                    (llegada.from && llegada.from !== 'Mercado' ? ' a ' + escapeHtml(llegada.from) : ' en el mercado') +
-                    ' por <strong>' + money(llegada.paid) + '</strong>') +
-                (precioEseDia != null ? ' · ese día valía ' + money(precioEseDia) : '') +
-                '</p>'
-              : '') +
             '<div class="viz-hover">' +
               lineChart(puntos, 'price', sube ? 'var(--pos)' : 'var(--neg)', 'Valor de mercado',
                 { height: 260, ticks: 7, fullTicks: true, padX: 96, hover: true,
@@ -2869,7 +2876,16 @@
             '</div>') +
       '</div>';
 
-    bindChartHover(caja.querySelector('.viz-hover'), puntos);
+    const textoLlegada = !llegada ? null
+      : (llegada.paid == null
+          ? 'reparto del ' + shortDay(diaLlegada) + ' a ' + llegada.owner
+          : 'fichado el ' + shortDay(diaLlegada) +
+            (llegada.from && llegada.from !== 'Mercado' ? ' a ' + llegada.from : ' en el mercado') +
+            ' por ' + money(llegada.paid)) +
+        (precioEseDia != null ? ' · ese día valía ' + money(precioEseDia) : '');
+
+    bindChartHover(caja.querySelector('.viz-hover'), puntos,
+      diaLlegada ? { day: diaLlegada, texto: textoLlegada } : null);
   }
 
   function renderSquads() {
