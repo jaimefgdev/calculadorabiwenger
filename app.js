@@ -2344,14 +2344,31 @@
   /** Puntos de cada mánager jornada a jornada, con lo que haya guardado. */
   function jornadaSeries() {
     const ids = Object.keys(state.jornadas.datos);
-    const puntos = ids.map(function (id) { return state.jornadas.datos[id]; })
-      .filter(function (j) { return j.round && j.round.number; })
-      .sort(function (a, b) { return a.round.number - b.round.number; })
-      .map(function (j) {
-        const fila = { round: j.round.number };
-        (j.standings || []).forEach(function (m) { fila['m' + m.id] = m.points == null ? null : m.points; });
-        return fila;
-      });
+
+    /* El eje va de la 1 a la 38 aunque solo se hayan jugado unas pocas: así se
+       ve el hueco que queda por delante en vez de una liga en miniatura. */
+    const jugadas = {};
+    ids.forEach(function (id) {
+      const jornada = state.jornadas.datos[id];
+      if (!jornada.round || !jornada.round.number) return;
+      jugadas[jornada.round.number] = jornada;
+    });
+
+    const total = (state.jornadas.list || []).reduce(function (mayor, round) {
+      return (round.part || 1) === 1 && round.number > mayor ? round.number : mayor;
+    }, 38);
+
+    const puntos = [];
+    for (let numero = 1; numero <= total; numero++) {
+      const fila = { round: numero };
+      const jornada = jugadas[numero];
+      if (jornada) {
+        (jornada.standings || []).forEach(function (m) {
+          fila['m' + m.id] = m.points == null ? null : m.points;
+        });
+      }
+      puntos.push(fila);
+    }
 
     const managers = {};
     ids.forEach(function (id) {
