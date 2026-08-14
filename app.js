@@ -484,7 +484,6 @@
     movers: null,          // los que más suben y bajan hoy
     market: null,          // el mercado de hoy, con sus pujas
     marketState: '',       // 'cargando' | 'error' | ''
-    bids: {},              // pujas consultadas a mano (Biwenger cobra 1 crédito)
     startPrices: {},       // lo que valía cada jugador el día que lo recibió
     jornadas: { list: [], actual: null, datos: {} },   // clasificación y alineaciones por jornada
     jornadaVista: null,    // la que se está mirando
@@ -1896,8 +1895,7 @@
     points: function (v) { return v.points == null ? -Infinity : v.points; },
     marketValue: function (v) { return v.marketValue || 0; },
     price: function (v) { return v.price || 0; },
-    until: function (v) { return v.until ? Date.parse(v.until) : Infinity; },
-    bids: function (v) { return v.bids == null ? -1 : v.bids; }
+    until: function (v) { return v.until ? Date.parse(v.until) : Infinity; }
   };
 
   /** Libres primero y, dentro de cada grupo, por valor. */
@@ -1924,13 +1922,13 @@
     if (!cuerpo) return;
 
     if (!state.market) {
-      cuerpo.innerHTML = '<tr><td colspan="7" class="muted">' +
+      cuerpo.innerHTML = '<tr><td colspan="6" class="muted">' +
         (state.marketState === 'error' ? 'No se ha podido traer el mercado.' : 'Cargando el mercado\u2026') +
         '</td></tr>';
       return;
     }
     if (state.market.length === 0) {
-      cuerpo.innerHTML = '<tr><td colspan="7" class="muted">Ahora mismo no hay nadie en el mercado.</td></tr>';
+      cuerpo.innerHTML = '<tr><td colspan="6" class="muted">Ahora mismo no hay nadie en el mercado.</td></tr>';
       return;
     }
 
@@ -1938,14 +1936,6 @@
       const sube = venta.increment > 0;
       /* De lo que vendes tú la API no da el contador, pero las ofertas
          recibidas sí están: se cuentan de ahí. */
-      /* De lo tuyo las ofertas recibidas ya las tienes; del resto hay que
-         preguntar a Biwenger, y cada consulta cuesta un crédito. */
-      const pujas = venta.mine
-        ? state.offers.filter(function (offer) {
-            return offer.direction === 'in' && offer.playerId === venta.playerId;
-          }).length
-        : (state.bids[venta.playerId] !== undefined ? state.bids[venta.playerId] : null);
-
       return '<tr' + (venta.mine ? ' class="row-mine"' : '') + '>' +
         '<td data-label="Futbolista"><span class="with-crest">' +
           playerName({ playerId: venta.playerId, player: venta.player }) +
@@ -1960,13 +1950,6 @@
             (sube ? '\u25b2' : '\u25bc') + '</span>' : '') + '</td>' +
         '<td class="num" data-label="Pide"><strong>' + money(venta.price || 0) + '</strong></td>' +
         '<td data-label="Queda">' + deadlineCell(venta.until) + '</td>' +
-        '<td class="num" data-label="Pujas">' + (pujas === null
-          ? '<button type="button" class="btn btn--ghost btn--mini" data-bids="' +
-            escapeHtml(venta.playerId) + '" data-seller="' + escapeHtml(venta.sellerId || '') + '"' +
-            ' title="Biwenger cobra 1 cr\u00e9dito por saber cu\u00e1ntas pujas tiene">ver</button>'
-          : (pujas === false
-            ? '<span class="sub" title="Hacen falta cr\u00e9ditos de Biwenger">sin cr\u00e9ditos</span>'
-            : '<span class="bids">' + pujas + '</span>')) + '</td>' +
       '</tr>';
     }).join('');
 
@@ -1977,34 +1960,8 @@
     });
 
     const libres = state.market.filter(function (v) { return v.free; }).length;
-    const conPujas = Object.keys(state.bids).filter(function (id) {
-      return typeof state.bids[id] === 'number';
-    }).length;
     $('market-note').textContent = state.market.length + ' en el mercado \u00b7 ' +
-      libres + ' libres \u00b7 ' + (state.market.length - libres) + ' de m\u00e1nagers' +
-      ' \u00b7 el n\u00ba de pujas lo cobra Biwenger a 1 cr\u00e9dito por consulta' +
-      (conPujas ? ' \u00b7 ' + conPujas + ' consultadas' : '');
-  }
-
-  /** Pregunta a Biwenger cuántas pujas tiene un jugador. Gasta 1 crédito. */
-  function askBids(playerId, sellerId, boton) {
-    const config = loadSyncConfig();
-    if (!config.url || !config.key) return;
-
-    if (boton) { boton.disabled = true; boton.textContent = '…'; }
-    fetch(config.url.replace(/\/+$/, '') + '/?key=' + encodeURIComponent(config.key) +
-      '&bids=' + encodeURIComponent(playerId) + (sellerId ? '&vendedor=' + encodeURIComponent(sellerId) : ''),
-      { headers: { 'accept': 'application/json' } })
-      .then(function (response) { return response.json(); })
-      .then(function (payload) {
-        /* false = la cuenta no tiene créditos; así no se vuelve a preguntar. */
-        state.bids[playerId] = payload.bids != null ? payload.bids : false;
-        renderMarket();
-      })
-      .catch(function () {
-        state.bids[playerId] = false;
-        renderMarket();
-      });
+      libres + ' libres \u00b7 ' + (state.market.length - libres) + ' de m\u00e1nagers';
   }
 
   /* ---------- Suben y bajan hoy ---------- */
@@ -3249,12 +3206,6 @@
         while (abiertos.length > 4) abiertos.shift();   // cuatro colores, cuatro líneas
       }
       renderJornadaChart();
-    });
-
-    $('market-body').addEventListener('click', function (event) {
-      const boton = event.target.closest('[data-bids]');
-      if (!boton) return;
-      askBids(boton.getAttribute('data-bids'), boton.getAttribute('data-seller'), boton);
     });
 
     document.querySelector('.table--market thead').addEventListener('click', function (event) {
