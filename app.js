@@ -32,7 +32,9 @@
   /* El once del simulador se guarda aparte: es tuyo, no el que tenga puesto
      Biwenger, y no debe perderse al recargar. */
   const XI_KEY = 'biwenger-calc-xi';
-  const AUTO_SYNC_MS = 5 * 60 * 1000;     // refresco automático
+  /* Cada cuarto de hora: el mercado se mueve una vez al día y con cinco
+     minutos se acumulaban demasiadas consultas contra Biwenger. */
+  const AUTO_SYNC_MS = 15 * 60 * 1000;    // refresco automático
 
   /* ---------- Utilidades ---------- */
 
