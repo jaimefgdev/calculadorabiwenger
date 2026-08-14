@@ -511,7 +511,8 @@
       spend: { key: 'total', dir: -1 },
       income: { key: 'total', dir: -1 },
       detail: { key: 'amount', dir: -1 },  // dentro de la ficha de cada jugador
-      rounds: { key: 'points', dir: -1 }
+      rounds: { key: 'points', dir: -1 },
+      market: { key: '', dir: -1 }        // vacío = libres primero y por valor
     }
   };
 
@@ -1278,8 +1279,9 @@
           (out ? '−' : '+') + money(offer.amount) + '</strong></td>' +
         '<td data-label="Queda">' + deadlineCell(offer.until) +
           (offer.bids != null
-            ? ' <span class="bids" title="Pujas por este jugador en toda la liga">' +
-              offer.bids + (offer.bids === 1 ? ' puja' : ' pujas') + '</span>'
+            ? ' <span class="bids" title="' + offer.bids +
+              (offer.bids === 1 ? ' puja' : ' pujas') + ' por este jugador en la liga">' +
+              offer.bids + '</span>'
             : '') + '</td>' +
         '<td data-label="Simular">' + simToggle(offer.id, on, out ? 'out' : 'in') + '</td>' +
       '</tr>';
@@ -1892,44 +1894,89 @@
       });
   }
 
+  const MARKET_VALUES = {
+    player: function (v) { return (v.player || '').toLowerCase(); },
+    seller: function (v) { return (v.free ? '0' : '1') + (v.seller || '').toLowerCase(); },
+    points: function (v) { return v.points == null ? -Infinity : v.points; },
+    marketValue: function (v) { return v.marketValue || 0; },
+    price: function (v) { return v.price || 0; },
+    until: function (v) { return v.until ? Date.parse(v.until) : Infinity; },
+    bids: function (v) { return v.bids == null ? -1 : v.bids; }
+  };
+
+  /** Libres primero y, dentro de cada grupo, por valor. */
+  function sortMarket(lista) {
+    const sort = state.sort.market;
+    if (!sort.key) {
+      return lista.slice().sort(function (a, b) {
+        if (a.free !== b.free) return a.free ? -1 : 1;
+        return (b.marketValue || 0) - (a.marketValue || 0);
+      });
+    }
+    const valor = MARKET_VALUES[sort.key] || MARKET_VALUES.marketValue;
+    return lista.slice().sort(function (a, b) {
+      const x = valor(a);
+      const y = valor(b);
+      if (x === y) return (a.player || '').localeCompare(b.player || '');
+      if (typeof x === 'string') return sort.dir * x.localeCompare(y);
+      return sort.dir * (x < y ? -1 : 1);
+    });
+  }
+
   function renderMarket() {
     const cuerpo = $('market-body');
     if (!cuerpo) return;
 
     if (!state.market) {
-      cuerpo.innerHTML = '<tr><td colspan="6" class="muted">' +
+      cuerpo.innerHTML = '<tr><td colspan="7" class="muted">' +
         (state.marketState === 'error' ? 'No se ha podido traer el mercado.' : 'Cargando el mercado\u2026') +
         '</td></tr>';
       return;
     }
     if (state.market.length === 0) {
-      cuerpo.innerHTML = '<tr><td colspan="6" class="muted">Ahora mismo no hay nadie en el mercado.</td></tr>';
+      cuerpo.innerHTML = '<tr><td colspan="7" class="muted">Ahora mismo no hay nadie en el mercado.</td></tr>';
       return;
     }
 
-    cuerpo.innerHTML = state.market.map(function (venta) {
+    cuerpo.innerHTML = sortMarket(state.market).map(function (venta) {
       const sube = venta.increment > 0;
+      /* De lo que vendes tú la API no da el contador, pero las ofertas
+         recibidas sí están: se cuentan de ahí. */
+      const pujas = venta.bids != null ? venta.bids
+        : (venta.mine ? state.offers.filter(function (offer) {
+            return offer.direction === 'in' && offer.playerId === venta.playerId;
+          }).length : null);
+
       return '<tr' + (venta.mine ? ' class="row-mine"' : '') + '>' +
         '<td data-label="Futbolista"><span class="with-crest">' +
           playerName({ playerId: venta.playerId, player: venta.player }) +
           statusMark(venta, 'mark--row') + crestOf(venta, 'crest--badge') + '</span></td>' +
-        '<td data-label="Vende">' + (venta.seller === 'Mercado'
-          ? '<span class="sub">Mercado</span>'
+        '<td data-label="Vende">' + (venta.free
+          ? '<span class="tag tag--free">Libre</span>'
           : '<span class="manager">' + avatar(venta.seller) +
             '<span class="manager__name">' + escapeHtml(venta.seller) + '</span></span>') + '</td>' +
+        '<td class="num" data-label="Puntos">' + (venta.points == null ? '<span class="sub">\u2014</span>' : venta.points) + '</td>' +
         '<td class="num" data-label="Valor">' + money(venta.marketValue || 0) +
           (venta.increment ? ' <span class="delta ' + (sube ? 'delta--up' : 'delta--down') + '">' +
             (sube ? '\u25b2' : '\u25bc') + '</span>' : '') + '</td>' +
         '<td class="num" data-label="Pide"><strong>' + money(venta.price || 0) + '</strong></td>' +
         '<td data-label="Queda">' + deadlineCell(venta.until) + '</td>' +
-        '<td class="num" data-label="Pujas">' + (venta.bids != null
-          ? '<span class="bids">' + venta.bids + '</span>'
-          : '<span class="sub">' + (venta.mine ? 'tuyo' : '\u2014') + '</span>') + '</td>' +
+        '<td class="num" data-label="Pujas">' + (pujas == null
+          ? '<span class="sub">\u2014</span>'
+          : '<span class="bids">' + pujas + '</span>') + '</td>' +
       '</tr>';
     }).join('');
 
+    Array.prototype.forEach.call(document.querySelectorAll('[data-market-sort]'), function (th) {
+      const key = th.getAttribute('data-market-sort');
+      th.setAttribute('aria-sort', key !== state.sort.market.key ? 'none'
+        : (state.sort.market.dir === 1 ? 'ascending' : 'descending'));
+    });
+
+    const libres = state.market.filter(function (v) { return v.free; }).length;
     const conPujas = state.market.filter(function (v) { return v.bids; }).length;
-    $('market-note').textContent = state.market.length + ' jugadores en el mercado' +
+    $('market-note').textContent = state.market.length + ' en el mercado \u00b7 ' +
+      libres + ' libres \u00b7 ' + (state.market.length - libres) + ' de m\u00e1nagers' +
       (conPujas ? ' \u00b7 ' + conPujas + ' con pujas' : '');
   }
 
@@ -3175,6 +3222,16 @@
         while (abiertos.length > 4) abiertos.shift();   // cuatro colores, cuatro líneas
       }
       renderJornadaChart();
+    });
+
+    document.querySelector('.table--market thead').addEventListener('click', function (event) {
+      const th = event.target.closest('[data-market-sort]');
+      if (!th) return;
+      const key = th.getAttribute('data-market-sort');
+      const sort = state.sort.market;
+      if (sort.key === key) sort.dir = -sort.dir;
+      else { sort.key = key; sort.dir = (key === 'player' || key === 'seller' || key === 'until') ? 1 : -1; }
+      renderMarket();
     });
 
     $('rounds-body').addEventListener('click', function (event) {
