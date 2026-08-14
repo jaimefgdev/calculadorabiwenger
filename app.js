@@ -2876,13 +2876,12 @@
             '</div>') +
       '</div>';
 
+    /* Corto y al grano: qué día llegó, por cuánto y cuánto valía entonces. */
     const textoLlegada = !llegada ? null
       : (llegada.paid == null
-          ? 'reparto del ' + shortDay(diaLlegada) + ' a ' + llegada.owner
-          : 'fichado el ' + shortDay(diaLlegada) +
-            (llegada.from && llegada.from !== 'Mercado' ? ' a ' + llegada.from : ' en el mercado') +
-            ' por ' + money(llegada.paid)) +
-        (precioEseDia != null ? ' · ese día valía ' + money(precioEseDia) : '');
+          ? 'reparto ' + shortDay(diaLlegada)
+          : 'fichado ' + shortDay(diaLlegada) + ' por ' + money(llegada.paid)) +
+        (precioEseDia != null ? ' · ' + money(precioEseDia) : '');
 
     bindChartHover(caja.querySelector('.viz-hover'), puntos,
       diaLlegada ? { day: diaLlegada, texto: textoLlegada } : null);

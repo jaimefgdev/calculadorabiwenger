@@ -1175,10 +1175,15 @@ main.wrap { padding-bottom: 3.5rem; }
 .viz-tip__day { color: var(--text-faint); font-size: .7rem; }
 
 /* El día en que el futbolista llegó a una plantilla. */
-.viz__mark { stroke: var(--viz-1); stroke-width: 1.5; stroke-dasharray: 4 3; opacity: .9; }
-.viz__markdot { fill: none; stroke: var(--viz-1); stroke-width: 2.5; }
+/* Amarillo propio para el día de la llegada: se separa bien del verde y del
+   rojo del trazo, también para quien no distingue esos dos colores. En claro
+   se oscurece, que sobre blanco el amarillo puro no se ve. */
+:root { --marca: #ffc233; }
+@media (prefers-color-scheme: light) { :root { --marca: #b8860b; } }
+.viz__mark { stroke: var(--marca); stroke-width: 1.5; stroke-dasharray: 4 3; opacity: .95; }
+.viz__markdot { fill: none; stroke: var(--marca); stroke-width: 3; }
 
 /* Antes de tenerlo, el trazo va apagado; desde ese día, con su color. */
 .viz__line--antes { stroke: var(--text-faint); opacity: .45; }
-.viz-tip--llegada { border-color: var(--viz-1); }
+.viz-tip--llegada { border-color: var(--marca); }
 .viz-tip__llegada { color: var(--text); font-weight: 560; }
