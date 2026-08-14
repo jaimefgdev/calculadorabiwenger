@@ -151,6 +151,9 @@ code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft)
   grid-template-columns: repeat(2, minmax(0, 1fr));
   align-items: start;
 }
+/* La de ventas lleva una columna más de contenido: se le da más ancho. */
+#panel-inicio .market-grid { grid-template-columns: minmax(0, .88fr) minmax(0, 1.12fr); }
+@media (max-width: 720px) { #panel-inicio .market-grid { grid-template-columns: 1fr; } }
 /* Apiladas solo cuando la pantalla es de verdad estrecha. */
 @media (max-width: 720px) {
   .market-grid { grid-template-columns: 1fr; }
@@ -432,7 +435,13 @@ code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft)
   display: flex; flex-direction: column; align-items: center; gap: .3rem;
   min-width: 0; text-align: center;
 }
-.pic-player.bench__face { width: 56px; height: 56px; }
+/* Mismo círculo que en el campo: translúcido y sin aro. El de por defecto es
+   opaco y en el banquillo se notaba el disco gris. */
+.pic-player.bench__face {
+  width: 56px; height: 56px;
+  background-color: rgba(0, 0, 0, .35);
+  box-shadow: none;
+}
 .bench__name {
   font-size: .78rem; font-weight: 560; max-width: 100%;
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
@@ -976,8 +985,14 @@ code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft)
 .table--offers th, .table--offers td,
 .table--listings th, .table--listings td { padding-inline: .45rem; }
 .table--offers .tag, .table--listings .tag { font-size: .7rem; }
-.table--listings td[data-label="Ofertas"] { white-space: normal; }
-.table--listings .bid { flex-wrap: wrap; row-gap: .1rem; margin-right: .35rem; }
+/* Todo en una sola línea: importe, diferencia e interruptor. */
+.table--listings td[data-label="Ofertas"] { white-space: nowrap; }
+.table--listings .bid { flex-wrap: nowrap; gap: .3rem; margin-right: .3rem; }
+.table--listings .bid strong { font-size: .82rem; }
+.table--listings .delta { font-size: .68rem; }
+.table--listings .switch { width: 30px; height: 17px; flex: none; }
+.table--listings .switch span { width: 11px; height: 11px; }
+.table--listings .switch[aria-pressed="true"] span { transform: translateX(13px); }
 .table--offers td[data-label="Operación"] { white-space: normal; }
 
 /* ---------- Jornadas ---------- */
@@ -1077,3 +1092,8 @@ main.wrap { padding-bottom: 3.5rem; }
 @media (max-width: 560px) {
   .viz-block .chips { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 }
+
+/* ---------- Mercado ---------- */
+.row-mine { background: var(--accent-soft); }
+.table--market .manager__name { max-width: 9rem; overflow: hidden; text-overflow: ellipsis; }
+.mark--row { position: static; display: inline-grid; width: 15px; height: 15px; font-size: .58rem; margin-left: .2rem; }

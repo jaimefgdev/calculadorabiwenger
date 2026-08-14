@@ -16,7 +16,7 @@
 <title>Calculadora Biwenger — Presupuestos de la liga</title>
 <!-- El ?v= se sube en cada publicación: obliga al navegador a bajar el archivo
      nuevo en vez de reutilizar el que tenga en caché. -->
-<link rel="stylesheet" href="styles.css?v=30">
+<link rel="stylesheet" href="styles.css?v=31">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>💰</text></svg>">
 </head>
 <body>
@@ -34,6 +34,7 @@
       <button class="tab" type="button" role="tab" data-tab="inicio" aria-selected="true">Inicio</button>
       <button class="tab" type="button" role="tab" data-tab="managers" aria-selected="false">Liga</button>
       <button class="tab" type="button" role="tab" data-tab="fichajes" aria-selected="false">Fichajes</button>
+      <button class="tab" type="button" role="tab" data-tab="mercado" aria-selected="false">Mercado</button>
       <button class="tab" type="button" role="tab" data-tab="datos" aria-selected="false">Datos</button>
       <button class="tab" type="button" role="tab" data-tab="jornadas" aria-selected="false">Jornadas</button>
     </nav>
@@ -377,6 +378,34 @@
       </section>
     </div>
 
+  </div><!-- /panel-datos -->
+
+  <!-- ============================================================
+       PESTAÑA · MERCADO
+       ============================================================ -->
+  <div id="panel-mercado" data-panel="mercado" hidden>
+    <section class="panel">
+      <div class="panel__head">
+        <h2>Mercado de hoy</h2>
+        <p class="muted" id="market-note">Quien está en venta, de quién es y cuántas pujas lleva.</p>
+      </div>
+      <div class="table-scroll">
+        <table class="table table--market">
+          <thead>
+            <tr>
+              <th>Futbolista</th>
+              <th>Vende</th>
+              <th class="num">Valor</th>
+              <th class="num" title="Precio de salida">Pide</th>
+              <th title="Tiempo que queda">Queda</th>
+              <th class="num">Pujas</th>
+            </tr>
+          </thead>
+          <tbody id="market-body"></tbody>
+        </table>
+      </div>
+    </section>
+
     <!-- A lo ancho y debajo del par, que estas filas piden sitio. -->
     <section class="panel">
         <div class="panel__head">
@@ -394,7 +423,8 @@
           </div>
         </div>
     </section>
-  </div><!-- /panel-datos -->
+  </div><!-- /panel-mercado -->
+
 
   <!-- ============================================================
        PESTAÑA · JORNADAS
@@ -435,6 +465,6 @@
 
 </main>
 
-<script src="app.js?v=30"></script>
+<script src="app.js?v=31"></script>
 </body>
 </html>

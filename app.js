@@ -482,6 +482,8 @@
     roundOpen: false,      // lista de partidos desplegada
     picker: null,          // hueco del campo que se está cambiando
     movers: null,          // los que más suben y bajan hoy
+    market: null,          // el mercado de hoy, con sus pujas
+    marketState: '',       // 'cargando' | 'error' | ''
     startPrices: {},       // lo que valía cada jugador el día que lo recibió
     jornadas: { list: [], actual: null, datos: {} },   // clasificación y alineaciones por jornada
     jornadaVista: null,    // la que se está mirando
@@ -1864,6 +1866,73 @@
     $('lineup-count').textContent = titulares + ' de 11 titulares · ' + money(valor) + ' de valor en el campo';
   }
 
+  /* ---------- Mercado ---------- */
+
+  function ensureMarket(forzar) {
+    const config = loadSyncConfig();
+    if (!config.url || !config.key) return;
+    if (state.marketState === 'cargando') return;
+    if (state.market && !forzar) return;
+
+    state.marketState = 'cargando';
+    renderMarket();
+
+    fetch(config.url.replace(/\/+$/, '') + '/?key=' + encodeURIComponent(config.key) + '&mercado=1',
+      { headers: { 'accept': 'application/json' } })
+      .then(function (response) { return response.json(); })
+      .then(function (payload) {
+        if (payload.error) throw new Error(payload.error);
+        state.market = payload.sales || [];
+        state.marketState = '';
+        renderMarket();
+      })
+      .catch(function () {
+        state.marketState = 'error';
+        renderMarket();
+      });
+  }
+
+  function renderMarket() {
+    const cuerpo = $('market-body');
+    if (!cuerpo) return;
+
+    if (!state.market) {
+      cuerpo.innerHTML = '<tr><td colspan="6" class="muted">' +
+        (state.marketState === 'error' ? 'No se ha podido traer el mercado.' : 'Cargando el mercado\u2026') +
+        '</td></tr>';
+      return;
+    }
+    if (state.market.length === 0) {
+      cuerpo.innerHTML = '<tr><td colspan="6" class="muted">Ahora mismo no hay nadie en el mercado.</td></tr>';
+      return;
+    }
+
+    cuerpo.innerHTML = state.market.map(function (venta) {
+      const sube = venta.increment > 0;
+      return '<tr' + (venta.mine ? ' class="row-mine"' : '') + '>' +
+        '<td data-label="Futbolista"><span class="with-crest">' +
+          playerName({ playerId: venta.playerId, player: venta.player }) +
+          statusMark(venta, 'mark--row') + crestOf(venta, 'crest--badge') + '</span></td>' +
+        '<td data-label="Vende">' + (venta.seller === 'Mercado'
+          ? '<span class="sub">Mercado</span>'
+          : '<span class="manager">' + avatar(venta.seller) +
+            '<span class="manager__name">' + escapeHtml(venta.seller) + '</span></span>') + '</td>' +
+        '<td class="num" data-label="Valor">' + money(venta.marketValue || 0) +
+          (venta.increment ? ' <span class="delta ' + (sube ? 'delta--up' : 'delta--down') + '">' +
+            (sube ? '\u25b2' : '\u25bc') + '</span>' : '') + '</td>' +
+        '<td class="num" data-label="Pide"><strong>' + money(venta.price || 0) + '</strong></td>' +
+        '<td data-label="Queda">' + deadlineCell(venta.until) + '</td>' +
+        '<td class="num" data-label="Pujas">' + (venta.bids != null
+          ? '<span class="bids">' + venta.bids + '</span>'
+          : '<span class="sub">' + (venta.mine ? 'tuyo' : '\u2014') + '</span>') + '</td>' +
+      '</tr>';
+    }).join('');
+
+    const conPujas = state.market.filter(function (v) { return v.bids; }).length;
+    $('market-note').textContent = state.market.length + ' jugadores en el mercado' +
+      (conPujas ? ' \u00b7 ' + conPujas + ' con pujas' : '');
+  }
+
   /* ---------- Suben y bajan hoy ---------- */
 
   /** ¿De quién es este futbolista? Se busca en las plantillas de la liga. */
@@ -2568,7 +2637,8 @@
       panel.hidden = panel.getAttribute('data-panel') !== name;
     });
     if (name === 'managers') { renderManagers(); renderSquads(); }
-    if (name === 'datos') { renderDataKpis(); renderKpiCharts(); renderSpending(); renderMovers(); }
+    if (name === 'datos') { renderDataKpis(); renderKpiCharts(); renderSpending(); }
+    if (name === 'mercado') { ensureMarket(); renderMarket(); renderMovers(); }
     if (name === 'jornadas') { ensureJornada(state.jornadaVista || 'actual'); renderJornadas(); }
   }
 
@@ -2606,7 +2676,8 @@
     renderLineup();
     renderWarnings();
     if (state.tab === 'managers') { renderManagers(); renderSquads(); }
-    if (state.tab === 'datos') { renderDataKpis(); renderKpiCharts(); renderSpending(); renderMovers(); }
+    if (state.tab === 'datos') { renderDataKpis(); renderKpiCharts(); renderSpending(); }
+    if (state.tab === 'mercado') { renderMarket(); renderMovers(); }
   }
 
   /* ---------- Persistencia ---------- */
@@ -2788,6 +2859,7 @@
     /* Mientras la jornada está viva es el único momento en que Biwenger da el
        banquillo: se captura en cada sincronización, se mire o no la pestaña. */
     ensureJornada('actual', true);
+    if (state.tab === 'mercado') ensureMarket(true);
     render();
 
     return { movements: movements.length, teams: Object.keys(teams).length };
