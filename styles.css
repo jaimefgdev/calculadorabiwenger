@@ -1044,8 +1044,9 @@ code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft)
 .mark--doubt      { color: #a87400; }
 .mark--out        { color: #444; }
 /* Pegado al borde izquierdo de la foto y por delante de ella. */
-.mark--pitch  { left: 12%; top: 50%; transform: translate(-50%, -95%); }
-.mark--bench  { left: 50%; top: 28px; margin-left: -36px; transform: translate(0, -50%); }
+/* El aviso, arriba a la izquierda de la cara; los puntos, abajo. */
+.mark--pitch  { left: 12%; top: 50%; transform: translate(-50%, -175%); }
+.mark--bench  { left: 50%; top: 16px; margin-left: -36px; transform: translate(0, -50%); }
 .mark--picker { left: 50%; top: 34px; margin-left: -36px; transform: translate(0, -50%); width: 17px; height: 17px; }
 
 /* ---------- Suben y bajan ---------- */
@@ -1126,3 +1127,22 @@ main.wrap { padding-bottom: 3.5rem; }
 .mark--cell { position: static; display: inline-grid; width: 19px; height: 19px; }
 /* Disponible: círculo verde con el visto en blanco. */
 .mark--ok { color: #fff; background: var(--pos); box-shadow: 0 1px 2px rgba(0,0,0,.35); }
+
+/* Puntos del futbolista, abajo a la izquierda de su foto. */
+.pts {
+  position: absolute; z-index: 3;
+  display: grid; place-items: center;
+  min-width: 19px; height: 19px; padding: 0 4px;
+  font-size: .66rem; font-weight: 700; line-height: 1;
+  font-variant-numeric: tabular-nums;
+  color: var(--text); background: #fff;
+  border-radius: 100px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, .5);
+}
+.pts--pitch { left: 12%; top: 50%; transform: translate(-50%, 75%); }
+.pts--bench { left: 50%; top: 48px; margin-left: -36px; transform: translate(0, -50%); }
+
+/* Cómo llegó cada futbolista a la plantilla: procedencia en pequeño e importe
+   al tamaño normal, en una sola línea. */
+.metodo { white-space: nowrap; font-variant-numeric: tabular-nums; }
+.metodo .sub { font-size: .72rem; }

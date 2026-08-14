@@ -1722,6 +1722,13 @@
     return CREST_OVERRIDES[team] || ('https://cdn.biwenger.com/i/t/' + encodeURIComponent(team) + '.png');
   }
 
+  /** Puntos del futbolista, en su círculo abajo a la izquierda de la foto. */
+  function pointsBadge(player, extra) {
+    if (!player || player.points == null) return '';
+    return '<span class="pts ' + (extra || '') + '" title="' + player.points +
+      (player.points === 1 ? ' punto' : ' puntos') + ' esta temporada">' + player.points + '</span>';
+  }
+
   /** Escudo del club del futbolista. `extra` decide si va como marca de agua. */
   function crestOf(player, extra) {
     if (!player || player.team == null) return '';
@@ -1767,7 +1774,7 @@
       : '<span class="pic-player pitch__face pitch__face--empty"></span>';
 
     return '<div class="pitch__slot">' + crestOf(player, 'crest--ghost') + face +
-      statusMark(player, 'mark--pitch') +
+      statusMark(player, 'mark--pitch') + pointsBadge(player, 'pts--pitch') +
       '<span class="pitch__name">' + (player ? escapeHtml(player.name) : '—') + '</span>' +
       '<button type="button" class="pitch__pick" data-slot="' + key + '" data-position="' + position + '"' +
         ' aria-label="Cambiar el ' + POSITION_NAMES[position] +
@@ -1908,7 +1915,7 @@
           return '<div class="bench__player">' +
             crestOf(player, 'crest--ghost') +
             faceOf(player.id, 'bench__face') +
-            statusMark(player, 'mark--bench') +
+            statusMark(player, 'mark--bench') + pointsBadge(player, 'pts--bench') +
             '<span class="bench__name">' + escapeHtml(player.name) + '</span>' +
           '</div>';
         }).join('');
@@ -2751,8 +2758,9 @@
           squadColumn('position', 'Pos.', '') +
           squadColumn('name', 'Futbolista', '') +
           '<th>Estado</th>' +
-          squadColumn('since', 'Desde', '') +
-          squadColumn('paid', 'Pagado', 'num') +
+          squadColumn('points', 'Puntos', 'num') +
+          squadColumn('since', 'Desde', 'detail-date') +
+          squadColumn('paid', 'Método', '') +
           squadColumn('marketValue', 'Valor de mercado', 'num') +
           '<th>Evolución</th>' +
           squadColumn('diff', 'Diferencia', 'num') +
@@ -2768,12 +2776,20 @@
               playerName({ playerId: player.id, player: player.name }) +
               crestOf(player, 'crest--badge') + '</span></td>' +
             '<td class="estado-cell">' + statusCell(player) + '</td>' +
+            '<td class="num">' + (player.points == null ? '<span class="sub">—</span>' : player.points) + '</td>' +
             '<td class="detail-date">' + shortDay(player.since) + '</td>' +
-            '<td class="num">' + (player.paid == null
-              ? '<span class="sub">reparto' +
-                (state.startPrices[player.id] ? ' · ' + money(state.startPrices[player.id]) : '') +
-                '</span>'
-              : money(player.paid)) + '</td>' +
+            '<td class="metodo">' + (function () {
+              /* Cómo llegó a la plantilla y por cuánto. El importe, siempre en el
+                 mismo tamaño; la procedencia, en pequeño al lado. */
+              if (player.paid == null) {
+                const valia = state.startPrices[player.id];
+                return '<span class="sub">reparto</span>' +
+                  (valia ? ' <span class="sub">·</span> ' + money(valia) : '');
+              }
+              const quien = !player.from || player.from === 'Mercado' ? 'mercado' : player.from;
+              return '<span class="sub">compra ' + escapeHtml(quien) + '</span>' +
+                ' <span class="sub">·</span> ' + money(player.paid);
+            })() + '</td>' +
             '<td class="num"><strong>' + (player.marketValue == null ? '—' : money(player.marketValue)) + '</strong></td>' +
             '<td class="spark-cell">' + sparkline(state.priceSeries[player.id], player.id, player.name) + '</td>' +
             '<td class="num">' + (diff == null ? '<span class="sub">—</span>' :
