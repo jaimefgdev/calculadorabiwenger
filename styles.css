@@ -261,9 +261,13 @@ code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft)
     radial-gradient(circle 17px at 100% 0,     transparent 13px, var(--linea) 13px 15px, transparent 15px),
     radial-gradient(circle 17px at 0 100%,     transparent 13px, var(--linea) 13px 15px, transparent 15px),
     radial-gradient(circle 17px at 100% 100%,  transparent 13px, var(--linea) 13px 15px, transparent 15px),
-    radial-gradient(125% 85% at 50% 42%, transparent 45%, rgba(0, 0, 0, .34) 100%),
-    repeating-linear-gradient(90deg, rgba(0, 0, 0, .05) 0 1px, transparent 1px 4px),
-    repeating-linear-gradient(180deg, #1d7f4d 0 12.5%, #14603a 12.5% 25%);
+    radial-gradient(130% 80% at 50% 38%, rgba(255, 255, 255, .10) 0%, transparent 55%),
+    radial-gradient(125% 90% at 50% 45%, transparent 40%, rgba(0, 0, 0, .38) 100%),
+    /* El corte del césped: ocho pasadas, con el borde de cada franja suavizado
+       para que no parezca un cambio de color plano. */
+    repeating-linear-gradient(180deg,
+      #1e8350 0 10%, #1a7548 10% 12.5%,
+      #166a41 12.5% 22.5%, #1a7548 22.5% 25%);
   box-shadow: inset 0 0 0 3px var(--linea), 0 10px 26px rgba(0, 0, 0, .35);
   overflow: hidden;
 }
@@ -989,3 +993,53 @@ code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft)
 .bench__points { font-size: .7rem; color: var(--text-faint); }
 /* Sin selector: el campo guardado no se toca. */
 .pitch--static .pitch__slot { cursor: default; }
+
+/* ---------- Lesionado · sancionado · duda ---------- */
+.mark {
+  position: absolute; z-index: 3;
+  display: grid; place-items: center;
+  width: 18px; height: 18px;
+  font-size: .68rem; font-weight: 700; line-height: 1;
+  color: #fff; background: #fff;
+  border-radius: 50%;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, .5);
+}
+.mark--injured    { color: #d80030; }
+.mark--sanctioned { color: #b00020; }
+.mark--doubt      { color: #a87400; }
+.mark--out        { color: #444; }
+/* Pegado al borde izquierdo de la foto y por delante de ella. */
+.mark--pitch  { left: 12%; top: 50%; transform: translate(-50%, -95%); }
+.mark--bench  { left: 50%; top: 28px; margin-left: -36px; transform: translate(0, -50%); }
+.mark--picker { left: 50%; top: 34px; margin-left: -36px; transform: translate(0, -50%); width: 17px; height: 17px; }
+
+/* ---------- Suben y bajan ---------- */
+.movers { display: grid; gap: 1.5rem; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+/* Cada fila necesita unos 250 px; en media pantalla no caben por debajo de
+   1200, así que las dos listas pasan a ir una debajo de la otra. */
+@media (max-width: 1200px) { .movers { grid-template-columns: 1fr; } }
+.movers__list { display: flex; flex-direction: column; }
+.mover {
+  display: grid; align-items: center; gap: .4rem;
+  grid-template-columns: 32px 15px minmax(0, 1fr) 24px auto auto;
+  padding: .3rem 0;
+  border-bottom: 1px solid var(--border);
+  font-size: .82rem;
+}
+.mover:last-child { border-bottom: 0; }
+.mover__face { position: relative; display: block; width: 32px; height: 32px; }
+.pic-player.mover__pic { width: 32px; height: 32px; }
+.mover__name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 560; }
+.mover__owner { display: inline-flex; align-items: center; justify-content: center; }
+.mover__owner .avatar { width: 24px; height: 24px; font-size: .58rem; }
+.mover__value { font-variant-numeric: tabular-nums; color: var(--text-soft); white-space: nowrap; font-size: .78rem; }
+.mover .delta { font-size: .7rem; }
+.mark--mover { left: 0; top: 50%; transform: translate(-40%, -50%); width: 15px; height: 15px; font-size: .58rem; }
+
+/* ---------- Respiración ----------
+   El campo iba pegado a la cabecera y la página terminaba en seco. */
+.pitch-wrap { margin-top: .9rem; }
+.lineup-bench { margin-top: .2rem; }
+main.wrap { padding-bottom: 3.5rem; }
+#jornada-chart { margin-top: 1.5rem; }
+.viz-block .panel__head { margin-bottom: .6rem; }

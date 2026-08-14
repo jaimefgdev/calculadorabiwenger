@@ -478,10 +478,12 @@
     round: null,           // próxima jornada y su hora de inicio
     roundOpen: false,      // lista de partidos desplegada
     picker: null,          // hueco del campo que se está cambiando
+    movers: null,          // los que más suben y bajan hoy
     jornadas: { list: [], actual: null, datos: {} },   // clasificación y alineaciones por jornada
     jornadaVista: null,    // la que se está mirando
     jornadaAbierta: null,  // mánager desplegado dentro de esa jornada
     jornadaEstado: '',     // 'cargando' | 'error' | ''
+    jornadaChart: [],      // mánagers dibujados en el gráfico de puntos
     pickerJornada: false,  // menú de jornadas abierto
     xi: null,              // el once del simulador
     squads: null,          // plantillas de todos los jugadores
@@ -829,10 +831,12 @@
         fmtTick(v) + '</text>';
     }).join('');
 
-    const firstLabel = '<text class="viz__tick" x="' + padX + '" y="' + (H - 6) + '">' + shortDay(points[0].day) + '</text>';
+    /* Por defecto el eje va en fechas; las jornadas traen su propia etiqueta. */
+    const etiqueta = opts.xlabel || function (point) { return shortDay(point.day); };
+    const firstLabel = '<text class="viz__tick" x="' + padX + '" y="' + (H - 6) + '">' + etiqueta(points[0]) + '</text>';
     const lastLabel = points.length > 1
       ? '<text class="viz__tick" x="' + (W - 12) + '" y="' + (H - 6) + '" text-anchor="end">' +
-        shortDay(points[points.length - 1].day) + '</text>'
+        etiqueta(points[points.length - 1]) + '</text>'
       : '';
 
     /* Un día es un cubo, no un continuo: los flujos diarios van en barras, con
@@ -871,7 +875,7 @@
         return '<path class="viz__line" d="' + d + '" stroke="' + serie.color + '"></path>' +
           points2.map(function (c) {
             return '<circle class="viz__dot" cx="' + c.x.toFixed(1) + '" cy="' + c.y.toFixed(1) +
-              '" r="4" fill="' + serie.color + '"><title>' + shortDay(c.point.day) + ' · ' +
+              '" r="4" fill="' + serie.color + '"><title>' + etiqueta(c.point) + ' · ' +
               serie.label + ': ' + (isCount ? String(c.point[serie.field]) : money(c.point[serie.field])) +
               '</title></circle>';
           }).join('');
@@ -1589,13 +1593,49 @@
       'https://cdn.biwenger.com/i/p/' + encodeURIComponent(id) + '.png\')"></span>';
   }
 
+  /* Lesionado, sancionado o en duda: un circulito blanco pegado al borde
+     izquierdo de la foto, por delante de ella. */
+  const STATUS_MARKS = {
+    injured:   { icon: '✚', label: 'Lesionado',  cls: 'mark--injured' },
+    sanctioned:{ icon: '▮', label: 'Sancionado', cls: 'mark--sanctioned' },
+    doubt:     { icon: '?', label: 'Duda',       cls: 'mark--doubt' },
+    discarded: { icon: '✕', label: 'Descartado', cls: 'mark--out' }
+  };
+
+  function statusMark(player, extra) {
+    const mark = player && STATUS_MARKS[player.status];
+    if (!mark) return '';
+    return '<span class="mark ' + mark.cls + ' ' + (extra || '') + '" title="' + mark.label + '"' +
+      ' aria-label="' + mark.label + '">' + mark.icon + '</span>';
+  }
+
+  /** ¿Alguno de mis titulares llega tocado a la jornada? */
+  function lineupAlerts() {
+    if (!state.xi) return [];
+    return Object.keys(state.xi.slots).map(function (key) {
+      return playerById(state.xi.slots[key]);
+    }).filter(function (player) {
+      return player && STATUS_MARKS[player.status] && player.status !== 'discarded';
+    });
+  }
+
+  /* El escudo del Madrid que sirve Biwenger lleva la franja azul; aquí va con
+     la morada, recoloreada sobre el propio escudo y empotrada para no depender
+     de ningún servidor de fuera. */
+  const CREST_OVERRIDES = {
+    15: 'data:image/png;base64,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'
+  };
+
+  function crestUrl(team) {
+    return CREST_OVERRIDES[team] || ('https://cdn.biwenger.com/i/t/' + encodeURIComponent(team) + '.png');
+  }
+
   /** Escudo del club del futbolista. `extra` decide si va como marca de agua. */
   function crestOf(player, extra) {
     if (!player || player.team == null) return '';
     return '<span class="crest ' + extra + '" aria-hidden="true"' +
       (player.teamName ? ' title="' + escapeHtml(player.teamName) + '"' : '') +
-      ' style="background-image:url(\'https://cdn.biwenger.com/i/t/' +
-      encodeURIComponent(player.team) + '.png\')"></span>';
+      ' style="background-image:url(\'' + crestUrl(player.team) + '\')"></span>';
   }
 
   /* Quién puede entrar en ese hueco: solo los que juegan en esa demarcación
@@ -1620,6 +1660,7 @@
       return {
         id: candidate.id,
         name: candidate.name,
+        status: candidate.status || null,
         role: (main ? POSITION_NAMES[main] + alt : ''),
         moving: slot ? 'ahora en ' + POSITION_NAMES[Number(slot.split('-')[0])] : ''
       };
@@ -1634,6 +1675,7 @@
       : '<span class="pic-player pitch__face pitch__face--empty"></span>';
 
     return '<div class="pitch__slot">' + crestOf(player, 'crest--ghost') + face +
+      statusMark(player, 'mark--pitch') +
       '<span class="pitch__name">' + (player ? escapeHtml(player.name) : '—') + '</span>' +
       '<button type="button" class="pitch__pick" data-slot="' + key + '" data-position="' + position + '"' +
         ' aria-label="Cambiar el ' + POSITION_NAMES[position] +
@@ -1683,6 +1725,7 @@
       return '<button type="button" class="picker__player"' +
         ' data-pick="' + escapeHtml(String(candidate.id)) + '">' +
         faceOf(candidate.id, 'picker__face') +
+        statusMark(candidate, 'mark--picker') +
         '<span class="picker__name">' + escapeHtml(candidate.name) + '</span>' +
         '<span class="picker__meta">' + escapeHtml(candidate.role) +
           (candidate.moving ? ' · ' + escapeHtml(candidate.moving) : '') + '</span>' +
@@ -1772,6 +1815,7 @@
           return '<div class="bench__player">' +
             crestOf(player, 'crest--ghost') +
             faceOf(player.id, 'bench__face') +
+            statusMark(player, 'mark--bench') +
             '<span class="bench__name">' + escapeHtml(player.name) + '</span>' +
           '</div>';
         }).join('');
@@ -1782,6 +1826,55 @@
       return sum + ((player && player.marketValue) || 0);
     }, 0);
     $('lineup-count').textContent = titulares + ' de 11 titulares · ' + money(valor) + ' de valor en el campo';
+  }
+
+  /* ---------- Suben y bajan hoy ---------- */
+
+  /** ¿De quién es este futbolista? Se busca en las plantillas de la liga. */
+  function ownerOf(playerId) {
+    const squads = squadList();
+    for (let i = 0; i < squads.length; i++) {
+      const players = squads[i].players || [];
+      for (let j = 0; j < players.length; j++) {
+        if (String(players[j].id) === String(playerId)) return squads[i].name;
+      }
+    }
+    return null;
+  }
+
+  function moverRow(player) {
+    const sube = player.increment > 0;
+    const dueño = ownerOf(player.id);
+    return '<div class="mover">' +
+      '<span class="mover__face">' + faceOf(player.id, 'mover__pic') +
+        statusMark(player, 'mark--mover') + '</span>' +
+      crestOf(player, 'crest--badge') +
+      '<span class="mover__name">' + escapeHtml(player.name) + '</span>' +
+      /* Solo la foto del dueño: el nombre ensanchaba la fila hasta desbordar.
+         Queda en el título, al pasar el ratón. */
+      '<span class="mover__owner" title="' + (dueño ? escapeHtml(dueño) : 'Sin dueño en la liga') + '">' +
+        (dueño ? avatar(dueño) : '<span class="sub">—</span>') + '</span>' +
+      '<span class="mover__value">' + money(player.marketValue || 0) + '</span>' +
+      '<span class="delta ' + (sube ? 'delta--up' : 'delta--down') + '">' +
+        (sube ? '▲ +' : '▼ −') + money(Math.abs(player.increment)) + '</span>' +
+    '</div>';
+  }
+
+  function renderMovers() {
+    const datos = state.movers || { up: [], down: [] };
+    const pinta = function (id, lista) {
+      $(id).innerHTML = lista.length === 0
+        ? '<p class="muted">Sin cambios todavía.</p>'
+        : lista.slice(0, 10).map(moverRow).join('');
+    };
+    pinta('movers-up', datos.up || []);
+    pinta('movers-down', datos.down || []);
+
+    const mios = (datos.up || []).concat(datos.down || [])
+      .filter(function (p) { return ownerOf(p.id); }).length;
+    $('movers-note').textContent = mios
+      ? 'Lo que más se mueve hoy · ' + mios + ' de estos jugadores tienen dueño en la liga.'
+      : 'Lo que más se mueve hoy en toda la competición.';
   }
 
   /* ---------- Pestaña de jornadas ----------
@@ -1947,6 +2040,63 @@
     '</div>';
   }
 
+  /* Cuatro colores validados: no se dibujan más de cuatro a la vez. */
+  const SERIE_COLORS = ['var(--viz-1)', 'var(--viz-4)', 'var(--viz-2)', 'var(--viz-3)'];
+
+  /** Puntos de cada mánager jornada a jornada, con lo que haya guardado. */
+  function jornadaSeries() {
+    const ids = Object.keys(state.jornadas.datos);
+    const puntos = ids.map(function (id) { return state.jornadas.datos[id]; })
+      .filter(function (j) { return j.round && j.round.number; })
+      .sort(function (a, b) { return a.round.number - b.round.number; })
+      .map(function (j) {
+        const fila = { round: j.round.number };
+        (j.standings || []).forEach(function (m) { fila['m' + m.id] = m.points == null ? null : m.points; });
+        return fila;
+      });
+
+    const managers = {};
+    ids.forEach(function (id) {
+      (state.jornadas.datos[id].standings || []).forEach(function (m) { managers[m.id] = m.name; });
+    });
+    return { puntos: puntos, managers: managers };
+  }
+
+  function renderJornadaChart() {
+    const caja = $('jornada-chart');
+    const datos = jornadaSeries();
+    const nombres = Object.keys(datos.managers);
+
+    if (datos.puntos.length === 0 || nombres.length === 0) { caja.hidden = true; return; }
+    caja.hidden = false;
+
+    const chips = nombres.map(function (id) {
+      const on = state.jornadaChart.indexOf(id) !== -1;
+      const color = SERIE_COLORS[state.jornadaChart.indexOf(id)] || 'var(--border-strong)';
+      return '<button type="button" class="chip" data-jornada-serie="' + escapeHtml(id) + '"' +
+        ' aria-pressed="' + (on ? 'true' : 'false') + '">' +
+        '<span class="chip__dot" style="background:' + color + '"></span>' +
+        escapeHtml(datos.managers[id]) + '</button>';
+    }).join('');
+
+    const series = state.jornadaChart.map(function (id, i) {
+      return { field: 'm' + id, color: SERIE_COLORS[i], label: datos.managers[id] };
+    });
+
+    const grafico = series.length === 0
+      ? '<p class="viz__empty">Elige a quién comparar.</p>'
+      : '<div class="viz__legend">' + series.map(function (linea) {
+          return '<span class="viz__key"><span class="chip__dot" style="background:' + linea.color + '"></span>' +
+            escapeHtml(linea.label) + '</span>';
+        }).join('') + '</div>' +
+        lineChart(datos.puntos, series[0].field, series[0].color, 'Puntos por jornada',
+          { count: true, series: series, xlabel: function (punto) { return 'J' + punto.round; } });
+
+    caja.innerHTML = '<div class="panel__head"><h2>Puntos por jornada</h2>' +
+      '<p class="muted">Máximo cuatro a la vez, para que se distingan los colores.</p></div>' +
+      '<div class="chips">' + chips + '</div>' + grafico;
+  }
+
   function renderJornadas() {
     const cuerpo = $('rounds-body');
     const boton = $('jornada-pick');
@@ -1999,6 +2149,7 @@
     }).join('');
 
     updateRoundHeaders();
+    renderJornadaChart();
   }
 
   function updateRoundHeaders() {
@@ -2345,7 +2496,7 @@
       panel.hidden = panel.getAttribute('data-panel') !== name;
     });
     if (name === 'managers') { renderManagers(); renderSquads(); }
-    if (name === 'datos') { renderDataKpis(); renderKpiCharts(); renderSpending(); }
+    if (name === 'datos') { renderDataKpis(); renderKpiCharts(); renderSpending(); renderMovers(); }
     if (name === 'jornadas') { ensureJornada(state.jornadaVista || 'actual'); renderJornadas(); }
   }
 
@@ -2383,7 +2534,7 @@
     renderLineup();
     renderWarnings();
     if (state.tab === 'managers') { renderManagers(); renderSquads(); }
-    if (state.tab === 'datos') { renderDataKpis(); renderKpiCharts(); renderSpending(); }
+    if (state.tab === 'datos') { renderDataKpis(); renderKpiCharts(); renderSpending(); renderMovers(); }
   }
 
   /* ---------- Persistencia ---------- */
@@ -2556,6 +2707,7 @@
     state.listings = Array.isArray(payload.listings) ? payload.listings : [];
     state.lineup = payload.lineup || null;
     state.round = payload.round || state.round;
+    state.movers = payload.movers || state.movers;
     state.me = payload.me || null;
     state.leagueStart = (payload.league && payload.league.startDay) || state.leagueStart;
     state.warnings = warnings;
@@ -2864,6 +3016,20 @@
       renderJornadaPicker();
       ensureJornada(id);
       renderJornadas();
+    });
+
+    $('jornada-chart').addEventListener('click', function (event) {
+      const chip = event.target.closest('[data-jornada-serie]');
+      if (!chip) return;
+      const id = chip.getAttribute('data-jornada-serie');
+      const abiertos = state.jornadaChart;
+      const donde = abiertos.indexOf(id);
+      if (donde !== -1) abiertos.splice(donde, 1);
+      else {
+        abiertos.push(id);
+        while (abiertos.length > 4) abiertos.shift();   // cuatro colores, cuatro líneas
+      }
+      renderJornadaChart();
     });
 
     $('rounds-body').addEventListener('click', function (event) {
