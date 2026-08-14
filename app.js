@@ -3063,15 +3063,6 @@
     /* Mientras la jornada está viva es el único momento en que Biwenger da el
        banquillo: se captura en cada sincronización, se mire o no la pestaña. */
     ensureJornada('actual', true);
-    /* El valor de equipo de cada uno se pide en segundo plano, pero de uno en
-       uno y espaciado: los ocho a la vez hacían que Biwenger cortara con un
-       429 por exceso de consultas. */
-    const pendientes = Object.keys(state.teams).filter(function (nombre) {
-      return !state.history[nombre];
-    });
-    pendientes.forEach(function (nombre, i) {
-      setTimeout(function () { ensureHistory(nombre); }, i * 1500);
-    });
     if (state.tab === 'mercado') ensureMarket(true);
     render();
 
