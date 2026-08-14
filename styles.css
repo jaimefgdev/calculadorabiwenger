@@ -995,8 +995,11 @@ code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft)
    ofertas parta en dos líneas: si no, su ancho fijo obliga a un desplazable. */
 .table--offers th, .table--offers td,
 .table--listings th, .table--listings td { padding-inline: .4rem; }
-/* El nombre se recorta antes que ensanchar la tabla. */
-.table--offers .player-name { display: inline-block; max-width: 4.2rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; vertical-align: middle; }
+/* Los nombres van enteros: se gana el sitio con la tipografía, no cortándolos. */
+.table--offers { font-size: .78rem; }
+.table--offers th, .table--offers td { padding-inline: .3rem; }
+.table--offers .pic-player { width: 20px; height: 20px; }
+.table--offers .crest--badge { width: 14px; height: 14px; }
 .table--offers td[data-label="Operación"] .sub { display: none; }
 .table--offers .tag, .table--listings .tag { font-size: .7rem; }
 /* Todo en una sola línea: importe, diferencia e interruptor. */
@@ -1198,3 +1201,5 @@ main.wrap { padding-bottom: 3.5rem; }
 .ficha__historial { margin-top: .3rem; }
 .ficha__historial td { padding: .3rem .4rem; }
 .player { cursor: pointer; }
+/* Resumen de la evolución, centrado bajo el gráfico. */
+.viz-resumen { text-align: center; margin-top: .4rem; }

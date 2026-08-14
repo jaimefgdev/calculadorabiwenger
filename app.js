@@ -2809,6 +2809,8 @@
     const enTablon = state.movements.filter(function (m) { return String(m.playerId) === clave; });
     if (enTablon.length) {
       ficha.name = ficha.name || enTablon[0].player;
+      ficha.position = ficha.position != null ? ficha.position : enTablon[0].position;
+      ficha.status = ficha.status || enTablon[0].status;
       ficha.team = ficha.team != null ? ficha.team : enTablon[0].team;
       ficha.teamName = ficha.teamName || enTablon[0].teamName;
     }
@@ -2899,9 +2901,8 @@
 
   /** Las operaciones de ese futbolista en la liga, de la más reciente atrás. */
   function playerHistory(ficha) {
-    if (!ficha.moves || ficha.moves.length === 0) {
-      return '<p class="muted">Sin movimientos en el tablón.</p>';
-    }
+    /* Sin operaciones no se dice nada: el hueco vacío ya lo cuenta. */
+    if (!ficha.moves || ficha.moves.length === 0) return '';
     return '<table class="detail-table ficha__historial"><tbody>' +
       ficha.moves.map(function (movimiento) {
         const compra = movimiento.type === 'buy';
@@ -2946,17 +2947,12 @@
     const ficha = playerInfo(abierto.id);
     const sube2 = ficha.increment > 0;
 
+    /* El precio y su variación ya los cuenta el gráfico: aquí sobran. */
     const datos = [
       ficha.position ? POSITION_NAMES[ficha.position] : null,
       ficha.teamName,
       ficha.points != null ? ficha.points + (ficha.points === 1 ? ' punto' : ' puntos') : null,
-      ficha.marketValue != null
-        ? money(ficha.marketValue) + (ficha.increment
-            ? ' <span class="delta ' + (sube2 ? 'delta--up' : 'delta--down') + '">' +
-              (sube2 ? '▲ +' : '▼ −') + money(Math.abs(ficha.increment)) + '</span>'
-            : '')
-        : null,
-      ficha.owner ? 'de <strong>' + escapeHtml(ficha.owner) + '</strong>' : 'sin dueño'
+      ficha.owner ? 'de <strong>' + escapeHtml(ficha.owner) + '</strong>' : '<strong>Libre</strong>'
     ].filter(Boolean).join(' · ');
 
     caja.hidden = false;
@@ -2976,17 +2972,18 @@
         '<p class="muted ficha__datos">' + datos + '</p>' +
         (puntos.length < 2
           ? '<p class="viz__empty">Todavía no hay evolución de este futbolista.</p>'
-          : '<p class="muted">De ' + money(primero) + ' a <strong>' + money(ultimo) + '</strong>' +
-            ' · <span class="delta ' + (sube ? 'delta--up' : 'delta--down') + '">' +
-            (sube ? '▲ +' : '▼ −') + money(Math.abs(salto)) + '</span></p>' +
-            '<div class="viz-hover">' +
+          : '<div class="viz-hover">' +
               lineChart(puntos, 'price', sube ? 'var(--pos)' : 'var(--neg)', 'Valor de mercado',
                 { height: 260, ticks: 7, fullTicks: true, padX: 96, hover: true,
                   mark: diaLlegada ? { day: diaLlegada, label: llegada.paid == null ? 'reparto' : 'fichaje' } : null }) +
               '<div class="viz-tip" hidden></div>' +
-            '</div>') +
-        '<h3 class="bench__title">En la liga</h3>' +
-        playerHistory(ficha) +
+            '</div>' +
+            '<p class="muted viz-resumen">De ' + money(primero) + ' a <strong>' + money(ultimo) + '</strong>' +
+              ' · <span class="delta ' + (sube ? 'delta--up' : 'delta--down') + '">' +
+              (sube ? '▲ +' : '▼ −') + money(Math.abs(salto)) + '</span></p>') +
+        (ficha.moves && ficha.moves.length
+          ? '<h3 class="bench__title">En la liga</h3>' + playerHistory(ficha)
+          : '') +
       '</div>';
 
     /* Corto y al grano: qué día llegó, por cuánto y cuánto valía entonces.
