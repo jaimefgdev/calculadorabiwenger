@@ -32,6 +32,9 @@
   /* El once del simulador se guarda aparte: es tuyo, no el que tenga puesto
      Biwenger, y no debe perderse al recargar. */
   const XI_KEY = 'biwenger-calc-xi';
+  /* El estado del futbolista cuando se hizo cada fichaje. Se guarda la primera
+     vez que se ve el movimiento y ya no se toca: Biwenger solo da el de hoy. */
+  const MOVE_STATUS_KEY = 'biwenger-calc-estado-fichajes';
   /* Media hora: el mercado solo se renueva una vez al día y las pujas duran
      24 h, así que no hay nada que mirar cada pocos minutos. Con el botón
      Actualizar se fuerza cuando quieras. */
@@ -487,6 +490,7 @@
     round: null,           // próxima jornada y su hora de inicio
     roundOpen: false,      // lista de partidos desplegada
     picker: null,          // hueco del campo que se está cambiando
+    moveStatus: {},        // estado congelado de cada fichaje
     movers: null,          // los que más suben y bajan hoy
     market: null,          // el mercado de hoy, con sus pujas
     marketState: '',       // 'cargando' | 'error' | ''
@@ -1196,6 +1200,8 @@
         '<td class="col-rank">' + (index + 1) + '</td>' +
         '<td data-label="Futbolista"><span class="with-crest">' + playerName(movement) +
           crestOf(movement, 'crest--badge') + '</span></td>' +
+        '<td class="estado-cell" data-label="Estado">' +
+          statusCell({ status: state.moveStatus[moveKey(movement)] }) + '</td>' +
         '<td data-label="Acción"><span class="tag ' + (buy ? 'tag--buy' : 'tag--sell') + '">' +
           (buy ? '↓ Fichado' : '↑ Vendido') + '</span></td>' +
         '<td data-label="Futbolista">' + managerCell + '</td>' +
@@ -2085,6 +2091,36 @@
      Biwenger solo enseña la alineación de una jornada mientras está en juego y
      borra el banquillo al empezar la siguiente. Aquí se guarda cada jornada en
      el navegador y no se pisa lo guardado con una respuesta más pobre. */
+
+  /** Identificador estable de un movimiento, para poder congelar su estado. */
+  function moveKey(movement) {
+    return (movement.playerId || movement.player) + '|' + movement.type + '|' + (movement.timestamp || movement.date);
+  }
+
+  function loadMoveStatus() {
+    try {
+      const raw = localStorage.getItem(MOVE_STATUS_KEY);
+      if (raw) state.moveStatus = JSON.parse(raw) || {};
+    } catch (error) { /* se empieza de cero */ }
+  }
+
+  function persistMoveStatus() {
+    try { localStorage.setItem(MOVE_STATUS_KEY, JSON.stringify(state.moveStatus)); } catch (error) { /* sin sitio */ }
+  }
+
+  /* La primera vez que aparece un fichaje se anota cómo estaba el futbolista;
+     a partir de ahí ese dato ya no cambia aunque se lesione después. */
+  function freezeMoveStatus(movements) {
+    let nuevos = 0;
+    movements.forEach(function (movement) {
+      const clave = moveKey(movement);
+      if (state.moveStatus[clave] === undefined) {
+        state.moveStatus[clave] = movement.status || 'ok';
+        nuevos += 1;
+      }
+    });
+    if (nuevos) persistMoveStatus();
+  }
 
   function loadJornadas() {
     try {
@@ -3020,7 +3056,8 @@
         timestamp: isNaN(time) ? null : time,
         source: item.source || '',
         team: item.team != null ? item.team : null,
-        teamName: item.teamName || null
+        teamName: item.teamName || null,
+        status: item.status || null
       };
     });
 
@@ -3061,6 +3098,7 @@
     state.me = payload.me || null;
     state.leagueStart = (payload.league && payload.league.startDay) || state.leagueStart;
     state.warnings = warnings;
+    freezeMoveStatus(movements);
     persist();
     recordSnapshot();
     /* Mientras la jornada está viva es el único momento en que Biwenger da el
@@ -3577,6 +3615,7 @@
 
     const hadData = loadStored();
     loadJornadas();
+    loadMoveStatus();
     loadXi();
     render();
 
