@@ -355,7 +355,8 @@
         players: teams[name] ? teams[name].players : null,
         points: teams[name] && teams[name].points != null ? teams[name].points : null,
         // Saldo tal cual lo da Biwenger; incluye cesiones, bonus y cláusulas.
-        officialBalance: teams[name] && teams[name].balance != null ? teams[name].balance : null
+        officialBalance: teams[name] && teams[name].balance != null ? teams[name].balance : null,
+        lastAccess: teams[name] ? teams[name].lastAccess : null
       };
     });
     const byName = new Map(rows.map(function (row) { return [row.name, row]; }));
@@ -405,7 +406,9 @@
       teamValue: function (row) { return row.teamValue; },
       players:   function (row) { return row.players; },
       balance:   function (row) { return row.balance; },
-      maxBid:    function (row) { return row.maxBid; }
+      maxBid:    function (row) { return row.maxBid; },
+      /* Al ordenar por conexión, primero el que acaba de entrar. */
+      lastAccess: function (row) { return row.lastAccess ? Date.parse(row.lastAccess) : -Infinity; }
     },
     moves: {
       player:  function (m) { return m.player; },
@@ -1478,6 +1481,28 @@
     return { text: minutes + 'm' + cola, urgent: true };
   }
 
+  /** Cuánto hace de algo, en horas, minutos y segundos. */
+  function timeSince(desde) {
+    if (!desde) return null;
+    const pasado = Date.now() - Date.parse(desde);
+    if (isNaN(pasado) || pasado < 0) return null;
+
+    const seconds = Math.floor(pasado / 1000);
+    const minutes = Math.floor(seconds / 60);
+    const hours = Math.floor(minutes / 60);
+    const days = Math.floor(hours / 24);
+
+    if (days >= 1) return days + 'd ' + (hours - days * 24) + 'h ' + (minutes - hours * 60) + 'm';
+    return hours + 'h ' + (minutes - hours * 60) + 'm ' + (seconds - minutes * 60) + 's';
+  }
+
+  function sinceCell(desde) {
+    const texto = timeSince(desde);
+    if (!texto) return '<span class="sub">—</span>';
+    return '<span class="deadline" data-since="' + escapeHtml(desde) + '"' +
+      ' title="' + escapeHtml(dateFormat.format(new Date(desde))) + '">' + texto + '</span>';
+  }
+
   /** Celda con el tiempo restante; `tickDeadlines` la refresca cada segundo. */
   function deadlineCell(until, conSegundos) {
     const left = timeLeft(until, conSegundos);
@@ -1490,6 +1515,12 @@
 
   /* Se actualizan en el sitio, sin repintar las tablas enteras. */
   function tickDeadlines() {
+    const desdes = document.querySelectorAll('[data-since]');
+    for (let j = 0; j < desdes.length; j++) {
+      const texto = timeSince(desdes[j].getAttribute('data-since'));
+      if (texto) desdes[j].textContent = texto;
+    }
+
     const marcas = document.querySelectorAll('[data-until]');
     for (let i = 0; i < marcas.length; i++) {
       const left = timeLeft(marcas[i].getAttribute('data-until'), marcas[i].hasAttribute('data-seconds'));
@@ -1976,7 +2007,7 @@
         '<td class="num" data-label="Valor">' + money(venta.marketValue || 0) +
           (venta.increment ? ' <span class="delta ' + (sube ? 'delta--up' : 'delta--down') + '">' +
             (sube ? '\u25b2' : '\u25bc') + '</span>' : '') + '</td>' +
-        '<td class="num" data-label="Pide"><strong>' + money(venta.price || 0) + '</strong></td>' +
+        '<td class="num" data-label="Precio"><strong>' + money(venta.price || 0) + '</strong></td>' +
         '<td class="spark-cell" data-label="Evolución">' +
           sparkline(state.priceSeries[venta.playerId], venta.playerId, venta.player) + '</td>' +
         '<td data-label="Queda">' + deadlineCell(venta.until) + '</td>' +
@@ -2442,6 +2473,7 @@
           money(row.balance) + '</span></td>' +
         '<td class="num" data-label="Puja máxima"><strong class="bid-amount">' +
           (row.maxBid == null ? '—' : money(row.maxBid)) + '</strong></td>' +
+        '<td data-label="Última conexión">' + sinceCell(row.lastAccess) + '</td>' +
       '</tr>' + (open ? managerPanel(row) : '');
     }).join('');
   }
@@ -3000,7 +3032,8 @@
         players: item.teamSize != null ? item.teamSize : null,
         points: item.points != null ? item.points : null,
         balance: item.balance != null ? item.balance : null,
-        icon: item.icon || null
+        icon: item.icon || null,
+        lastAccess: item.lastAccess || null
       };
     });
 
@@ -3028,10 +3061,15 @@
     /* Mientras la jornada está viva es el único momento en que Biwenger da el
        banquillo: se captura en cada sincronización, se mire o no la pestaña. */
     ensureJornada('actual', true);
-    /* El valor de equipo de cada uno se pedía al desplegar su ficha, y hasta
-       que llegaba se veía «Reconstruyendo…». Se piden todos de una vez, en
-       segundo plano: son rápidos y el Worker cachea los precios. */
-    Object.keys(state.teams).forEach(function (nombre) { ensureHistory(nombre); });
+    /* El valor de equipo de cada uno se pide en segundo plano, pero de uno en
+       uno y espaciado: los ocho a la vez hacían que Biwenger cortara con un
+       429 por exceso de consultas. */
+    const pendientes = Object.keys(state.teams).filter(function (nombre) {
+      return !state.history[nombre];
+    });
+    pendientes.forEach(function (nombre, i) {
+      setTimeout(function () { ensureHistory(nombre); }, i * 1500);
+    });
     if (state.tab === 'mercado') ensureMarket(true);
     render();
 
