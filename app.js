@@ -32,9 +32,10 @@
   /* El once del simulador se guarda aparte: es tuyo, no el que tenga puesto
      Biwenger, y no debe perderse al recargar. */
   const XI_KEY = 'biwenger-calc-xi';
-  /* Cada cuarto de hora: el mercado se mueve una vez al día y con cinco
-     minutos se acumulaban demasiadas consultas contra Biwenger. */
-  const AUTO_SYNC_MS = 15 * 60 * 1000;    // refresco automático
+  /* Media hora: el mercado solo se renueva una vez al día y las pujas duran
+     24 h, así que no hay nada que mirar cada pocos minutos. Con el botón
+     Actualizar se fuerza cuando quieras. */
+  const AUTO_SYNC_MS = 30 * 60 * 1000;    // refresco automático
 
   /* ---------- Utilidades ---------- */
 
