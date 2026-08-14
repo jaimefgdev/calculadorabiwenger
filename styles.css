@@ -1189,3 +1189,12 @@ main.wrap { padding-bottom: 3.5rem; }
 .viz-tip__llegada { color: var(--text); font-weight: 560; }
 /* El valor de mercado del día de la llegada, del color de la marca. */
 .viz-tip__valor { color: var(--marca); font-weight: 700; }
+
+/* Ficha del futbolista. */
+.ficha__head { align-items: center; }
+.ficha__head .with-crest { gap: .5rem; }
+.pic-player.ficha__face { width: 40px; height: 40px; }
+.ficha__datos { margin-bottom: .6rem; }
+.ficha__historial { margin-top: .3rem; }
+.ficha__historial td { padding: .3rem .4rem; }
+.player { cursor: pointer; }

@@ -612,7 +612,8 @@
       ? '<span class="pic-player" style="background-image:url(\'https://cdn.biwenger.com/i/p/' +
         encodeURIComponent(id) + '.png\')" aria-hidden="true"></span>'
       : '';
-    return '<span class="player">' + pic + '<span class="player-name">' +
+    return '<span class="player" data-player-id="' + escapeHtml(String(id || '')) + '">' +
+      pic + '<span class="player-name">' +
       escapeHtml(movement.player) + '</span></span>';
   }
 
@@ -2766,6 +2767,56 @@
     return '20' + texto.slice(0, 2) + '-' + texto.slice(2, 4) + '-' + texto.slice(4, 6);
   }
 
+  /** Reúne en un solo sitio lo que cada pestaña sabe de un futbolista. */
+  function playerInfo(id) {
+    const clave = String(id);
+    const ficha = { id: clave, name: null, position: null, status: null, team: null, teamName: null,
+      marketValue: null, increment: 0, points: null };
+
+    const enPlantilla = (function () {
+      const squads = squadList();
+      for (let i = 0; i < squads.length; i++) {
+        const players = squads[i].players || [];
+        for (let j = 0; j < players.length; j++) {
+          if (String(players[j].id) === clave) return { squad: squads[i], player: players[j] };
+        }
+      }
+      return null;
+    })();
+
+    if (enPlantilla) {
+      const p = enPlantilla.player;
+      ficha.name = p.name; ficha.position = p.position; ficha.status = p.status;
+      ficha.team = p.team; ficha.teamName = p.teamName;
+      ficha.marketValue = p.marketValue; ficha.increment = p.increment || 0;
+      ficha.points = p.points;
+      ficha.owner = enPlantilla.squad.name;
+    }
+
+    const enMercado = (state.market || []).filter(function (v) { return String(v.playerId) === clave; })[0];
+    if (enMercado) {
+      ficha.name = ficha.name || enMercado.player;
+      ficha.position = ficha.position != null ? ficha.position : enMercado.position;
+      ficha.status = ficha.status || enMercado.status;
+      ficha.team = ficha.team != null ? ficha.team : enMercado.team;
+      ficha.teamName = ficha.teamName || enMercado.teamName;
+      ficha.marketValue = ficha.marketValue != null ? ficha.marketValue : enMercado.marketValue;
+      ficha.increment = ficha.increment || enMercado.increment || 0;
+      ficha.points = ficha.points != null ? ficha.points : enMercado.points;
+      ficha.enVenta = enMercado;
+    }
+
+    const enTablon = state.movements.filter(function (m) { return String(m.playerId) === clave; });
+    if (enTablon.length) {
+      ficha.name = ficha.name || enTablon[0].player;
+      ficha.team = ficha.team != null ? ficha.team : enTablon[0].team;
+      ficha.teamName = ficha.teamName || enTablon[0].teamName;
+    }
+    ficha.moves = enTablon.slice().sort(function (a, b) { return (b.timestamp || 0) - (a.timestamp || 0); });
+
+    return ficha;
+  }
+
   /** Busca en las plantillas cómo y cuándo llegó ese futbolista, y a quién. */
   function acquisitionOf(playerId) {
     const squads = squadList();
@@ -2846,7 +2897,29 @@
     caja.addEventListener('touchend', salir);
   }
 
-  /** Gráfico grande de la evolución de un futbolista. */
+  /** Las operaciones de ese futbolista en la liga, de la más reciente atrás. */
+  function playerHistory(ficha) {
+    if (!ficha.moves || ficha.moves.length === 0) {
+      return '<p class="muted">Sin movimientos en el tablón.</p>';
+    }
+    return '<table class="detail-table ficha__historial"><tbody>' +
+      ficha.moves.map(function (movimiento) {
+        const compra = movimiento.type === 'buy';
+        return '<tr>' +
+          '<td class="detail-date">' + escapeHtml(movimiento.date || '—') + '</td>' +
+          '<td><span class="tag ' + (compra ? 'tag--buy' : 'tag--sell') + '">' +
+            (compra ? '↓ Fichado' : '↑ Vendido') + '</span></td>' +
+          '<td>' + (movimiento.manager
+            ? '<span class="manager">' + avatar(movimiento.manager) +
+              '<span class="manager__name">' + escapeHtml(movimiento.manager) + '</span></span>'
+            : '<span class="sub">—</span>') + '</td>' +
+          '<td class="num"><strong class="' + (compra ? 'money-neg' : 'money-pos') + '">' +
+            (compra ? '−' : '+') + money(movimiento.amount) + '</strong></td>' +
+        '</tr>';
+      }).join('') + '</tbody></table>';
+  }
+
+  /** Ficha del futbolista: quién lo tiene, cuánto vale y por dónde ha pasado. */
   function renderPriceModal() {
     const caja = $('price-modal');
     const abierto = state.priceModal;
@@ -2870,16 +2943,37 @@
     const sube = ultimo >= primero;
     const salto = ultimo - primero;
 
+    const ficha = playerInfo(abierto.id);
+    const sube2 = ficha.increment > 0;
+
+    const datos = [
+      ficha.position ? POSITION_NAMES[ficha.position] : null,
+      ficha.teamName,
+      ficha.points != null ? ficha.points + (ficha.points === 1 ? ' punto' : ' puntos') : null,
+      ficha.marketValue != null
+        ? money(ficha.marketValue) + (ficha.increment
+            ? ' <span class="delta ' + (sube2 ? 'delta--up' : 'delta--down') + '">' +
+              (sube2 ? '▲ +' : '▼ −') + money(Math.abs(ficha.increment)) + '</span>'
+            : '')
+        : null,
+      ficha.owner ? 'de <strong>' + escapeHtml(ficha.owner) + '</strong>' : 'sin dueño'
+    ].filter(Boolean).join(' · ');
+
     caja.hidden = false;
     caja.innerHTML =
       '<div class="picker__backdrop" data-price-close></div>' +
-      '<div class="picker__card modal__card" role="dialog" aria-modal="true" aria-label="Evolución de ' +
+      '<div class="picker__card modal__card" role="dialog" aria-modal="true" aria-label="Ficha de ' +
         escapeHtml(abierto.name) + '">' +
-        '<div class="picker__head">' +
-          '<strong>' + escapeHtml(abierto.name) + '</strong>' +
+        '<div class="picker__head ficha__head">' +
+          '<span class="with-crest">' +
+            faceOf(abierto.id, 'ficha__face') +
+            '<strong>' + escapeHtml(abierto.name) + '</strong>' +
+            crestOf(ficha, 'crest--badge') + statusMark(ficha, 'mark--row') +
+          '</span>' +
           '<button type="button" class="btn btn--ghost btn--close" data-price-close' +
             ' title="Cerrar" aria-label="Cerrar">✕</button>' +
         '</div>' +
+        '<p class="muted ficha__datos">' + datos + '</p>' +
         (puntos.length < 2
           ? '<p class="viz__empty">Todavía no hay evolución de este futbolista.</p>'
           : '<p class="muted">De ' + money(primero) + ' a <strong>' + money(ultimo) + '</strong>' +
@@ -2891,6 +2985,8 @@
                   mark: diaLlegada ? { day: diaLlegada, label: llegada.paid == null ? 'reparto' : 'fichaje' } : null }) +
               '<div class="viz-tip" hidden></div>' +
             '</div>') +
+        '<h3 class="bench__title">En la liga</h3>' +
+        playerHistory(ficha) +
       '</div>';
 
     /* Corto y al grano: qué día llegó, por cuánto y cuánto valía entonces.
@@ -3560,6 +3656,20 @@
       if (!spark) return;
       state.priceModal = { id: spark.getAttribute('data-spark'), name: spark.getAttribute('data-spark-name') };
       renderPriceModal();
+    });
+
+    /* La ficha se abre pulsando el nombre, solo en estas tres tablas. */
+    ['moves-body', 'market-body', 'squads-body'].forEach(function (id) {
+      $(id).addEventListener('click', function (event) {
+        const quien = event.target.closest('[data-player-id]');
+        if (!quien || !quien.getAttribute('data-player-id')) return;
+        state.priceModal = {
+          id: quien.getAttribute('data-player-id'),
+          name: quien.querySelector('.player-name') ? quien.querySelector('.player-name').textContent : ''
+        };
+        ensurePriceSeries([state.priceModal.id], renderPriceModal);
+        renderPriceModal();
+      });
     });
 
     $('price-modal').addEventListener('click', function (event) {
