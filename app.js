@@ -1632,6 +1632,7 @@
   /* Lesionado, sancionado o en duda: un circulito blanco pegado al borde
      izquierdo de la foto, por delante de ella. */
   const STATUS_MARKS = {
+    ok:        { icon: '✓', label: 'Disponible', cls: 'mark--ok' },
     injured:   { icon: '✚', label: 'Lesionado',  cls: 'mark--injured' },
     sanctioned:{ icon: '▮', label: 'Sancionado', cls: 'mark--sanctioned' },
     doubt:     { icon: '?', label: 'Duda',       cls: 'mark--doubt' },
@@ -1639,9 +1640,18 @@
   };
 
   function statusMark(player, extra) {
-    const mark = player && STATUS_MARKS[player.status];
+    /* El visto de «disponible» solo se pinta donde se pide expresamente
+       (la columna Estado), no encima de cada foto. */
+    const mark = player && player.status !== 'ok' && STATUS_MARKS[player.status];
     if (!mark) return '';
     return '<span class="mark ' + mark.cls + ' ' + (extra || '') + '" title="' + mark.label + '"' +
+      ' aria-label="' + mark.label + '">' + mark.icon + '</span>';
+  }
+
+  /** Celda de estado: siempre dice algo, también cuando está sano. */
+  function statusCell(player) {
+    const mark = STATUS_MARKS[(player && player.status) || 'ok'] || STATUS_MARKS.ok;
+    return '<span class="mark ' + mark.cls + ' mark--cell" title="' + mark.label + '"' +
       ' aria-label="' + mark.label + '">' + mark.icon + '</span>';
   }
 
@@ -2002,8 +2012,8 @@
     return '<div class="mover">' +
       '<span class="with-crest">' +
         playerName({ playerId: player.id, player: player.name }) +
-        statusMark(player, 'mark--row') +
         crestOf(player, 'crest--badge') +
+        statusMark(player, 'mark--row') +
       '</span>' +
       /* Solo la foto del dueño: el nombre ensanchaba la fila hasta desbordar.
          Queda en el título, al pasar el ratón. */
@@ -2655,6 +2665,7 @@
         '<table class="detail-table"><thead><tr>' +
           squadColumn('position', 'Pos.', '') +
           squadColumn('name', 'Futbolista', '') +
+          '<th>Estado</th>' +
           squadColumn('since', 'Desde', '') +
           squadColumn('paid', 'Pagado', 'num') +
           squadColumn('marketValue', 'Valor de mercado', 'num') +
@@ -2671,10 +2682,11 @@
             '<td><span class="with-crest">' +
               playerName({ playerId: player.id, player: player.name }) +
               crestOf(player, 'crest--badge') + '</span></td>' +
+            '<td class="estado-cell">' + statusCell(player) + '</td>' +
             '<td class="detail-date">' + shortDay(player.since) + '</td>' +
             '<td class="num">' + (player.paid == null
               ? '<span class="sub">reparto' +
-                (state.startPrices[player.id] ? ' · valía ' + money(state.startPrices[player.id]) : '') +
+                (state.startPrices[player.id] ? ' · ' + money(state.startPrices[player.id]) : '') +
                 '</span>'
               : money(player.paid)) + '</td>' +
             '<td class="num"><strong>' + (player.marketValue == null ? '—' : money(player.marketValue)) + '</strong></td>' +
