@@ -1753,6 +1753,7 @@
     $('pitch').innerHTML =
       '<span class="pitch__area pitch__area--top" aria-hidden="true"></span>' +
       '<span class="pitch__area pitch__area--bottom" aria-hidden="true"></span>' +
+      '<span class="pitch__spot" aria-hidden="true"></span>' +
       rows.map(function (row) {
         const slots = [];
         for (let i = 0; i < row.count; i++) slots.push(pitchSlot(row.position + '-' + i, row.position));
@@ -1919,6 +1920,7 @@
     return '<div class="pitch pitch--static">' +
       '<span class="pitch__area pitch__area--top" aria-hidden="true"></span>' +
       '<span class="pitch__area pitch__area--bottom" aria-hidden="true"></span>' +
+      '<span class="pitch__spot" aria-hidden="true"></span>' +
       filas + '</div>';
   }
 
