@@ -1056,22 +1056,20 @@ code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft)
 .movers__list { display: flex; flex-direction: column; }
 .mover {
   display: grid; align-items: center; gap: .4rem;
-  grid-template-columns: 34px 22px minmax(0, 1fr) 24px auto auto;
+  grid-template-columns: minmax(0, 1fr) 24px auto auto;
   padding: .3rem 0;
   border-bottom: 1px solid var(--border);
   font-size: .82rem;
 }
 .mover:last-child { border-bottom: 0; }
-.mover__face { position: relative; display: block; width: 34px; height: 34px; }
-.pic-player.mover__pic { width: 34px; height: 34px; }
+.mover .with-crest { min-width: 0; }
+.mover .player-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 /* El escudo, del tamaño suficiente para reconocer el equipo de un vistazo. */
-.mover .crest--badge { width: 22px; height: 22px; opacity: 1; }
-.mover__name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 560; }
+.mover .crest--badge { width: 18px; height: 18px; opacity: 1; }
 .mover__owner { display: inline-flex; align-items: center; justify-content: center; }
 .mover__owner .avatar { width: 24px; height: 24px; font-size: .58rem; }
 .mover__value { font-variant-numeric: tabular-nums; color: var(--text-soft); white-space: nowrap; font-size: .78rem; }
 .mover .delta { font-size: .7rem; }
-.mark--mover { left: 0; top: 50%; transform: translate(-40%, -50%); width: 15px; height: 15px; font-size: .58rem; }
 
 /* ---------- Respiración ----------
    El campo iba pegado a la cabecera y la página terminaba en seco. */

@@ -1998,11 +1998,13 @@
   function moverRow(player) {
     const sube = player.increment > 0;
     const dueño = ownerOf(player.id);
+    /* Mismo formato que el resto de tablas: foto, nombre y escudo detrás. */
     return '<div class="mover">' +
-      '<span class="mover__face">' + faceOf(player.id, 'mover__pic') +
-        statusMark(player, 'mark--mover') + '</span>' +
-      crestOf(player, 'crest--badge') +
-      '<span class="mover__name">' + escapeHtml(player.name) + '</span>' +
+      '<span class="with-crest">' +
+        playerName({ playerId: player.id, player: player.name }) +
+        statusMark(player, 'mark--row') +
+        crestOf(player, 'crest--badge') +
+      '</span>' +
       /* Solo la foto del dueño: el nombre ensanchaba la fila hasta desbordar.
          Queda en el título, al pasar el ratón. */
       '<span class="mover__owner" title="' + (dueño ? escapeHtml(dueño) : 'Sin dueño en la liga') + '">' +
