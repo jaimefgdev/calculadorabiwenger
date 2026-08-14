@@ -1173,3 +1173,9 @@ main.wrap { padding-bottom: 3.5rem; }
   box-shadow: 0 4px 14px rgba(0, 0, 0, .35);
 }
 .viz-tip__day { color: var(--text-faint); font-size: .7rem; }
+
+/* El día en que el futbolista llegó a una plantilla. */
+.viz__mark { stroke: var(--viz-1); stroke-width: 1.5; stroke-dasharray: 4 3; opacity: .9; }
+.viz__markdot { fill: none; stroke: var(--viz-1); stroke-width: 2.5; }
+.viz__marktext { fill: var(--viz-1); font-size: 9px; font-weight: 700; }
+.viz-llegada { margin-top: .3rem; }

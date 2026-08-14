@@ -922,6 +922,22 @@
 
     /* Las medidas viajan con el SVG: así el rastreador puede traducir un punto
        de la pantalla al día que le corresponde. */
+    /* El día en que llegó a la plantilla se señala aparte, en azul, para
+       distinguirlo del trazo del precio. */
+    let marca = '';
+    if (opts.mark && opts.mark.day) {
+      const i = points.map(function (punto) { return punto.day; }).indexOf(opts.mark.day);
+      if (i !== -1 && points[i][key] != null) {
+        const mx = x(i);
+        const my = y(points[i][key]);
+        marca = '<line class="viz__mark" x1="' + mx.toFixed(1) + '" x2="' + mx.toFixed(1) +
+            '" y1="' + padTop + '" y2="' + (H - padBottom) + '"></line>' +
+          '<circle class="viz__markdot" cx="' + mx.toFixed(1) + '" cy="' + my.toFixed(1) + '" r="6"></circle>' +
+          '<text class="viz__marktext" x="' + mx.toFixed(1) + '" y="' + (padTop - 3) +
+            '" text-anchor="middle">' + escapeHtml(opts.mark.label || '') + '</text>';
+      }
+    }
+
     const cursor = opts.hover
       ? '<line class="viz__cross" x1="0" x2="0" y1="' + padTop + '" y2="' + (H - padBottom) + '" hidden></line>' +
         '<circle class="viz__cursor" r="5" fill="' + color + '" hidden></circle>'
@@ -931,7 +947,7 @@
       ' data-padx="' + padX + '" data-w="' + W + '"' +
       ' aria-label="Evolución de ' + escapeHtml(label.toLowerCase()) + '">' + grid + area +
       '<path class="viz__line" d="' + path + '" stroke="' + color + '"></path>' + dots +
-      cursor + firstLabel + lastLabel + '</svg>';
+      marca + cursor + firstLabel + lastLabel + '</svg>';
   }
 
   /** Bloque de gráficos de la ficha, con sus interruptores. */
@@ -2718,6 +2734,25 @@
     return '20' + texto.slice(0, 2) + '-' + texto.slice(2, 4) + '-' + texto.slice(4, 6);
   }
 
+  /** Busca en las plantillas cómo y cuándo llegó ese futbolista, y a quién. */
+  function acquisitionOf(playerId) {
+    const squads = squadList();
+    for (let i = 0; i < squads.length; i++) {
+      const players = squads[i].players || [];
+      for (let j = 0; j < players.length; j++) {
+        if (String(players[j].id) === String(playerId)) {
+          return {
+            owner: squads[i].name,
+            since: players[j].since || null,
+            paid: players[j].paid,
+            from: players[j].from || null
+          };
+        }
+      }
+    }
+    return null;
+  }
+
   /**
    * Sigue el ratón por el gráfico y va cantando el precio de cada día: con 45
    * puntos, dar con el círculo exacto es imposible.
@@ -2786,6 +2821,14 @@
       return { day: stampToDay(par[0]), price: par[1] };
     });
 
+    const llegada = acquisitionOf(abierto.id);
+    const diaLlegada = llegada && llegada.since;
+    const precioEseDia = (function () {
+      if (!diaLlegada) return null;
+      const punto = puntos.filter(function (p) { return p.day === diaLlegada; })[0];
+      return punto ? punto.price : null;
+    })();
+
     const primero = puntos.length ? puntos[0].price : 0;
     const ultimo = puntos.length ? puntos[puntos.length - 1].price : 0;
     const sube = ultimo >= primero;
@@ -2806,9 +2849,22 @@
           : '<p class="muted">De ' + money(primero) + ' a <strong>' + money(ultimo) + '</strong>' +
             ' · <span class="delta ' + (sube ? 'delta--up' : 'delta--down') + '">' +
             (sube ? '▲ +' : '▼ −') + money(Math.abs(salto)) + '</span></p>' +
+            (llegada
+              ? '<p class="muted viz-llegada">' +
+                (llegada.paid == null
+                  ? 'Le tocó a <strong>' + escapeHtml(llegada.owner) + '</strong> en el reparto del ' +
+                    escapeHtml(shortDay(diaLlegada))
+                  : '<strong>' + escapeHtml(llegada.owner) + '</strong> lo fichó el ' +
+                    escapeHtml(shortDay(diaLlegada)) +
+                    (llegada.from && llegada.from !== 'Mercado' ? ' a ' + escapeHtml(llegada.from) : ' en el mercado') +
+                    ' por <strong>' + money(llegada.paid) + '</strong>') +
+                (precioEseDia != null ? ' · ese día valía ' + money(precioEseDia) : '') +
+                '</p>'
+              : '') +
             '<div class="viz-hover">' +
               lineChart(puntos, 'price', sube ? 'var(--pos)' : 'var(--neg)', 'Valor de mercado',
-                { height: 260, ticks: 7, fullTicks: true, padX: 96, hover: true }) +
+                { height: 260, ticks: 7, fullTicks: true, padX: 96, hover: true,
+                  mark: diaLlegada ? { day: diaLlegada, label: llegada.paid == null ? 'reparto' : 'fichaje' } : null }) +
               '<div class="viz-tip" hidden></div>' +
             '</div>') +
       '</div>';
