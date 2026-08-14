@@ -2811,6 +2811,8 @@
       ficha.name = ficha.name || enTablon[0].player;
       ficha.position = ficha.position != null ? ficha.position : enTablon[0].position;
       ficha.status = ficha.status || enTablon[0].status;
+      ficha.points = ficha.points != null ? ficha.points : enTablon[0].points;
+      ficha.marketValue = ficha.marketValue != null ? ficha.marketValue : enTablon[0].marketValue;
       ficha.team = ficha.team != null ? ficha.team : enTablon[0].team;
       ficha.teamName = ficha.teamName || enTablon[0].teamName;
     }
@@ -3341,7 +3343,10 @@
         source: item.source || '',
         team: item.team != null ? item.team : null,
         teamName: item.teamName || null,
-        status: item.status || null
+        status: item.status || null,
+        position: item.position != null ? item.position : null,
+        points: item.points != null ? item.points : null,
+        marketValue: item.marketValue != null ? item.marketValue : null
       };
     });
 
