@@ -1105,3 +1105,13 @@ main.wrap { padding-bottom: 3.5rem; }
 
 /* Jugador libre en el mercado, sin dueño. */
 .tag--free { background: var(--bg-surface); color: var(--text-soft); }
+
+/* Minigráfica de la evolución del precio de un futbolista. */
+.spark { display: inline-block; line-height: 0; }
+.spark svg { display: block; }
+.spark-cell { width: 1%; padding-block: .15rem !important; }
+/* En pantallas muy estrechas la ficha ya va justa: la minigráfica se retira. */
+@media (max-width: 560px) {
+  .table--squads .detail-table th:nth-child(6),
+  .table--squads .detail-table td:nth-child(6) { display: none; }
+}

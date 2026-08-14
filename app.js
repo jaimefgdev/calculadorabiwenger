@@ -485,6 +485,7 @@
     market: null,          // el mercado de hoy, con sus pujas
     marketState: '',       // 'cargando' | 'error' | ''
     startPrices: {},       // lo que valía cada jugador el día que lo recibió
+    priceSeries: {},       // evolución de precio de cada futbolista
     jornadas: { list: [], actual: null, datos: {} },   // clasificación y alineaciones por jornada
     jornadaVista: null,    // la que se está mirando
     jornadaAbierta: null,  // mánager desplegado dentro de esa jornada
@@ -1901,9 +1902,15 @@
   /** Libres primero y, dentro de cada grupo, por valor. */
   function sortMarket(lista) {
     const sort = state.sort.market;
+    /* Orden natural: primero los libres y luego cada mánager con los suyos
+       juntos, de más caro a más barato dentro de cada grupo. */
     if (!sort.key) {
       return lista.slice().sort(function (a, b) {
         if (a.free !== b.free) return a.free ? -1 : 1;
+        if (!a.free) {
+          const quien = (a.seller || '').localeCompare(b.seller || '');
+          if (quien) return quien;
+        }
         return (b.marketValue || 0) - (a.marketValue || 0);
       });
     }
@@ -1959,9 +1966,15 @@
         : (state.sort.market.dir === 1 ? 'ascending' : 'descending'));
     });
 
-    const libres = state.market.filter(function (v) { return v.free; }).length;
-    $('market-note').textContent = state.market.length + ' en el mercado \u00b7 ' +
-      libres + ' libres \u00b7 ' + (state.market.length - libres) + ' de m\u00e1nagers';
+    /* El mercado se renueva cuando vencen los jugadores libres: el más
+       próximo de esos plazos es la hora de cierre. */
+    const cierre = state.market
+      .filter(function (v) { return v.free && v.until; })
+      .map(function (v) { return v.until; })
+      .sort()[0] || null;
+
+    $('market-note').innerHTML = state.market.length + ' en el mercado' +
+      (cierre ? ' \u00b7 se renueva en ' + deadlineCell(cierre) : '');
   }
 
   /* ---------- Suben y bajan hoy ---------- */
@@ -2518,6 +2531,61 @@
       .catch(function () { /* se queda sin dato */ });
   }
 
+  /* Minigráfica de la evolución del precio, sin ejes ni números: solo la
+     forma, en verde si acaba por encima de como empezó y en rojo si no. */
+  function sparkline(serie) {
+    if (!serie || serie.length < 2) return '<span class="sub">—</span>';
+
+    const W = 76, H = 22, pad = 2;
+    const valores = serie.map(function (par) { return par[1]; });
+    const min = Math.min.apply(null, valores);
+    const max = Math.max.apply(null, valores);
+    const span = (max - min) || 1;
+
+    const puntos = serie.map(function (par, i) {
+      const x = pad + (i * (W - pad * 2)) / (serie.length - 1);
+      const y = pad + (1 - (par[1] - min) / span) * (H - pad * 2);
+      return x.toFixed(1) + ' ' + y.toFixed(1);
+    });
+
+    const sube = valores[valores.length - 1] >= valores[0];
+    const color = sube ? 'var(--pos)' : 'var(--neg)';
+    const diferencia = valores[valores.length - 1] - valores[0];
+
+    return '<span class="spark" title="' + serie.length + ' días · ' +
+      (diferencia >= 0 ? '+' : '−') + money(Math.abs(diferencia)) + '">' +
+      '<svg viewBox="0 0 ' + W + ' ' + H + '" width="' + W + '" height="' + H + '" aria-hidden="true">' +
+      '<polyline points="' + puntos.join(' ') + '" fill="none" stroke="' + color +
+      '" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"' +
+      ' vector-effect="non-scaling-stroke"></polyline>' +
+      '<circle cx="' + puntos[puntos.length - 1].split(' ')[0] + '" cy="' +
+      puntos[puntos.length - 1].split(' ')[1] + '" r="1.8" fill="' + color + '"></circle>' +
+      '</svg></span>';
+  }
+
+  /** Pide la evolución de precio de los jugadores de esa plantilla. */
+  function ensurePriceSeries(squad) {
+    const config = loadSyncConfig();
+    if (!config.url || !config.key || !squad) return;
+
+    const faltan = (squad.players || []).filter(function (player) {
+      return state.priceSeries[player.id] === undefined;
+    });
+    if (faltan.length === 0) return;
+    faltan.forEach(function (player) { state.priceSeries[player.id] = null; });
+
+    fetch(config.url.replace(/\/+$/, '') + '/?key=' + encodeURIComponent(config.key) +
+      '&historial=' + encodeURIComponent(faltan.map(function (p) { return p.id; }).join(',')),
+      { headers: { 'accept': 'application/json' } })
+      .then(function (response) { return response.json(); })
+      .then(function (payload) {
+        if (!payload || payload.error) return;
+        Object.keys(payload).forEach(function (id) { state.priceSeries[id] = payload[id]; });
+        renderSquads();
+      })
+      .catch(function () { /* sin evolución */ });
+  }
+
   function renderSquads() {
     ensureSquads();
     const body = $('squads-body');
@@ -2543,6 +2611,7 @@
           squadColumn('since', 'Desde', '') +
           squadColumn('paid', 'Pagado', 'num') +
           squadColumn('marketValue', 'Valor de mercado', 'num') +
+          '<th>Evolución</th>' +
           squadColumn('diff', 'Diferencia', 'num') +
         '</tr></thead><tbody>' +
         sortSquad(squad.players).map(function (player) {
@@ -2562,6 +2631,7 @@
                 '</span>'
               : money(player.paid)) + '</td>' +
             '<td class="num"><strong>' + (player.marketValue == null ? '—' : money(player.marketValue)) + '</strong></td>' +
+            '<td class="spark-cell">' + sparkline(state.priceSeries[player.id]) + '</td>' +
             '<td class="num">' + (diff == null ? '<span class="sub">—</span>' :
               '<span class="delta ' + (diff >= 0 ? 'delta--up' : 'delta--down') + '">' +
               (diff >= 0 ? '▲ +' : '▼ −') + money(Math.abs(diff)) + '</span>') + '</td>' +
@@ -2890,6 +2960,10 @@
     /* Mientras la jornada está viva es el único momento en que Biwenger da el
        banquillo: se captura en cada sincronización, se mire o no la pestaña. */
     ensureJornada('actual', true);
+    /* El valor de equipo de cada uno se pedía al desplegar su ficha, y hasta
+       que llegaba se veía «Reconstruyendo…». Se piden todos de una vez, en
+       segundo plano: son rápidos y el Worker cachea los precios. */
+    Object.keys(state.teams).forEach(function (nombre) { ensureHistory(nombre); });
     if (state.tab === 'mercado') ensureMarket(true);
     render();
 
@@ -3252,7 +3326,9 @@
       const id = button.getAttribute('data-squad');
       state.expandedSquad = state.expandedSquad === id ? null : id;
       if (state.expandedSquad) {
-        ensureStartPrices(squadList().filter(function (s) { return s.id === id; })[0]);
+        const plantilla = squadList().filter(function (s) { return s.id === id; })[0];
+        ensureStartPrices(plantilla);
+        ensurePriceSeries(plantilla);
       }
       renderSquads();
     });
