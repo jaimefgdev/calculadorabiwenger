@@ -1055,7 +1055,8 @@ code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft)
 /* Los dos círculos se anclan a la foto, no a la ficha entera: en el campo la
    ficha es más alta por el nombre y quedaban descolgados. */
 .face-box { position: relative; display: inline-block; line-height: 0; }
-.mark--esquina { top: 0; left: 0; transform: translate(-38%, -22%); }
+/* Los dos, un poco metidos hacia dentro y a la misma distancia del borde. */
+.mark--esquina { top: 0; left: 0; transform: translate(-32%, 12%); }
 .mark--picker { left: 50%; top: 34px; margin-left: -36px; transform: translate(0, -50%); width: 17px; height: 17px; }
 
 /* ---------- Suben y bajan ---------- */
@@ -1149,7 +1150,7 @@ main.wrap { padding-bottom: 3.5rem; }
   border-radius: 100px;
   box-shadow: 0 1px 3px rgba(0, 0, 0, .5);
 }
-.pts--esquina { bottom: 0; left: 0; transform: translate(-38%, 22%); }
+.pts--esquina { bottom: 0; left: 0; transform: translate(-32%, -12%); }
 
 /* Cómo llegó cada futbolista a la plantilla: procedencia en pequeño e importe
    al tamaño normal, en una sola línea. */
