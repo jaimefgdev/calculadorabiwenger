@@ -1459,27 +1459,31 @@
   /* ---------- Cuenta atrás de pujas y ventas ---------- */
 
   /** Lo que queda hasta `until`, en el detalle justo para cada escala. */
-  function timeLeft(until) {
+  function timeLeft(until, conSegundos) {
     if (!until) return null;
     const left = Date.parse(until) - Date.now();
     if (isNaN(left)) return null;
     if (left <= 0) return { text: 'vencida', urgent: true };
 
-    /* Formato corto para que la columna no ensanche la tabla. */
-    const minutes = Math.floor(left / 60000);
+    /* Formato corto para que la columna no ensanche la tabla; con segundos
+       solo donde se piden, como en la renovación del mercado. */
+    const seconds = Math.floor(left / 1000);
+    const minutes = Math.floor(seconds / 60);
     const hours = Math.floor(minutes / 60);
     const days = Math.floor(hours / 24);
-    if (days >= 1) return { text: days + 'd ' + (hours - days * 24) + 'h', urgent: false };
-    if (hours >= 1) return { text: hours + 'h ' + (minutes - hours * 60) + 'm', urgent: hours < 2 };
-    return { text: minutes + 'm', urgent: true };
+    const cola = conSegundos ? ' ' + (seconds - minutes * 60) + 's' : '';
+
+    if (days >= 1) return { text: days + 'd ' + (hours - days * 24) + 'h' + cola, urgent: false };
+    if (hours >= 1) return { text: hours + 'h ' + (minutes - hours * 60) + 'm' + cola, urgent: hours < 2 };
+    return { text: minutes + 'm' + cola, urgent: true };
   }
 
   /** Celda con el tiempo restante; `tickDeadlines` la refresca cada segundo. */
-  function deadlineCell(until) {
-    const left = timeLeft(until);
+  function deadlineCell(until, conSegundos) {
+    const left = timeLeft(until, conSegundos);
     if (!left) return '<span class="sub">—</span>';
     return '<span class="deadline' + (left.urgent ? ' deadline--soon' : '') + '"' +
-      ' data-until="' + escapeHtml(until) + '"' +
+      ' data-until="' + escapeHtml(until) + '"' + (conSegundos ? ' data-seconds="1"' : '') +
       ' title="' + escapeHtml(dateFormat.format(new Date(until))) + '">' +
       escapeHtml(left.text) + '</span>';
   }
@@ -1488,7 +1492,7 @@
   function tickDeadlines() {
     const marcas = document.querySelectorAll('[data-until]');
     for (let i = 0; i < marcas.length; i++) {
-      const left = timeLeft(marcas[i].getAttribute('data-until'));
+      const left = timeLeft(marcas[i].getAttribute('data-until'), marcas[i].hasAttribute('data-seconds'));
       if (!left) continue;
       marcas[i].textContent = left.text;
       marcas[i].classList.toggle('deadline--soon', left.urgent);
@@ -1905,6 +1909,10 @@
   const MARKET_VALUES = {
     player: function (v) { return (v.player || '').toLowerCase(); },
     seller: function (v) { return (v.free ? '0' : '1') + (v.seller || '').toLowerCase(); },
+    status: function (v) {
+      const orden = { injured: 0, sanctioned: 1, doubt: 2, discarded: 3 };
+      return orden[v.status] != null ? orden[v.status] : 9;
+    },
     points: function (v) { return v.points == null ? -Infinity : v.points; },
     marketValue: function (v) { return v.marketValue || 0; },
     price: function (v) { return v.price || 0; },
@@ -1941,13 +1949,13 @@
     if (!cuerpo) return;
 
     if (!state.market) {
-      cuerpo.innerHTML = '<tr><td colspan="7" class="muted">' +
+      cuerpo.innerHTML = '<tr><td colspan="8" class="muted">' +
         (state.marketState === 'error' ? 'No se ha podido traer el mercado.' : 'Cargando el mercado\u2026') +
         '</td></tr>';
       return;
     }
     if (state.market.length === 0) {
-      cuerpo.innerHTML = '<tr><td colspan="7" class="muted">Ahora mismo no hay nadie en el mercado.</td></tr>';
+      cuerpo.innerHTML = '<tr><td colspan="8" class="muted">Ahora mismo no hay nadie en el mercado.</td></tr>';
       return;
     }
 
@@ -1958,11 +1966,12 @@
       return '<tr' + (venta.mine ? ' class="row-mine"' : '') + '>' +
         '<td data-label="Futbolista"><span class="with-crest">' +
           playerName({ playerId: venta.playerId, player: venta.player }) +
-          statusMark(venta, 'mark--row') + crestOf(venta, 'crest--badge') + '</span></td>' +
-        '<td data-label="Vende">' + (venta.free
+          crestOf(venta, 'crest--badge') + '</span></td>' +
+        '<td data-label="Propietario">' + (venta.free
           ? '<span class="tag tag--free">Libre</span>'
           : '<span class="manager">' + avatar(venta.seller) +
             '<span class="manager__name">' + escapeHtml(venta.seller) + '</span></span>') + '</td>' +
+        '<td class="estado-cell" data-label="Estado">' + statusCell(venta) + '</td>' +
         '<td class="num" data-label="Puntos">' + (venta.points == null ? '<span class="sub">\u2014</span>' : venta.points) + '</td>' +
         '<td class="num" data-label="Valor">' + money(venta.marketValue || 0) +
           (venta.increment ? ' <span class="delta ' + (sube ? 'delta--up' : 'delta--down') + '">' +
@@ -1988,7 +1997,7 @@
       .sort()[0] || null;
 
     $('market-note').innerHTML = state.market.length + ' en el mercado' +
-      (cierre ? ' \u00b7 se renueva en ' + deadlineCell(cierre) : '');
+      (cierre ? ' \u00b7 se renueva en ' + deadlineCell(cierre, true) : '');
   }
 
   /* ---------- Suben y bajan hoy ---------- */
@@ -3362,7 +3371,7 @@
       const key = th.getAttribute('data-market-sort');
       const sort = state.sort.market;
       if (sort.key === key) sort.dir = -sort.dir;
-      else { sort.key = key; sort.dir = (key === 'player' || key === 'seller' || key === 'until') ? 1 : -1; }
+      else { sort.key = key; sort.dir = (key === 'player' || key === 'seller' || key === 'until' || key === 'status') ? 1 : -1; }
       renderMarket();
     });
 
