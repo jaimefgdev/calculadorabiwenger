@@ -506,6 +506,8 @@
     offers: [],            // pujas enviadas y ofertas recibidas, pendientes
     me: null,              // saldo y puja máxima oficiales del usuario
     syncing: false,
+    syncFails: 0,          // fallos seguidos, para espaciar los reintentos
+    nextSyncAt: 0,         // no se vuelve a intentar antes de este momento
     lastSync: null,
     // key vacía = orden por defecto de cada tabla (ver más abajo).
     sort: {
@@ -3122,6 +3124,8 @@
       })
       .then(function (payload) {
         const result = applySync(payload);
+        state.syncFails = 0;
+        state.nextSyncAt = 0;
         state.lastSync = Date.now();
         saveSyncConfig({ url: url, key: key, lastSync: state.lastSync });
         renderLastSync(state.lastSync);
@@ -3132,7 +3136,14 @@
         const message = /failed to fetch/i.test(String(error))
           ? 'No se ha podido contactar con el Worker: revisa la URL y que esté desplegado.'
           : String(error.message || error);
-        setStatus('status-sync', message, 'err');
+        /* Cada fallo seguido dobla la espera, hasta media hora. */
+        state.syncFails += 1;
+        const espera = Math.min(AUTO_SYNC_MS * Math.pow(2, state.syncFails - 1), 30 * 60 * 1000);
+        state.nextSyncAt = Date.now() + espera;
+
+        const minutos = Math.round(espera / 60000);
+        setStatus('status-sync', message + ' Se reintenta en ' + minutos +
+          (minutos === 1 ? ' minuto.' : ' minutos.'), 'err');
         renderLastSync(state.lastSync, state.lastSync ? null : 'Error al actualizar');
       })
       .then(function () {
@@ -3146,12 +3157,17 @@
      esté a la vista. Biwenger publica los fichajes al cerrar el mercado, así
      que no tiene sentido consultar más a menudo. */
   function startAutoSync() {
+    /* Si falla, se espera cada vez más: insistir cada cinco minutos contra una
+       API que nos ha cortado solo alarga el corte. */
     setInterval(function () {
-      if (document.visibilityState === 'visible') syncNow(true);
-    }, AUTO_SYNC_MS);
+      if (document.visibilityState !== 'visible') return;
+      if (state.nextSyncAt && Date.now() < state.nextSyncAt) return;
+      syncNow(true);
+    }, 60 * 1000);
 
     document.addEventListener('visibilitychange', function () {
       if (document.visibilityState !== 'visible') return;
+      if (state.nextSyncAt && Date.now() < state.nextSyncAt) return;
       if (!state.lastSync || Date.now() - state.lastSync > AUTO_SYNC_MS) syncNow(true);
     });
   }
