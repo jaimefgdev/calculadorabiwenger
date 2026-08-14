@@ -16,7 +16,7 @@
 <title>Calculadora Biwenger — Presupuestos de la liga</title>
 <!-- El ?v= se sube en cada publicación: obliga al navegador a bajar el archivo
      nuevo en vez de reutilizar el que tenga en caché. -->
-<link rel="stylesheet" href="styles.css?v=37">
+<link rel="stylesheet" href="styles.css?v=38">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>💰</text></svg>">
 </head>
 <body>
@@ -398,6 +398,7 @@
               <th class="num sortable" data-market-sort="points" tabindex="0" aria-sort="none" title="Puntos esta temporada">Puntos</th>
               <th class="num sortable" data-market-sort="marketValue" tabindex="0" aria-sort="none">Valor</th>
               <th class="num sortable" data-market-sort="price" tabindex="0" aria-sort="none" title="Precio de salida">Pide</th>
+              <th>Evolución</th>
               <th class="sortable" data-market-sort="until" tabindex="0" aria-sort="none" title="Tiempo que queda">Queda</th>
             </tr>
           </thead>
@@ -463,8 +464,11 @@
     </section>
   </div><!-- /panel-jornadas -->
 
+  <!-- Evolución de un futbolista, a tamaño grande. -->
+  <div id="price-modal" class="picker picker--modal" hidden></div>
+
 </main>
 
-<script src="app.js?v=37"></script>
+<script src="app.js?v=38"></script>
 </body>
 </html>

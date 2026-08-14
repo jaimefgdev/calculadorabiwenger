@@ -486,6 +486,7 @@
     marketState: '',       // 'cargando' | 'error' | ''
     startPrices: {},       // lo que valía cada jugador el día que lo recibió
     priceSeries: {},       // evolución de precio de cada futbolista
+    priceModal: null,      // futbolista con la evolución ampliada
     jornadas: { list: [], actual: null, datos: {} },   // clasificación y alineaciones por jornada
     jornadaVista: null,    // la que se está mirando
     jornadaAbierta: null,  // mánager desplegado dentro de esa jornada
@@ -1883,6 +1884,7 @@
         state.market = payload.sales || [];
         state.marketState = '';
         renderMarket();
+        ensurePriceSeries(state.market.map(function (v) { return v.playerId; }), renderMarket);
       })
       .catch(function () {
         state.marketState = 'error';
@@ -1929,13 +1931,13 @@
     if (!cuerpo) return;
 
     if (!state.market) {
-      cuerpo.innerHTML = '<tr><td colspan="6" class="muted">' +
+      cuerpo.innerHTML = '<tr><td colspan="7" class="muted">' +
         (state.marketState === 'error' ? 'No se ha podido traer el mercado.' : 'Cargando el mercado\u2026') +
         '</td></tr>';
       return;
     }
     if (state.market.length === 0) {
-      cuerpo.innerHTML = '<tr><td colspan="6" class="muted">Ahora mismo no hay nadie en el mercado.</td></tr>';
+      cuerpo.innerHTML = '<tr><td colspan="7" class="muted">Ahora mismo no hay nadie en el mercado.</td></tr>';
       return;
     }
 
@@ -1956,6 +1958,8 @@
           (venta.increment ? ' <span class="delta ' + (sube ? 'delta--up' : 'delta--down') + '">' +
             (sube ? '\u25b2' : '\u25bc') + '</span>' : '') + '</td>' +
         '<td class="num" data-label="Pide"><strong>' + money(venta.price || 0) + '</strong></td>' +
+        '<td class="spark-cell" data-label="Evolución">' +
+          sparkline(state.priceSeries[venta.playerId], venta.playerId, venta.player) + '</td>' +
         '<td data-label="Queda">' + deadlineCell(venta.until) + '</td>' +
       '</tr>';
     }).join('');
@@ -2533,7 +2537,7 @@
 
   /* Minigráfica de la evolución del precio, sin ejes ni números: solo la
      forma, en verde si acaba por encima de como empezó y en rojo si no. */
-  function sparkline(serie) {
+  function sparkline(serie, id, nombre) {
     if (!serie || serie.length < 2) return '<span class="sub">—</span>';
 
     const W = 76, H = 22, pad = 2;
@@ -2552,38 +2556,85 @@
     const color = sube ? 'var(--pos)' : 'var(--neg)';
     const diferencia = valores[valores.length - 1] - valores[0];
 
-    return '<span class="spark" title="' + serie.length + ' días · ' +
-      (diferencia >= 0 ? '+' : '−') + money(Math.abs(diferencia)) + '">' +
+    return '<button type="button" class="spark" data-spark="' + escapeHtml(String(id || '')) + '"' +
+      ' data-spark-name="' + escapeHtml(nombre || '') + '"' +
+      ' title="' + serie.length + ' días · ' +
+      (diferencia >= 0 ? '+' : '−') + money(Math.abs(diferencia)) + ' · pulsa para ampliar">' +
       '<svg viewBox="0 0 ' + W + ' ' + H + '" width="' + W + '" height="' + H + '" aria-hidden="true">' +
       '<polyline points="' + puntos.join(' ') + '" fill="none" stroke="' + color +
       '" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"' +
       ' vector-effect="non-scaling-stroke"></polyline>' +
       '<circle cx="' + puntos[puntos.length - 1].split(' ')[0] + '" cy="' +
       puntos[puntos.length - 1].split(' ')[1] + '" r="1.8" fill="' + color + '"></circle>' +
-      '</svg></span>';
+      '</svg></button>';
   }
 
-  /** Pide la evolución de precio de los jugadores de esa plantilla. */
-  function ensurePriceSeries(squad) {
+  /** Pide la evolución de precio de una lista de futbolistas, por tandas. */
+  function ensurePriceSeries(ids, alTerminar) {
     const config = loadSyncConfig();
-    if (!config.url || !config.key || !squad) return;
+    if (!config.url || !config.key) return;
 
-    const faltan = (squad.players || []).filter(function (player) {
-      return state.priceSeries[player.id] === undefined;
+    const faltan = (ids || []).filter(function (id) {
+      return id && state.priceSeries[id] === undefined;
     });
     if (faltan.length === 0) return;
-    faltan.forEach(function (player) { state.priceSeries[player.id] = null; });
+    faltan.forEach(function (id) { state.priceSeries[id] = null; });
 
-    fetch(config.url.replace(/\/+$/, '') + '/?key=' + encodeURIComponent(config.key) +
-      '&historial=' + encodeURIComponent(faltan.map(function (p) { return p.id; }).join(',')),
-      { headers: { 'accept': 'application/json' } })
-      .then(function (response) { return response.json(); })
-      .then(function (payload) {
-        if (!payload || payload.error) return;
-        Object.keys(payload).forEach(function (id) { state.priceSeries[id] = payload[id]; });
-        renderSquads();
-      })
-      .catch(function () { /* sin evolución */ });
+    /* El Worker atiende 30 por consulta: el mercado entero va en dos o tres. */
+    for (let i = 0; i < faltan.length; i += 25) {
+      const tanda = faltan.slice(i, i + 25);
+      fetch(config.url.replace(/\/+$/, '') + '/?key=' + encodeURIComponent(config.key) +
+        '&historial=' + encodeURIComponent(tanda.join(',')),
+        { headers: { 'accept': 'application/json' } })
+        .then(function (response) { return response.json(); })
+        .then(function (payload) {
+          if (!payload || payload.error) return;
+          Object.keys(payload).forEach(function (id) { state.priceSeries[id] = payload[id]; });
+          if (alTerminar) alTerminar();
+        })
+        .catch(function () { /* sin evolución */ });
+    }
+  }
+
+  /* Los precios vienen con la fecha como 260814; el resto de la calculadora
+     trabaja con 2026-08-14. */
+  function stampToDay(stamp) {
+    const texto = String(stamp);
+    return '20' + texto.slice(0, 2) + '-' + texto.slice(2, 4) + '-' + texto.slice(4, 6);
+  }
+
+  /** Gráfico grande de la evolución de un futbolista. */
+  function renderPriceModal() {
+    const caja = $('price-modal');
+    const abierto = state.priceModal;
+    if (!abierto) { caja.hidden = true; caja.innerHTML = ''; return; }
+
+    const serie = state.priceSeries[abierto.id];
+    const puntos = (serie || []).map(function (par) {
+      return { day: stampToDay(par[0]), price: par[1] };
+    });
+
+    const primero = puntos.length ? puntos[0].price : 0;
+    const ultimo = puntos.length ? puntos[puntos.length - 1].price : 0;
+    const sube = ultimo >= primero;
+    const salto = ultimo - primero;
+
+    caja.hidden = false;
+    caja.innerHTML =
+      '<div class="picker__backdrop" data-price-close></div>' +
+      '<div class="picker__card modal__card" role="dialog" aria-modal="true" aria-label="Evolución de ' +
+        escapeHtml(abierto.name) + '">' +
+        '<div class="picker__head">' +
+          '<strong>' + escapeHtml(abierto.name) + '</strong>' +
+          '<button type="button" class="btn btn--ghost btn--sm" data-price-close>Cerrar</button>' +
+        '</div>' +
+        (puntos.length < 2
+          ? '<p class="viz__empty">Todavía no hay evolución de este futbolista.</p>'
+          : '<p class="muted">' + puntos.length + ' días · de ' + money(primero) + ' a ' + money(ultimo) +
+            ' · <span class="delta ' + (sube ? 'delta--up' : 'delta--down') + '">' +
+            (sube ? '▲ +' : '▼ −') + money(Math.abs(salto)) + '</span></p>' +
+            lineChart(puntos, 'price', sube ? 'var(--pos)' : 'var(--neg)', 'Valor de mercado')) +
+      '</div>';
   }
 
   function renderSquads() {
@@ -2631,7 +2682,7 @@
                 '</span>'
               : money(player.paid)) + '</td>' +
             '<td class="num"><strong>' + (player.marketValue == null ? '—' : money(player.marketValue)) + '</strong></td>' +
-            '<td class="spark-cell">' + sparkline(state.priceSeries[player.id]) + '</td>' +
+            '<td class="spark-cell">' + sparkline(state.priceSeries[player.id], player.id, player.name) + '</td>' +
             '<td class="num">' + (diff == null ? '<span class="sub">—</span>' :
               '<span class="delta ' + (diff >= 0 ? 'delta--up' : 'delta--down') + '">' +
               (diff >= 0 ? '▲ +' : '▼ −') + money(Math.abs(diff)) + '</span>') + '</td>' +
@@ -3209,6 +3260,20 @@
       renderPicker();
     });
 
+    /* Cualquier minigráfica, de la plantilla o del mercado, abre el detalle. */
+    document.addEventListener('click', function (event) {
+      const spark = event.target.closest('[data-spark]');
+      if (!spark) return;
+      state.priceModal = { id: spark.getAttribute('data-spark'), name: spark.getAttribute('data-spark-name') };
+      renderPriceModal();
+    });
+
+    $('price-modal').addEventListener('click', function (event) {
+      if (!event.target.closest('[data-price-close]')) return;
+      state.priceModal = null;
+      renderPriceModal();
+    });
+
     $('lineup-picker').addEventListener('click', function (event) {
       if (event.target.closest('[data-picker-close]')) {
         state.picker = null;
@@ -3244,6 +3309,7 @@
       if (event.key !== 'Escape') return;
       if (state.picker) { state.picker = null; renderPicker(); }
       if (state.pickerJornada) { state.pickerJornada = false; renderJornadaPicker(); }
+      if (state.priceModal) { state.priceModal = null; renderPriceModal(); }
     });
 
     $('jornada-pick').addEventListener('click', function () {
@@ -3328,7 +3394,7 @@
       if (state.expandedSquad) {
         const plantilla = squadList().filter(function (s) { return s.id === id; })[0];
         ensureStartPrices(plantilla);
-        ensurePriceSeries(plantilla);
+        ensurePriceSeries((plantilla && plantilla.players || []).map(function (p) { return p.id; }), renderSquads);
       }
       renderSquads();
     });

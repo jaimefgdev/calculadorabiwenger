@@ -1115,3 +1115,10 @@ main.wrap { padding-bottom: 3.5rem; }
   .table--squads .detail-table th:nth-child(6),
   .table--squads .detail-table td:nth-child(6) { display: none; }
 }
+
+/* La minigráfica es un botón: se pulsa para ver el detalle. */
+.spark { background: none; border: 0; padding: 0; cursor: pointer; }
+.spark:hover svg, .spark:focus-visible svg { opacity: .75; }
+/* Gráfico ampliado, centrado en la pantalla. */
+.picker--modal { position: fixed; z-index: 60; }
+.modal__card { width: min(100%, 640px); max-height: 85vh; }
