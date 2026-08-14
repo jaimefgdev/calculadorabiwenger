@@ -920,10 +920,18 @@
         '"><title>' + shortDay(c.point.day) + ' · ' + fmtFull(c.point[key]) + '</title></circle>';
     }).join('');
 
-    return '<svg class="viz__svg" viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="Evolución de ' +
-      escapeHtml(label.toLowerCase()) + '">' + grid + area +
+    /* Las medidas viajan con el SVG: así el rastreador puede traducir un punto
+       de la pantalla al día que le corresponde. */
+    const cursor = opts.hover
+      ? '<line class="viz__cross" x1="0" x2="0" y1="' + padTop + '" y2="' + (H - padBottom) + '" hidden></line>' +
+        '<circle class="viz__cursor" r="5" fill="' + color + '" hidden></circle>'
+      : '';
+
+    return '<svg class="viz__svg" viewBox="0 0 ' + W + ' ' + H + '" role="img"' +
+      ' data-padx="' + padX + '" data-w="' + W + '"' +
+      ' aria-label="Evolución de ' + escapeHtml(label.toLowerCase()) + '">' + grid + area +
       '<path class="viz__line" d="' + path + '" stroke="' + color + '"></path>' + dots +
-      firstLabel + lastLabel + '</svg>';
+      cursor + firstLabel + lastLabel + '</svg>';
   }
 
   /** Bloque de gráficos de la ficha, con sus interruptores. */
@@ -2710,6 +2718,63 @@
     return '20' + texto.slice(0, 2) + '-' + texto.slice(2, 4) + '-' + texto.slice(4, 6);
   }
 
+  /**
+   * Sigue el ratón por el gráfico y va cantando el precio de cada día: con 45
+   * puntos, dar con el círculo exacto es imposible.
+   */
+  function bindChartHover(caja, puntos) {
+    if (!caja || puntos.length < 2) return;
+    const svg = caja.querySelector('svg');
+    const tip = caja.querySelector('.viz-tip');
+    if (!svg || !tip) return;
+
+    const W = Number(svg.getAttribute('data-w'));
+    const padX = Number(svg.getAttribute('data-padx'));
+    const util = W - padX - 12;
+    const cruz = svg.querySelector('.viz__cross');
+    const bola = svg.querySelector('.viz__cursor');
+    const circulos = svg.querySelectorAll('.viz__dot');
+
+    const mover = function (event) {
+      const donde = event.touches ? event.touches[0] : event;
+      const marco = svg.getBoundingClientRect();
+      const x = ((donde.clientX - marco.left) * W) / marco.width;
+
+      let i = Math.round(((x - padX) * (puntos.length - 1)) / util);
+      i = Math.max(0, Math.min(puntos.length - 1, i));
+      const dato = puntos[i];
+      const punto = circulos[i];
+      if (!punto) return;
+
+      const cx = punto.getAttribute('cx');
+      cruz.setAttribute('x1', cx);
+      cruz.setAttribute('x2', cx);
+      cruz.hidden = false;
+      bola.setAttribute('cx', cx);
+      bola.setAttribute('cy', punto.getAttribute('cy'));
+      bola.hidden = false;
+
+      tip.innerHTML = '<span class="viz-tip__day">' + escapeHtml(shortDay(dato.day)) + '</span>' +
+        '<strong>' + money(dato.price) + '</strong>';
+      tip.hidden = false;
+
+      const enPantalla = (Number(cx) / W) * marco.width;
+      const tope = marco.width - tip.offsetWidth - 4;
+      tip.style.left = Math.max(4, Math.min(tope, enPantalla - tip.offsetWidth / 2)) + 'px';
+    };
+
+    const salir = function () {
+      tip.hidden = true;
+      cruz.hidden = true;
+      bola.hidden = true;
+    };
+
+    caja.addEventListener('mousemove', mover);
+    caja.addEventListener('touchmove', mover, { passive: true });
+    caja.addEventListener('mouseleave', salir);
+    caja.addEventListener('touchend', salir);
+  }
+
   /** Gráfico grande de la evolución de un futbolista. */
   function renderPriceModal() {
     const caja = $('price-modal');
@@ -2741,9 +2806,14 @@
           : '<p class="muted">De ' + money(primero) + ' a <strong>' + money(ultimo) + '</strong>' +
             ' · <span class="delta ' + (sube ? 'delta--up' : 'delta--down') + '">' +
             (sube ? '▲ +' : '▼ −') + money(Math.abs(salto)) + '</span></p>' +
-            lineChart(puntos, 'price', sube ? 'var(--pos)' : 'var(--neg)', 'Valor de mercado',
-              { height: 260, ticks: 7, fullTicks: true, padX: 96 })) +
+            '<div class="viz-hover">' +
+              lineChart(puntos, 'price', sube ? 'var(--pos)' : 'var(--neg)', 'Valor de mercado',
+                { height: 260, ticks: 7, fullTicks: true, padX: 96, hover: true }) +
+              '<div class="viz-tip" hidden></div>' +
+            '</div>') +
       '</div>';
+
+    bindChartHover(caja.querySelector('.viz-hover'), puntos);
   }
 
   function renderSquads() {
