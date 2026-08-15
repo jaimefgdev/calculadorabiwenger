@@ -2933,6 +2933,10 @@
     const bola = svg.querySelector('.viz__cursor');
     const circulos = svg.querySelectorAll('.viz__dot');
 
+    if (llegada) {
+      llegada.indice = puntos.map(function (punto) { return punto.day; }).indexOf(llegada.day);
+    }
+
     const mover = function (event) {
       const donde = event.touches ? event.touches[0] : event;
       const marco = svg.getBoundingClientRect();
@@ -2940,6 +2944,11 @@
 
       let i = Math.round(((x - padX) * (puntos.length - 1)) / util);
       i = Math.max(0, Math.min(puntos.length - 1, i));
+
+      /* Con un año de precios cada día ocupa poco más de un píxel, así que el
+         día de la llegada atrae al cursor si se pasa cerca. */
+      if (llegada && llegada.indice >= 0 && Math.abs(i - llegada.indice) <= 2) i = llegada.indice;
+
       const dato = puntos[i];
       const punto = circulos[i];
       if (!punto) return;
