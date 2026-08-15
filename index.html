@@ -16,7 +16,7 @@
 <title>Calculadora Biwenger — Presupuestos de la liga</title>
 <!-- El ?v= se sube en cada publicación: obliga al navegador a bajar el archivo
      nuevo en vez de reutilizar el que tenga en caché. -->
-<link rel="stylesheet" href="styles.css?v=73">
+<link rel="stylesheet" href="styles.css?v=75">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>💰</text></svg>">
 </head>
 <body>
@@ -417,11 +417,13 @@
         </div>
         <div class="movers">
           <div>
-            <h3 class="bench__title">Más suben</h3>
+            <button type="button" class="bench__title movers__titulo" data-movers="movers-up"
+              aria-expanded="false">Más suben <span class="round__caret" aria-hidden="true">▸</span></button>
             <div id="movers-up" class="movers__list"></div>
           </div>
           <div>
-            <h3 class="bench__title">Más bajan</h3>
+            <button type="button" class="bench__title movers__titulo" data-movers="movers-down"
+              aria-expanded="false">Más bajan <span class="round__caret" aria-hidden="true">▸</span></button>
             <div id="movers-down" class="movers__list"></div>
           </div>
         </div>
@@ -473,6 +475,6 @@
 
 </main>
 
-<script src="app.js?v=73"></script>
+<script src="app.js?v=75"></script>
 </body>
 </html>

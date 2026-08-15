@@ -2149,14 +2149,17 @@
       const tope = abierto ? MOVERS_LARGO : MOVERS_CORTO;
       const hayMas = lista.length > MOVERS_CORTO;
 
+      /* Se despliega pulsando el título; abajo solo queda el «Ver menos». */
       $(id).innerHTML = lista.length === 0
         ? '<p class="muted">Sin cambios todavía.</p>'
         : lista.slice(0, tope).map(moverRow).join('') +
-          (hayMas
+          (abierto && hayMas
             ? '<button type="button" class="btn btn--ghost btn--sm movers__mas" data-movers="' + id + '">' +
-              (abierto ? 'Ver menos' : 'Ver más · ' + Math.min(lista.length, MOVERS_LARGO) + ' jugadores') +
-              '</button>'
+              'Ver menos</button>'
             : '');
+
+      const titulo = document.querySelector('[data-movers="' + id + '"].movers__titulo');
+      if (titulo) titulo.setAttribute('aria-expanded', abierto ? 'true' : 'false');
     };
 
     pinta('movers-up', datos.up || []);
@@ -2757,12 +2760,20 @@
   }
 
   const PERIODOS = [
-    { label: '6 meses', dias: 180 },
-    { label: '3 meses', dias: 90 },
-    { label: '1 mes', dias: 30 },
-    { label: '15 días', dias: 15 },
-    { label: '1 semana', dias: 7 }
+    { label: '6m', dias: 180 },
+    { label: '3m', dias: 90 },
+    { label: '1m', dias: 30 },
+    { label: '15d', dias: 15 },
+    { label: '7d', dias: 7 }
   ];
+
+  /** Importe corto, para las filas donde no cabe la cifra entera. */
+  function compactMoney(n) {
+    const valor = Math.abs(n);
+    if (valor >= 1000000) return (Math.round(valor / 100000) / 10).toFixed(1).replace('.', ',') + 'M';
+    if (valor >= 1000) return Math.round(valor / 1000) + 'k';
+    return String(Math.round(valor));
+  }
 
   /* Minigráfica de la evolución del precio, sin ejes ni números: solo la
      forma, en verde si acaba por encima de como empezó y en rojo si no. */
@@ -3055,11 +3066,10 @@
                 const arriba = cambio >= 0;
                 return '<span class="periodo"><span class="periodo__label">' + periodo.label + '</span>' +
                   '<span class="delta ' + (arriba ? 'delta--up' : 'delta--down') + '">' +
-                  (arriba ? '▲ +' : '▼ −') + money(Math.abs(cambio)) + '</span></span>';
+                  (arriba ? '+' : '−') + compactMoney(cambio) + '</span></span>';
               }).join('');
               return '<div class="viz-periodos">' +
-                '<span class="periodo periodo--dias"><span class="periodo__label">histórico</span>' +
-                  '<strong>' + puntos.length + ' días</strong></span>' +
+                '<span class="periodo periodo--dias"><strong>' + puntos.length + ' días</strong></span>' +
                 celdas + '</div>';
             })()) +
         (ficha.moves && ficha.moves.length
@@ -3755,14 +3765,12 @@
     });
 
     /* Cualquier minigráfica, de la plantilla o del mercado, abre el detalle. */
-    ['movers-up', 'movers-down'].forEach(function (id) {
-      $(id).addEventListener('click', function (event) {
-        const boton = event.target.closest('[data-movers]');
-        if (!boton) return;
-        const clave = boton.getAttribute('data-movers');
-        state.moversAbiertos[clave] = !state.moversAbiertos[clave];
-        renderMovers();
-      });
+    document.querySelector('.movers').addEventListener('click', function (event) {
+      const boton = event.target.closest('[data-movers]');
+      if (!boton) return;
+      const clave = boton.getAttribute('data-movers');
+      state.moversAbiertos[clave] = !state.moversAbiertos[clave];
+      renderMovers();
     });
 
     document.addEventListener('click', function (event) {

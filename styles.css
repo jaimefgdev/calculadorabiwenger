@@ -1212,13 +1212,30 @@ main.wrap { padding-bottom: 3.5rem; }
 .viz-resumen { text-align: center; margin-top: .4rem; }
 
 /* Variación por periodos, bajo el gráfico de precio. */
+/* Todo en una línea, también en móvil: etiquetas cortas e importes compactos. */
 .viz-periodos {
-  display: flex; flex-wrap: wrap; align-items: center; gap: .2rem 1rem;
+  display: flex; flex-wrap: nowrap; align-items: baseline;
+  justify-content: space-between; gap: .35rem;
   margin-top: .5rem; padding-top: .5rem;
   border-top: 1px solid var(--border);
 }
-.periodo { display: inline-flex; align-items: baseline; gap: .3rem; font-size: .76rem; }
-.periodo__label { color: var(--text-faint); font-size: .68rem; text-transform: uppercase; letter-spacing: .03em; }
-.periodo--dias { margin-right: auto; }
+.periodo { display: inline-flex; align-items: baseline; gap: .2rem; font-size: .72rem; white-space: nowrap; }
+.periodo__label { color: var(--text-faint); font-size: .66rem; text-transform: uppercase; letter-spacing: .02em; }
+.periodo .delta { font-size: .72rem; }
+.periodo--dias { color: var(--text-soft); }
+@media (max-width: 560px) {
+  .periodo, .periodo .delta { font-size: .64rem; }
+  .periodo__label { font-size: .6rem; }
+}
 /* Ver más / ver menos en las listas de subidas y bajadas. */
 .movers__mas { margin-top: .5rem; width: 100%; }
+/* Los títulos de subidas y bajadas son el interruptor de la lista larga. */
+.movers__titulo {
+  display: flex; align-items: center; gap: .35rem;
+  background: none; border: 0; padding: 0;
+  font: inherit; color: var(--text-faint); cursor: pointer;
+  font-size: .8rem; text-transform: uppercase; letter-spacing: .04em;
+  margin: 1rem 0 .5rem;
+}
+.movers__titulo:hover { color: var(--text); }
+.movers__titulo[aria-expanded="true"] .round__caret { transform: rotate(90deg); }
