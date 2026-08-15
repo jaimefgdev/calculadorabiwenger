@@ -35,10 +35,12 @@
   /* El estado del futbolista cuando se hizo cada fichaje. Se guarda la primera
      vez que se ve el movimiento y ya no se toca: Biwenger solo da el de hoy. */
   const MOVE_STATUS_KEY = 'biwenger-calc-estado-fichajes-v2';
-  /* Media hora: el mercado solo se renueva una vez al día y las pujas duran
-     24 h, así que no hay nada que mirar cada pocos minutos. Con el botón
-     Actualizar se fuerza cuando quieras. */
-  const AUTO_SYNC_MS = 30 * 60 * 1000;    // refresco automático
+  /* En reposo, media hora: el mercado se renueva una vez al día y las pujas
+     duran 24 h. Se aprieta al terminar cada partido, que es cuando llegan los
+     puntos: con puntuación mixta hay que esperar a las notas del AS, así que
+     durante el partido no hay nada que mirar. */
+  const AUTO_SYNC_MS = 30 * 60 * 1000;
+  const AUTO_SYNC_PUNTOS_MS = 10 * 60 * 1000;
 
   /* ---------- Utilidades ---------- */
 
@@ -492,6 +494,7 @@
     picker: null,          // hueco del campo que se está cambiando
     moveStatus: {},        // estado congelado de cada fichaje
     movers: null,          // los que más suben y bajan hoy
+    moversAbiertos: {},    // listas desplegadas a la lista larga
     market: null,          // el mercado de hoy, con sus pujas
     marketState: '',       // 'cargando' | 'error' | ''
     startPrices: {},       // lo que valía cada jugador el día que lo recibió
@@ -2079,7 +2082,7 @@
             (sube ? '\u25b2' : '\u25bc') + '</span>' : '') + '</td>' +
         '<td class="num" data-label="Precio"><strong>' + money(venta.price || 0) + '</strong></td>' +
         '<td class="spark-cell" data-label="Evolución">' +
-          sparkline(state.priceSeries[venta.playerId], venta.playerId, venta.player) + '</td>' +
+          sparkline(ultimos(state.priceSeries[venta.playerId], 45), venta.playerId, venta.player) + '</td>' +
         '<td data-label="Queda">' + deadlineCell(venta.until) + '</td>' +
       '</tr>';
     }).join('');
@@ -2135,13 +2138,27 @@
     '</div>';
   }
 
+  const MOVERS_CORTO = 25;
+  const MOVERS_LARGO = 150;
+
   function renderMovers() {
     const datos = state.movers || { up: [], down: [] };
+
     const pinta = function (id, lista) {
+      const abierto = !!state.moversAbiertos[id];
+      const tope = abierto ? MOVERS_LARGO : MOVERS_CORTO;
+      const hayMas = lista.length > MOVERS_CORTO;
+
       $(id).innerHTML = lista.length === 0
         ? '<p class="muted">Sin cambios todavía.</p>'
-        : lista.slice(0, 25).map(moverRow).join('');
+        : lista.slice(0, tope).map(moverRow).join('') +
+          (hayMas
+            ? '<button type="button" class="btn btn--ghost btn--sm movers__mas" data-movers="' + id + '">' +
+              (abierto ? 'Ver menos' : 'Ver más · ' + Math.min(lista.length, MOVERS_LARGO) + ' jugadores') +
+              '</button>'
+            : '');
     };
+
     pinta('movers-up', datos.up || []);
     pinta('movers-down', datos.down || []);
   }
@@ -2231,6 +2248,8 @@
     state.jornadas.datos[id] = {
       round: payload.round,
       standings: filas,
+      /* Si esta vez no llega, se conserva el que ya hubiera guardado. */
+      bestXi: payload.bestXi || (previo && previo.bestXi) || null,
       savedAt: new Date().toISOString()
     };
     if (payload.rounds && payload.rounds.length) state.jornadas.list = payload.rounds;
@@ -2417,6 +2436,24 @@
       '<div class="chips">' + chips + '</div>' + grafico;
   }
 
+  /** El once ideal de la jornada, cuando Biwenger ya ha puntuado. */
+  function renderBestXi(jornada) {
+    const caja = $('jornada-best');
+    const once = jornada && jornada.bestXi;
+    if (!once || !once.players || once.players.length === 0) {
+      caja.hidden = true;
+      caja.innerHTML = '';
+      return;
+    }
+
+    caja.hidden = false;
+    caja.innerHTML = '<div class="panel__head"><h2>Once ideal</h2>' +
+      '<p class="muted">' + escapeHtml(once.type) + ' · ' + once.points + ' puntos entre los once</p></div>' +
+      '<div class="lineup-grid"><div class="pitch-wrap">' +
+        staticPitch(once.type, once.players) +
+      '</div></div>';
+  }
+
   function renderJornadas() {
     const cuerpo = $('rounds-body');
     const boton = $('jornada-pick');
@@ -2424,6 +2461,8 @@
 
     /* El número manda: así el rótulo es «Jornada 3» aunque la API conteste en
        inglés. */
+    renderBestXi(jornada);
+
     boton.textContent = jornada && jornada.round
       ? (jornada.round.number ? 'Jornada ' + jornada.round.number : (jornada.round.name || '—'))
       : '—';
@@ -2702,6 +2741,29 @@
       .catch(function () { /* se queda sin dato */ });
   }
 
+  /** Los últimos `n` días de una serie. */
+  function ultimos(serie, n) {
+    return serie && serie.length > n ? serie.slice(-n) : serie;
+  }
+
+  /** Cuánto ha cambiado el precio en los últimos `dias`, si hay tanto histórico. */
+  function variacion(serie, dias) {
+    if (!serie || serie.length < 2) return null;
+    /* Un dato por día: si la serie no llega, ese periodo no se muestra. */
+    if (serie.length <= dias) return null;
+    const desde = serie[serie.length - 1 - dias][1];
+    const hasta = serie[serie.length - 1][1];
+    return hasta - desde;
+  }
+
+  const PERIODOS = [
+    { label: '6 meses', dias: 180 },
+    { label: '3 meses', dias: 90 },
+    { label: '1 mes', dias: 30 },
+    { label: '15 días', dias: 15 },
+    { label: '1 semana', dias: 7 }
+  ];
+
   /* Minigráfica de la evolución del precio, sin ejes ni números: solo la
      forma, en verde si acaba por encima de como empezó y en rojo si no. */
   function sparkline(serie, id, nombre) {
@@ -2751,7 +2813,7 @@
     for (let i = 0; i < faltan.length; i += 25) {
       const tanda = faltan.slice(i, i + 25);
       fetch(config.url.replace(/\/+$/, '') + '/?key=' + encodeURIComponent(config.key) +
-        '&historial=' + encodeURIComponent(tanda.join(',')),
+        '&historial=' + encodeURIComponent(tanda.join(',')) + '&dias=400',
         { headers: { 'accept': 'application/json' } })
         .then(function (response) { return response.json(); })
         .then(function (payload) {
@@ -2985,7 +3047,21 @@
             '</div>' +
             '<p class="muted viz-resumen">De ' + money(primero) + ' a <strong>' + money(ultimo) + '</strong>' +
               ' · <span class="delta ' + (sube ? 'delta--up' : 'delta--down') + '">' +
-              (sube ? '▲ +' : '▼ −') + money(Math.abs(salto)) + '</span></p>') +
+              (sube ? '▲ +' : '▼ −') + money(Math.abs(salto)) + '</span></p>' +
+            (function () {
+              const celdas = PERIODOS.map(function (periodo) {
+                const cambio = variacion(serie, periodo.dias);
+                if (cambio == null) return '';
+                const arriba = cambio >= 0;
+                return '<span class="periodo"><span class="periodo__label">' + periodo.label + '</span>' +
+                  '<span class="delta ' + (arriba ? 'delta--up' : 'delta--down') + '">' +
+                  (arriba ? '▲ +' : '▼ −') + money(Math.abs(cambio)) + '</span></span>';
+              }).join('');
+              return '<div class="viz-periodos">' +
+                '<span class="periodo periodo--dias"><span class="periodo__label">histórico</span>' +
+                  '<strong>' + puntos.length + ' días</strong></span>' +
+                celdas + '</div>';
+            })()) +
         (ficha.moves && ficha.moves.length
           ? '<h3 class="bench__title">En la liga</h3>' + playerHistory(ficha)
           : '') +
@@ -2995,7 +3071,7 @@
        El valor de mercado de ese día va en amarillo, como la marca. */
     const textoLlegada = !llegada ? null
       : (llegada.paid == null
-          ? 'reparto ' + escapeHtml(shortDay(diaLlegada))
+          ? 'en reparto ' + escapeHtml(shortDay(diaLlegada))
           : 'fichado ' + escapeHtml(shortDay(diaLlegada)) + ' por ' + money(llegada.paid)) +
         (precioEseDia != null
           ? ' · <span class="viz-tip__valor">' + money(precioEseDia) + '</span>'
@@ -3061,7 +3137,7 @@
                 ' <span class="sub">·</span> ' + money(player.paid);
             })() + '</td>' +
             '<td class="num"><strong>' + (player.marketValue == null ? '—' : money(player.marketValue)) + '</strong></td>' +
-            '<td class="spark-cell">' + sparkline(state.priceSeries[player.id], player.id, player.name) + '</td>' +
+            '<td class="spark-cell">' + sparkline(ultimos(state.priceSeries[player.id], 45), player.id, player.name) + '</td>' +
             '<td class="num">' + (diff == null ? '<span class="sub">—</span>' :
               '<span class="delta ' + (diff >= 0 ? 'delta--up' : 'delta--down') + '">' +
               (diff >= 0 ? '▲ +' : '▼ −') + money(Math.abs(diff)) + '</span>') + '</td>' +
@@ -3462,7 +3538,7 @@
           : String(error.message || error);
         /* Cada fallo seguido dobla la espera, hasta media hora. */
         state.syncFails += 1;
-        const espera = Math.min(AUTO_SYNC_MS * Math.pow(2, state.syncFails - 1), 30 * 60 * 1000);
+        const espera = Math.min(intervaloSync() * Math.pow(2, state.syncFails - 1), 30 * 60 * 1000);
         state.nextSyncAt = Date.now() + espera;
 
         const minutos = Math.round(espera / 60000);
@@ -3480,19 +3556,42 @@
   /* Refresco automático: al abrir y cada AUTO_SYNC_MS, siempre que la pestaña
      esté a la vista. Biwenger publica los fichajes al cerrar el mercado, así
      que no tiene sentido consultar más a menudo. */
+  /**
+   * ¿Acaba de terminar algún partido? Desde el pitido final y durante las
+   * horas siguientes es cuando aparecen las notas del AS y, con ellas, los
+   * puntos. Antes de eso no hay nada nuevo que traer.
+   */
+  function ventanaDePuntos() {
+    const partidos = (state.round && state.round.matches) || [];
+    const ahora = Date.now();
+    const FINAL = 1.75 * 60 * 60 * 1000;   // pitido final aproximado
+    const LIMITE = 5 * 60 * 60 * 1000;     // margen para que se publiquen
+
+    return partidos.some(function (partido) {
+      const empieza = Date.parse(partido.start);
+      if (isNaN(empieza)) return false;
+      return ahora >= empieza + FINAL && ahora <= empieza + LIMITE;
+    });
+  }
+
+  function intervaloSync() {
+    return ventanaDePuntos() ? AUTO_SYNC_PUNTOS_MS : AUTO_SYNC_MS;
+  }
+
   function startAutoSync() {
     /* Si falla, se espera cada vez más: insistir cada cinco minutos contra una
        API que nos ha cortado solo alarga el corte. */
     setInterval(function () {
       if (document.visibilityState !== 'visible') return;
       if (state.nextSyncAt && Date.now() < state.nextSyncAt) return;
+      if (state.lastSync && Date.now() - state.lastSync < intervaloSync()) return;
       syncNow(true);
     }, 60 * 1000);
 
     document.addEventListener('visibilitychange', function () {
       if (document.visibilityState !== 'visible') return;
       if (state.nextSyncAt && Date.now() < state.nextSyncAt) return;
-      if (!state.lastSync || Date.now() - state.lastSync > AUTO_SYNC_MS) syncNow(true);
+      if (!state.lastSync || Date.now() - state.lastSync > intervaloSync()) syncNow(true);
     });
   }
 
@@ -3656,6 +3755,16 @@
     });
 
     /* Cualquier minigráfica, de la plantilla o del mercado, abre el detalle. */
+    ['movers-up', 'movers-down'].forEach(function (id) {
+      $(id).addEventListener('click', function (event) {
+        const boton = event.target.closest('[data-movers]');
+        if (!boton) return;
+        const clave = boton.getAttribute('data-movers');
+        state.moversAbiertos[clave] = !state.moversAbiertos[clave];
+        renderMovers();
+      });
+    });
+
     document.addEventListener('click', function (event) {
       const spark = event.target.closest('[data-spark]');
       if (!spark) return;

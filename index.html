@@ -16,7 +16,7 @@
 <title>Calculadora Biwenger — Presupuestos de la liga</title>
 <!-- El ?v= se sube en cada publicación: obliga al navegador a bajar el archivo
      nuevo en vez de reutilizar el que tenga en caché. -->
-<link rel="stylesheet" href="styles.css?v=68">
+<link rel="stylesheet" href="styles.css?v=73">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>💰</text></svg>">
 </head>
 <body>
@@ -439,9 +439,8 @@
           <h2>Jornadas</h2>
           <p class="muted" id="jornada-note">Cada jornada se guarda aquí para siempre: Biwenger borra los suplentes en cuanto empieza la siguiente.</p>
         </div>
-        <span class="field-label">Jornada
-          <button type="button" id="jornada-pick" class="field field--pick" aria-haspopup="dialog">—</button>
-        </span>
+        <button type="button" id="jornada-pick" class="field field--pick"
+          aria-haspopup="dialog" aria-label="Elegir jornada">—</button>
       </div>
 
       <div class="table-scroll">
@@ -458,6 +457,9 @@
         </table>
       </div>
 
+      <!-- Once ideal de la jornada, en cuanto Biwenger puntúa. -->
+      <div id="jornada-best" class="viz-block" hidden></div>
+
       <!-- Evolución de puntos, cuando haya varias jornadas guardadas. -->
       <div id="jornada-chart" class="viz-block" hidden></div>
 
@@ -471,6 +473,6 @@
 
 </main>
 
-<script src="app.js?v=68"></script>
+<script src="app.js?v=73"></script>
 </body>
 </html>

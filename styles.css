@@ -1210,3 +1210,15 @@ main.wrap { padding-bottom: 3.5rem; }
 .player { cursor: pointer; }
 /* Resumen de la evolución, centrado bajo el gráfico. */
 .viz-resumen { text-align: center; margin-top: .4rem; }
+
+/* Variación por periodos, bajo el gráfico de precio. */
+.viz-periodos {
+  display: flex; flex-wrap: wrap; align-items: center; gap: .2rem 1rem;
+  margin-top: .5rem; padding-top: .5rem;
+  border-top: 1px solid var(--border);
+}
+.periodo { display: inline-flex; align-items: baseline; gap: .3rem; font-size: .76rem; }
+.periodo__label { color: var(--text-faint); font-size: .68rem; text-transform: uppercase; letter-spacing: .03em; }
+.periodo--dias { margin-right: auto; }
+/* Ver más / ver menos en las listas de subidas y bajadas. */
+.movers__mas { margin-top: .5rem; width: 100%; }
