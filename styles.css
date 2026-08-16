@@ -331,8 +331,9 @@ code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft)
 .ranking__row .with-crest { min-width: 0; }
 .ranking__row .player-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ranking__owner {
+  /* El tamaño lo afina ajustarNombres() para que el nombre quepa entero. */
   font-size: .66rem; color: var(--text-faint);
-  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  white-space: nowrap; overflow: hidden;
   padding-left: 26px;   /* alineado con el nombre, bajo la foto */
 }
 .ranking__value { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
@@ -1076,9 +1077,8 @@ code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft)
   .market-grid .switch span { width: 11px; }
   .market-grid .switch[aria-pressed="true"] span { transform: translateX(13px); }
   .manager__name {
-    max-width: 128px;
-    overflow: hidden;
-    text-overflow: ellipsis;
+    /* Enteros también aquí: en vez de cortarlos, se aprieta la letra. */
+    font-size: .92em;
     white-space: nowrap;
   }
 }
@@ -1281,11 +1281,18 @@ main.wrap { padding-bottom: 3.5rem; }
 @media (max-width: 620px) {
   .viz-block .chips { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 }
-.chip__label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* Hasta dos líneas: «José Mário dos Santos Mourinho» en una sola obligaría a
+   una letra ilegible. El tamaño exacto lo afina ajustarNombres(). */
+.chip__label {
+  min-width: 0; overflow: hidden; text-align: center;
+  white-space: normal; overflow-wrap: anywhere;
+  line-height: 1.1; max-height: 2.2em;
+}
 
 /* ---------- Mercado ---------- */
 .row-mine { background: var(--accent-soft); }
-.table--market .manager__name { max-width: 9rem; overflow: hidden; text-overflow: ellipsis; }
+/* Los nombres de mánager van enteros; el sitio se gana con la tipografía. */
+.table--market .manager__name { white-space: nowrap; }
 .mark--row { position: static; display: inline-grid; width: 15px; height: 15px; font-size: .58rem; margin-left: .2rem; }
 
 /* Jugador libre en el mercado, sin dueño. */

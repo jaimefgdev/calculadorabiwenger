@@ -2519,6 +2519,35 @@
   /* Cuatro colores validados: no se dibujan más de cuatro a la vez. */
   const SERIE_COLORS = ['var(--viz-1)', 'var(--viz-4)', 'var(--viz-2)', 'var(--viz-3)'];
 
+  /**
+   * Encoge la letra de un rótulo hasta que cabe entero en su hueco. Los nombres
+   * de los mánagers van de «Eneko» a «José Mário dos Santos Mourinho», y en una
+   * pastilla estrecha no hay tamaño único que sirva para los dos.
+   */
+  function ajustarAlAncho(elemento, maximo, minimo) {
+    if (!elemento) return;
+    let tamano = maximo;
+    elemento.style.fontSize = tamano + 'px';
+    /* Medio punto cada vuelta: sobra para que no se note el escalón. Se mira a
+       lo ancho y a lo alto, porque hay rótulos que pueden partir en dos. */
+    while (tamano > minimo &&
+      (elemento.scrollWidth > elemento.clientWidth + 1 ||
+       elemento.scrollHeight > elemento.clientHeight + 1)) {
+      tamano -= 0.5;
+      elemento.style.fontSize = tamano + 'px';
+    }
+  }
+
+  /** Todos los nombres de mánager que puedan quedarse cortos. */
+  function ajustarNombres() {
+    Array.prototype.forEach.call(document.querySelectorAll('.chip__label'), function (el) {
+      ajustarAlAncho(el, 11.5, 6);
+    });
+    Array.prototype.forEach.call(document.querySelectorAll('.ranking__owner'), function (el) {
+      ajustarAlAncho(el, 10.5, 5.5);
+    });
+  }
+
   /* La liga son 38 jornadas: los ejes se plantean enteros desde el principio. */
   const JORNADAS_LIGA = 38;
 
@@ -2566,17 +2595,6 @@
     if (datos.puntos.length === 0 || nombres.length === 0) { caja.hidden = true; return; }
     caja.hidden = false;
 
-    /* En una pastilla de cien píxeles no cabe «José Mário dos Santos
-       Mourinho»: se deja la primera palabra (dos si es muy corta) y el nombre
-       entero se ve al pasar por encima. */
-    const corto = function (nombre) {
-      const partes = String(nombre || '').split(/\s+/).filter(Boolean);
-      if (partes.length === 0) return '';
-      let salida = partes[0];
-      if (salida.length <= 4 && partes[1]) salida += ' ' + partes[1];
-      return salida;
-    };
-
     const chips = nombres.map(function (id) {
       const on = state.jornadaChart.indexOf(id) !== -1;
       const color = SERIE_COLORS[state.jornadaChart.indexOf(id)] || 'var(--border-strong)';
@@ -2584,7 +2602,7 @@
         ' title="' + escapeHtml(datos.managers[id]) + '"' +
         ' aria-pressed="' + (on ? 'true' : 'false') + '">' +
         '<span class="chip__dot" style="background:' + color + '"></span>' +
-        '<span class="chip__label">' + escapeHtml(corto(datos.managers[id])) + '</span></button>';
+        '<span class="chip__label">' + escapeHtml(datos.managers[id]) + '</span></button>';
     }).join('');
 
     const series = state.jornadaChart.map(function (id, i) {
@@ -2602,6 +2620,7 @@
 
     caja.innerHTML = '<div class="panel__head"><h2>Puntos por jornada</h2></div>' +
       '<div class="chips">' + chips + '</div>' + grafico;
+    ajustarNombres();
   }
 
   /** El once ideal de la jornada, cuando Biwenger ya ha puntuado. */
@@ -3686,6 +3705,7 @@
     if (mando) mando.innerHTML = selectorAmbito('nuestra', state.ambito.nuestra, state.puesto.nuestra);
 
     renderLaLiga();
+    ajustarNombres();
   }
 
   /** De quién es cada futbolista, mirando las ocho plantillas. */
@@ -3744,6 +3764,7 @@
 
     const mando = $('ambitos-laliga');
     if (mando) mando.innerHTML = selectorAmbito('laliga', state.ambito.laliga, state.puesto.laliga);
+    ajustarNombres();
   }
 
   /** Trae la tabla de toda la competición; se guarda mientras dure la sesión. */
@@ -4311,6 +4332,14 @@
       renderDataKpis();
       renderKpiCharts();
     }
+
+    /* Al girar el móvil o cambiar el tamaño de la ventana los huecos cambian:
+       los nombres se vuelven a ajustar. */
+    let ajusteEnCola = null;
+    window.addEventListener('resize', function () {
+      clearTimeout(ajusteEnCola);
+      ajusteEnCola = setTimeout(ajustarNombres, 150);
+    });
 
     /* Globito de las barras: vale para el ratón y para el dedo. */
     document.addEventListener('pointermove', function (event) {
