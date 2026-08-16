@@ -1715,11 +1715,60 @@
     } catch (error) { /* sin persistencia */ }
   }
 
+  /* ---------- La alineación, igual en el PC y en el móvil ----------
+     Se guarda en el almacén del Worker con la hora en que la tocaste. Al
+     sincronizar, cada aparato se queda con la más reciente. */
+
+  let envioXi = null;
+
+  /** Alineación cambiada por ti: se sella con la hora y se comparte. */
+  function guardarXiMia() {
+    if (state.xi) state.xi.savedAt = new Date().toISOString();
+    persistXi();
+
+    const config = loadSyncConfig();
+    if (!config.url || !config.key || !state.xi) return;
+
+    /* Al recolocar a varios seguidos se espera un poco: un solo envío. */
+    clearTimeout(envioXi);
+    envioXi = setTimeout(function () {
+      fetch(config.url.replace(/\/+$/, '') + '/?key=' + encodeURIComponent(config.key) + '&alineacion=1', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(state.xi)
+      }).catch(function () { /* se queda en local; ya subirá al próximo cambio */ });
+    }, 1200);
+  }
+
+  /** Trae la del almacén y se queda con ella solo si es más nueva que la de aquí. */
+  function traerXiCompartida() {
+    const config = loadSyncConfig();
+    if (!config.url || !config.key) return;
+
+    fetch(config.url.replace(/\/+$/, '') + '/?key=' + encodeURIComponent(config.key) + '&alineacion=1',
+      { headers: { 'accept': 'application/json' } })
+      .then(function (response) { return response.json(); })
+      .then(function (payload) {
+        const fuera = payload && payload.lineup;
+        if (!fuera || !fuera.slots || !fuera.savedAt) return;
+
+        const mia = state.xi;
+        if (mia && mia.savedAt && mia.savedAt >= fuera.savedAt) return;
+
+        state.xi = { type: fuera.type || '4-4-2', slots: fuera.slots, savedAt: fuera.savedAt };
+        persistXi();
+        renderLineup();
+      })
+      .catch(function () { /* sin almacén se sigue con la de este navegador */ });
+  }
+
   function loadXi() {
     try {
       const raw = localStorage.getItem(XI_KEY);
       const data = raw ? JSON.parse(raw) : null;
-      if (data && data.slots) state.xi = { type: data.type || '4-4-2', slots: data.slots };
+      if (data && data.slots) {
+        state.xi = { type: data.type || '4-4-2', slots: data.slots, savedAt: data.savedAt || null };
+      }
     } catch (error) { /* se empieza con la de Biwenger */ }
   }
 
@@ -1753,7 +1802,9 @@
         }
       });
     }
-    state.xi = { type: type, slots: slots };
+    /* Sin hora: es la de Biwenger, no una elección tuya, así que la que venga
+       del otro aparato manda sobre ella. */
+    state.xi = { type: type, slots: slots, savedAt: null };
     persistXi();
   }
 
@@ -1987,7 +2038,7 @@
     state.xi.slots = kept;
 
     state.picker = null;
-    persistXi();
+    guardarXiMia();
     renderLineup();
     renderPicker();
   }
@@ -3439,8 +3490,9 @@
         '</span>';
       };
 
+      /* Un guion si no llegó a jugar; «0 pts» si jugó y no puntuó. */
       columnas += '<span class="barras__col" data-j="' + jornada + '" data-p="' +
-          (dato.sinNota ? 'sin nota' : dato.points + ' pts') + '">' +
+          (dato.sinNota ? '–' : dato.points + ' pts') + '">' +
         '<span class="barras__pista">' + mitad(false) + (hayNegativos ? mitad(true) : '') + '</span>' +
       '</span>';
     }
@@ -4007,6 +4059,8 @@
     /* Mientras la jornada está viva es el único momento en que Biwenger da el
        banquillo: se captura en cada sincronización, se mire o no la pestaña. */
     ensureJornada('actual', true);
+    /* Y se mira si has tocado la alineación desde el otro aparato. */
+    traerXiCompartida();
     if (state.tab === 'mercado') ensureMarket(true);
     render();
 
@@ -4361,7 +4415,7 @@
       else delete state.xi.slots[slot];
 
       state.picker = null;
-      persistXi();
+      guardarXiMia();
       renderLineup();
       renderPicker();
     });
@@ -4592,6 +4646,8 @@
     loadJornadas();
     loadMoveStatus();
     loadXi();
+    /* Al abrir, lo primero es ver si el otro aparato dejó otra alineación. */
+    traerXiCompartida();
     render();
 
     let saved = null;
