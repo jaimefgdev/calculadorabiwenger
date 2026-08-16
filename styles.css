@@ -287,6 +287,43 @@ code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft)
 /* El once ideal va solo en su bloque, así que se centra. */
 .panel__head--center { text-align: center; }
 
+/* ---------- Quién puntúa en la liga ---------- */
+.rankings {
+  display: grid; gap: 1.1rem;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+@media (max-width: 1100px) { .rankings { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 620px) { .rankings { grid-template-columns: 1fr; } }
+
+.ranking { min-width: 0; }
+.ranking__title { font-size: .9rem; font-weight: 650; }
+.ranking__hint { font-size: .72rem; color: var(--text-faint); margin-bottom: .5rem; }
+.ranking__list { list-style: none; margin: 0; padding: 0; counter-reset: puesto; }
+.ranking__row {
+  counter-increment: puesto;
+  display: grid; align-items: center; gap: .5rem;
+  grid-template-columns: 1.2rem minmax(0, 1fr) auto;
+  padding: .3rem 0;
+  border-bottom: 1px solid var(--border);
+  font-size: .82rem;
+}
+.ranking__row:last-child { border-bottom: 0; }
+.ranking__row::before {
+  content: counter(puesto);
+  font-family: var(--mono); font-size: .7rem; color: var(--text-faint); text-align: right;
+}
+/* El nombre puede ser largo: se corta él, no la fila. */
+.ranking__quien { min-width: 0; display: grid; gap: 0; }
+.ranking__row .with-crest { min-width: 0; }
+.ranking__row .player-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ranking__owner {
+  font-size: .66rem; color: var(--text-faint);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  padding-left: 26px;   /* alineado con el nombre, bajo la foto */
+}
+.ranking__value { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.ranking__sub { display: block; font-size: .66rem; font-weight: 400; color: var(--text-faint); }
+
 /* Los puntos de la clasificación abren el desglose por futbolista. */
 .puntos-toggle {
   font: inherit; color: inherit;

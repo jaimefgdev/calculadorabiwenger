@@ -2576,8 +2576,7 @@
         '<td class="num" data-label="Puntos"><strong>' +
           (fila.points == null ? '—' : fila.points) + '</strong></td>' +
         '<td class="num" data-label="Jugadores">' +
-          (fila.played == null ? '<span class="sub">—</span>'
-            : fila.played + '<span class="sub"> / ' + (fila.xi || []).length + '</span>') + '</td>' +
+          (fila.played == null ? '<span class="sub">—</span>' : fila.played) + '</td>' +
         '<td class="num" data-label="Valor del once">' +
           (fila.xiValue ? money(fila.xiValue) : '<span class="sub">—</span>') + '</td>' +
       '</tr>' + detalle;
@@ -2730,13 +2729,20 @@
       return String(s.id) === String(equipo.id);
     })[0];
 
-    const cuerpo = !plantilla || !(plantilla.players || []).length
+    /* Los que ni han jugado ni han puntuado no dicen nada: fuera. */
+    const conAlgo = ((plantilla && plantilla.players) || []).filter(function (jugador) {
+      return (jugador.points || 0) !== 0 || (jugador.played || 0) > 0;
+    });
+
+    const cuerpo = !plantilla
       ? '<p class="muted">Sin plantilla todavía: sincroniza para traerla.</p>'
+      : conAlgo.length === 0
+      ? '<p class="muted">Todavía no ha jugado ninguno de sus futbolistas.</p>'
       : '<table class="detail-table"><thead><tr>' +
           '<th class="detail-rank">Pos.</th><th>Futbolista</th>' +
           '<th class="num">Puntos</th><th class="num">Partidos</th>' +
         '</tr></thead><tbody>' +
-        plantilla.players.slice().sort(function (a, b) {
+        conAlgo.slice().sort(function (a, b) {
           return (b.points == null ? -Infinity : b.points) - (a.points == null ? -Infinity : a.points);
         }).map(function (jugador) {
           return '<tr>' +
@@ -3297,6 +3303,88 @@
 
   /* ---------- Rankings de gasto e ingresos ---------- */
 
+  /* ---------- Quién puntúa en la liga ----------
+     Solo cuentan los futbolistas que tiene alguno de los ocho, y solo los que
+     ya han jugado: un 0 de quien no se ha estrenado no dice nada. */
+
+  const RANKING_TOPE = 10;
+
+  /** Todos los futbolistas de las plantillas, con su dueño y su media. */
+  function futbolistasDeLaLiga() {
+    const lista = [];
+    squadList().forEach(function (plantilla) {
+      (plantilla.players || []).forEach(function (jugador) {
+        const partidos = jugador.played || 0;
+        if (partidos === 0 && (jugador.points || 0) === 0) return;
+        lista.push({
+          id: jugador.id,
+          name: jugador.name,
+          position: jugador.position,
+          team: jugador.team,
+          teamName: jugador.teamName,
+          points: jugador.points || 0,
+          played: partidos,
+          media: partidos > 0 ? (jugador.points || 0) / partidos : null,
+          owner: plantilla.name
+        });
+      });
+    });
+    return lista;
+  }
+
+  function rankingRows(lista, valor) {
+    return '<ol class="ranking__list">' + lista.map(function (jugador) {
+      return '<li class="ranking__row">' +
+        '<span class="ranking__quien">' +
+          '<span class="with-crest">' +
+            playerName({ playerId: jugador.id, player: jugador.name }) +
+            crestOf(jugador, 'crest--badge') +
+          '</span>' +
+          '<span class="ranking__owner">' + escapeHtml(jugador.owner) + '</span>' +
+        '</span>' +
+        '<strong class="ranking__value">' + valor(jugador) + '</strong>' +
+      '</li>';
+    }).join('') + '</ol>';
+  }
+
+  function renderRankings() {
+    const caja = $('rankings-jugadores');
+    if (!caja) return;
+
+    const todos = futbolistasDeLaLiga();
+    if (todos.length === 0) {
+      caja.innerHTML = '<p class="muted">Sin plantillas todavía: sincroniza para traerlas.</p>';
+      return;
+    }
+
+    /* La media solo tiene sentido con partidos jugados. */
+    const conPartidos = todos.filter(function (j) { return j.played > 0; });
+    const porPuntos = todos.slice().sort(function (a, b) { return b.points - a.points; });
+    const porMedia = conPartidos.slice().sort(function (a, b) { return b.media - a.media; });
+
+    const enteros = function (j) { return j.points + ' pts'; };
+    const decimales = function (j) { return j.media.toFixed(1); };
+    const partidos = function (j) {
+      return '<span class="ranking__sub">' + j.played + (j.played === 1 ? ' partido' : ' partidos') + '</span>';
+    };
+
+    const bloque = function (titulo, pie, lista, valor) {
+      return '<div class="ranking">' +
+        '<h3 class="ranking__title">' + titulo + '</h3>' +
+        '<p class="ranking__hint">' + pie + '</p>' +
+        rankingRows(lista.slice(0, RANKING_TOPE), function (j) {
+          return valor(j) + partidos(j);
+        }) +
+      '</div>';
+    };
+
+    caja.innerHTML =
+      bloque('Más puntos', 'Los que más suman en total', porPuntos, enteros) +
+      bloque('Mejor media', 'Puntos por partido jugado', porMedia, decimales) +
+      bloque('Menos puntos', 'Los que menos suman, habiendo jugado', porPuntos.slice().reverse(), enteros) +
+      bloque('Peor media', 'Puntos por partido jugado', porMedia.slice().reverse(), decimales);
+  }
+
   function renderSpending() {
     ['spend', 'income'].forEach(function (kind) {
       const buys = kind === 'spend';
@@ -3380,7 +3468,7 @@
       panel.hidden = panel.getAttribute('data-panel') !== name;
     });
     if (name === 'managers') { renderManagers(); renderSquads(); }
-    if (name === 'datos') { renderDataKpis(); renderKpiCharts(); renderSpending(); }
+    if (name === 'datos') { renderDataKpis(); renderKpiCharts(); renderSpending(); renderRankings(); }
     if (name === 'mercado') { ensureMarket(); renderMarket(); renderMovers(); }
     if (name === 'jornadas') { ensureJornada(state.jornadaVista || 'actual'); renderJornadas(); }
   }
@@ -3419,7 +3507,7 @@
     renderLineup();
     renderWarnings();
     if (state.tab === 'managers') { renderManagers(); renderSquads(); }
-    if (state.tab === 'datos') { renderDataKpis(); renderKpiCharts(); renderSpending(); }
+    if (state.tab === 'datos') { renderDataKpis(); renderKpiCharts(); renderSpending(); renderRankings(); }
     if (state.tab === 'mercado') { renderMarket(); renderMovers(); }
   }
 
