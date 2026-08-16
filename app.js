@@ -1010,7 +1010,8 @@
     const chips = CHART_SERIES.map(function (serie) {
       const on = state.charts[serie.key];
       return '<button type="button" class="chip" data-chart="' + serie.key + '" aria-pressed="' + (on ? 'true' : 'false') + '">' +
-        '<span class="chip__dot" style="background:' + serie.color + '"></span>' + serie.label + '</button>';
+        '<span class="chip__dot" style="background:' + serie.color + '"></span>' +
+        '<span class="chip__label">' + serie.label + '</span></button>';
     }).join('');
 
     const charts = CHART_SERIES.filter(function (serie) { return state.charts[serie.key]; })
@@ -2492,6 +2493,17 @@
     if (datos.puntos.length === 0 || nombres.length === 0) { caja.hidden = true; return; }
     caja.hidden = false;
 
+    /* En una pastilla de cien píxeles no cabe «José Mário dos Santos
+       Mourinho»: se deja la primera palabra (dos si es muy corta) y el nombre
+       entero se ve al pasar por encima. */
+    const corto = function (nombre) {
+      const partes = String(nombre || '').split(/\s+/).filter(Boolean);
+      if (partes.length === 0) return '';
+      let salida = partes[0];
+      if (salida.length <= 4 && partes[1]) salida += ' ' + partes[1];
+      return salida;
+    };
+
     const chips = nombres.map(function (id) {
       const on = state.jornadaChart.indexOf(id) !== -1;
       const color = SERIE_COLORS[state.jornadaChart.indexOf(id)] || 'var(--border-strong)';
@@ -2499,7 +2511,7 @@
         ' title="' + escapeHtml(datos.managers[id]) + '"' +
         ' aria-pressed="' + (on ? 'true' : 'false') + '">' +
         '<span class="chip__dot" style="background:' + color + '"></span>' +
-        escapeHtml(datos.managers[id]) + '</button>';
+        '<span class="chip__label">' + escapeHtml(corto(datos.managers[id])) + '</span></button>';
     }).join('');
 
     const series = state.jornadaChart.map(function (id, i) {
@@ -2515,8 +2527,7 @@
         lineChart(datos.puntos, series[0].field, series[0].color, 'Puntos por jornada',
           { count: true, series: series, xlabel: function (punto) { return 'J' + punto.round; } });
 
-    caja.innerHTML = '<div class="panel__head"><h2>Puntos por jornada</h2>' +
-      '<p class="muted">Máximo cuatro a la vez, para que se distingan los colores.</p></div>' +
+    caja.innerHTML = '<div class="panel__head"><h2>Puntos por jornada</h2></div>' +
       '<div class="chips">' + chips + '</div>' + grafico;
   }
 
@@ -3428,19 +3439,59 @@
         '</span>';
       };
 
-      columnas += '<span class="barras__col" title="Jornada ' + jornada + ' · ' +
-          (dato.sinNota ? 'sin nota' : dato.points + (Math.abs(dato.points) === 1 ? ' punto' : ' puntos')) + '">' +
+      columnas += '<span class="barras__col" data-j="' + jornada + '" data-p="' +
+          (dato.sinNota ? 'sin nota' : dato.points + ' pts') + '">' +
         '<span class="barras__pista">' + mitad(false) + (hayNegativos ? mitad(true) : '') + '</span>' +
       '</span>';
     }
 
     return '<div class="barras">' +
+      '<div class="barras__tip" hidden></div>' +
       '<div class="barras__cuerpo">' + columnas + '</div>' +
       '<div class="barras__eje"><span>J1</span><span>J' + Math.round(JORNADAS_LIGA / 2) +
         '</span><span>J' + JORNADAS_LIGA + '</span></div>' +
-      '<p class="barras__pie">' + ficha.points + ' puntos en ' + rondas.length +
-        (rondas.length === 1 ? ' partido' : ' partidos') + '</p>' +
     '</div>';
+  }
+
+  /**
+   * El globito del gráfico de barras. Las columnas son de cinco píxeles, así
+   * que no se caza una con el dedo: se mira dónde está el puntero y se salta a
+   * la jornada con datos más cercana.
+   */
+  function tipDeBarras(cuerpo, clienteX) {
+    const caja = cuerpo.closest('.barras');
+    const tip = caja.querySelector('.barras__tip');
+    const conDatos = Array.prototype.slice.call(cuerpo.querySelectorAll('[data-j]'));
+    if (!tip || conDatos.length === 0) return;
+
+    let mejor = conDatos[0];
+    let cerca = Infinity;
+    conDatos.forEach(function (col) {
+      const r = col.getBoundingClientRect();
+      const distancia = Math.abs(clienteX - (r.left + r.width / 2));
+      if (distancia < cerca) { cerca = distancia; mejor = col; }
+    });
+
+    const r = mejor.getBoundingClientRect();
+    tip.innerHTML = '<strong>J' + mejor.getAttribute('data-j') + '</strong>' +
+      '<span>' + escapeHtml(mejor.getAttribute('data-p')) + '</span>';
+    tip.hidden = false;
+
+    /* Que no se salga por los lados: se le pone tope a izquierda y derecha. */
+    const base = caja.getBoundingClientRect();
+    const mitadTip = tip.getBoundingClientRect().width / 2;
+    const centro = r.left + r.width / 2 - base.left;
+    tip.style.left = Math.max(mitadTip, Math.min(base.width - mitadTip, centro)) + 'px';
+
+    conDatos.forEach(function (col) { col.classList.toggle('barras__col--activa', col === mejor); });
+  }
+
+  function ocultarTipDeBarras(caja) {
+    const tip = caja.querySelector('.barras__tip');
+    if (tip) tip.hidden = true;
+    Array.prototype.forEach.call(caja.querySelectorAll('.barras__col--activa'), function (col) {
+      col.classList.remove('barras__col--activa');
+    });
   }
 
   function rankingRows(lista, valor, prefijo) {
@@ -4090,33 +4141,6 @@
     setStatus('status-standings', '');
   }
 
-  function exportCsv() {
-    const rows = budgetRows();
-    const header = ['Jugador', 'Fichajes', 'Ventas', 'Inicial', 'Gastado', 'Ingresado', 'Saldo disponible', 'Valor equipo', 'Puja máxima'];
-    const lines = [header.join(';')].concat(rows.map(function (row) {
-      return [
-        row.name,
-        row.buys,
-        row.sells,
-        row.initial,
-        row.spent,
-        row.earned,
-        row.balance,
-        row.teamValue == null ? '' : row.teamValue,
-        row.maxBid == null ? '' : Math.round(row.maxBid)
-      ].join(';');
-    }));
-    const bom = String.fromCharCode(0xfeff);
-    const blob = new Blob([bom + lines.join('\r\n')], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = 'presupuestos-biwenger.csv';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
-  }
 
   /* ---------- Eventos ---------- */
 
@@ -4211,6 +4235,23 @@
       renderDataKpis();
       renderKpiCharts();
     }
+
+    /* Globito de las barras: vale para el ratón y para el dedo. */
+    document.addEventListener('pointermove', function (event) {
+      const cuerpo = event.target.closest && event.target.closest('.barras__cuerpo');
+      if (cuerpo) tipDeBarras(cuerpo, event.clientX);
+    });
+
+    document.addEventListener('pointerdown', function (event) {
+      const cuerpo = event.target.closest && event.target.closest('.barras__cuerpo');
+      if (cuerpo) { tipDeBarras(cuerpo, event.clientX); return; }
+      Array.prototype.forEach.call(document.querySelectorAll('.barras'), ocultarTipDeBarras);
+    });
+
+    document.addEventListener('pointerleave', function (event) {
+      const caja = event.target.closest && event.target.closest('.barras');
+      if (caja) ocultarTipDeBarras(caja);
+    }, true);
 
     $('data-kpis').addEventListener('click', function (event) {
       const row = event.target.closest('[data-kpi]');
@@ -4520,7 +4561,6 @@
     $('btn-process-board').addEventListener('click', processBoard);
     $('btn-process-standings').addEventListener('click', processStandings);
     $('btn-reset').addEventListener('click', resetAll);
-    $('btn-csv').addEventListener('click', exportCsv);
 
     $('filter-text').addEventListener('input', function (event) {
       state.filters.text = event.target.value;

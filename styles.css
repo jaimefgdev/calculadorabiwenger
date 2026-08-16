@@ -353,8 +353,25 @@ code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft)
 /* ---------- Puntos jornada a jornada ----------
    Una columna por jornada, de izquierda a derecha. Con muchas jornadas la tira
    se desplaza sola en horizontal en vez de estrujar las columnas. */
-.barras { margin: .5rem 0 .2rem; }
-.barras__cuerpo { display: flex; align-items: stretch; gap: 1px; }
+/* El hueco de arriba es el sitio del globito: sin él taparía las barras. */
+.barras { position: relative; margin: .5rem 0 .2rem; padding-top: 3rem; }
+.barras__cuerpo { display: flex; align-items: stretch; gap: 1px; touch-action: none; }
+/* La jornada señalada, para saber de cuál habla el globito. */
+.barras__col--activa .barras__barra { filter: brightness(1.35); }
+.barras__col--activa { background: var(--bg-surface); }
+
+/* Globito con la jornada y sus puntos, encima de la columna señalada. */
+.barras__tip {
+  position: absolute; top: 0; transform: translateX(-50%);
+  display: grid; justify-items: center;
+  padding: .15rem .4rem;
+  background: var(--bg-elev); border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow);
+  pointer-events: none; white-space: nowrap; z-index: 4;
+}
+.barras__tip strong { font-family: var(--mono); font-size: .66rem; color: var(--text-faint); }
+.barras__tip span { font-size: .78rem; font-weight: 700; font-variant-numeric: tabular-nums; }
 /* Las 38 caben siempre: las jornadas sin jugar quedan como hueco a la derecha. */
 .barras__col { flex: 1 1 0; min-width: 0; display: flex; }
 .barras__eje {
@@ -372,7 +389,6 @@ code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft)
 .barras__barra--neg { border-radius: 0 0 2px 2px; background: var(--neg); }
 /* Jornada sin jugar: solo la marca del suelo, para que se lea el eje entero. */
 .barras__col--vacia { border-bottom: 1px solid var(--border); }
-.barras__pie { margin-top: .35rem; font-size: .68rem; color: var(--text-faint); }
 
 /* Dentro del desglose de una plantilla, la fila del futbolista se pulsa. */
 .fila-puntos { cursor: pointer; }
@@ -1152,6 +1168,17 @@ code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft)
 .table--listings .switch[aria-pressed="true"] span { transform: translateX(13px); }
 .table--offers td[data-label="Operación"] { white-space: normal; }
 
+/* Las columnas de reloj, interruptor y ofertas llevan piezas de anchos muy
+   distintos: pegadas a la izquierda quedan desiguales fila a fila, así que se
+   centran con su cabecera y forman columna. */
+.table--offers th:nth-child(4), .table--offers th:nth-child(5),
+.table--offers td[data-label="Queda"], .table--offers td[data-label="Simular"],
+.table--listings th:nth-child(3), .table--listings th:nth-child(4),
+.table--listings td[data-label="Queda"], .table--listings td[data-label="Ofertas"] { text-align: center; }
+/* Dentro de «Ofertas» pueden ir varias: se centran como grupo. */
+.table--listings td[data-label="Ofertas"] .bid { display: inline-flex; vertical-align: middle; }
+.table--offers td[data-label="Simular"] .switch { vertical-align: middle; }
+
 /* ---------- Jornadas ---------- */
 .jornadas-wrap { position: relative; }
 /* El menú de jornadas se dibuja sobre su propio panel. */
@@ -1240,14 +1267,21 @@ main.wrap { padding-bottom: 3.5rem; }
   grid-template-columns: repeat(8, minmax(0, 1fr));
 }
 .viz-block .chip {
-  min-width: 0; padding: .3rem .4rem; gap: .3rem;
-  font-size: .72rem;
-  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-  display: flex; align-items: center;
+  min-width: 0; padding: .3rem .35rem; gap: .28rem;
+  /* La letra se encoge con el ancho disponible: así los ocho nombres caben
+     centrados igual en el móvil que en el ordenador. */
+  font-size: clamp(.56rem, 1.15vw, .72rem);
+  display: flex; align-items: center; justify-content: center;
+  overflow: hidden;
 }
-@media (max-width: 560px) {
+/* El punto de color no se encoge; el que se recorta es el nombre. */
+.viz-block .chip .chip__dot { flex: none; }
+/* Por debajo de 620 px ocho pastillas quedarían en 33 px cada una: mejor dos
+   filas de cuatro. En el móvil no llega a pasar, que la página se ve a 1024. */
+@media (max-width: 620px) {
   .viz-block .chips { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 }
+.chip__label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 /* ---------- Mercado ---------- */
 .row-mine { background: var(--accent-soft); }
