@@ -512,6 +512,7 @@
     tab: 'inicio',
     expandedManager: null,
     expandedPoints: null,   // desglose de puntos por futbolista, en la clasificación
+    puntosDetalle: null,    // gráfico de puntos por jornada de un futbolista
     listings: [],
     lineup: null,          // mi alineación en Biwenger
     round: null,           // próxima jornada y su hora de inicio
@@ -2340,8 +2341,10 @@
         if (id != null) state.jornadaVista = id;
         renderJornadas();
         /* La jornada llega después de la sincronización, y con ella los puntos
-           que se suman a la clasificación: hay que repintarla. */
+           que se suman a la clasificación y las clasificaciones de futbolistas:
+           hay que repintarlas. */
         renderManagers();
+        renderRankings();
       })
       .catch(function () {
         state.jornadaEstado = 'error';
@@ -2724,42 +2727,37 @@
    * los partidos que lleva jugados.
    */
   function panelDePuntos(row) {
-    const equipo = state.teams[row.name];
-    const plantilla = equipo && squadList().filter(function (s) {
-      return String(s.id) === String(equipo.id);
-    })[0];
+    /* Solo los que ha alineado, y con lo que hicieron estando alineados. */
+    const suyos = futbolistasAlineados(row.name)
+      .sort(function (a, b) { return b.points - a.points; });
 
-    /* Los que ni han jugado ni han puntuado no dicen nada: fuera. */
-    const conAlgo = ((plantilla && plantilla.players) || []).filter(function (jugador) {
-      return (jugador.points || 0) !== 0 || (jugador.played || 0) > 0;
-    });
-
-    const cuerpo = !plantilla
-      ? '<p class="muted">Sin plantilla todavía: sincroniza para traerla.</p>'
-      : conAlgo.length === 0
-      ? '<p class="muted">Todavía no ha jugado ninguno de sus futbolistas.</p>'
+    const cuerpo = suyos.length === 0
+      ? '<p class="muted">Todavía no hay jornadas guardadas con su alineación.</p>'
       : '<table class="detail-table"><thead><tr>' +
           '<th class="detail-rank">Pos.</th><th>Futbolista</th>' +
-          '<th class="num">Puntos</th><th class="num">Partidos</th>' +
+          '<th class="num">Puntos</th><th class="num">Alineado</th>' +
         '</tr></thead><tbody>' +
-        conAlgo.slice().sort(function (a, b) {
-          return (b.points == null ? -Infinity : b.points) - (a.points == null ? -Infinity : a.points);
-        }).map(function (jugador) {
-          return '<tr>' +
+        suyos.map(function (jugador) {
+          const clave = 'plantilla:' + row.name + ':' + jugador.id;
+          const abierto = state.puntosDetalle === clave;
+          return '<tr class="fila-puntos' + (abierto ? ' row-open' : '') + '"' +
+              ' data-puntos="' + escapeHtml(clave) + '">' +
             '<td class="detail-rank">' +
               (jugador.position ? POSITION_NAMES[jugador.position] : '—') + '</td>' +
             '<td><span class="with-crest">' +
               playerName({ playerId: jugador.id, player: jugador.name }) +
               crestOf(jugador, 'crest--badge') + '</span></td>' +
-            '<td class="num"><strong>' +
-              (jugador.points == null ? '<span class="sub">—</span>' : jugador.points) + '</strong></td>' +
-            '<td class="num">' +
-              (jugador.played == null ? '<span class="sub">—</span>' : jugador.played) + '</td>' +
-          '</tr>';
+            '<td class="num"><strong>' + jugador.points + '</strong></td>' +
+            '<td class="num">' + jugador.played + '</td>' +
+          '</tr>' +
+          (abierto
+            ? '<tr class="detail-row"><td class="detail-cell" colspan="4">' +
+              graficoDePuntos(jugador) + '</td></tr>'
+            : '');
         }).join('') + '</tbody></table>';
 
     return '<tr class="detail-row"><td class="detail-cell" colspan="' + MANAGER_COLUMNS + '"><div class="detail">' +
-      '<h3 class="bench__title">Puntos por futbolista</h3>' + cuerpo +
+      '<h3 class="bench__title">Puntos por futbolista alineado</h3>' + cuerpo +
     '</div></td></tr>';
   }
 
@@ -3307,42 +3305,124 @@
      Solo cuentan los futbolistas que tiene alguno de los ocho, y solo los que
      ya han jugado: un 0 de quien no se ha estrenado no dice nada. */
 
-  const RANKING_TOPE = 10;
+  /**
+   * Cuántos se enseñan en cada clasificación. Se amplía sola a 25 en cuanto hay
+   * gente de sobra, pero nunca tanto como para que el mismo futbolista salga a
+   * la vez en «más puntos» y en «menos»: para eso hacen falta el doble de
+   * alineados que puestos tiene la lista.
+   */
+  function topeRanking(total) {
+    if (total >= 50) return 25;
+    if (total >= 20) return 10;
+    return Math.max(1, Math.floor(total / 2));
+  }
 
-  /** Todos los futbolistas de las plantillas, con su dueño y su media. */
-  function futbolistasDeLaLiga() {
-    const lista = [];
-    squadList().forEach(function (plantilla) {
-      (plantilla.players || []).forEach(function (jugador) {
-        const partidos = jugador.played || 0;
-        if (partidos === 0 && (jugador.points || 0) === 0) return;
-        lista.push({
-          id: jugador.id,
-          name: jugador.name,
-          position: jugador.position,
-          team: jugador.team,
-          teamName: jugador.teamName,
-          points: jugador.points || 0,
-          played: partidos,
-          media: partidos > 0 ? (jugador.points || 0) / partidos : null,
-          owner: plantilla.name
+  /**
+   * Lo que ha hecho cada futbolista jornada a jornada contando solo cuando
+   * estaba alineado, que es lo único que le suma a su mánager. Si salió y no
+   * puntuó —un cero, un sin calificar o un partido que no jugó— cuenta igual
+   * como alineación: ese hueco desaprovechado también dice mucho.
+   *
+   * `deQuien` limita el recuento a las alineaciones de un mánager.
+   */
+  function futbolistasAlineados(deQuien) {
+    const porJugador = {};
+
+    Object.keys(state.jornadas.datos).forEach(function (id) {
+      const jornada = state.jornadas.datos[id];
+      const numero = (jornada.round && jornada.round.number) || null;
+
+      (jornada.standings || []).forEach(function (fila) {
+        if (deQuien && fila.name !== deQuien) return;
+
+        (fila.xi || []).forEach(function (jugador) {
+          const clave = String(jugador.id);
+          if (!porJugador[clave]) {
+            porJugador[clave] = {
+              id: clave, name: jugador.name, position: jugador.position,
+              team: jugador.team, teamName: jugador.teamName,
+              owner: fila.name, rounds: [], points: 0
+            };
+          }
+          const ficha = porJugador[clave];
+          /* Puede haber cambiado de manos: manda el último que lo alineó. */
+          ficha.owner = fila.name;
+          ficha.name = jugador.name || ficha.name;
+          ficha.rounds.push({
+            number: numero,
+            points: jugador.points || 0,
+            sinNota: jugador.points == null
+          });
+          ficha.points += jugador.points || 0;
         });
       });
     });
-    return lista;
+
+    return Object.keys(porJugador).map(function (clave) {
+      const ficha = porJugador[clave];
+      ficha.rounds.sort(function (a, b) { return (a.number || 0) - (b.number || 0); });
+      ficha.played = ficha.rounds.length;          // veces alineado
+      ficha.media = ficha.played ? ficha.points / ficha.played : null;
+      return ficha;
+    });
   }
 
-  function rankingRows(lista, valor) {
-    return '<ol class="ranking__list">' + lista.map(function (jugador) {
-      return '<li class="ranking__row">' +
-        '<span class="ranking__quien">' +
-          '<span class="with-crest">' +
-            playerName({ playerId: jugador.id, player: jugador.name }) +
-            crestOf(jugador, 'crest--badge') +
+  /**
+   * Los puntos de un futbolista jornada a jornada, en barras horizontales. Con
+   * puntuaciones negativas la barra crece hacia el otro lado desde el cero.
+   */
+  function graficoDePuntos(ficha) {
+    const rondas = ficha.rounds || [];
+    if (rondas.length === 0) return '';
+
+    const hayNegativos = rondas.some(function (r) { return r.points < 0; });
+    const tope = Math.max.apply(null, rondas.map(function (r) { return Math.abs(r.points); }).concat([1]));
+
+    const barra = function (ancho, negativa) {
+      return '<span class="barras__mitad' + (negativa ? ' barras__mitad--neg' : '') + '">' +
+        (ancho > 0
+          ? '<span class="barras__barra' + (negativa ? ' barras__barra--neg' : '') +
+            '" style="width:' + ancho.toFixed(1) + '%"></span>'
+          : '') +
+      '</span>';
+    };
+
+    return '<div class="barras' + (hayNegativos ? ' barras--cero' : '') + '">' +
+      rondas.map(function (r) {
+        const ancho = (Math.abs(r.points) / tope) * 100;
+        const negativa = r.points < 0;
+        return '<div class="barras__fila">' +
+          '<span class="barras__etiqueta">J' + (r.number || '?') + '</span>' +
+          '<span class="barras__pista">' +
+            (hayNegativos ? barra(negativa ? ancho : 0, true) : '') +
+            barra(negativa ? 0 : ancho, false) +
           '</span>' +
-          '<span class="ranking__owner">' + escapeHtml(jugador.owner) + '</span>' +
-        '</span>' +
-        '<strong class="ranking__value">' + valor(jugador) + '</strong>' +
+          '<strong class="barras__valor' + (negativa ? ' money-neg' : '') + '">' +
+            (r.sinNota ? '–' : r.points) + '</strong>' +
+        '</div>';
+      }).join('') +
+      '<p class="barras__pie">' + ficha.points + ' puntos en ' + rondas.length +
+        (rondas.length === 1 ? ' alineación' : ' alineaciones') + '</p>' +
+    '</div>';
+  }
+
+  function rankingRows(lista, valor, prefijo) {
+    return '<ol class="ranking__list">' + lista.map(function (jugador) {
+      const clave = prefijo + ':' + jugador.id;
+      const abierto = state.puntosDetalle === clave;
+      return '<li class="ranking__row' + (abierto ? ' ranking__row--abierta' : '') + '">' +
+        '<button type="button" class="ranking__boton" data-puntos="' + escapeHtml(clave) + '"' +
+          ' aria-expanded="' + (abierto ? 'true' : 'false') + '">' +
+          '<span class="ranking__quien">' +
+            '<span class="with-crest">' +
+              playerName({ playerId: jugador.id, player: jugador.name }) +
+              crestOf(jugador, 'crest--badge') +
+            '</span>' +
+            '<span class="ranking__owner">' + escapeHtml(jugador.owner) + '</span>' +
+          '</span>' +
+          '<strong class="ranking__value">' + valor(jugador) + '</strong>' +
+        '</button>' +
+        (abierto ? graficoDePuntos(jugador) : '') +
       '</li>';
     }).join('') + '</ol>';
   }
@@ -3351,38 +3431,37 @@
     const caja = $('rankings-jugadores');
     if (!caja) return;
 
-    const todos = futbolistasDeLaLiga();
+    const todos = futbolistasAlineados(null);
     if (todos.length === 0) {
-      caja.innerHTML = '<p class="muted">Sin plantillas todavía: sincroniza para traerlas.</p>';
+      caja.innerHTML = '<p class="muted">Todavía no hay jornadas guardadas con alineaciones.</p>';
       return;
     }
 
-    /* La media solo tiene sentido con partidos jugados. */
-    const conPartidos = todos.filter(function (j) { return j.played > 0; });
     const porPuntos = todos.slice().sort(function (a, b) { return b.points - a.points; });
-    const porMedia = conPartidos.slice().sort(function (a, b) { return b.media - a.media; });
+    const porMedia = todos.slice().sort(function (a, b) { return b.media - a.media; });
 
     const enteros = function (j) { return j.points + ' pts'; };
     const decimales = function (j) { return j.media.toFixed(1); };
-    const partidos = function (j) {
-      return '<span class="ranking__sub">' + j.played + (j.played === 1 ? ' partido' : ' partidos') + '</span>';
+    const veces = function (j) {
+      return '<span class="ranking__sub">' + j.played +
+        (j.played === 1 ? ' alineación' : ' alineaciones') + '</span>';
     };
 
-    const bloque = function (titulo, pie, lista, valor) {
+    const tope = topeRanking(todos.length);
+    const bloque = function (titulo, prefijo, lista, valor) {
       return '<div class="ranking">' +
         '<h3 class="ranking__title">' + titulo + '</h3>' +
-        '<p class="ranking__hint">' + pie + '</p>' +
-        rankingRows(lista.slice(0, RANKING_TOPE), function (j) {
-          return valor(j) + partidos(j);
-        }) +
+        rankingRows(lista.slice(0, tope), function (j) {
+          return valor(j) + veces(j);
+        }, prefijo) +
       '</div>';
     };
 
     caja.innerHTML =
-      bloque('Más puntos', 'Los que más suman en total', porPuntos, enteros) +
-      bloque('Mejor media', 'Puntos por partido jugado', porMedia, decimales) +
-      bloque('Menos puntos', 'Los que menos suman, habiendo jugado', porPuntos.slice().reverse(), enteros) +
-      bloque('Peor media', 'Puntos por partido jugado', porMedia.slice().reverse(), decimales);
+      bloque('Más puntos', 'mas', porPuntos, enteros) +
+      bloque('Mejor media', 'media', porMedia, decimales) +
+      bloque('Menos puntos', 'menos', porPuntos.slice().reverse(), enteros) +
+      bloque('Peor media', 'peormedia', porMedia.slice().reverse(), decimales);
   }
 
   function renderSpending() {
@@ -3957,6 +4036,15 @@
       if (row) toggleKpi(row.getAttribute('data-kpi'));
     });
 
+    /* En las clasificaciones de futbolistas, cada uno abre su gráfico. */
+    $('rankings-jugadores').addEventListener('click', function (event) {
+      const fila = event.target.closest('[data-puntos]');
+      if (!fila) return;
+      const clave = fila.getAttribute('data-puntos');
+      state.puntosDetalle = state.puntosDetalle === clave ? null : clave;
+      renderRankings();
+    });
+
     bindSorting('managers');
 
     /* El botón del sistema abre el mismo panel que los cambios. */
@@ -4168,6 +4256,15 @@
         renderManagers();
         return;
       }
+      /* Dentro del desglose, cada futbolista abre su gráfico por jornada. */
+      const detalle = event.target.closest('[data-puntos]');
+      if (detalle) {
+        const clave = detalle.getAttribute('data-puntos');
+        state.puntosDetalle = state.puntosDetalle === clave ? null : clave;
+        renderManagers();
+        return;
+      }
+
       /* Los puntos abren su propio desglose, sin tocar la ficha del mánager. */
       const puntos = event.target.closest('[data-manager-points]');
       if (puntos) {

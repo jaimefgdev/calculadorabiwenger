@@ -297,18 +297,17 @@ code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft)
 
 .ranking { min-width: 0; }
 .ranking__title { font-size: .9rem; font-weight: 650; }
-.ranking__hint { font-size: .72rem; color: var(--text-faint); margin-bottom: .5rem; }
 .ranking__list { list-style: none; margin: 0; padding: 0; counter-reset: puesto; }
+/* La fila es un bloque para que el gráfico, al abrirse, ocupe todo el ancho;
+   la rejilla vive en el botón. */
 .ranking__row {
   counter-increment: puesto;
-  display: grid; align-items: center; gap: .5rem;
-  grid-template-columns: 1.2rem minmax(0, 1fr) auto;
   padding: .3rem 0;
   border-bottom: 1px solid var(--border);
   font-size: .82rem;
 }
 .ranking__row:last-child { border-bottom: 0; }
-.ranking__row::before {
+.ranking__boton::before {
   content: counter(puesto);
   font-family: var(--mono); font-size: .7rem; color: var(--text-faint); text-align: right;
 }
@@ -323,6 +322,42 @@ code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft)
 }
 .ranking__value { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
 .ranking__sub { display: block; font-size: .66rem; font-weight: 400; color: var(--text-faint); }
+
+/* La fila entera es pulsable: abre el gráfico por jornada. */
+.ranking__boton {
+  display: grid; align-items: center; gap: .5rem;
+  grid-template-columns: 1.2rem minmax(0, 1fr) auto;
+  width: 100%; padding: 0; margin: 0;
+  font: inherit; color: inherit; text-align: left;
+  background: transparent; border: 0; cursor: pointer;
+}
+.ranking__boton:hover .player-name { color: var(--accent); }
+.ranking__boton:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.ranking__row--abierta { background: var(--bg-surface); }
+
+/* ---------- Puntos jornada a jornada, en barras ---------- */
+.barras { margin: .5rem 0 .2rem; padding: .3rem 0 0; }
+.barras__fila {
+  display: grid; align-items: center; gap: .5rem;
+  grid-template-columns: 1.8rem minmax(0, 1fr) 2.2rem;
+  padding: .12rem 0;
+}
+.barras__etiqueta { font-family: var(--mono); font-size: .66rem; color: var(--text-faint); }
+.barras__pista { display: flex; align-items: center; height: 10px; min-width: 0; }
+/* Sin negativos toda la pista crece a la derecha; con ellos se parte en dos. */
+.barras__mitad { flex: 1 1 0; min-width: 0; display: flex; }
+.barras--cero .barras__mitad--neg { justify-content: flex-end; border-right: 1px solid var(--border-strong); }
+.barras__barra { height: 8px; border-radius: 4px; background: var(--viz-1, #2a78d6); }
+.barras__barra--neg { background: var(--neg); }
+.barras__valor {
+  font-size: .72rem; text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.barras__pie { margin-top: .35rem; font-size: .68rem; color: var(--text-faint); }
+
+/* Dentro del desglose de una plantilla, la fila del futbolista se pulsa. */
+.fila-puntos { cursor: pointer; }
+.fila-puntos:hover .player-name { color: var(--accent); }
 
 /* Los puntos de la clasificación abren el desglose por futbolista. */
 .puntos-toggle {
