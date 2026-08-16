@@ -1065,7 +1065,10 @@ code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft)
   color: #fff; background: rgba(0, 0, 0, .7);
   border-radius: 100px;
 }
+/* Sin nota todavía («?») o sin haber puntuado («—»): se dice, pero apagado. */
+.pitch__points--vacio { color: var(--text-faint); background: rgba(0, 0, 0, .45); font-weight: 600; }
 .bench__points { font-size: .7rem; color: var(--text-faint); }
+.bench__points--vacio { opacity: .7; }
 /* Sin selector: el campo guardado no se toca. */
 .pitch--static .pitch__slot { cursor: default; }
 

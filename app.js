@@ -2346,6 +2346,15 @@
   }
 
   /* Campo de solo lectura: las mismas líneas que el simulador, sin botones. */
+  /**
+   * Lo que se pone en la chapa de puntos de un futbolista: su nota, un guion si
+   * su partido acabó y no puntuó, y una interrogación mientras no se sepa.
+   */
+  function marcaDePuntos(jugador) {
+    if (jugador.points != null) return String(jugador.points);
+    return jugador.pending ? '?' : '—';
+  }
+
   function staticPitch(type, jugadores) {
     const porLinea = { 1: [], 2: [], 3: [], 4: [] };
     jugadores.forEach(function (jugador) {
@@ -2359,8 +2368,8 @@
           crestOf(jugador, 'crest--ghost') +
           faceOf(jugador.id, 'pitch__face') +
           '<span class="pitch__name">' + escapeHtml(jugador.name) + '</span>' +
-          (jugador.points == null ? '' :
-            '<span class="pitch__points">' + jugador.points + '</span>') +
+          '<span class="pitch__points' + (jugador.points == null ? ' pitch__points--vacio' : '') + '">' +
+            marcaDePuntos(jugador) + '</span>' +
         '</div>';
       }).join('');
       return '<div class="pitch__line">' + huecos + '</div>';
@@ -2385,8 +2394,8 @@
             crestOf(jugador, 'crest--ghost') +
             faceOf(jugador.id, 'bench__face') +
             '<span class="bench__name">' + escapeHtml(jugador.name) + '</span>' +
-            (jugador.points == null ? '' :
-              '<span class="bench__points">' + jugador.points + ' pts</span>') +
+            '<span class="bench__points' + (jugador.points == null ? ' bench__points--vacio' : '') + '">' +
+              marcaDePuntos(jugador) + (jugador.points == null ? '' : ' pts') + '</span>' +
           '</div>';
         }).join('') + '</div>';
 
