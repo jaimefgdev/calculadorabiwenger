@@ -1772,6 +1772,28 @@
     } catch (error) { /* se empieza con la de Biwenger */ }
   }
 
+  /**
+   * Tu alineación tal y como la tienes puesta.
+   *
+   * `/user?fields=lineup` manda un sistema que no siempre es el bueno: cuenta a
+   * cada futbolista por su puesto de ficha, así que un 4-6-0 con un delantero
+   * jugando de medio lo devuelve como 4-5-1. La clasificación de la jornada sí
+   * trae el sistema real y el once ya colocado por líneas, así que manda esa
+   * cuando está.
+   */
+  function alineacionOficial() {
+    const round = state.round;
+    const jornada = round && round.id != null ? state.jornadas.datos[round.id] : null;
+    const mia = jornada && state.me && (jornada.standings || []).filter(function (fila) {
+      return String(fila.id) === String(state.me.id);
+    })[0];
+
+    if (mia && mia.type && (mia.xi || []).length === 11) {
+      return { type: mia.type, players: mia.xi };
+    }
+    return state.lineup;
+  }
+
   function ensureXi() {
     /* Lo guardado manda, pero se limpian los que ya no estén en la plantilla
        (vendidos desde la última vez). */
@@ -1786,7 +1808,7 @@
       }
       return;
     }
-    const lineup = state.lineup;
+    const lineup = alineacionOficial();
     const type = (lineup && lineup.type) || '4-4-2';
     const slots = {};
 
