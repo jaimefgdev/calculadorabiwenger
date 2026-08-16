@@ -287,6 +287,18 @@ code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft)
 /* El once ideal va solo en su bloque, así que se centra. */
 .panel__head--center { text-align: center; }
 
+/* Los puntos de la clasificación abren el desglose por futbolista. */
+.puntos-toggle {
+  font: inherit; color: inherit;
+  background: transparent; border: 0;
+  padding: 0; margin: 0;
+  cursor: pointer;
+  border-bottom: 1px dashed var(--border-strong);
+}
+.puntos-toggle:hover { color: var(--accent); border-bottom-color: var(--accent); }
+.puntos-toggle:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.puntos-toggle[aria-expanded="true"] { color: var(--accent); border-bottom-color: var(--accent); }
+
 /* ---------- El campo ---------- */
 .field-label { display: flex; align-items: center; gap: .5rem; font-size: .8rem; color: var(--text-soft); }
 .field-label .field { min-width: 110px; }
@@ -1065,10 +1077,12 @@ code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft)
   color: #fff; background: rgba(0, 0, 0, .7);
   border-radius: 100px;
 }
-/* Sin nota todavía («?») o sin haber puntuado («—»): se dice, pero apagado. */
-.pitch__points--vacio { color: var(--text-faint); background: rgba(0, 0, 0, .45); font-weight: 600; }
+/* Sin nota todavía («?») o sin haber puntuado («–»): en blanco, que se lea. */
+.pitch__points--vacio { color: #fff; background: rgba(0, 0, 0, .55); font-size: .64rem; }
 .bench__points { font-size: .7rem; color: var(--text-faint); }
-.bench__points--vacio { opacity: .7; }
+/* Aquí no hay chapa detrás, así que va la tinta del tema: blanca en oscuro y
+   negra en claro. Un #fff fijo desaparecería con el tema claro. */
+.bench__points--vacio { color: var(--text); font-size: .64rem; }
 /* Sin selector: el campo guardado no se toca. */
 .pitch--static .pitch__slot { cursor: default; }
 
