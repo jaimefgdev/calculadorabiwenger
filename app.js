@@ -513,6 +513,10 @@
     expandedManager: null,
     expandedPoints: null,   // desglose de puntos por futbolista, en la clasificación
     puntosDetalle: null,    // gráfico de puntos por jornada de un futbolista
+    laliga: null,           // todos los futbolistas de la competición
+    ambito: { nuestra: 'total', laliga: 'total' },   // total · en casa · fuera
+    puesto: { nuestra: '0', laliga: '0' },           // demarcación: 0 son todas
+    laligaCargando: false,
     listings: [],
     lineup: null,          // mi alineación en Biwenger
     round: null,           // próxima jornada y su hora de inicio
@@ -2441,6 +2445,9 @@
   /* Cuatro colores validados: no se dibujan más de cuatro a la vez. */
   const SERIE_COLORS = ['var(--viz-1)', 'var(--viz-4)', 'var(--viz-2)', 'var(--viz-3)'];
 
+  /* La liga son 38 jornadas: los ejes se plantean enteros desde el principio. */
+  const JORNADAS_LIGA = 38;
+
   /** Puntos de cada mánager jornada a jornada, con lo que haya guardado. */
   function jornadaSeries() {
     const ids = Object.keys(state.jornadas.datos);
@@ -3345,7 +3352,8 @@
             porJugador[clave] = {
               id: clave, name: jugador.name, position: jugador.position,
               team: jugador.team, teamName: jugador.teamName,
-              owner: fila.name, rounds: [], points: 0
+              owner: fila.name, rounds: [], points: 0,
+              pointsHome: 0, playedHome: 0, pointsAway: 0, playedAway: 0
             };
           }
           const ficha = porJugador[clave];
@@ -3355,9 +3363,17 @@
           ficha.rounds.push({
             number: numero,
             points: jugador.points || 0,
-            sinNota: jugador.points == null
+            sinNota: jugador.points == null,
+            home: jugador.home
           });
           ficha.points += jugador.points || 0;
+          if (jugador.home === true) {
+            ficha.pointsHome += jugador.points || 0;
+            ficha.playedHome += 1;
+          } else if (jugador.home === false) {
+            ficha.pointsAway += jugador.points || 0;
+            ficha.playedAway += 1;
+          }
         });
       });
     });
@@ -3380,34 +3396,48 @@
     const rondas = ficha.rounds || [];
     if (rondas.length === 0) return '';
 
-    const hayNegativos = rondas.some(function (r) { return r.points < 0; });
-    const tope = Math.max.apply(null, rondas.map(function (r) { return Math.abs(r.points); }).concat([1]));
+    /* El eje son las 38 jornadas desde el principio: así una sola jornada no
+       se dibuja como una barra gigante que ocupa todo. */
+    const porJornada = {};
+    rondas.forEach(function (r) { if (r.number) porJornada[r.number] = r; });
 
-    const columnas = rondas.map(function (r) {
-      const alto = (Math.abs(r.points) / tope) * 100;
-      const negativa = r.points < 0;
-      const barra = function (mitadNegativa) {
-        const suya = mitadNegativa === negativa;
-        return '<span class="barras__mitad' + (mitadNegativa ? ' barras__mitad--neg' : '') + '">' +
-          (suya && alto > 0
+    const conDatos = Object.keys(porJornada);
+    if (conDatos.length === 0) return '';
+
+    const hayNegativos = conDatos.some(function (n) { return porJornada[n].points < 0; });
+    const tope = Math.max.apply(null, conDatos.map(function (n) {
+      return Math.abs(porJornada[n].points);
+    }).concat([1]));
+
+    let columnas = '';
+    for (let jornada = 1; jornada <= JORNADAS_LIGA; jornada++) {
+      const dato = porJornada[jornada];
+      if (!dato) {
+        columnas += '<span class="barras__col barras__col--vacia"></span>';
+        continue;
+      }
+
+      const alto = (Math.abs(dato.points) / tope) * 100;
+      const negativa = dato.points < 0;
+      const mitad = function (esNegativa) {
+        return '<span class="barras__mitad' + (esNegativa ? ' barras__mitad--neg' : '') + '">' +
+          (esNegativa === negativa && alto > 0
             ? '<span class="barras__barra' + (negativa ? ' barras__barra--neg' : '') +
               '" style="height:' + alto.toFixed(1) + '%"></span>'
             : '') +
         '</span>';
       };
 
-      return '<div class="barras__col">' +
-        '<span class="barras__valor' + (negativa ? ' money-neg' : '') + '">' +
-          (r.sinNota ? '–' : r.points) + '</span>' +
-        '<span class="barras__pista">' +
-          barra(false) + (hayNegativos ? barra(true) : '') +
-        '</span>' +
-        '<span class="barras__etiqueta">J' + (r.number || '?') + '</span>' +
-      '</div>';
-    }).join('');
+      columnas += '<span class="barras__col" title="Jornada ' + jornada + ' · ' +
+          (dato.sinNota ? 'sin nota' : dato.points + (Math.abs(dato.points) === 1 ? ' punto' : ' puntos')) + '">' +
+        '<span class="barras__pista">' + mitad(false) + (hayNegativos ? mitad(true) : '') + '</span>' +
+      '</span>';
+    }
 
     return '<div class="barras">' +
       '<div class="barras__cuerpo">' + columnas + '</div>' +
+      '<div class="barras__eje"><span>J1</span><span>J' + Math.round(JORNADAS_LIGA / 2) +
+        '</span><span>J' + JORNADAS_LIGA + '</span></div>' +
       '<p class="barras__pie">' + ficha.points + ' puntos en ' + rondas.length +
         (rondas.length === 1 ? ' partido' : ' partidos') + '</p>' +
     '</div>';
@@ -3434,18 +3464,66 @@
     }).join('') + '</ol>';
   }
 
-  function renderRankings() {
-    const caja = $('rankings-jugadores');
-    if (!caja) return;
+  /* Cada tanda se puede mirar entera, solo en casa o solo fuera. */
+  const AMBITOS = [
+    { clave: 'total', nombre: 'Total', puntos: 'points', partidos: 'played' },
+    { clave: 'casa', nombre: 'En casa', puntos: 'pointsHome', partidos: 'playedHome' },
+    { clave: 'fuera', nombre: 'Fuera', puntos: 'pointsAway', partidos: 'playedAway' }
+  ];
 
-    const todos = futbolistasAlineados(null);
-    if (todos.length === 0) {
-      caja.innerHTML = '<p class="muted">Todavía no hay jornadas guardadas con alineaciones.</p>';
-      return;
+  /* Y por demarcación: comparar un portero con un delantero no dice mucho. */
+  const PUESTOS = [
+    { clave: '0', nombre: 'Todas' },
+    { clave: '1', nombre: 'Porteros' },
+    { clave: '2', nombre: 'Defensas' },
+    { clave: '3', nombre: 'Medios' },
+    { clave: '4', nombre: 'Delanteros' }
+  ];
+
+  function selectorAmbito(marca, elegido, puesto) {
+    const chips = function (lista, tipo, actual) {
+      return lista.map(function (opcion) {
+        return '<button type="button" class="ambito" data-' + tipo + '="' + marca + ':' + opcion.clave + '"' +
+          ' aria-pressed="' + (opcion.clave === actual ? 'true' : 'false') + '">' +
+          opcion.nombre + '</button>';
+      }).join('');
+    };
+
+    return '<div class="ambitos" role="group" aria-label="Casa o fuera">' +
+        chips(AMBITOS, 'ambito', elegido) +
+      '</div>' +
+      '<div class="ambitos" role="group" aria-label="Demarcación">' +
+        chips(PUESTOS, 'puesto', puesto) +
+      '</div>';
+  }
+
+  /** Las cuatro listas de una tanda de futbolistas, en el ámbito elegido. */
+  function cuatroListas(lista, marca, cual, puesto) {
+    const ambito = AMBITOS.filter(function (a) { return a.clave === cual; })[0] || AMBITOS[0];
+
+    /* En casa y fuera solo entra quien ha jugado alguno allí. */
+    const conDatos = lista.filter(function (j) {
+        if (puesto && puesto !== '0' && String(j.position) !== String(puesto)) return false;
+        return (j[ambito.partidos] || 0) > 0;
+      })
+      .map(function (j) {
+        const partidos = j[ambito.partidos] || 0;
+        const puntos = j[ambito.puntos] || 0;
+        return Object.assign({}, j, {
+          points: puntos, played: partidos, media: partidos ? puntos / partidos : 0,
+          rounds: ambito.clave === 'total' ? j.rounds
+            : (j.rounds || []).filter(function (r) {
+                return ambito.clave === 'casa' ? r.home === true : r.home === false;
+              })
+        });
+      });
+
+    if (conDatos.length === 0) {
+      return '<p class="muted">Sin datos todavía para eso.</p>';
     }
 
-    const porPuntos = todos.slice().sort(function (a, b) { return b.points - a.points; });
-    const porMedia = todos.slice().sort(function (a, b) { return b.media - a.media; });
+    const porPuntos = conDatos.slice().sort(function (a, b) { return b.points - a.points; });
+    const porMedia = conDatos.slice().sort(function (a, b) { return b.media - a.media; });
 
     const enteros = function (j) { return j.points + ' pts'; };
     const decimales = function (j) { return j.media.toFixed(1); };
@@ -3454,21 +3532,117 @@
         (j.played === 1 ? ' partido' : ' partidos') + '</span>';
     };
 
-    const tope = topeRanking(todos.length);
-    const bloque = function (titulo, prefijo, lista, valor) {
+    const tope = topeRanking(conDatos.length);
+    const bloque = function (titulo, prefijo, orden, valor) {
       return '<div class="ranking">' +
         '<h3 class="ranking__title">' + titulo + '</h3>' +
-        rankingRows(lista.slice(0, tope), function (j) {
+        rankingRows(orden.slice(0, tope), function (j) {
           return valor(j) + veces(j);
-        }, prefijo) +
+        }, marca + ':' + ambito.clave + ':' + (puesto || '0') + ':' + prefijo) +
       '</div>';
     };
 
-    caja.innerHTML =
-      bloque('Más puntos', 'mas', porPuntos, enteros) +
+    return bloque('Más puntos', 'mas', porPuntos, enteros) +
       bloque('Mejor media', 'media', porMedia, decimales) +
       bloque('Menos puntos', 'menos', porPuntos.slice().reverse(), enteros) +
       bloque('Peor media', 'peormedia', porMedia.slice().reverse(), decimales);
+  }
+
+  function renderRankings() {
+    const caja = $('rankings-jugadores');
+    if (!caja) return;
+
+    const todos = futbolistasAlineados(null);
+    caja.innerHTML = todos.length === 0
+      ? '<p class="muted">Todavía no hay jornadas guardadas con alineaciones.</p>'
+      : cuatroListas(todos, 'nuestra', state.ambito.nuestra, state.puesto.nuestra);
+
+    const mando = $('ambitos-nuestra');
+    if (mando) mando.innerHTML = selectorAmbito('nuestra', state.ambito.nuestra, state.puesto.nuestra);
+
+    renderLaLiga();
+  }
+
+  /** De quién es cada futbolista, mirando las ocho plantillas. */
+  function duenosDeFutbolistas() {
+    const de = {};
+    squadList().forEach(function (plantilla) {
+      (plantilla.players || []).forEach(function (jugador) {
+        de[String(jugador.id)] = plantilla.name;
+      });
+    });
+    return de;
+  }
+
+  /** Lo mismo, pero con todos los futbolistas de la competición. */
+  function renderLaLiga() {
+    const caja = $('rankings-laliga');
+    if (!caja) return;
+
+    const datos = state.laliga;
+    if (!datos) {
+      caja.innerHTML = '<p class="muted">Cargando los datos de la competición…</p>';
+      return;
+    }
+
+    const dueno = duenosDeFutbolistas();
+    /* La racha llega sin numerar: la última entrada es la jornada en curso y
+       las anteriores, hacia atrás. */
+    const jornadaActual = (state.round && state.round.number) || JORNADAS_LIGA;
+
+    const lista = datos.map(function (jugador) {
+      const racha = jugador.fitness || [];
+      const desde = jornadaActual - racha.length + 1;
+      return {
+        id: jugador.id,
+        name: jugador.name,
+        position: jugador.position,
+        team: jugador.team,
+        teamName: jugador.teamName,
+        points: jugador.points || 0,
+        played: jugador.played || 0,
+        pointsHome: jugador.pointsHome || 0,
+        playedHome: jugador.playedHome || 0,
+        pointsAway: jugador.pointsAway || 0,
+        playedAway: jugador.playedAway || 0,
+        media: jugador.played ? (jugador.points || 0) / jugador.played : 0,
+        owner: dueno[String(jugador.id)] || 'Libre',
+        rounds: racha.map(function (nota, i) {
+          return { number: desde + i, points: nota == null ? 0 : nota, sinNota: nota == null };
+        })
+      };
+    });
+
+    caja.innerHTML = lista.length === 0
+      ? '<p class="muted">Todavía no ha jugado nadie.</p>'
+      : cuatroListas(lista, 'laliga', state.ambito.laliga, state.puesto.laliga);
+
+    const mando = $('ambitos-laliga');
+    if (mando) mando.innerHTML = selectorAmbito('laliga', state.ambito.laliga, state.puesto.laliga);
+  }
+
+  /** Trae la tabla de toda la competición; se guarda mientras dure la sesión. */
+  function ensureLaLiga(forzar) {
+    const config = loadSyncConfig();
+    if (!config.url || !config.key) return;
+    if (state.laliga && !forzar) return;
+    if (state.laligaCargando) return;
+
+    state.laligaCargando = true;
+    fetch(config.url.replace(/\/+$/, '') + '/?key=' + encodeURIComponent(config.key) + '&ranking=1',
+      { headers: { 'accept': 'application/json' } })
+      .then(function (response) { return response.json(); })
+      .then(function (payload) {
+        if (payload.error) throw new Error(payload.error);
+        state.laliga = payload.players || [];
+        state.laligaCargando = false;
+        renderLaLiga();
+      })
+      .catch(function () {
+        state.laligaCargando = false;
+        const caja = $('rankings-laliga');
+        if (caja) caja.innerHTML = '<p class="muted">No se han podido traer los datos de la competición.</p>';
+      });
   }
 
   function renderSpending() {
@@ -3554,7 +3728,7 @@
       panel.hidden = panel.getAttribute('data-panel') !== name;
     });
     if (name === 'managers') { renderManagers(); renderSquads(); }
-    if (name === 'datos') { renderDataKpis(); renderKpiCharts(); renderSpending(); renderRankings(); }
+    if (name === 'datos') { ensureSquads(); ensureLaLiga(); renderDataKpis(); renderKpiCharts(); renderSpending(); renderRankings(); }
     if (name === 'mercado') { ensureMarket(); renderMarket(); renderMovers(); }
     if (name === 'jornadas') { ensureJornada(state.jornadaVista || 'actual'); renderJornadas(); }
   }
@@ -3593,7 +3767,7 @@
     renderLineup();
     renderWarnings();
     if (state.tab === 'managers') { renderManagers(); renderSquads(); }
-    if (state.tab === 'datos') { renderDataKpis(); renderKpiCharts(); renderSpending(); renderRankings(); }
+    if (state.tab === 'datos') { ensureSquads(); ensureLaLiga(); renderDataKpis(); renderKpiCharts(); renderSpending(); renderRankings(); }
     if (state.tab === 'mercado') { renderMarket(); renderMovers(); }
   }
 
@@ -4044,12 +4218,24 @@
     });
 
     /* En las clasificaciones de futbolistas, cada uno abre su gráfico. */
-    $('rankings-jugadores').addEventListener('click', function (event) {
-      const fila = event.target.closest('[data-puntos]');
-      if (!fila) return;
-      const clave = fila.getAttribute('data-puntos');
-      state.puntosDetalle = state.puntosDetalle === clave ? null : clave;
-      renderRankings();
+    ['rankings-jugadores', 'rankings-laliga', 'ambitos-nuestra', 'ambitos-laliga'].forEach(function (id) {
+      $(id).addEventListener('click', function (event) {
+        const mando = event.target.closest('[data-ambito], [data-puesto]');
+        if (mando) {
+          const cual = mando.hasAttribute('data-ambito') ? 'ambito' : 'puesto';
+          const partes = mando.getAttribute('data-' + cual).split(':');
+          state[cual][partes[0]] = partes[1];
+          state.puntosDetalle = null;
+          renderRankings();
+          return;
+        }
+
+        const fila = event.target.closest('[data-puntos]');
+        if (!fila) return;
+        const clave = fila.getAttribute('data-puntos');
+        state.puntosDetalle = state.puntosDetalle === clave ? null : clave;
+        renderRankings();
+      });
     });
 
     bindSorting('managers');

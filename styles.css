@@ -295,6 +295,21 @@ code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft)
   grid-template-columns: repeat(4, minmax(0, 1fr));
 }
 
+/* Mandos de casa/fuera y demarcación, encima de las cuatro listas. */
+.ambitos { display: flex; flex-wrap: wrap; gap: .3rem; margin-bottom: .5rem; }
+.ambito {
+  font: inherit; font-size: .74rem;
+  padding: .18rem .55rem;
+  color: var(--text-soft); background: var(--bg-surface);
+  border: 1px solid var(--border); border-radius: 100px;
+  cursor: pointer;
+}
+.ambito:hover { border-color: var(--border-hover); color: var(--text); }
+.ambito[aria-pressed="true"] {
+  color: var(--accent); border-color: var(--accent); background: var(--accent-soft);
+}
+.ambito:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
 .ranking { min-width: 0; }
 .ranking__title { font-size: .9rem; font-weight: 650; }
 .ranking__list { list-style: none; margin: 0; padding: 0; counter-reset: puesto; }
@@ -339,21 +354,24 @@ code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft)
    Una columna por jornada, de izquierda a derecha. Con muchas jornadas la tira
    se desplaza sola en horizontal en vez de estrujar las columnas. */
 .barras { margin: .5rem 0 .2rem; }
-.barras__cuerpo {
-  display: flex; align-items: flex-end; gap: .25rem;
-  overflow-x: auto; padding-bottom: .2rem;
+.barras__cuerpo { display: flex; align-items: stretch; gap: 1px; }
+/* Las 38 caben siempre: las jornadas sin jugar quedan como hueco a la derecha. */
+.barras__col { flex: 1 1 0; min-width: 0; display: flex; }
+.barras__eje {
+  display: flex; justify-content: space-between;
+  margin-top: .15rem;
+  font-family: var(--mono); font-size: .58rem; color: var(--text-faint);
 }
-.barras__col { flex: 1 0 22px; min-width: 22px; display: grid; justify-items: center; gap: .15rem; }
-.barras__etiqueta { font-family: var(--mono); font-size: .6rem; color: var(--text-faint); }
-.barras__valor { font-size: .68rem; font-variant-numeric: tabular-nums; }
 
 /* La pista tiene alto fijo; sin negativos la barra sube desde abajo y, con
    ellos, la mitad de abajo cuelga desde la línea del cero. */
 .barras__pista { display: flex; flex-direction: column; width: 100%; height: 52px; }
 .barras__mitad { flex: 1 1 0; display: flex; align-items: flex-end; }
 .barras__mitad--neg { align-items: flex-start; border-top: 1px solid var(--border-strong); }
-.barras__barra { width: 100%; border-radius: 3px 3px 0 0; background: var(--viz-1, #2a78d6); }
-.barras__barra--neg { border-radius: 0 0 3px 3px; background: var(--neg); }
+.barras__barra { width: 100%; border-radius: 2px 2px 0 0; background: var(--viz-1, #2a78d6); }
+.barras__barra--neg { border-radius: 0 0 2px 2px; background: var(--neg); }
+/* Jornada sin jugar: solo la marca del suelo, para que se lea el eje entero. */
+.barras__col--vacia { border-bottom: 1px solid var(--border); }
 .barras__pie { margin-top: .35rem; font-size: .68rem; color: var(--text-faint); }
 
 /* Dentro del desglose de una plantilla, la fila del futbolista se pulsa. */
