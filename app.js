@@ -2735,7 +2735,7 @@
       ? '<p class="muted">Todavía no hay jornadas guardadas con su alineación.</p>'
       : '<table class="detail-table"><thead><tr>' +
           '<th class="detail-rank">Pos.</th><th>Futbolista</th>' +
-          '<th class="num">Puntos</th><th class="num">Alineado</th>' +
+          '<th class="num">Puntos</th><th class="num">Partidos</th>' +
         '</tr></thead><tbody>' +
         suyos.map(function (jugador) {
           const clave = 'plantilla:' + row.name + ':' + jugador.id;
@@ -3336,6 +3336,10 @@
         if (deQuien && fila.name !== deQuien) return;
 
         (fila.xi || []).forEach(function (jugador) {
+          /* Si el equipo del futbolista aún no ha jugado su partido, esa
+             jornada no cuenta: no ha tenido ocasión de puntuar. */
+          if (jugador.pending) return;
+
           const clave = String(jugador.id);
           if (!porJugador[clave]) {
             porJugador[clave] = {
@@ -3361,15 +3365,16 @@
     return Object.keys(porJugador).map(function (clave) {
       const ficha = porJugador[clave];
       ficha.rounds.sort(function (a, b) { return (a.number || 0) - (b.number || 0); });
-      ficha.played = ficha.rounds.length;          // veces alineado
+      ficha.played = ficha.rounds.length;          // partidos con su equipo ya jugado
       ficha.media = ficha.played ? ficha.points / ficha.played : null;
       return ficha;
     });
   }
 
   /**
-   * Los puntos de un futbolista jornada a jornada, en barras horizontales. Con
-   * puntuaciones negativas la barra crece hacia el otro lado desde el cero.
+   * Los puntos de un futbolista jornada a jornada: una columna por jornada, de
+   * izquierda a derecha. Con puntuaciones negativas la columna cuelga por
+   * debajo de la línea del cero.
    */
   function graficoDePuntos(ficha) {
     const rondas = ficha.rounds || [];
@@ -3378,31 +3383,33 @@
     const hayNegativos = rondas.some(function (r) { return r.points < 0; });
     const tope = Math.max.apply(null, rondas.map(function (r) { return Math.abs(r.points); }).concat([1]));
 
-    const barra = function (ancho, negativa) {
-      return '<span class="barras__mitad' + (negativa ? ' barras__mitad--neg' : '') + '">' +
-        (ancho > 0
-          ? '<span class="barras__barra' + (negativa ? ' barras__barra--neg' : '') +
-            '" style="width:' + ancho.toFixed(1) + '%"></span>'
-          : '') +
-      '</span>';
-    };
+    const columnas = rondas.map(function (r) {
+      const alto = (Math.abs(r.points) / tope) * 100;
+      const negativa = r.points < 0;
+      const barra = function (mitadNegativa) {
+        const suya = mitadNegativa === negativa;
+        return '<span class="barras__mitad' + (mitadNegativa ? ' barras__mitad--neg' : '') + '">' +
+          (suya && alto > 0
+            ? '<span class="barras__barra' + (negativa ? ' barras__barra--neg' : '') +
+              '" style="height:' + alto.toFixed(1) + '%"></span>'
+            : '') +
+        '</span>';
+      };
 
-    return '<div class="barras' + (hayNegativos ? ' barras--cero' : '') + '">' +
-      rondas.map(function (r) {
-        const ancho = (Math.abs(r.points) / tope) * 100;
-        const negativa = r.points < 0;
-        return '<div class="barras__fila">' +
-          '<span class="barras__etiqueta">J' + (r.number || '?') + '</span>' +
-          '<span class="barras__pista">' +
-            (hayNegativos ? barra(negativa ? ancho : 0, true) : '') +
-            barra(negativa ? 0 : ancho, false) +
-          '</span>' +
-          '<strong class="barras__valor' + (negativa ? ' money-neg' : '') + '">' +
-            (r.sinNota ? '–' : r.points) + '</strong>' +
-        '</div>';
-      }).join('') +
+      return '<div class="barras__col">' +
+        '<span class="barras__valor' + (negativa ? ' money-neg' : '') + '">' +
+          (r.sinNota ? '–' : r.points) + '</span>' +
+        '<span class="barras__pista">' +
+          barra(false) + (hayNegativos ? barra(true) : '') +
+        '</span>' +
+        '<span class="barras__etiqueta">J' + (r.number || '?') + '</span>' +
+      '</div>';
+    }).join('');
+
+    return '<div class="barras">' +
+      '<div class="barras__cuerpo">' + columnas + '</div>' +
       '<p class="barras__pie">' + ficha.points + ' puntos en ' + rondas.length +
-        (rondas.length === 1 ? ' alineación' : ' alineaciones') + '</p>' +
+        (rondas.length === 1 ? ' partido' : ' partidos') + '</p>' +
     '</div>';
   }
 
@@ -3444,7 +3451,7 @@
     const decimales = function (j) { return j.media.toFixed(1); };
     const veces = function (j) {
       return '<span class="ranking__sub">' + j.played +
-        (j.played === 1 ? ' alineación' : ' alineaciones') + '</span>';
+        (j.played === 1 ? ' partido' : ' partidos') + '</span>';
     };
 
     const tope = topeRanking(todos.length);
