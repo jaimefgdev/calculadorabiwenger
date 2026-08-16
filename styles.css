@@ -228,7 +228,7 @@ code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft)
 /* El reloj es texto, no una fila de cajas: números algo mayores y en el
    color de acento; la unidad, discreta al lado. */
 .round__clock {
-  display: flex; align-items: baseline; gap: .9rem;
+  display: flex; align-items: baseline; gap: .9rem; flex-wrap: wrap;
   font-family: var(--mono);
   font-variant-numeric: tabular-nums;
 }
@@ -252,6 +252,40 @@ code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft)
 .round__hour { font-family: var(--mono); color: var(--text-soft); }
 .round__vs { margin: 0 .35rem; color: var(--text-faint); }
 .round__tv { font-size: .78rem; color: var(--accent); text-align: right; }
+
+/* ---------- Jornada en juego ---------- */
+.round__live {
+  display: inline-flex; align-items: center; gap: .35rem;
+  font-family: var(--font); font-size: .78rem; font-weight: 700;
+  text-transform: uppercase; letter-spacing: .05em;
+  color: var(--marca);
+}
+.round__live::before {
+  content: ''; width: .5rem; height: .5rem; border-radius: 50%;
+  background: var(--marca); animation: latido 1.6s ease-in-out infinite;
+}
+@keyframes latido { 0%, 100% { opacity: 1; } 50% { opacity: .25; } }
+@media (prefers-reduced-motion: reduce) { .round__live::before { animation: none; } }
+
+/* El reloj pasa a contar al siguiente partido, y lo dice. En móvil el aviso de
+   «en juego» y la cuenta no caben de una: se deja que caiga a otra línea. */
+.round__next { display: inline-flex; align-items: baseline; gap: .55rem; flex-wrap: wrap; }
+.round__next small {
+  font-family: var(--font); font-size: .68rem; color: var(--text-faint);
+}
+
+/* Marcador ya jugado: manda sobre los nombres de los equipos. */
+.round__score {
+  font-family: var(--mono); font-variant-numeric: tabular-nums;
+  font-weight: 700; color: var(--text);
+}
+.round__game--live .round__score { color: var(--marca); }
+.round__game--done { color: var(--text-soft); }
+.round__final { font-size: .78rem; color: var(--text-faint); }
+.round__playing { font-size: .78rem; font-weight: 700; color: var(--marca); }
+
+/* El once ideal va solo en su bloque, así que se centra. */
+.panel__head--center { text-align: center; }
 
 /* ---------- El campo ---------- */
 .field-label { display: flex; align-items: center; gap: .5rem; font-size: .8rem; color: var(--text-soft); }

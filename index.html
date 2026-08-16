@@ -16,7 +16,7 @@
 <title>Calculadora Biwenger — Presupuestos de la liga</title>
 <!-- El ?v= se sube en cada publicación: obliga al navegador a bajar el archivo
      nuevo en vez de reutilizar el que tenga en caché. -->
-<link rel="stylesheet" href="styles.css?v=76">
+<link rel="stylesheet" href="styles.css?v=77">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>💰</text></svg>">
 </head>
 <body>
@@ -114,7 +114,7 @@
   <section id="round-panel" class="panel round" hidden>
     <div class="round__top">
       <button type="button" class="round__toggle" id="round-toggle" aria-expanded="false" aria-controls="round-games">
-        <span class="round__label">Inicio de la</span>
+        <span class="round__label" id="round-label">Inicio de la</span>
         <strong class="round__name" id="round-name">—</strong>
         <span class="round__when" id="round-when"></span>
         <span class="round__caret" aria-hidden="true">▸</span>
@@ -439,7 +439,6 @@
       <div class="panel__head panel__head--row">
         <div>
           <h2>Jornadas</h2>
-          <p class="muted" id="jornada-note">Cada jornada se guarda aquí para siempre: Biwenger borra los suplentes en cuanto empieza la siguiente.</p>
         </div>
         <button type="button" id="jornada-pick" class="field field--pick"
           aria-haspopup="dialog" aria-label="Elegir jornada">—</button>
@@ -475,6 +474,6 @@
 
 </main>
 
-<script src="app.js?v=76"></script>
+<script src="app.js?v=77"></script>
 </body>
 </html>

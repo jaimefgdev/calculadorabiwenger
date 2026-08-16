@@ -1457,8 +1457,14 @@
     if (!round || !round.start) { section.hidden = true; return; }
 
     section.hidden = false;
+    /* Con la jornada empezada no interesa el arranque de la siguiente, sino
+       cómo va la de ahora. */
+    const enJuego = !!round.live;
+    $('round-label').textContent = enJuego ? 'En juego la' : 'Inicio de la';
     $('round-name').textContent = 'Jornada ' + (round.number || '');
-    $('round-when').textContent = dateFormat.format(new Date(round.start));
+    $('round-when').textContent = enJuego
+      ? (round.played || 0) + ' de ' + (round.games || 0) + ' partidos jugados'
+      : dateFormat.format(new Date(round.start));
 
     const matches = round.matches || [];
     const toggle = $('round-toggle');
@@ -1472,7 +1478,7 @@
     tickRound();
   }
 
-  /** Los diez partidos, agrupados por día: hora, equipos y dónde se ve. */
+  /** Los diez partidos, agrupados por día: hora, marcador y dónde se ve. */
   function roundGames(matches) {
     let day = '';
     return matches.map(function (match) {
@@ -1481,12 +1487,27 @@
       const header = key === day ? '' :
         '<p class="round__day">' + escapeHtml(key) + '</p>';
       day = key;
+
+      const hayMarcador = match.homeScore != null && match.awayScore != null;
+      const acabado = match.status === 'finished';
+      const rodando = hayMarcador && !acabado;
+
+      /* Una vez jugado el partido, el canal ya no le importa a nadie: ese
+         hueco lo ocupa cómo va. */
+      const estado = acabado ? '<span class="round__final">Final</span>'
+        : (rodando ? '<span class="round__playing">En juego</span>'
+          : (match.tv ? escapeHtml(match.tv) : '—'));
+
       return header +
-        '<div class="round__game">' +
+        '<div class="round__game' + (rodando ? ' round__game--live' : '') +
+          (acabado ? ' round__game--done' : '') + '">' +
           '<span class="round__hour">' + timeFormat.format(when) + '</span>' +
           '<span class="round__teams">' + escapeHtml(match.home) +
-            '<span class="round__vs">–</span>' + escapeHtml(match.away) + '</span>' +
-          '<span class="round__tv">' + (match.tv ? escapeHtml(match.tv) : '—') + '</span>' +
+            (hayMarcador
+              ? '<span class="round__vs round__score">' + match.homeScore + '–' + match.awayScore + '</span>'
+              : '<span class="round__vs">–</span>') +
+            escapeHtml(match.away) + '</span>' +
+          '<span class="round__tv">' + estado + '</span>' +
         '</div>';
     }).join('');
   }
@@ -1499,9 +1520,13 @@
     if (!clock || !round || !round.start) return;
 
     let left = Math.floor((Date.parse(round.start) - Date.now()) / 1000);
+    const enJuego = !!round.live;
+
     if (left <= 0) {
-      clock.innerHTML = '<span class="round__unit"><span class="round__value">¡Ya!</span>' +
-        '<small>en juego</small></span>';
+      clock.innerHTML = enJuego
+        ? '<span class="round__live">En juego</span>'
+        : '<span class="round__unit"><span class="round__value">¡Ya!</span>' +
+          '<small>en juego</small></span>';
       return;
     }
 
@@ -1511,7 +1536,9 @@
     const seconds = left - minutes * 60;
     const pad = (n) => (n < 10 ? '0' + n : String(n));
 
-    clock.innerHTML = [
+    /* Con la jornada empezada el reloj cuenta al siguiente partido, no al
+       arranque de nada. */
+    const unidades = [
       { value: days, label: days === 1 ? 'día' : 'días' },
       { value: pad(hours), label: 'horas' },
       { value: pad(minutes), label: 'min' },
@@ -1520,6 +1547,11 @@
       return '<span class="round__unit"><span class="round__value">' + unit.value + '</span>' +
         '<small>' + unit.label + '</small></span>';
     }).join('');
+
+    clock.innerHTML = enJuego
+      ? '<span class="round__live">En juego</span>' +
+        '<span class="round__next"><small>próximo partido</small>' + unidades + '</span>'
+      : unidades;
   }
 
   /* ---------- Cuenta atrás de pujas y ventas ---------- */
@@ -2450,11 +2482,10 @@
     }
 
     caja.hidden = false;
-    caja.innerHTML = '<div class="panel__head"><h2>Once ideal</h2>' +
-      '<p class="muted">' + escapeHtml(once.type) + ' · ' + once.points + ' puntos entre los once</p></div>' +
-      '<div class="lineup-grid"><div class="pitch-wrap">' +
-        staticPitch(once.type, once.players) +
-      '</div></div>';
+    caja.innerHTML = '<div class="panel__head panel__head--center"><h2>Once ideal</h2>' +
+      '<p class="muted">' + escapeHtml(once.type || '') + (once.type ? ' · ' : '') +
+        once.points + ' puntos entre los once</p></div>' +
+      '<div class="pitch-wrap">' + staticPitch(once.type, once.players) + '</div>';
   }
 
   function renderJornadas() {
@@ -3576,20 +3607,19 @@
      esté a la vista. Biwenger publica los fichajes al cerrar el mercado, así
      que no tiene sentido consultar más a menudo. */
   /**
-   * ¿Acaba de terminar algún partido? Desde el pitido final y durante las
-   * horas siguientes es cuando aparecen las notas del AS y, con ellas, los
-   * puntos. Antes de eso no hay nada nuevo que traer.
+   * ¿Hay algún partido en marcha o recién acabado? Mientras se juega cambian
+   * los resultados, y desde el pitido final aparecen las notas del AS y con
+   * ellas los puntos. Fuera de esa horquilla no hay nada nuevo que traer.
    */
   function ventanaDePuntos() {
     const partidos = (state.round && state.round.matches) || [];
     const ahora = Date.now();
-    const FINAL = 1.75 * 60 * 60 * 1000;   // pitido final aproximado
-    const LIMITE = 5 * 60 * 60 * 1000;     // margen para que se publiquen
+    const LIMITE = 5 * 60 * 60 * 1000;     // lo que dura el partido más el margen
 
     return partidos.some(function (partido) {
       const empieza = Date.parse(partido.start);
       if (isNaN(empieza)) return false;
-      return ahora >= empieza + FINAL && ahora <= empieza + LIMITE;
+      return ahora >= empieza && ahora <= empieza + LIMITE;
     });
   }
 
