@@ -1179,6 +1179,73 @@ code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft)
 .table--listings td[data-label="Ofertas"] .bid { display: inline-flex; vertical-align: middle; }
 .table--offers td[data-label="Simular"] .switch { vertical-align: middle; }
 
+/* ---------- Partidos de la jornada ---------- */
+.partidos { display: grid; gap: .3rem; }
+.partido { border: 1px solid var(--border); border-radius: var(--radius-sm); overflow: hidden; }
+.partido--abierto { border-color: var(--accent); }
+.partido__cab {
+  display: grid; align-items: center; gap: .5rem;
+  grid-template-columns: 1fr auto 1fr;
+  width: 100%; padding: .45rem .6rem;
+  font: inherit; font-size: .84rem; color: inherit;
+  background: transparent; border: 0; cursor: pointer; text-align: center;
+}
+.partido__cab[disabled] { cursor: default; opacity: .75; }
+.partido__cab:not([disabled]):hover { background: var(--bg-surface); }
+.partido__cab:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.partido__equipo { display: flex; align-items: center; justify-content: flex-start; gap: .35rem; min-width: 0; }
+.partido__equipo--local { justify-content: flex-end; }
+.partido__marcador {
+  font-family: var(--mono); font-weight: 700;
+  min-width: 3.2rem; padding: .1rem .35rem;
+  background: var(--bg-surface); border-radius: var(--radius-sm);
+}
+/* En juego o por acabar: el marcador va en el color de marca. */
+.partido__marcador--vivo { color: var(--marca); }
+
+.partido__detalle { padding: .3rem .6rem .6rem; border-top: 1px solid var(--border); }
+.alin__aviso { font-size: .72rem; margin-bottom: .4rem; }
+.alineaciones { display: grid; gap: 1rem; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+@media (max-width: 620px) { .alineaciones { grid-template-columns: 1fr; } }
+.alin__titulo { font-size: .8rem; font-weight: 650; margin-bottom: .25rem; }
+.alin__banquillo {
+  margin-top: .4rem; font-size: .68rem; text-transform: uppercase;
+  letter-spacing: .05em; color: var(--text-faint);
+}
+.alin__fila {
+  display: grid; align-items: center; gap: .4rem;
+  grid-template-columns: 2.1rem minmax(0, 1fr) auto 1.9rem;
+  padding: .16rem 0; font-size: .78rem;
+  border-bottom: 1px solid var(--border);
+}
+.alin__fila:last-child { border-bottom: 0; }
+.alin__pos { font-size: .62rem; color: var(--text-faint); }
+.alin__fila .with-crest { min-width: 0; }
+.alin__fila .player-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.alin__lances { display: flex; gap: .15rem; }
+.alin__pts { text-align: right; font-weight: 700; font-variant-numeric: tabular-nums; }
+
+/* Cada lance, en su circulito: gol, tarjeta, cambio… */
+.lance {
+  display: grid; place-items: center;
+  width: 15px; height: 15px;
+  font-size: .58rem; font-weight: 700; line-height: 1;
+  border-radius: 50%;
+  color: #111; background: #fff;
+}
+.lance--gol { background: #fff; }
+.lance--penalti { background: var(--marca); }
+.lance--fallo { background: var(--neg); color: #fff; }
+.lance--asist { background: var(--pos); color: #fff; }
+.lance--entra { background: var(--pos); color: #fff; font-size: .5rem; }
+.lance--sale { background: var(--neg); color: #fff; font-size: .5rem; }
+/* Las tarjetas no son redondas: son tarjetas. */
+.lance--amarilla, .lance--roja { width: 10px; height: 14px; border-radius: 2px; }
+.lance--amarilla { background: #f5c518; }
+.lance--roja { background: #e0142c; }
+.lance--lesion { background: var(--neg); color: #fff; }
+.lance--otro { background: var(--border-strong); color: var(--text-soft); }
+
 /* ---------- Jornadas ---------- */
 .jornadas-wrap { position: relative; }
 /* El menú de jornadas se dibuja sobre su propio panel. */

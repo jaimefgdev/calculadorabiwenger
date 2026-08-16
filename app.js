@@ -513,6 +513,9 @@
     expandedManager: null,
     expandedPoints: null,   // desglose de puntos por futbolista, en la clasificación
     puntosDetalle: null,    // gráfico de puntos por jornada de un futbolista
+    partidos: {},           // partidos de cada jornada, con sus alineaciones
+    partidosEstado: '',
+    partidoAbierto: null,   // el partido cuyo detalle se está viendo
     laliga: null,           // todos los futbolistas de la competición
     ambito: { nuestra: 'total', laliga: 'total' },   // total · en casa · fuera
     puesto: { nuestra: '0', laliga: '0' },           // demarcación: 0 son todas
@@ -2623,6 +2626,131 @@
     ajustarNombres();
   }
 
+  /* ---------- Los partidos de la jornada ----------
+     Biwenger numera los lances sin explicarlos; el significado se ha despejado
+     cruzándolos con el desglose de puntos y con los resultados. */
+  const LANCES = {
+    1:  { icono: '\u26bd', clase: 'lance--gol',      nombre: 'Gol' },
+    2:  { icono: '\u26bd', clase: 'lance--penalti',  nombre: 'Gol de penalti' },
+    3:  { icono: 'A',      clase: 'lance--asist',    nombre: 'Asistencia' },
+    4:  { icono: '\u25bc', clase: 'lance--sale',     nombre: 'Sale' },
+    5:  { icono: '\u25b2', clase: 'lance--entra',    nombre: 'Entra' },
+    6:  { icono: '',       clase: 'lance--amarilla', nombre: 'Tarjeta amarilla' },
+    7:  { icono: '',       clase: 'lance--roja',     nombre: 'Tarjeta roja' },
+    14: { icono: '\u002b', clase: 'lance--lesion',   nombre: 'Lesi\u00f3n' },
+    16: { icono: '\u26bd', clase: 'lance--fallo',    nombre: 'Penalti cometido' }
+  };
+
+  function lancesDe(jugador) {
+    return (jugador.events || []).map(function (lance) {
+      const ficha = LANCES[lance.type];
+      const minuto = lance.minute != null ? lance.minute + "'" : '';
+      if (!ficha) {
+        return '<span class="lance lance--otro" title="Lance ' + lance.type + ' ' + minuto + '">\u00b7</span>';
+      }
+      return '<span class="lance ' + ficha.clase + '" title="' + ficha.nombre + ' ' + minuto + '">' +
+        ficha.icono + '</span>';
+    }).join('');
+  }
+
+  /** Una alineaci\u00f3n de las dos del partido. */
+  function once(equipo, titulo) {
+    const fila = function (jugador) {
+      return '<div class="alin__fila">' +
+        '<span class="alin__pos">' + (jugador.position ? POSITION_NAMES[jugador.position] : '\u2014') + '</span>' +
+        '<span class="with-crest">' + playerName({ playerId: jugador.id, player: jugador.name }) + '</span>' +
+        '<span class="alin__lances">' + lancesDe(jugador) + '</span>' +
+        '<span class="alin__pts">' + (jugador.points == null ? '<span class="sub">\u2013</span>' : jugador.points) + '</span>' +
+      '</div>';
+    };
+
+    return '<div class="alin">' +
+      '<h4 class="alin__titulo">' + escapeHtml(titulo) + '</h4>' +
+      equipo.xi.map(fila).join('') +
+      (equipo.bench.length
+        ? '<p class="alin__banquillo">Entraron</p>' + equipo.bench.map(fila).join('')
+        : '') +
+    '</div>';
+  }
+
+  function renderPartidos() {
+    const caja = $('jornada-partidos');
+    if (!caja) return;
+
+    const jornada = jornadaActiva();
+    const id = jornada && jornada.round ? jornada.round.id : null;
+    if (id == null) { caja.hidden = true; caja.innerHTML = ''; return; }
+
+    const datos = state.partidos[id];
+    caja.hidden = false;
+
+    if (!datos) {
+      caja.innerHTML = '<div class="panel__head"><h2>Partidos</h2></div>' +
+        '<p class="muted">' + (state.partidosEstado === 'error'
+          ? 'No se han podido traer los partidos.' : 'Cargando los partidos\u2026') + '</p>';
+      return;
+    }
+
+    const partidos = datos.games || [];
+    caja.innerHTML = '<div class="panel__head"><h2>Partidos</h2></div>' +
+      (partidos.length === 0
+        ? '<p class="muted">Esta jornada todav\u00eda no tiene calendario.</p>'
+        : '<div class="partidos">' + partidos.map(function (juego) {
+            const abierto = state.partidoAbierto === juego.id;
+            const jugado = juego.home.score != null && juego.away.score != null;
+            const acabado = juego.status === 'finished';
+            const hayAlineacion = juego.home.xi.length > 0;
+
+            return '<div class="partido' + (abierto ? ' partido--abierto' : '') + '">' +
+              '<button type="button" class="partido__cab" data-partido="' + juego.id + '"' +
+                ' aria-expanded="' + (abierto ? 'true' : 'false') + '"' +
+                (hayAlineacion ? '' : ' disabled') + '>' +
+                '<span class="partido__equipo partido__equipo--local">' +
+                  escapeHtml(juego.home.name) + crestOf({ team: juego.home.id, teamName: juego.home.name }, 'crest--badge') +
+                '</span>' +
+                '<span class="partido__marcador' + (acabado ? '' : ' partido__marcador--vivo') + '">' +
+                  (jugado ? juego.home.score + '\u2013' + juego.away.score : '\u2013') + '</span>' +
+                '<span class="partido__equipo">' +
+                  crestOf({ team: juego.away.id, teamName: juego.away.name }, 'crest--badge') +
+                  escapeHtml(juego.away.name) +
+                '</span>' +
+              '</button>' +
+              (abierto
+                ? '<div class="partido__detalle">' +
+                    (jugado ? '' : '<p class="muted alin__aviso">Alineaciones probables: el partido no se ha jugado.</p>') +
+                    '<div class="alineaciones">' +
+                      once(juego.home, juego.home.name) +
+                      once(juego.away, juego.away.name) +
+                    '</div>' +
+                  '</div>'
+                : '') +
+            '</div>';
+          }).join('') + '</div>');
+  }
+
+  /** Pide los partidos de una jornada; se guardan mientras dure la sesi\u00f3n. */
+  function ensurePartidos(id, forzar) {
+    const config = loadSyncConfig();
+    if (!config.url || !config.key || id == null) return;
+    if (state.partidos[id] && !forzar) return;
+    if (state.partidosEstado === 'cargando') return;
+
+    state.partidosEstado = 'cargando';
+    fetch(config.url.replace(/\/+$/, '') + '/?key=' + encodeURIComponent(config.key) +
+      '&partidos=' + encodeURIComponent(id), { headers: { 'accept': 'application/json' } })
+      .then(function (response) { return response.json(); })
+      .then(function (payload) {
+        if (payload.error) throw new Error(payload.error);
+        state.partidos[id] = payload;
+        state.partidosEstado = '';
+        renderPartidos();
+      })
+      .catch(function () {
+        state.partidosEstado = 'error';
+        renderPartidos();
+      });
+  }
+
   /** El once ideal de la jornada, cuando Biwenger ya ha puntuado. */
   function renderBestXi(jornada) {
     const caja = $('jornada-best');
@@ -2648,6 +2776,12 @@
     /* El número manda: así el rótulo es «Jornada 3» aunque la API conteste en
        inglés. */
     renderBestXi(jornada);
+
+    /* Los partidos van entre la clasificación y el once ideal. */
+    if (jornada && jornada.round && jornada.round.id != null) {
+      ensurePartidos(jornada.round.id);
+    }
+    renderPartidos();
 
     boton.textContent = jornada && jornada.round
       ? (jornada.round.number ? 'Jornada ' + jornada.round.number : (jornada.round.name || '—'))
@@ -4361,6 +4495,15 @@
     $('data-kpis').addEventListener('click', function (event) {
       const row = event.target.closest('[data-kpi]');
       if (row) toggleKpi(row.getAttribute('data-kpi'));
+    });
+
+    /* Cada partido despliega las dos alineaciones. */
+    $('jornada-partidos').addEventListener('click', function (event) {
+      const cab = event.target.closest('[data-partido]');
+      if (!cab) return;
+      const cual = Number(cab.getAttribute('data-partido'));
+      state.partidoAbierto = state.partidoAbierto === cual ? null : cual;
+      renderPartidos();
     });
 
     /* En las clasificaciones de futbolistas, cada uno abre su gráfico. */
