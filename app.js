@@ -350,6 +350,30 @@
 
   /* ---------- Cálculo ---------- */
 
+  /**
+   * Los puntos de la jornada en juego, que Biwenger no suma a la clasificación
+   * general hasta que la cierra: mientras tanto manda ceros y en su propia app
+   * los enseña igualmente. Aquí se suman para que la tabla vaya subiendo según
+   * acaban los partidos, y se dejan de sumar en cuanto la jornada acaba, que es
+   * cuando Biwenger ya los tiene en el total.
+   */
+  function conJornadaEnJuego(equipo, base) {
+    const round = state.round;
+    if (!equipo || !equipo.id || !round || !round.live || round.id == null) return base;
+
+    const jornada = state.jornadas.datos[round.id];
+    if (!jornada) return base;
+
+    /* Por identificador y no por nombre: en la jornada Biwenger devuelve el
+       nombre con emojis y aquí llega sin ellos. */
+    const fila = (jornada.standings || []).filter(function (f) {
+      return String(f.id) === String(equipo.id);
+    })[0];
+    const suma = fila && fila.points ? fila.points : 0;
+    if (!suma) return base;
+    return (base || 0) + suma;
+  }
+
   function computeBudgets(movements, teams) {
     const rows = MANAGERS.map(function (name) {
       return {
@@ -361,7 +385,7 @@
         sells: 0,
         teamValue: teams[name] ? teams[name].value : null,
         players: teams[name] ? teams[name].players : null,
-        points: teams[name] && teams[name].points != null ? teams[name].points : null,
+        points: conJornadaEnJuego(teams[name], teams[name] && teams[name].points != null ? teams[name].points : null),
         // Saldo tal cual lo da Biwenger; incluye cesiones, bonus y cláusulas.
         officialBalance: teams[name] && teams[name].balance != null ? teams[name].balance : null,
         lastAccess: teams[name] ? teams[name].lastAccess : null
@@ -2314,6 +2338,9 @@
         state.jornadaEstado = '';
         if (id != null) state.jornadaVista = id;
         renderJornadas();
+        /* La jornada llega después de la sincronización, y con ella los puntos
+           que se suman a la clasificación: hay que repintarla. */
+        renderManagers();
       })
       .catch(function () {
         state.jornadaEstado = 'error';

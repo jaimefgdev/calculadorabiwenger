@@ -1183,7 +1183,9 @@ main.wrap { padding-bottom: 3.5rem; }
   min-width: 19px; height: 19px; padding: 0 4px;
   font-size: .66rem; font-weight: 700; line-height: 1;
   font-variant-numeric: tabular-nums;
-  color: var(--text); background: #fff;
+  /* El círculo es blanco en los dos temas, así que el número va negro fijo:
+     con la tinta del tema salía casi blanco sobre blanco en modo oscuro. */
+  color: #111111; background: #fff;
   border-radius: 100px;
   box-shadow: 0 1px 3px rgba(0, 0, 0, .5);
 }
