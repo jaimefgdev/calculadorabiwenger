@@ -1230,18 +1230,19 @@ code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft)
 .vistas--campo { justify-content: flex-end; }
 .vistas--tabla { justify-content: flex-start; }
 
-/* En la vista de campo los lances van bajo el nombre, en una tira. */
+/* En la vista de campo los lances van debajo del nombre, en su propia línea:
+   flotando se comían el nombre del futbolista. */
 .pitch__lances, .bench__lances {
-  position: absolute; bottom: -6px; left: 50%; transform: translateX(-50%);
-  display: flex; gap: .1rem; z-index: 3;
+  display: flex; gap: .1rem; justify-content: center;
+  margin-top: .1rem; z-index: 3;
 }
-.bench__lances { position: static; transform: none; justify-content: center; margin-top: .15rem; }
 .pitch__lances .lance, .bench__lances .lance { width: 13px; height: 13px; font-size: .52rem; }
 .pitch__lances .lance--amarilla, .pitch__lances .lance--roja,
 .bench__lances .lance--amarilla, .bench__lances .lance--roja { width: 9px; height: 12px; }
 /* Los dos campos de un partido, uno al lado del otro. */
 .alineaciones .pitch-wrap { margin-top: .3rem; }
-.alineaciones .bench { margin-top: .3rem; }
+/* Los suplentes, de tres en tres: con cuatro se aprietan demasiado. */
+.alineaciones .bench { margin-top: .3rem; grid-template-columns: repeat(3, minmax(0, 1fr)); }
 
 /* Cada lance, en su circulito: gol, tarjeta, cambio… */
 .lance {
