@@ -516,6 +516,7 @@
     partidos: {},           // partidos de cada jornada, con sus alineaciones
     partidosEstado: '',
     partidoAbierto: null,   // el partido cuyo detalle se está viendo
+    vistaPartido: 'tabla',  // cómo se enseña la alineación: tabla o campo
     laliga: null,           // todos los futbolistas de la competición
     ambito: { nuestra: 'total', laliga: 'total' },   // total · en casa · fuera
     puesto: { nuestra: '0', laliga: '0' },           // demarcación: 0 son todas
@@ -2673,6 +2674,56 @@
     '</div>';
   }
 
+  /**
+   * El mismo once, pero sobre el campo. El sistema no lo dice Biwenger en los
+   * partidos, as\u00ed que se deduce contando por demarcaci\u00f3n: cuatro defensas,
+   * cuatro medios y dos delanteros son un 4-4-2.
+   */
+  function campoDePartido(equipo, titulo) {
+    const porLinea = { 1: [], 2: [], 3: [], 4: [] };
+    equipo.xi.forEach(function (jugador) {
+      const pos = jugador.position || 3;
+      (porLinea[pos] || porLinea[3]).push(jugador);
+    });
+
+    const hueco = function (jugador) {
+      return '<div class="pitch__slot">' +
+        faceOf(jugador.id, 'pitch__face') +
+        '<span class="pitch__name">' + escapeHtml(jugador.name) + '</span>' +
+        '<span class="pitch__points' + (jugador.points == null ? ' pitch__points--vacio' : '') + '">' +
+          (jugador.points == null ? '\u2013' : jugador.points) + '</span>' +
+        (jugador.events && jugador.events.length
+          ? '<span class="pitch__lances">' + lancesDe(jugador) + '</span>' : '') +
+      '</div>';
+    };
+
+    const lineas = [4, 3, 2, 1].map(function (pos) {
+      return '<div class="pitch__line">' + porLinea[pos].map(hueco).join('') + '</div>';
+    }).join('');
+
+    return '<div class="alin">' +
+      '<h4 class="alin__titulo">' + escapeHtml(titulo) + '</h4>' +
+      '<div class="pitch-wrap"><div class="pitch pitch--static">' +
+        '<span class="pitch__area pitch__area--top" aria-hidden="true"></span>' +
+        '<span class="pitch__area pitch__area--bottom" aria-hidden="true"></span>' +
+        '<span class="pitch__spot" aria-hidden="true"></span>' +
+        lineas +
+      '</div></div>' +
+      (equipo.bench.length
+        ? '<p class="alin__banquillo">Entraron</p>' +
+          '<div class="bench">' + equipo.bench.map(function (jugador) {
+            return '<div class="bench__player">' +
+              faceOf(jugador.id, 'bench__face') +
+              '<span class="bench__name">' + escapeHtml(jugador.name) + '</span>' +
+              '<span class="bench__points">' + (jugador.points == null ? '\u2013' : jugador.points) + '</span>' +
+              (jugador.events && jugador.events.length
+                ? '<span class="bench__lances">' + lancesDe(jugador) + '</span>' : '') +
+            '</div>';
+          }).join('') + '</div>'
+        : '') +
+    '</div>';
+  }
+
   function renderPartidos() {
     const caja = $('jornada-partidos');
     if (!caja) return;
@@ -2718,9 +2769,19 @@
               (abierto
                 ? '<div class="partido__detalle">' +
                     (jugado ? '' : '<p class="muted alin__aviso">Alineaciones probables: el partido no se ha jugado.</p>') +
+                    (function () {
+                      /* Solo se ofrece la otra vista: campo a la derecha, tabla
+                         a la izquierda. */
+                      const otra = state.vistaPartido === 'tabla' ? 'campo' : 'tabla';
+                      return '<div class="vistas vistas--' + otra + '">' +
+                        '<button type="button" class="ambito" data-vista="' + otra + '">' +
+                          (otra === 'campo' ? 'Campo' : 'Tabla') + '</button>' +
+                      '</div>';
+                    })() +
                     '<div class="alineaciones">' +
-                      once(juego.home, juego.home.name) +
-                      once(juego.away, juego.away.name) +
+                      (state.vistaPartido === 'campo'
+                        ? campoDePartido(juego.home, juego.home.name) + campoDePartido(juego.away, juego.away.name)
+                        : once(juego.home, juego.home.name) + once(juego.away, juego.away.name)) +
                     '</div>' +
                   '</div>'
                 : '') +
@@ -4499,6 +4560,13 @@
 
     /* Cada partido despliega las dos alineaciones. */
     $('jornada-partidos').addEventListener('click', function (event) {
+      const vista = event.target.closest('[data-vista]');
+      if (vista) {
+        state.vistaPartido = vista.getAttribute('data-vista');
+        renderPartidos();
+        return;
+      }
+
       const cab = event.target.closest('[data-partido]');
       if (!cab) return;
       const cual = Number(cab.getAttribute('data-partido'));

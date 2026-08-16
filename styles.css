@@ -1225,6 +1225,24 @@ code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft)
 .alin__lances { display: flex; gap: .15rem; }
 .alin__pts { text-align: right; font-weight: 700; font-variant-numeric: tabular-nums; }
 
+/* El botón de cambio de vista: solo el de la vista en la que no estás. */
+.vistas { display: flex; margin-bottom: .4rem; }
+.vistas--campo { justify-content: flex-end; }
+.vistas--tabla { justify-content: flex-start; }
+
+/* En la vista de campo los lances van bajo el nombre, en una tira. */
+.pitch__lances, .bench__lances {
+  position: absolute; bottom: -6px; left: 50%; transform: translateX(-50%);
+  display: flex; gap: .1rem; z-index: 3;
+}
+.bench__lances { position: static; transform: none; justify-content: center; margin-top: .15rem; }
+.pitch__lances .lance, .bench__lances .lance { width: 13px; height: 13px; font-size: .52rem; }
+.pitch__lances .lance--amarilla, .pitch__lances .lance--roja,
+.bench__lances .lance--amarilla, .bench__lances .lance--roja { width: 9px; height: 12px; }
+/* Los dos campos de un partido, uno al lado del otro. */
+.alineaciones .pitch-wrap { margin-top: .3rem; }
+.alineaciones .bench { margin-top: .3rem; }
+
 /* Cada lance, en su circulito: gol, tarjeta, cambio… */
 .lance {
   display: grid; place-items: center;
@@ -1236,14 +1254,16 @@ code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft)
 .lance--gol { background: #fff; }
 .lance--penalti { background: var(--marca); }
 .lance--fallo { background: var(--neg); color: #fff; }
-.lance--asist { background: var(--pos); color: #fff; }
+/* Asistencia: círculo azul con la A en blanco. */
+.lance--asist { background: #2a78d6; color: #fff; }
 .lance--entra { background: var(--pos); color: #fff; font-size: .5rem; }
 .lance--sale { background: var(--neg); color: #fff; font-size: .5rem; }
 /* Las tarjetas no son redondas: son tarjetas. */
 .lance--amarilla, .lance--roja { width: 10px; height: 14px; border-radius: 2px; }
 .lance--amarilla { background: #f5c518; }
 .lance--roja { background: #e0142c; }
-.lance--lesion { background: var(--neg); color: #fff; }
+/* Lesión: círculo blanco con la cruz en rojo. */
+.lance--lesion { background: #fff; color: var(--neg); font-size: .72rem; }
 .lance--otro { background: var(--border-strong); color: var(--text-soft); }
 
 /* ---------- Jornadas ---------- */
