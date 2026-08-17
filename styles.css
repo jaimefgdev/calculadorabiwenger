@@ -1585,6 +1585,8 @@ main.wrap { padding-bottom: 3.5rem; }
 /* La versión del Worker, discreta, junto al botón de vaciar. */
 .worker-version { margin-left: auto; font-size: .72rem; font-family: var(--mono); }
 
+.picker__nota { margin: .5rem 0 0; font-size: .78rem; }
+
 /* Solo para lectores de pantalla. */
 .sr-only {
   position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;

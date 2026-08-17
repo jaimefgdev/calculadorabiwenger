@@ -1628,13 +1628,17 @@
         '<small>' + unit.label + '</small></span>';
     }).join('');
 
-    /* A la derecha, siempre la cuenta atrás, diciendo a qué partido. */
-    const siguiente = (round.matches || []).filter(function (partido) {
+    /* A la derecha, siempre la cuenta atrás, diciendo a qué partido. El Worker
+       lo busca entre las dos jornadas: LaLiga aplaza partidos y a veces el
+       siguiente pitido es de otra jornada distinta a la que está en juego. */
+    const siguiente = round.proximo || (round.matches || []).filter(function (partido) {
       return Date.parse(partido.start) === Date.parse(round.start);
     })[0];
 
+    const deOtra = siguiente && siguiente.otraJornada && siguiente.number
+      ? ' (jornada ' + siguiente.number + ')' : '';
     const rotulo = siguiente
-      ? 'próximo partido · <strong class="round__rival">' +
+      ? 'próximo partido' + deOtra + ' · <strong class="round__rival">' +
         escapeHtml(siguiente.home + ' – ' + siguiente.away) + '</strong>'
       : 'próximo partido';
 
@@ -2146,7 +2150,6 @@
     const empty = '<button type="button" class="picker__player picker__player--empty" data-pick="">' +
       '<span class="pic-player picker__face picker__face--empty"></span>' +
       '<span class="picker__name">Dejar vacío</span>' +
-      '<span class="picker__meta">sin jugador</span>' +
     '</button>';
 
     box.hidden = false;
@@ -2159,9 +2162,10 @@
           '<button type="button" class="btn btn--ghost btn--close" data-picker-close' +
               ' title="Cerrar" aria-label="Cerrar">✕</button>' +
         '</div>' +
-        (cards
-          ? '<div class="picker__grid">' + cards + empty + '</div>'
-          : '<p class="muted">No queda nadie disponible para esta posición.</p>') +
+        /* Vaciar el hueco se ofrece siempre, también en la portería: si solo
+           tienes un portero no había nadie que listar y desaparecía la opción. */
+        '<div class="picker__grid">' + cards + empty + '</div>' +
+        (cards ? '' : '<p class="muted picker__nota">No hay nadie más para esta posición.</p>') +
       '</div>';
   }
 
