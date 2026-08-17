@@ -1184,8 +1184,8 @@ code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft)
    cara, estado y puntos en sus círculos, y el nombre debajo. */
 #jugadores-buscar { min-width: 240px; }
 .jugadores-rejilla {
-  display: grid; gap: 1rem .6rem;
-  grid-template-columns: repeat(auto-fill, minmax(84px, 1fr));
+  display: grid; gap: 1.1rem .7rem;
+  grid-template-columns: repeat(auto-fill, minmax(122px, 1fr));
 }
 .jugador-card {
   position: relative; overflow: hidden;
@@ -1198,12 +1198,15 @@ code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft)
 .jugador-card:hover { background: var(--bg-surface); }
 .jugador-card:hover .jugador-card__nombre { color: var(--accent); }
 .jugador-card:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-/* La medida la lleva la caja de la cara, igual que en el campo. */
-.jugador-card .face-box { display: block; width: min(92%, 62px); margin: 0 auto; }
+/* La medida la lleva la caja de la cara, igual que en el campo, pero aquí hay
+   sitio de sobra: caras más grandes y menos futbolistas por fila. */
+.jugador-card .face-box { display: block; width: min(90%, 84px); margin: 0 auto; }
 .jugador-card .pic-player { position: relative; z-index: 1; }
+/* El escudo crece con la cara para que la marca de agua siga cuadrando. */
+.jugador-card .crest--ghost { width: 86px; height: 85px; left: calc(50% - 12px); }
 .jugador-card__nombre {
   position: relative; z-index: 1;
-  font-size: .7rem; font-weight: 600; line-height: 1.15;
+  font-size: .78rem; font-weight: 600; line-height: 1.15;
   max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 
@@ -1454,7 +1457,9 @@ main.wrap { padding-bottom: 3.5rem; }
 .spark:hover svg, .spark:focus-visible svg { opacity: .75; }
 /* Gráfico ampliado, centrado en la pantalla. */
 .picker--modal { position: fixed; z-index: 60; }
-.modal__card { width: min(100%, 640px); max-height: 85vh; }
+/* La altura la manda el hueco visible, no la página: en móvil la página es más
+   alta de lo que se ve. */
+.modal__card { width: min(100%, 640px); max-height: 100%; }
 
 /* En las fichas y los menús la barra del sistema canta muchísimo sobre el panel
    oscuro y se queda ahí fija: se oculta. El contenido se sigue desplazando con

@@ -2556,7 +2556,7 @@
       ajustarAlAncho(el, 10.5, 5.5);
     });
     Array.prototype.forEach.call(document.querySelectorAll('.jugador-card__nombre'), function (el) {
-      ajustarAlAncho(el, 11.2, 7);
+      ajustarAlAncho(el, 12.5, 8);
     });
   }
 
@@ -3631,6 +3631,29 @@
       }).join('') + '</tbody></table>';
   }
 
+  /**
+   * Deja la ficha centrada en lo que se est\u00e1 viendo.
+   *
+   * En el m\u00f3vil la p\u00e1gina se dibuja a 1024 px y el navegador la escala, as\u00ed que
+   * una ventana `fixed` se centra respecto a esa p\u00e1gina entera y aparece a
+   * media altura, lejos del futbolista que se ha pulsado. Con `visualViewport`
+   * se sabe qu\u00e9 trozo se ve de verdad y la ficha se coloca justo ah\u00ed.
+   */
+  function ajustarFichaALaVista() {
+    const caja = $('price-modal');
+    if (!caja || caja.hidden) return;
+
+    const vista = window.visualViewport;
+    if (!vista) return;                    // sin soporte, el centrado normal vale
+
+    caja.style.top = vista.offsetTop + 'px';
+    caja.style.left = vista.offsetLeft + 'px';
+    caja.style.width = vista.width + 'px';
+    caja.style.height = vista.height + 'px';
+    caja.style.right = 'auto';
+    caja.style.bottom = 'auto';
+  }
+
   /** Ficha del futbolista: quién lo tiene, cuánto vale y por dónde ha pasado. */
   function renderPriceModal() {
     const caja = $('price-modal');
@@ -3667,6 +3690,7 @@
     ].filter(Boolean).join(' · ');
 
     caja.hidden = false;
+    ajustarFichaALaVista();
     caja.innerHTML =
       '<div class="picker__backdrop" data-price-close></div>' +
       '<div class="picker__card modal__card" role="dialog" aria-modal="true" aria-label="Ficha de ' +
@@ -4831,6 +4855,12 @@
       state.priceModal = { id: spark.getAttribute('data-spark'), name: spark.getAttribute('data-spark-name') };
       renderPriceModal();
     });
+
+    /* Si el móvil se desplaza o cambia el zoom con la ficha abierta, se recoloca. */
+    if (window.visualViewport) {
+      window.visualViewport.addEventListener('resize', ajustarFichaALaVista);
+      window.visualViewport.addEventListener('scroll', ajustarFichaALaVista);
+    }
 
     $('jugadores-buscar').addEventListener('input', renderJugadores);
 
