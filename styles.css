@@ -1259,11 +1259,19 @@ code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft)
 /* Dos demarcaciones: mandan las chapas en fila dentro de un envoltorio. */
 .puestos { display: inline-flex; align-items: center; gap: 2px; }
 .puestos .puesto { position: static; transform: none; margin: 0; }
+/* Sobre las caras, las chapas van pegadas al borde izquierdo y encogidas: si
+   no, la segunda o la tercera se meten debajo del estado, que va a la derecha. */
 .puestos--esquina {
   position: absolute; top: 0; left: 0; z-index: 2;
-  transform: translate(-12%, -12%);
+  transform: translate(-16%, -12%);
+  gap: 1px;
 }
-.puestos--esquina .puesto { padding: 0 .22rem; font-size: .52rem; line-height: 1.35; }
+.puestos--esquina .puesto { padding: 0 .16rem; font-size: .46rem; line-height: 1.4; letter-spacing: .01em; }
+/* Con tres demarcaciones caben dos arriba y la tercera debajo, centrada. */
+.puestos--tres.puestos--esquina {
+  flex-wrap: wrap; justify-content: center; row-gap: 1px;
+  width: 38px;
+}
 /* Hueco fijo: así la cara y el nombre empiezan en la misma vertical en todas
    las filas, lleven una demarcación o tres. */
 .puestos--fila {
@@ -1566,6 +1574,9 @@ main.wrap { padding-bottom: 3.5rem; }
 /* La etiqueta de puja u oferta nunca parte el icono del texto. */
 .tag { white-space: nowrap; }
 
+/* La cabecera de la alineación: el botón de mandarla y el sistema. */
+.lineup-acciones { display: inline-flex; align-items: center; gap: .6rem; flex-wrap: wrap; }
+
 /* Solo para lectores de pantalla. */
 .sr-only {
   position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
@@ -1636,6 +1647,10 @@ main.wrap { padding-bottom: 3.5rem; }
 
 .op-importe { display: block; margin-bottom: .8rem; }
 .op-importe span { display: block; font-size: .72rem; color: var(--text-faint); margin-bottom: .25rem; }
+/* Sin flechitas de subir y bajar: la cantidad se escribe a mano. */
+.op-importe input::-webkit-outer-spin-button,
+.op-importe input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+.op-importe input[type="number"] { -moz-appearance: textfield; appearance: textfield; }
 .op-importe input {
   width: 100%; padding: .5rem .6rem; font-size: 1rem; font-weight: 700;
   border: 1px solid var(--border); border-radius: 8px;

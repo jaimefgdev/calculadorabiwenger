@@ -1884,6 +1884,13 @@
 
     /* Lo guardado manda, pero se limpian los que ya no estén en la plantilla
        (vendidos desde la última vez). */
+    /* Un once guardado sin nadie no sirve de nada y además tapa el de Biwenger:
+       si allí hay alineación, se vuelve a construir con ella. */
+    if (state.xi && Object.keys(state.xi.slots || {}).length === 0) {
+      const hay = alineacionOficial();
+      if (hay && (hay.players || []).length) state.xi = null;
+    }
+
     if (state.xi) {
       const squad = mySquad();
       if (squad.length) {
@@ -2350,7 +2357,10 @@
           return (mia ? '<span class="pujado" title="Tu puja">' + money(mia.amount) + '</span>' : '') +
             '<button type="button" class="ambito ambito--pujar' + (mia ? ' ambito--pujado' : '') +
               '" data-pujar="' + escapeHtml(String(venta.playerId)) + '">' +
-              (mia ? 'Cambiar' : 'Pujar') + '</button>';
+              (mia ? 'Cambiar' : 'Pujar') + '</button>' +
+            /* Con puja hecha, al lado va el aspa para retirarla. */
+            (mia ? '<button type="button" class="btn btn--sm btn--no" data-retirar="' +
+              escapeHtml(mia.id) + '" title="Retirar la puja">✕</button>' : '');
         })()) + '</td>' +
       '</tr>';
     }).join('');
@@ -2476,10 +2486,8 @@
         '<input type="number" id="op-importe" inputmode="numeric" step="100000" min="0"' +
           ' value="' + partida + '"></label>' +
       '<p class="op-aviso"></p>' +
+      /* Para cerrar está el aspa de arriba: aquí solo va la acción. */
       '<div class="op-botones">' +
-        (mia ? '<button type="button" class="btn btn--no" data-op-quitar="' +
-          escapeHtml(mia.id) + '">Retirar</button>' : '') +
-        '<button type="button" class="btn btn--ghost" data-op-cerrar>Cancelar</button>' +
         '<button type="button" class="btn btn--primary" data-op-pujar="' +
           escapeHtml(String(venta.playerId)) + '">' + (mia ? 'Cambiarla' : 'Pujar') + '</button>' +
       '</div>');
@@ -2533,7 +2541,6 @@
       '<label class="op-importe"><span>Precio nuevo</span>' +
         '<input type="number" id="op-importe" inputmode="numeric" step="100000" min="0"' +
           ' value="' + (venta.price || 0) + '"></label>' +
-      '<p class="sub op-texto">Al renovarla se rechazan las ofertas que tenga.</p>' +
       '<p class="op-aviso"></p>' +
       '<div class="op-botones">' +
         '<button type="button" class="btn btn--ghost" data-op-mismo="' +
@@ -2570,8 +2577,91 @@
       '<div class="op-botones">' +
         '<button type="button" class="btn btn--ghost" data-op-cerrar>Cancelar</button>' +
         '<button type="button" class="btn btn--primary" data-op-quitar-mercado="' +
-          escapeHtml(String(venta.playerId)) + '">S\u00ed, quitarlo</button>' +
+          escapeHtml(String(venta.playerId)) + '">S\u00ed</button>' +
       '</div>');
+  }
+
+  /* ---------- Mandar la alineación a Biwenger ---------- */
+
+  /**
+   * El once en el orden que espera Biwenger: portero, defensas, medios y
+   * delanteros, tantos como diga el sistema. Los huecos vacíos van como null,
+   * igual que los manda su propia web.
+   */
+  function onceParaBiwenger() {
+    if (!state.xi) return null;
+    const lineas = formationLines(state.xi.type);
+    const orden = [[1, 1], [2, lineas[2]], [3, lineas[3]], [4, lineas[4]]];
+    const ids = [];
+    orden.forEach(function (par) {
+      for (let i = 0; i < par[1]; i++) ids.push(state.xi.slots[par[0] + '-' + i] || null);
+    });
+    return ids;
+  }
+
+  function abrirEnviarOnce() {
+    const once = onceParaBiwenger();
+    if (!once) return;
+
+    const puestos = once.filter(Boolean).length;
+    /* Un once vacío borraría el que tengas puesto allí: ni se ofrece. */
+    if (puestos === 0) {
+      abrirOpModal(
+        '<div class="op-card__cab">' +
+          '<h3 id="op-modal-titulo">Todavía no</h3>' +
+          '<button type="button" class="btn btn--ghost btn--close" data-op-cerrar' +
+            ' title="Cerrar" aria-label="Cerrar">✕</button>' +
+        '</div>' +
+        '<p class="op-texto">No hay ningún titular puesto. Si mandara esto, ' +
+          'Biwenger se quedaría sin alineación.</p>' +
+        '<div class="op-botones">' +
+          '<button type="button" class="btn btn--primary" data-op-cerrar>Vale</button>' +
+        '</div>');
+      return;
+    }
+    const huecos = once.length - puestos;
+    const jornada = state.round && state.round.number;
+
+    abrirOpModal(
+      '<div class="op-card__cab">' +
+        '<h3 id="op-modal-titulo">Poner esta alineación en Biwenger</h3>' +
+        '<button type="button" class="btn btn--ghost btn--close" data-op-cerrar' +
+          ' title="Cerrar" aria-label="Cerrar">\u2715</button>' +
+      '</div>' +
+      '<dl class="op-datos">' +
+        '<div><dt>Sistema</dt><dd><strong>' + escapeHtml(state.xi.type) + '</strong></dd></div>' +
+        '<div><dt>Titulares</dt><dd>' + puestos + ' de ' + once.length + '</dd></div>' +
+        (jornada ? '<div><dt>Jornada</dt><dd>' + jornada + '</dd></div>' : '') +
+      '</dl>' +
+      (huecos
+        ? '<p class="op-texto">Quedan ' + huecos + (huecos === 1 ? ' hueco' : ' huecos') +
+          ' sin cubrir; en Biwenger se quedarán vacíos.</p>'
+        : '') +
+      '<p class="op-aviso"></p>' +
+      '<div class="op-botones">' +
+        '<button type="button" class="btn btn--ghost" data-op-cerrar>Cancelar</button>' +
+        '<button type="button" class="btn btn--primary" data-op-alinear>S\u00ed</button>' +
+      '</div>');
+  }
+
+  function mandarOnce() {
+    const once = onceParaBiwenger();
+    if (!once || once.filter(Boolean).length === 0) {
+      opAviso('No hay alineación que mandar.', true);
+      return;
+    }
+
+    opAviso('Guardando la alineación\u2026');
+    lanzarOperacion({
+      accion: 'alinear',
+      type: state.xi.type,
+      players: once,
+      /* Los suplentes se devuelven tal cual: aquí no se tocan. */
+      reserves: (state.lineup && state.lineup.reserves) || [],
+      captain: (state.lineup && state.lineup.captain) || null,
+      coach: (state.lineup && state.lineup.coach) || null,
+      round: (state.round && state.round.id) || null
+    }, 'Alineación guardada en Biwenger.');
   }
 
   /** Las ofertas recibidas y tus pujas, cada una con lo que se puede hacer. */
@@ -2638,7 +2728,7 @@
   let opPendiente = null;
 
   /** Paso intermedio: enseña qué va a pasar y espera el sí. */
-  function confirmarOperacion(accion, oferta) {
+  function confirmarOperacion(accion, oferta, desdeOfertas) {
     const guion = OPERACIONES[accion];
     if (!guion || !oferta) return;
 
@@ -2662,22 +2752,26 @@
           ' title="Cerrar" aria-label="Cerrar">\u2715</button>' +
       '</div>' +
       '<p class="op-texto">' + escapeHtml(texto) + '</p>' +
-      (accion === 'devolver'
-        ? '<p class="sub op-texto">Se rechazan todas las ofertas que tenga.</p>' : '') +
       '<p class="op-aviso"></p>' +
       '<div class="op-botones">' +
-        '<button type="button" class="btn btn--ghost" data-op-volver>Volver</button>' +
-        '<button type="button" class="btn btn--primary" data-op-va>S\u00ed, hazlo</button>' +
+        '<button type="button" class="btn btn--ghost" data-op-volver>' +
+          (desdeOfertas ? 'Volver' : 'Cancelar') + '</button>' +
+        '<button type="button" class="btn btn--primary" data-op-va>S\u00ed</button>' +
       '</div>');
 
     opPendiente = {
       accion: accion,
+      desdeOfertas: !!desdeOfertas,
       id: oferta.id,
       playerId: oferta.playerId,
       importe: importe,
       hecho: guion.hecho
     };
   }
+
+  /* Lo que hay que volver a abrir cuando termine la operación (y su sincronía):
+     al responder una oferta se vuelve a la lista, que sigue teniendo trabajo. */
+  let trasOperar = null;
 
   function lanzarOperacion(orden, mensaje) {
     Array.prototype.forEach.call(document.querySelectorAll('#op-modal button'), function (b) {
@@ -2687,8 +2781,19 @@
       .then(function () {
         opAviso(mensaje);
         opPendiente = null;
+        const volver = trasOperar;
+        trasOperar = null;
         /* Lo que diga Biwenger manda: se vuelve a preguntar todo. */
-        setTimeout(function () { cerrarOpModal(); syncNow(true); }, 900);
+        setTimeout(function () {
+          syncNow(true);
+          if (volver) {
+            /* La lista se repinta con lo que acabe de llegar. */
+            volver();
+            setTimeout(volver, 2500);
+          } else {
+            cerrarOpModal();
+          }
+        }, 900);
       })
       .catch(function (error) {
         Array.prototype.forEach.call(document.querySelectorAll('#op-modal button'), function (b) {
@@ -2702,6 +2807,10 @@
   function ejecutarPendiente() {
     if (!opPendiente) return;
     opAviso('Hablando con Biwenger\u2026');
+    /* Las tres respuestas a una oferta devuelven a la lista de ofertas. */
+    if (['aceptar', 'rechazar', 'devolver'].indexOf(opPendiente.accion) !== -1) {
+      trasOperar = abrirOfertas;
+    }
 
     if (opPendiente.accion === 'devolver') {
       lanzarOperacion({ accion: 'devolver', player: opPendiente.playerId, price: opPendiente.importe },
@@ -2720,6 +2829,14 @@
         if (puja) { abrirPuja(puja.getAttribute('data-pujar')); return; }
         const renovar = event.target.closest('[data-renovar]');
         if (renovar) { abrirRenovar(renovar.getAttribute('data-renovar')); return; }
+        const retirar = event.target.closest('[data-retirar]');
+        if (retirar) {
+          const oferta = state.offers.filter(function (o) {
+            return String(o.id) === String(retirar.getAttribute('data-retirar'));
+          })[0];
+          confirmarOperacion('retirar', oferta);
+          return;
+        }
         const quitar = event.target.closest('[data-quitar]');
         if (quitar) abrirQuitar(quitar.getAttribute('data-quitar'));
       });
@@ -2728,14 +2845,23 @@
     const pastilla = $('btn-ofertas');
     if (pastilla) pastilla.addEventListener('click', abrirOfertas);
 
+    const enviar = $('lineup-enviar');
+    if (enviar) enviar.addEventListener('click', abrirEnviarOnce);
+
     const caja = $('op-modal');
     if (!caja) return;
 
     caja.addEventListener('click', function (event) {
       if (event.target === caja) { cerrarOpModal(); return; }
       if (event.target.closest('[data-op-cerrar]')) { cerrarOpModal(); return; }
-      if (event.target.closest('[data-op-volver]')) { abrirOfertas(); return; }
+      if (event.target.closest('[data-op-volver]')) {
+        /* Se vuelve a la lista solo si se salió de ella. */
+        if (opPendiente && opPendiente.desdeOfertas) abrirOfertas();
+        else cerrarOpModal();
+        return;
+      }
       if (event.target.closest('[data-op-va]')) { ejecutarPendiente(); return; }
+      if (event.target.closest('[data-op-alinear]')) { mandarOnce(); return; }
 
       const puja = event.target.closest('[data-op-pujar]');
       if (puja) { confirmarPuja(puja.getAttribute('data-op-pujar')); return; }
@@ -2775,7 +2901,7 @@
       if (accion) {
         const id = accion.getAttribute('data-oferta');
         const oferta = state.offers.filter(function (o) { return String(o.id) === String(id); })[0];
-        confirmarOperacion(accion.getAttribute('data-op'), oferta);
+        confirmarOperacion(accion.getAttribute('data-op'), oferta, true);
       }
     });
 
