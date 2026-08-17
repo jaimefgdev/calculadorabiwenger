@@ -267,6 +267,10 @@ code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft)
 @keyframes latido { 0%, 100% { opacity: 1; } 50% { opacity: .25; } }
 @media (prefers-reduced-motion: reduce) { .round__live::before { animation: none; } }
 
+/* El partido en juego va en el rótulo de la izquierda, junto a la jornada. */
+.round__when .round__live { margin-right: .4rem; }
+.round__when { display: inline-flex; align-items: center; gap: .1rem; flex-wrap: wrap; }
+
 /* Con un partido rodando, en el reloj va ese partido y su marcador. */
 .round__ahora {
   display: inline-flex; align-items: center; gap: .4rem;
@@ -1538,6 +1542,24 @@ main.wrap { padding-bottom: 3.5rem; }
 /* Columna de estado en la ficha de la plantilla. */
 .estado-cell { text-align: center; width: 1%; }
 .mark--cell { position: static; display: inline-grid; width: 19px; height: 19px; }
+/* El manager que tiene a ese futbolista, en un círculo pequeño. */
+.dueno { display: inline-flex; line-height: 0; }
+.dueno .avatar {
+  width: 18px; height: 18px; font-size: .5rem;
+  border: 1.5px solid var(--card, #fff);
+  box-shadow: 0 1px 3px rgba(0,0,0,.35);
+}
+.dueno--esquina { position: absolute; right: 0; bottom: 0; transform: translate(26%, 14%); z-index: 3; }
+.dueno--fila { margin-left: .3rem; vertical-align: middle; }
+.dueno--fila .avatar { width: 16px; height: 16px; }
+
+/* A una de sanción: una tarjeta amarilla, con forma de tarjeta. */
+.mark--amarillas {
+  background: #f5c518; border-radius: 3px;
+  width: 12px; height: 16px;
+}
+.mark--amarillas.mark--cell { width: 13px; height: 17px; }
+
 /* Disponible: círculo verde con el visto en blanco. */
 .mark--ok { color: #fff; background: var(--pos); box-shadow: 0 1px 2px rgba(0,0,0,.35); }
 

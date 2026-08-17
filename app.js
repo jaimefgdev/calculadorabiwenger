@@ -1312,7 +1312,8 @@
         '<td data-label="Futbolista"><span class="with-crest">' + playerName(movement, true) +
           crestOf(movement, 'crest--badge') + '</span></td>' +
         '<td class="estado-cell" data-label="Estado">' +
-          statusCell({ status: state.moveStatus[moveKey(movement)] || movement.status }) + '</td>' +
+          statusCell({ id: movement.playerId,
+            status: state.moveStatus[moveKey(movement)] || movement.status }) + '</td>' +
         '<td data-label="Acción"><span class="tag ' + (buy ? 'tag--buy' : 'tag--sell') + '">' +
           (buy ? '↓ Fichado' : '↑ Vendido') + '</span></td>' +
         '<td data-label="Futbolista">' + managerCell + '</td>' +
@@ -1527,11 +1528,16 @@
       return partido.homeScore != null && partido.awayScore != null && partido.status !== 'finished';
     })[0];
 
-    $('round-when').textContent = rodando
-      ? rodando.home + ' – ' + rodando.away
-      : (enJuego
+    if (rodando) {
+      $('round-when').innerHTML = '<span class="round__live">En juego</span>' +
+        '<span class="round__ahora">' + escapeHtml(rodando.home) +
+          '<strong class="round__score">' + rodando.homeScore + '–' + rodando.awayScore + '</strong>' +
+          escapeHtml(rodando.away) + '</span>';
+    } else {
+      $('round-when').textContent = enJuego
         ? (round.played || 0) + ' de ' + (round.games || 0) + ' partidos jugados'
-        : dateFormat.format(new Date(round.start)));
+        : dateFormat.format(new Date(round.start));
+    }
 
     const matches = round.matches || [];
     const toggle = $('round-toggle');
@@ -1589,20 +1595,6 @@
     let left = Math.floor((Date.parse(round.start) - Date.now()) / 1000);
     const enJuego = !!round.live;
 
-    const enCurso = (round.matches || []).filter(function (partido) {
-      return partido.homeScore != null && partido.awayScore != null && partido.status !== 'finished';
-    })[0];
-
-    if (enCurso) {
-      clock.innerHTML = '<span class="round__live">En juego</span>' +
-        '<span class="round__ahora">' +
-          escapeHtml(enCurso.home) +
-          '<strong class="round__score">' + enCurso.homeScore + '–' + enCurso.awayScore + '</strong>' +
-          escapeHtml(enCurso.away) +
-        '</span>';
-      return;
-    }
-
     if (left <= 0) {
       clock.innerHTML = enJuego
         ? '<span class="round__live">En juego</span>'
@@ -1629,26 +1621,17 @@
         '<small>' + unit.label + '</small></span>';
     }).join('');
 
-    /* Con un partido rodando, lo que interesa es ese partido y su marcador, no
-       la cuenta atrás del siguiente. */
-    const rodando = (round.matches || []).filter(function (partido) {
-      return partido.homeScore != null && partido.awayScore != null && partido.status !== 'finished';
+    /* A la derecha, siempre la cuenta atrás, diciendo a qué partido. */
+    const siguiente = (round.matches || []).filter(function (partido) {
+      return Date.parse(partido.start) === Date.parse(round.start);
     })[0];
 
-    if (rodando) {
-      clock.innerHTML = '<span class="round__live">En juego</span>' +
-        '<span class="round__ahora">' +
-          escapeHtml(rodando.home) +
-          '<strong class="round__score">' + rodando.homeScore + '–' + rodando.awayScore + '</strong>' +
-          escapeHtml(rodando.away) +
-        '</span>';
-      return;
-    }
+    const rotulo = siguiente
+      ? 'próximo · ' + siguiente.home + ' – ' + siguiente.away
+      : 'próximo partido';
 
-    clock.innerHTML = enJuego
-      ? '<span class="round__live">En juego</span>' +
-        '<span class="round__next"><small>próximo partido</small>' + unidades + '</span>'
-      : unidades;
+    clock.innerHTML = '<span class="round__next"><small>' + escapeHtml(rotulo) + '</small>' +
+      unidades + '</span>';
   }
 
   /* ---------- Cuenta atrás de pujas y ventas ---------- */
@@ -1749,6 +1732,7 @@
         state.squads = { status: 'ok', list: payload.squads || [] };
         (payload.squads || []).forEach(function (s) { recordarPosiciones(s.players); });
         render();
+        if (state.tab === 'jornadas') renderPartidos();
       })
       .catch(function () {
         state.squads = { status: 'error', list: [] };
@@ -1973,9 +1957,26 @@
     discarded: { icon: '✕', label: 'Descartado', cls: 'mark--out' }
   };
 
+  /* Amarillas de cada futbolista, para avisar de quién está a una de sanción.
+     Biwenger no lo manda como estado: sale del recuento de la temporada. */
+  const amarillasDe = {};
+
+  function aUnaDeSancion(player) {
+    if (!player || player.id == null) return false;
+    const amarillas = amarillasDe[String(player.id)] || 0;
+    /* En la liga se cumple ciclo a las cinco: con cuatro, la siguiente sanciona. */
+    return amarillas > 0 && amarillas % 5 === 4;
+  }
+
   function statusMark(player, extra) {
     /* El visto de «disponible» solo se pinta donde se pide expresamente
        (la columna Estado), no encima de cada foto. */
+    if (player && player.status === 'ok' && aUnaDeSancion(player)) {
+      return '<span class="mark mark--amarillas ' + (extra || '') + '"' +
+        ' title="Cuatro amarillas: a una de sanción"' +
+        ' aria-label="Cuatro amarillas">' + '</span>';
+    }
+
     const mark = player && player.status !== 'ok' && STATUS_MARKS[player.status];
     if (!mark) return '';
     return '<span class="mark ' + mark.cls + ' ' + (extra || '') + '" title="' + mark.label + '"' +
@@ -1984,6 +1985,10 @@
 
   /** Celda de estado: siempre dice algo, también cuando está sano. */
   function statusCell(player) {
+    if (player && (player.status || 'ok') === 'ok' && aUnaDeSancion(player)) {
+      return '<span class="mark mark--amarillas mark--cell"' +
+        ' title="Cuatro amarillas: a una de sanción"></span>';
+    }
     const mark = STATUS_MARKS[(player && player.status) || 'ok'] || STATUS_MARKS.ok;
     return '<span class="mark ' + mark.cls + ' mark--cell" title="' + mark.label + '"' +
       ' aria-label="' + mark.label + '">' + mark.icon + '</span>';
@@ -2780,13 +2785,32 @@
    * Foto con sus chapas para las alineaciones de jornada y de partido: aquí la
    * nota puede no estar todavía, y se marca con «?» o con un guion.
    */
-  function caraDeAlineacion(jugador, claseCara) {
+  /* De quién es cada futbolista. Se recalcula solo si cambian las plantillas. */
+  let duenosMemo = null;
+  let duenosDe = null;
+
+  function duenoDe(id) {
+    const lista = squadList();
+    if (duenosDe !== lista) { duenosDe = lista; duenosMemo = duenosDeFutbolistas(); }
+    return (duenosMemo && duenosMemo[String(id)]) || '';
+  }
+
+  /** El manager que lo tiene en su plantilla, en un círculo con su foto. */
+  function chapaDeManager(jugador, extra) {
+    const dueno = jugador && duenoDe(jugador.id);
+    if (!dueno) return '';
+    return '<span class="dueno ' + (extra || '') + '" title="' + escapeHtml(dueno) + '">' +
+      avatar(dueno) + '</span>';
+  }
+
+  function caraDeAlineacion(jugador, claseCara, conDueno) {
     const sinNota = jugador.points == null;
     return '<span class="face-box">' + faceOf(jugador.id, claseCara) +
       chapaDePuesto(jugador.position, 'puesto--esquina') +
       statusMark(jugador, 'mark--esquina') +
       '<span class="pts pts--esquina' + (sinNota ? ' pts--sinnota' : '') + '">' +
         marcaDePuntos(jugador) + '</span>' +
+      (conDueno ? chapaDeManager(jugador, 'dueno--esquina') : '') +
     '</span>';
   }
 
@@ -2881,7 +2905,8 @@
     const fila = function (jugador) {
       return '<div class="alin__fila">' +
         '<span class="alin__pos">' + (jugador.position ? POSITION_NAMES[jugador.position] : '\u2014') + '</span>' +
-        '<span class="with-crest">' + playerName({ playerId: jugador.id, player: jugador.name }) + '</span>' +
+        '<span class="with-crest">' + playerName({ playerId: jugador.id, player: jugador.name }) +
+          chapaDeManager(jugador, 'dueno--fila') + '</span>' +
         '<span class="alin__lances">' + lancesDe(jugador) + '</span>' +
         '<span class="alin__pts">' + (jugador.points == null ? '<span class="sub">\u2013</span>' : jugador.points) + '</span>' +
       '</div>';
@@ -2910,7 +2935,7 @@
 
     const hueco = function (jugador) {
       return '<div class="pitch__slot">' +
-        caraDeAlineacion(jugador, 'pitch__face') +
+        caraDeAlineacion(jugador, 'pitch__face', true) +
         '<span class="pitch__name">' + escapeHtml(jugador.name) + '</span>' +
         (jugador.events && jugador.events.length
           ? '<span class="pitch__lances">' + lancesDe(jugador) + '</span>' : '') +
@@ -2933,7 +2958,7 @@
         ? '<p class="alin__banquillo">Entraron</p>' +
           '<div class="bench">' + equipo.bench.map(function (jugador) {
             return '<div class="bench__player">' +
-              caraDeAlineacion(jugador, 'bench__face') +
+              caraDeAlineacion(jugador, 'bench__face', true) +
               '<span class="bench__name">' + escapeHtml(jugador.name) + '</span>' +
               (jugador.events && jugador.events.length
                 ? '<span class="bench__lances">' + lancesDe(jugador) + '</span>' : '') +
@@ -2953,6 +2978,8 @@
 
     const datos = state.partidos[id];
     caja.hidden = false;
+    /* Para poner el círculo del manager hay que saber de quién es cada uno. */
+    ensureSquads();
 
     if (!datos) {
       caja.innerHTML = '<div class="panel__head"><h2>Partidos</h2></div>' +
@@ -4306,8 +4333,16 @@
         if (payload.error) throw new Error(payload.error);
         state.recuento = payload.players || [];
         recordarPosiciones(state.recuento);
+        state.recuento.forEach(function (j) { amarillasDe[String(j.id)] = j.yellow || 0; });
         state.recuentoCargando = false;
         renderRankingsTemporada();
+        /* Las amarillas llegan después de pintar: si alguien está a una de
+           sanción, hay que repasar las vistas para que salga su tarjeta. */
+        if (state.recuento.some(aUnaDeSancion)) {
+          render();
+          if (state.tab === 'jugadores') renderJugadores();
+          if (state.tab === 'jornadas') renderJornadas();
+        }
       })
       .catch(function () {
         state.recuentoCargando = false;
@@ -4784,6 +4819,8 @@
     ensureJornada('actual', true);
     /* Y se mira si has tocado la alineación desde el otro aparato. */
     traerXiCompartida();
+    /* El recuento trae las amarillas, que hacen falta para el estado. */
+    ensureRecuento();
     /* Los partidos de la jornada que se esté viendo, por si ya hay alineaciones. */
     const viendo = jornadaActiva();
     if (viendo && viendo.round) ensurePartidos(viendo.round.id, true);
