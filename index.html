@@ -16,7 +16,7 @@
 <title>Calculadora Biwenger — Presupuestos de la liga</title>
 <!-- El ?v= se sube en cada publicación: obliga al navegador a bajar el archivo
      nuevo en vez de reutilizar el que tenga en caché. -->
-<link rel="stylesheet" href="styles.css?v=110">
+<link rel="stylesheet" href="styles.css?v=111">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>💰</text></svg>">
 </head>
 <body>
@@ -262,7 +262,7 @@
       <table class="table table--moves">
         <thead>
           <tr>
-            <th class="col-rank">#</th>
+            <th class="col-rank">Pos.</th>
             <th class="sortable" data-sort="player" tabindex="0" aria-sort="none">Futbolista</th>
             <th title="Cómo estaba el futbolista cuando se hizo la operación">Estado</th>
             <th class="sortable" data-sort="type" tabindex="0" aria-sort="none">Acción</th>
@@ -354,13 +354,25 @@
       </div>
     </section>
 
-    <!-- A lo ancho y debajo del par, que estas filas piden sitio. -->
+    <!-- A lo ancho y debajo de la tabla, que estas filas piden sitio. -->
     <section class="panel">
-        <div class="panel__head">
-          <h2>Los que más se mueven hoy</h2>
+      <div class="panel__head">
+        <h2>Los que más se mueven hoy</h2>
+      </div>
+        <div class="movers">
+          <div>
+            <button type="button" class="bench__title movers__titulo" data-movers="movers-up"
+              aria-expanded="false">Más suben <span class="round__caret" aria-hidden="true">▸</span></button>
+            <div id="movers-up" class="movers__list"></div>
+          </div>
+          <div>
+            <button type="button" class="bench__title movers__titulo" data-movers="movers-down"
+              aria-expanded="false">Más bajan <span class="round__caret" aria-hidden="true">▸</span></button>
+            <div id="movers-down" class="movers__list"></div>
+          </div>
         </div>
-
-  </div><!-- /panel-fichajes -->
+    </section>
+  </div><!-- /panel-mercado -->
 
   <!-- ============================================================
        PESTAÑA · MÁNAGERS
@@ -440,22 +452,7 @@
       <div id="ambitos-laliga"></div>
       <div id="rankings-laliga" class="rankings"></div>
     </section>
-
-    
-        <div class="movers">
-          <div>
-            <button type="button" class="bench__title movers__titulo" data-movers="movers-up"
-              aria-expanded="false">Más suben <span class="round__caret" aria-hidden="true">▸</span></button>
-            <div id="movers-up" class="movers__list"></div>
-          </div>
-          <div>
-            <button type="button" class="bench__title movers__titulo" data-movers="movers-down"
-              aria-expanded="false">Más bajan <span class="round__caret" aria-hidden="true">▸</span></button>
-            <div id="movers-down" class="movers__list"></div>
-          </div>
-        </div>
-    </section>
-  </div><!-- /panel-mercado -->
+  </div><!-- /panel-datos -->
 
 
   <!-- ============================================================
@@ -522,6 +519,6 @@
 
 </main>
 
-<script src="app.js?v=110"></script>
+<script src="app.js?v=111"></script>
 </body>
 </html>

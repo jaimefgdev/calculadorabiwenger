@@ -661,7 +661,7 @@
   }
 
   /** Nombre del futbolista con su foto del CDN de Biwenger. */
-  function playerName(movement) {
+  function playerName(movement, sinChapa) {
     const id = movement.playerId;
     const pic = id
       ? '<span class="pic-player" style="background-image:url(\'https://cdn.biwenger.com/i/p/' +
@@ -672,7 +672,7 @@
       : (posicionConocida[String(id)] != null ? posicionConocida[String(id)] : null);
 
     return '<span class="player" data-player-id="' + escapeHtml(String(id || '')) + '">' +
-      chapaDePuesto(puesto, 'puesto--fila') + pic + '<span class="player-name">' +
+      (sinChapa ? '' : chapaDePuesto(puesto, 'puesto--fila')) + pic + '<span class="player-name">' +
       escapeHtml(movement.player) + '</span></span>';
   }
 
@@ -1306,8 +1306,10 @@
         ? '<div class="manager">' + avatar(movement.manager) + '<span>' + escapeHtml(movement.manager) + '</span></div>'
         : '<span class="unknown">Sin identificar</span>';
       return '<tr>' +
-        '<td class="col-rank">' + (index + 1) + '</td>' +
-        '<td data-label="Futbolista"><span class="with-crest">' + playerName(movement) +
+        /* El número de fila no dice nada; ahí va la demarcación. */
+        '<td class="col-rank">' + (chapaDePuesto(movement.position ||
+          posicionConocida[String(movement.playerId)], 'puesto--fila') || '—') + '</td>' +
+        '<td data-label="Futbolista"><span class="with-crest">' + playerName(movement, true) +
           crestOf(movement, 'crest--badge') + '</span></td>' +
         '<td class="estado-cell" data-label="Estado">' +
           statusCell({ status: state.moveStatus[moveKey(movement)] || movement.status }) + '</td>' +
@@ -1519,9 +1521,17 @@
     const enJuego = !!round.live;
     $('round-label').textContent = enJuego ? 'En juego la' : 'Inicio de la';
     $('round-name').textContent = 'Jornada ' + (round.number || '');
-    $('round-when').textContent = enJuego
-      ? (round.played || 0) + ' de ' + (round.games || 0) + ' partidos jugados'
-      : dateFormat.format(new Date(round.start));
+    /* Si hay un partido rodando, el rótulo lo dice; el reloj de al lado lleva el
+       marcador. Si no, cuántos van jugados o cuándo empieza. */
+    const rodando = (round.matches || []).filter(function (partido) {
+      return partido.homeScore != null && partido.awayScore != null && partido.status !== 'finished';
+    })[0];
+
+    $('round-when').textContent = rodando
+      ? rodando.home + ' – ' + rodando.away
+      : (enJuego
+        ? (round.played || 0) + ' de ' + (round.games || 0) + ' partidos jugados'
+        : dateFormat.format(new Date(round.start)));
 
     const matches = round.matches || [];
     const toggle = $('round-toggle');
@@ -4171,7 +4181,7 @@
           ' aria-expanded="' + (abierto ? 'true' : 'false') + '">' +
           '<span class="ranking__quien">' +
             '<span class="with-crest">' +
-              playerName({ playerId: jugador.id, player: jugador.name }) +
+              playerName({ playerId: jugador.id, player: jugador.name, position: jugador.position }) +
               crestOf(jugador, 'crest--badge') +
             '</span>' +
             '<span class="ranking__owner">' + escapeHtml(jugador.owner) + '</span>' +
@@ -4324,6 +4334,9 @@
         if (ranking.porteros && j.position !== 1) return false;
         if (!j.appearances) return false;
         if (ranking.minimo && (j.played || 0) < ranking.minimo) return false;
+        /* En los «más», un cero no es un dato: si solo hay dos con rojas, se
+           enseñan dos. En «menos encajados» el cero sí dice algo. */
+        if (!ranking.menor && !(j[ranking.campo] > 0)) return false;
         return true;
       }).sort(function (a, b) {
         const diferencia = ranking.menor ? a[ranking.campo] - b[ranking.campo]
