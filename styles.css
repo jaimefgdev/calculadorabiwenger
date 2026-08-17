@@ -267,6 +267,16 @@ code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft)
 @keyframes latido { 0%, 100% { opacity: 1; } 50% { opacity: .25; } }
 @media (prefers-reduced-motion: reduce) { .round__live::before { animation: none; } }
 
+/* Con un partido rodando, en el reloj va ese partido y su marcador. */
+.round__ahora {
+  display: inline-flex; align-items: center; gap: .4rem;
+  font-family: var(--font); font-size: .86rem;
+}
+.round__ahora .round__score {
+  font-family: var(--mono); color: var(--marca);
+  padding: .05rem .35rem; background: var(--bg-surface); border-radius: var(--radius-sm);
+}
+
 /* El reloj pasa a contar al siguiente partido, y lo dice. En móvil el aviso de
    «en juego» y la cuenta no caben de una: se deja que caiga a otra línea. */
 .round__next { display: inline-flex; align-items: baseline; gap: .55rem; flex-wrap: wrap; }
@@ -286,6 +296,12 @@ code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft)
 
 /* El once ideal va solo en su bloque, así que se centra. */
 .panel__head--center { text-align: center; }
+
+/* Los rankings de la temporada son diez: cinco por fila en pantalla ancha. */
+.rankings--muchos { grid-template-columns: repeat(5, minmax(0, 1fr)); row-gap: 1.4rem; }
+@media (max-width: 1100px) { .rankings--muchos { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+/* Estas filas no se pulsan: no llevan el gráfico por jornada. */
+.ranking__boton--fijo { cursor: default; }
 
 /* Rótulo que agrupa varios paneles bajo un mismo tema. */
 .seccion__titulo {

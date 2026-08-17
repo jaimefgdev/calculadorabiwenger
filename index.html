@@ -16,7 +16,7 @@
 <title>Calculadora Biwenger — Presupuestos de la liga</title>
 <!-- El ?v= se sube en cada publicación: obliga al navegador a bajar el archivo
      nuevo en vez de reutilizar el que tenga en caché. -->
-<link rel="stylesheet" href="styles.css?v=109">
+<link rel="stylesheet" href="styles.css?v=110">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>💰</text></svg>">
 </head>
 <body>
@@ -416,6 +416,11 @@
   <div id="panel-datos" data-panel="datos" hidden>
     
 
+    <h2 class="seccion__titulo">Rankings</h2>
+    <section class="panel">
+      <div id="rankings-temporada" class="rankings rankings--muchos"></div>
+    </section>
+
     <h2 class="seccion__titulo">Puntos</h2>
 
     <!-- Los futbolistas que más y menos rinden: primero los nuestros. -->
@@ -517,6 +522,6 @@
 
 </main>
 
-<script src="app.js?v=109"></script>
+<script src="app.js?v=110"></script>
 </body>
 </html>

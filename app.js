@@ -513,6 +513,8 @@
     expandedManager: null,
     expandedPoints: null,   // desglose de puntos por futbolista, en la clasificación
     puntosDetalle: null,    // gráfico de puntos por jornada de un futbolista
+    recuento: null,         // goles, asistencias y tarjetas de toda la competición
+    recuentoCargando: false,
     jugadores: null,        // lista completa de la competición, para el buscador
     jugadoresCargando: false,
     estadisticas: {},       // resumen de temporada de cada futbolista
@@ -1577,6 +1579,20 @@
     let left = Math.floor((Date.parse(round.start) - Date.now()) / 1000);
     const enJuego = !!round.live;
 
+    const enCurso = (round.matches || []).filter(function (partido) {
+      return partido.homeScore != null && partido.awayScore != null && partido.status !== 'finished';
+    })[0];
+
+    if (enCurso) {
+      clock.innerHTML = '<span class="round__live">En juego</span>' +
+        '<span class="round__ahora">' +
+          escapeHtml(enCurso.home) +
+          '<strong class="round__score">' + enCurso.homeScore + '–' + enCurso.awayScore + '</strong>' +
+          escapeHtml(enCurso.away) +
+        '</span>';
+      return;
+    }
+
     if (left <= 0) {
       clock.innerHTML = enJuego
         ? '<span class="round__live">En juego</span>'
@@ -1602,6 +1618,22 @@
       return '<span class="round__unit"><span class="round__value">' + unit.value + '</span>' +
         '<small>' + unit.label + '</small></span>';
     }).join('');
+
+    /* Con un partido rodando, lo que interesa es ese partido y su marcador, no
+       la cuenta atrás del siguiente. */
+    const rodando = (round.matches || []).filter(function (partido) {
+      return partido.homeScore != null && partido.awayScore != null && partido.status !== 'finished';
+    })[0];
+
+    if (rodando) {
+      clock.innerHTML = '<span class="round__live">En juego</span>' +
+        '<span class="round__ahora">' +
+          escapeHtml(rodando.home) +
+          '<strong class="round__score">' + rodando.homeScore + '–' + rodando.awayScore + '</strong>' +
+          escapeHtml(rodando.away) +
+        '</span>';
+      return;
+    }
 
     clock.innerHTML = enJuego
       ? '<span class="round__live">En juego</span>' +
@@ -4235,6 +4267,94 @@
       bloque('Peor media', 'peormedia', porMedia.slice().reverse(), decimales);
   }
 
+  /* ---------- Rankings de la temporada ----------
+     Salen del recuento de lances de cada jornada. Los minutos no est\u00e1n:
+     Biwenger solo los da en la ficha de cada futbolista, uno a uno. */
+  const RANKINGS = [
+    { titulo: 'M\u00e1s goles',          campo: 'goals',        sufijo: '' },
+    { titulo: 'M\u00e1s asistencias',    campo: 'assists',      sufijo: '' },
+    { titulo: 'Goles por partido',  campo: 'goalsPerGame', sufijo: '', decimal: true, minimo: 1 },
+    { titulo: 'M\u00e1s partidos',       campo: 'played',       sufijo: '' },
+    { titulo: 'M\u00e1s amarillas',      campo: 'yellow',       sufijo: '' },
+    { titulo: 'M\u00e1s rojas',          campo: 'red',          sufijo: '' },
+    { titulo: 'M\u00e1s sustituciones',  campo: 'subsOut',      sufijo: '' },
+    { titulo: 'M\u00e1s veces suplente', campo: 'subsIn',       sufijo: '' },
+    { titulo: 'Porter\u00edas a cero',   campo: 'cleanSheets',  sufijo: '', porteros: true },
+    { titulo: 'Menos goles encajados', campo: 'conceded',   sufijo: '', porteros: true, menor: true }
+  ];
+
+  function ensureRecuento() {
+    const config = loadSyncConfig();
+    if (!config.url || !config.key) return;
+    if (state.recuento || state.recuentoCargando) return;
+
+    state.recuentoCargando = true;
+    fetch(config.url.replace(/\/+$/, '') + '/?key=' + encodeURIComponent(config.key) + '&recuento=1',
+      { headers: { 'accept': 'application/json' } })
+      .then(function (response) { return response.json(); })
+      .then(function (payload) {
+        if (payload.error) throw new Error(payload.error);
+        state.recuento = payload.players || [];
+        recordarPosiciones(state.recuento);
+        state.recuentoCargando = false;
+        renderRankingsTemporada();
+      })
+      .catch(function () {
+        state.recuentoCargando = false;
+        state.recuento = [];
+        renderRankingsTemporada();
+      });
+  }
+
+  function renderRankingsTemporada() {
+    const caja = $('rankings-temporada');
+    if (!caja) return;
+
+    const todos = state.recuento;
+    if (!todos) { caja.innerHTML = ''; return; }
+    if (todos.length === 0) {
+      caja.innerHTML = '<p class="muted">Todav\u00eda no hay jornadas jugadas.</p>';
+      return;
+    }
+
+    caja.innerHTML = RANKINGS.map(function (ranking) {
+      /* Solo los porteros en lo que solo les toca a ellos, y solo quien ha
+         jugado: un cero de quien no se ha estrenado no dice nada. */
+      const lista = todos.filter(function (j) {
+        if (ranking.porteros && j.position !== 1) return false;
+        if (!j.appearances) return false;
+        if (ranking.minimo && (j.played || 0) < ranking.minimo) return false;
+        return true;
+      }).sort(function (a, b) {
+        const diferencia = ranking.menor ? a[ranking.campo] - b[ranking.campo]
+                                         : b[ranking.campo] - a[ranking.campo];
+        return diferencia || String(a.name).localeCompare(String(b.name), 'es');
+      }).slice(0, 10);
+
+      if (lista.length === 0) return '';
+
+      return '<div class="ranking">' +
+        '<h3 class="ranking__title">' + ranking.titulo + '</h3>' +
+        '<ol class="ranking__list">' + lista.map(function (jugador) {
+          const valor = ranking.decimal
+            ? (jugador[ranking.campo] || 0).toFixed(2).replace('.', ',')
+            : (jugador[ranking.campo] || 0);
+          return '<li class="ranking__row">' +
+            '<span class="ranking__boton ranking__boton--fijo">' +
+              '<span class="ranking__quien">' +
+                '<span class="with-crest">' +
+                  playerName({ playerId: jugador.id, player: jugador.name, position: jugador.position }) +
+                  crestOf(jugador, 'crest--badge') +
+                '</span>' +
+              '</span>' +
+              '<strong class="ranking__value">' + valor + '</strong>' +
+            '</span>' +
+          '</li>';
+        }).join('') + '</ol>' +
+      '</div>';
+    }).join('');
+  }
+
   function renderRankings() {
     const caja = $('rankings-jugadores');
     if (!caja) return;
@@ -4419,7 +4539,7 @@
     });
     if (name === 'managers') { renderManagers(); renderSquads(); }
     if (name === 'fichajes') { renderDataKpis(); renderKpiCharts(); renderSpending(); }
-    if (name === 'datos') { ensureSquads(); ensureLaLiga(); renderRankings(); }
+    if (name === 'datos') { ensureSquads(); ensureLaLiga(); ensureRecuento(); renderRankings(); renderRankingsTemporada(); }
     if (name === 'mercado') { ensureMarket(); renderMarket(); renderMovers(); }
     if (name === 'jugadores') { ensureJugadores(); renderJugadores(); }
     if (name === 'jornadas') { ensureJornada(state.jornadaVista || 'actual'); renderJornadas(); }
@@ -4460,7 +4580,7 @@
     renderWarnings();
     if (state.tab === 'managers') { renderManagers(); renderSquads(); }
     if (state.tab === 'fichajes') { renderDataKpis(); renderKpiCharts(); renderSpending(); }
-    if (state.tab === 'datos') { ensureSquads(); ensureLaLiga(); renderRankings(); }
+    if (state.tab === 'datos') { ensureSquads(); ensureLaLiga(); ensureRecuento(); renderRankings(); renderRankingsTemporada(); }
     if (state.tab === 'mercado') { renderMarket(); renderMovers(); }
   }
 
