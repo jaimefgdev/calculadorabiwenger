@@ -2406,9 +2406,12 @@
     })
       .then(function (response) { return response.json(); })
       .then(function (payload) {
-        if (payload.error) throw new Error(payload.error);
-        if (!payload.hecho) throw new Error(payload.error || 'Biwenger no ha completado la operación.');
-        return payload;
+        if (payload.hecho) return payload;
+        const fallo = new Error(payload.error || 'Biwenger no ha completado la operación.');
+        /* El Worker cuenta qué intentó y qué le contestaron: se enseña debajo
+           del error, que es lo que hace falta para saber por dónde falla. */
+        fallo.intentos = payload.intentos || null;
+        throw fallo;
       });
   }
 
@@ -2656,10 +2659,8 @@
       accion: 'alinear',
       type: state.xi.type,
       players: once,
-      /* Los suplentes se devuelven tal cual: aquí no se tocan. */
-      reserves: (state.lineup && state.lineup.reserves) || [],
+      /* Solo el once: los suplentes se quedan como estén en Biwenger. */
       captain: (state.lineup && state.lineup.captain) || null,
-      coach: (state.lineup && state.lineup.coach) || null,
       round: (state.round && state.round.id) || null
     }, function (respuesta) {
       /* El Worker vuelve a leer la alineación después de guardarla: si no
@@ -2807,6 +2808,11 @@
           b.disabled = false;
         });
         opAviso(String(error.message || error), true);
+        const hueco = document.querySelector('#op-modal .op-aviso');
+        if (hueco && error.intentos) {
+          hueco.insertAdjacentHTML('beforeend',
+            '<span class="op-detalle">' + escapeHtml(error.intentos.join(' · ')) + '</span>');
+        }
       });
   }
 
