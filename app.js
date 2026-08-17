@@ -645,6 +645,19 @@
     return '<span class="avatar" style="background:' + color + '" aria-hidden="true">' + initials + photo + '</span>';
   }
 
+  /* Demarcación de cada futbolista, para poder pintarla en cualquier tabla
+     aunque quien la dibuja no la sepa. Se llena con la lista de la competición
+     y con las plantillas. */
+  const posicionConocida = {};
+
+  function recordarPosiciones(lista) {
+    (lista || []).forEach(function (jugador) {
+      if (jugador && jugador.id != null && jugador.position != null) {
+        posicionConocida[String(jugador.id)] = jugador.position;
+      }
+    });
+  }
+
   /** Nombre del futbolista con su foto del CDN de Biwenger. */
   function playerName(movement) {
     const id = movement.playerId;
@@ -652,8 +665,12 @@
       ? '<span class="pic-player" style="background-image:url(\'https://cdn.biwenger.com/i/p/' +
         encodeURIComponent(id) + '.png\')" aria-hidden="true"></span>'
       : '';
+    /* La demarcación va delante, con su color, igual que en las fichas. */
+    const puesto = movement.position != null ? movement.position
+      : (posicionConocida[String(id)] != null ? posicionConocida[String(id)] : null);
+
     return '<span class="player" data-player-id="' + escapeHtml(String(id || '')) + '">' +
-      pic + '<span class="player-name">' +
+      chapaDePuesto(puesto, 'puesto--fila') + pic + '<span class="player-name">' +
       escapeHtml(movement.player) + '</span></span>';
   }
 
@@ -1688,6 +1705,7 @@
       .then(function (payload) {
         if (payload.error) throw new Error(payload.error);
         state.squads = { status: 'ok', list: payload.squads || [] };
+        (payload.squads || []).forEach(function (s) { recordarPosiciones(s.players); });
         render();
       })
       .catch(function () {
@@ -2003,6 +2021,7 @@
 
     return '<div class="pitch__slot">' + crestOf(player, 'crest--ghost') +
       '<span class="face-box">' + face +
+        chapaDePuesto(player && player.position, 'puesto--esquina') +
         statusMark(player, 'mark--esquina') + pointsBadge(player, 'pts--esquina') +
       '</span>' +
       '<span class="pitch__name">' + (player ? escapeHtml(player.name) : '—') + '</span>' +
@@ -2146,9 +2165,7 @@
       : bench.map(function (player) {
           return '<div class="bench__player">' +
             crestOf(player, 'crest--ghost') +
-            '<span class="face-box">' + faceOf(player.id, 'bench__face') +
-              statusMark(player, 'mark--esquina') + pointsBadge(player, 'pts--esquina') +
-            '</span>' +
+            caraConChapas(player, 'bench__face') +
             '<span class="bench__name">' + escapeHtml(player.name) + '</span>' +
           '</div>';
         }).join('');
@@ -2178,6 +2195,7 @@
       .then(function (payload) {
         if (payload.error) throw new Error(payload.error);
         state.market = payload.sales || [];
+        recordarPosiciones(state.market.map(function (v) { return { id: v.playerId, position: v.position }; }));
         state.marketState = '';
         renderMarket();
         ensurePriceSeries(state.market.map(function (v) { return v.playerId; }), renderMarket);
@@ -2426,6 +2444,10 @@
       };
     });
 
+    (payload.standings || []).forEach(function (fila) {
+      recordarPosiciones(fila.xi); recordarPosiciones(fila.bench);
+    });
+
     state.jornadas.datos[id] = {
       round: payload.round,
       standings: filas,
@@ -2519,10 +2541,8 @@
       const huecos = porLinea[pos].map(function (jugador) {
         return '<div class="pitch__slot">' +
           crestOf(jugador, 'crest--ghost') +
-          faceOf(jugador.id, 'pitch__face') +
+          caraDeAlineacion(jugador, 'pitch__face') +
           '<span class="pitch__name">' + escapeHtml(jugador.name) + '</span>' +
-          '<span class="pitch__points' + (jugador.points == null ? ' pitch__points--vacio' : '') + '">' +
-            marcaDePuntos(jugador) + '</span>' +
         '</div>';
       }).join('');
       return '<div class="pitch__line">' + huecos + '</div>';
@@ -2545,10 +2565,8 @@
       : '<div class="bench">' + fila.bench.map(function (jugador) {
           return '<div class="bench__player">' +
             crestOf(jugador, 'crest--ghost') +
-            faceOf(jugador.id, 'bench__face') +
+            caraDeAlineacion(jugador, 'bench__face') +
             '<span class="bench__name">' + escapeHtml(jugador.name) + '</span>' +
-            '<span class="bench__points' + (jugador.points == null ? ' bench__points--vacio' : '') + '">' +
-              marcaDePuntos(jugador) + '</span>' +
           '</div>';
         }).join('') + '</div>';
 
@@ -2687,6 +2705,7 @@
       .then(function (payload) {
         if (payload.error) throw new Error(payload.error);
         state.jugadores = payload.players || [];
+        recordarPosiciones(state.jugadores);
         state.jugadoresCargando = false;
         renderJugadores();
       })
@@ -2707,12 +2726,34 @@
     5: { texto: 'EN', clase: 'puesto--entrenador' }
   };
 
-  function chapaDePuesto(posicion) {
+  function chapaDePuesto(posicion, extra) {
     const chapa = PUESTO_CHAPA[posicion];
     if (!chapa) return '';
     const nombre = POSITION_NAMES[posicion] || 'Entrenador';
-    return '<span class="puesto ' + chapa.clase + '" title="' + nombre + '">' +
-      chapa.texto + '</span>';
+    return '<span class="puesto ' + chapa.clase + (extra ? ' ' + extra : '') +
+      '" title="' + nombre + '">' + chapa.texto + '</span>';
+  }
+
+  /**
+   * Foto con sus chapas para las alineaciones de jornada y de partido: aquí la
+   * nota puede no estar todavía, y se marca con «?» o con un guion.
+   */
+  function caraDeAlineacion(jugador, claseCara) {
+    const sinNota = jugador.points == null;
+    return '<span class="face-box">' + faceOf(jugador.id, claseCara) +
+      chapaDePuesto(jugador.position, 'puesto--esquina') +
+      statusMark(jugador, 'mark--esquina') +
+      '<span class="pts pts--esquina' + (sinNota ? ' pts--sinnota' : '') + '">' +
+        marcaDePuntos(jugador) + '</span>' +
+    '</span>';
+  }
+
+  /** Foto con sus tres chapas, igual en todos los sitios. */
+  function caraConChapas(jugador, claseCara) {
+    return '<span class="face-box">' + faceOf(jugador.id, claseCara) +
+      chapaDePuesto(jugador.position, 'puesto--esquina') +
+      statusMark(jugador, 'mark--esquina') + pointsBadge(jugador, 'pts--esquina') +
+    '</span>';
   }
 
   function renderJugadores() {
@@ -2751,9 +2792,7 @@
           escapeHtml(String(jugador.id)) + '">' +
         chapaDePuesto(jugador.position) +
         crestOf(jugador, 'crest--ghost') +
-        '<span class="face-box">' + faceOf(jugador.id, 'pitch__face') +
-          statusMark(jugador, 'mark--esquina') + pointsBadge(jugador, 'pts--esquina') +
-        '</span>' +
+        caraConChapas(jugador, 'pitch__face') +
         '<span class="jugador-card__nombre player-name">' + escapeHtml(jugador.name) + '</span>' +
       '</button>';
     }).join('');
@@ -2830,10 +2869,8 @@
 
     const hueco = function (jugador) {
       return '<div class="pitch__slot">' +
-        faceOf(jugador.id, 'pitch__face') +
+        caraDeAlineacion(jugador, 'pitch__face') +
         '<span class="pitch__name">' + escapeHtml(jugador.name) + '</span>' +
-        '<span class="pitch__points' + (jugador.points == null ? ' pitch__points--vacio' : '') + '">' +
-          (jugador.points == null ? '\u2013' : jugador.points) + '</span>' +
         (jugador.events && jugador.events.length
           ? '<span class="pitch__lances">' + lancesDe(jugador) + '</span>' : '') +
       '</div>';
@@ -2855,9 +2892,8 @@
         ? '<p class="alin__banquillo">Entraron</p>' +
           '<div class="bench">' + equipo.bench.map(function (jugador) {
             return '<div class="bench__player">' +
-              faceOf(jugador.id, 'bench__face') +
+              caraDeAlineacion(jugador, 'bench__face') +
               '<span class="bench__name">' + escapeHtml(jugador.name) + '</span>' +
-              '<span class="bench__points">' + (jugador.points == null ? '\u2013' : jugador.points) + '</span>' +
               (jugador.events && jugador.events.length
                 ? '<span class="bench__lances">' + lancesDe(jugador) + '</span>' : '') +
             '</div>';
@@ -4270,6 +4306,7 @@
       .then(function (payload) {
         if (payload.error) throw new Error(payload.error);
         state.laliga = payload.players || [];
+        recordarPosiciones(state.laliga);
         state.laligaCargando = false;
         renderLaLiga();
       })
@@ -4363,7 +4400,8 @@
       panel.hidden = panel.getAttribute('data-panel') !== name;
     });
     if (name === 'managers') { renderManagers(); renderSquads(); }
-    if (name === 'datos') { ensureSquads(); ensureLaLiga(); renderDataKpis(); renderKpiCharts(); renderSpending(); renderRankings(); }
+    if (name === 'fichajes') { renderDataKpis(); renderKpiCharts(); renderSpending(); }
+    if (name === 'datos') { ensureSquads(); ensureLaLiga(); renderRankings(); }
     if (name === 'mercado') { ensureMarket(); renderMarket(); renderMovers(); }
     if (name === 'jugadores') { ensureJugadores(); renderJugadores(); }
     if (name === 'jornadas') { ensureJornada(state.jornadaVista || 'actual'); renderJornadas(); }
@@ -4403,7 +4441,8 @@
     renderLineup();
     renderWarnings();
     if (state.tab === 'managers') { renderManagers(); renderSquads(); }
-    if (state.tab === 'datos') { ensureSquads(); ensureLaLiga(); renderDataKpis(); renderKpiCharts(); renderSpending(); renderRankings(); }
+    if (state.tab === 'fichajes') { renderDataKpis(); renderKpiCharts(); renderSpending(); }
+    if (state.tab === 'datos') { ensureSquads(); ensureLaLiga(); renderRankings(); }
     if (state.tab === 'mercado') { renderMarket(); renderMovers(); }
   }
 

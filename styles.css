@@ -287,6 +287,12 @@ code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft)
 /* El once ideal va solo en su bloque, así que se centra. */
 .panel__head--center { text-align: center; }
 
+/* Rótulo que agrupa varios paneles bajo un mismo tema. */
+.seccion__titulo {
+  font-size: 1.05rem; font-weight: 650;
+  margin: 1.6rem 0 .7rem;
+}
+
 /* ---------- Quién puntúa en la liga ---------- */
 /* Las cuatro siempre en una fila, también en móvil: ahí la página se ve con
    1024 px de ancho y caben. Los nombres largos se recortan con puntos. */
@@ -1205,6 +1211,21 @@ code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft)
 .jugador-card .pic-player { position: relative; z-index: 1; }
 /* El escudo crece con la cara para que la marca de agua siga cuadrando. */
 .jugador-card .crest--ghost { width: 86px; height: 85px; left: calc(50% - 12px); }
+/* En las tablas va delante del nombre, en la misma línea. */
+.puesto--fila {
+  position: static; flex: none;
+  padding: .02rem .26rem; margin-right: .25rem;
+  font-size: .56rem; line-height: 1.4;
+}
+
+/* La misma chapa, pequeña, sobre las caras de las alineaciones. */
+.puesto--esquina {
+  top: 0; left: 0; transform: translate(-28%, -12%);
+  padding: 0 .22rem; font-size: .52rem; line-height: 1.35;
+}
+/* Sin nota todavía: el circulito se ve, pero apagado. */
+.pts--sinnota { color: #555; }
+
 /* Demarcación, arriba a la izquierda de la ficha y con su color. */
 .puesto {
   /* Metida hacia dentro: la ficha tiene las esquinas redondeadas y recorta lo
@@ -1389,7 +1410,9 @@ code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft)
    ficha es más alta por el nombre y quedaban descolgados. */
 .face-box { position: relative; display: inline-block; line-height: 0; }
 /* Los dos, un poco metidos hacia dentro y a la misma distancia del borde. */
-.mark--esquina { top: 0; left: 0; transform: translate(-32%, 12%); }
+/* Siempre en el mismo sitio, mire donde mire: estado arriba a la derecha,
+   puntos abajo a la izquierda y demarcación arriba a la izquierda. */
+.mark--esquina { top: 0; right: 0; left: auto; transform: translate(32%, 12%); }
 .mark--picker { left: 50%; top: 34px; margin-left: -36px; transform: translate(0, -50%); width: 17px; height: 17px; }
 
 /* ---------- Suben y bajan ---------- */

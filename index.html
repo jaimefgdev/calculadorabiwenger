@@ -16,7 +16,7 @@
 <title>Calculadora Biwenger — Presupuestos de la liga</title>
 <!-- El ?v= se sube en cada publicación: obliga al navegador a bajar el archivo
      nuevo en vez de reutilizar el que tenga en caché. -->
-<link rel="stylesheet" href="styles.css?v=107">
+<link rel="stylesheet" href="styles.css?v=108">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>💰</text></svg>">
 </head>
 <body>
@@ -277,61 +277,8 @@
 
     <p id="moves-empty" class="empty">Aún no hay movimientos: sincroniza o pega el HTML del tablón.</p>
   </section>
-  </div><!-- /panel-fichajes -->
 
-  <!-- ============================================================
-       PESTAÑA · MÁNAGERS
-       ============================================================ -->
-  <div id="panel-managers" data-panel="managers" hidden>
-    <section class="panel">
-      <div class="panel__head">
-        <h2>Clasificación</h2>
-        <p class="muted">Ordenada por puntos y, a igualdad, por valor de equipo. Pulsa un jugador para ver sus cifras y sus gráficos.</p>
-      </div>
-      <div class="table-scroll">
-        <table class="table table--managers">
-          <thead>
-            <tr>
-              <th class="col-rank">#</th>
-              <th class="sortable" data-sort="name" tabindex="0" aria-sort="none">Jugador</th>
-              <th class="num sortable" data-sort="points" tabindex="0" aria-sort="none">Puntos</th>
-              <th class="num sortable" data-sort="teamValue" tabindex="0" aria-sort="none">Valor equipo</th>
-              <th class="num sortable" data-sort="players" tabindex="0" aria-sort="none" title="Jugadores en plantilla">Jug.</th>
-              <th class="num sortable" data-sort="balance" tabindex="0" aria-sort="none">Saldo</th>
-              <th class="num sortable" data-sort="maxBid" tabindex="0" aria-sort="none">Puja máxima</th>
-              <th class="sortable" data-sort="lastAccess" tabindex="0" aria-sort="none" title="Cuánto hace que entró en Biwenger">Última conexión</th>
-            </tr>
-          </thead>
-          <tbody id="managers-body"></tbody>
-        </table>
-      </div>
-    </section>
-    <section class="panel">
-      <div class="panel__head">
-        <h2>Plantillas</h2>
-        <p class="muted">Pulsa un jugador para ver su plantilla: desde cuándo tiene a cada futbolista, lo que pagó y lo que vale hoy.</p>
-      </div>
-      <div class="table-scroll">
-        <table class="table table--squads">
-          <thead>
-            <tr>
-              <th></th>
-              <th class="num">Jugadores</th>
-              <th class="num">Pagado</th>
-              <th class="num" title="Valor de mercado">Valor</th>
-            </tr>
-          </thead>
-          <tbody id="squads-body"></tbody>
-        </table>
-      </div>
-    </section>
-  </div><!-- /panel-managers -->
-
-  <!-- ============================================================
-       PESTAÑA · DATOS
-       ============================================================ -->
-  <div id="panel-datos" data-panel="datos" hidden>
-    <section class="panel">
+<section class="panel">
       <div class="panel__head">
         <h2>Evolución de la liga</h2>
       </div>
@@ -351,25 +298,7 @@
 
     <div id="kpi-charts" class="kpi-charts"></div>
 
-    <!-- Los futbolistas que más y menos rinden: primero los nuestros. -->
-    <section class="panel">
-      <div class="panel__head">
-        <h2>Nuestra liga</h2>
-      </div>
-      <div id="ambitos-nuestra"></div>
-      <div id="rankings-jugadores" class="rankings"></div>
-    </section>
-
-    <!-- Y lo mismo con todos los futbolistas de la competición. -->
-    <section class="panel">
-      <div class="panel__head">
-        <h2>LaLiga</h2>
-      </div>
-      <div id="ambitos-laliga"></div>
-      <div id="rankings-laliga" class="rankings"></div>
-    </section>
-
-    <div class="market-grid">
+<div class="market-grid">
       <section class="panel">
         <div class="panel__head">
           <h2>Quién ficha más</h2>
@@ -430,6 +359,84 @@
         <div class="panel__head">
           <h2>Los que más se mueven hoy</h2>
         </div>
+
+  </div><!-- /panel-fichajes -->
+
+  <!-- ============================================================
+       PESTAÑA · MÁNAGERS
+       ============================================================ -->
+  <div id="panel-managers" data-panel="managers" hidden>
+    <section class="panel">
+      <div class="panel__head">
+        <h2>Clasificación</h2>
+        <p class="muted">Ordenada por puntos y, a igualdad, por valor de equipo. Pulsa un jugador para ver sus cifras y sus gráficos.</p>
+      </div>
+      <div class="table-scroll">
+        <table class="table table--managers">
+          <thead>
+            <tr>
+              <th class="col-rank">#</th>
+              <th class="sortable" data-sort="name" tabindex="0" aria-sort="none">Jugador</th>
+              <th class="num sortable" data-sort="points" tabindex="0" aria-sort="none">Puntos</th>
+              <th class="num sortable" data-sort="teamValue" tabindex="0" aria-sort="none">Valor equipo</th>
+              <th class="num sortable" data-sort="players" tabindex="0" aria-sort="none" title="Jugadores en plantilla">Jug.</th>
+              <th class="num sortable" data-sort="balance" tabindex="0" aria-sort="none">Saldo</th>
+              <th class="num sortable" data-sort="maxBid" tabindex="0" aria-sort="none">Puja máxima</th>
+              <th class="sortable" data-sort="lastAccess" tabindex="0" aria-sort="none" title="Cuánto hace que entró en Biwenger">Última conexión</th>
+            </tr>
+          </thead>
+          <tbody id="managers-body"></tbody>
+        </table>
+      </div>
+    </section>
+    <section class="panel">
+      <div class="panel__head">
+        <h2>Plantillas</h2>
+        <p class="muted">Pulsa un jugador para ver su plantilla: desde cuándo tiene a cada futbolista, lo que pagó y lo que vale hoy.</p>
+      </div>
+      <div class="table-scroll">
+        <table class="table table--squads">
+          <thead>
+            <tr>
+              <th></th>
+              <th class="num">Jugadores</th>
+              <th class="num">Pagado</th>
+              <th class="num" title="Valor de mercado">Valor</th>
+            </tr>
+          </thead>
+          <tbody id="squads-body"></tbody>
+        </table>
+      </div>
+    </section>
+  </div><!-- /panel-managers -->
+
+  <!-- ============================================================
+       PESTAÑA · DATOS
+       ============================================================ -->
+  <div id="panel-datos" data-panel="datos" hidden>
+    
+
+    <h2 class="seccion__titulo">Puntos</h2>
+
+    <!-- Los futbolistas que más y menos rinden: primero los nuestros. -->
+    <section class="panel">
+      <div class="panel__head">
+        <h2>Nuestra liga</h2>
+      </div>
+      <div id="ambitos-nuestra"></div>
+      <div id="rankings-jugadores" class="rankings"></div>
+    </section>
+
+    <!-- Y lo mismo con todos los futbolistas de la competición. -->
+    <section class="panel">
+      <div class="panel__head">
+        <h2>LaLiga</h2>
+      </div>
+      <div id="ambitos-laliga"></div>
+      <div id="rankings-laliga" class="rankings"></div>
+    </section>
+
+    
         <div class="movers">
           <div>
             <button type="button" class="bench__title movers__titulo" data-movers="movers-up"
@@ -510,6 +517,6 @@
 
 </main>
 
-<script src="app.js?v=107"></script>
+<script src="app.js?v=108"></script>
 </body>
 </html>
