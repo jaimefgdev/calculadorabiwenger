@@ -1210,11 +1210,13 @@ code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft)
   /* Metida hacia dentro: la ficha tiene las esquinas redondeadas y recorta lo
      que toca el borde, así que pegada a (0,0) se le comía la esquina. */
   position: absolute; top: 4px; left: 4px; z-index: 2;
-  padding: .08rem .3rem;
-  font-size: .58rem; font-weight: 700; letter-spacing: .03em; line-height: 1.25;
+  padding: .1rem .38rem;
+  font-size: .68rem; font-weight: 700; letter-spacing: .03em; line-height: 1.25;
   color: #fff; border-radius: 100px;
 }
-.puesto--por { background: #f5c518; color: #111; }   /* portero */
+/* Amarillo más oscuro que el de las tarjetas: sobre el claro, las letras
+   blancas no se leían. */
+.puesto--por { background: #b8860b; }                 /* portero */
 .puesto--def { background: #2a78d6; }                 /* defensa */
 .puesto--med { background: #1baf7a; }                 /* medio */
 .puesto--del { background: #e0142c; }                 /* delantero */
@@ -1248,6 +1250,9 @@ code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft)
 .stat strong { font-size: .95rem; font-variant-numeric: tabular-nums; }
 
 /* ---------- Partidos de la jornada ---------- */
+/* La tabla de la clasificación queda justo encima: aire para que el rótulo no
+   se pegue al último mánager. */
+#jornada-partidos { margin-top: 1.5rem; }
 .partidos { display: grid; gap: .3rem; }
 .partido { border: 1px solid var(--border); border-radius: var(--radius-sm); overflow: hidden; }
 .partido--abierto { border-color: var(--accent); }

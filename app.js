@@ -2558,6 +2558,10 @@
     Array.prototype.forEach.call(document.querySelectorAll('.jugador-card__nombre'), function (el) {
       ajustarAlAncho(el, 12.5, 8);
     });
+    /* «Media goles p/p» y «Goles encajados» no caben a tamaño normal. */
+    Array.prototype.forEach.call(document.querySelectorAll('.stat__label'), function (el) {
+      ajustarAlAncho(el, 10.2, 7);
+    });
   }
 
   /* La liga son 38 jornadas: los ejes se plantean enteros desde el principio. */
@@ -3566,7 +3570,7 @@
         '<h4 class="stats__titulo">Juego</h4>' +
         '<div class="stats__rejilla">' +
           /* Al portero le interesan los goles que le meten, no los que mete. */
-          (portero ? celda('Goles/E', numero(datos.conceded))
+          (portero ? celda('Goles encajados', numero(datos.conceded))
                    : celda('Goles', numero(datos.goals))) +
           (atras ? celda('Porterías a cero', numero(datos.cleanSheets))
                  : celda('Gol cada', golCada(datos)) +
@@ -3735,8 +3739,7 @@
             ' title="Cerrar" aria-label="Cerrar">✕</button>' +
         '</div>' +
         '<p class="muted ficha__datos">' + datos + '</p>' +
-        estadisticasDeTemporada(abierto.id) +
-        rachaDeTemporada(abierto.id) +
+        (abierto.soloPrecio ? '' : estadisticasDeTemporada(abierto.id) + rachaDeTemporada(abierto.id)) +
         (puntos.length < 2
           ? '<p class="viz__empty">Todavía no hay evolución de este futbolista.</p>'
           : '<div class="viz-hover">' +
@@ -3765,6 +3768,9 @@
           ? '<h3 class="bench__title">En la liga</h3>' + playerHistory(ficha)
           : '') +
       '</div>';
+
+    /* Los rótulos largos de las estadísticas encogen hasta verse enteros. */
+    ajustarNombres();
 
     /* Corto y al grano: qué día llegó, por cuánto y cuánto valía entonces.
        El valor de mercado de ese día va en amarillo, como la marca. */
@@ -4882,7 +4888,9 @@
     document.addEventListener('click', function (event) {
       const spark = event.target.closest('[data-spark]');
       if (!spark) return;
-      state.priceModal = { id: spark.getAttribute('data-spark'), name: spark.getAttribute('data-spark-name') };
+      /* Desde la minigráfica se pide el precio, no la ficha entera. */
+      state.priceModal = { id: spark.getAttribute('data-spark'),
+        name: spark.getAttribute('data-spark-name'), soloPrecio: true };
       renderPriceModal();
     });
 
