@@ -16,7 +16,7 @@
 <title>Calculadora Biwenger — Presupuestos de la liga</title>
 <!-- El ?v= se sube en cada publicación: obliga al navegador a bajar el archivo
      nuevo en vez de reutilizar el que tenga en caché. -->
-<link rel="stylesheet" href="styles.css?v=112">
+<link rel="stylesheet" href="styles.css?v=113">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>💰</text></svg>">
 </head>
 <body>
@@ -334,6 +334,9 @@
       <div class="panel__head">
         <h2>Mercado de hoy</h2>
         <p class="muted" id="market-note">Quien está en venta, de quién es y cuántas pujas lleva.</p>
+        <!-- Las ofertas que te han hecho, para aceptarlas o rechazarlas aquí mismo. -->
+        <button type="button" id="btn-ofertas" class="ambito ambito--ofertas" hidden
+          aria-haspopup="dialog">Ofertas</button>
       </div>
       <div class="table-scroll">
         <table class="table table--market">
@@ -347,6 +350,7 @@
               <th class="num sortable" data-market-sort="price" tabindex="0" aria-sort="none" title="Precio que pide quien lo vende">Precio</th>
               <th>Evolución</th>
               <th class="sortable" data-market-sort="until" tabindex="0" aria-sort="none" title="Tiempo que queda">Queda</th>
+              <th class="col-pujar"><span class="sr-only">Pujar</span></th>
             </tr>
           </thead>
           <tbody id="market-body"></tbody>
@@ -517,8 +521,13 @@
   <!-- Evolución de un futbolista, a tamaño grande. -->
   <div id="price-modal" class="picker picker--modal" hidden></div>
 
+  <!-- Diálogo de las operaciones que se mandan a Biwenger: pujar, aceptar,
+       rechazar o devolver al mercado. Siempre pide confirmación. -->
+  <div id="op-modal" class="op-modal" hidden role="dialog" aria-modal="true"
+    aria-labelledby="op-modal-titulo"></div>
+
 </main>
 
-<script src="app.js?v=112"></script>
+<script src="app.js?v=113"></script>
 </body>
 </html>

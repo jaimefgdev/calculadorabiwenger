@@ -1520,13 +1520,16 @@
     /* Con la jornada empezada no interesa el arranque de la siguiente, sino
        cómo va la de ahora. */
     const enJuego = !!round.live;
-    $('round-label').textContent = enJuego ? 'En juego la' : 'Inicio de la';
-    $('round-name').textContent = 'Jornada ' + (round.number || '');
     /* Si hay un partido rodando, el rótulo lo dice; el reloj de al lado lleva el
        marcador. Si no, cuántos van jugados o cuándo empieza. */
     const rodando = (round.matches || []).filter(function (partido) {
       return partido.homeScore != null && partido.awayScore != null && partido.status !== 'finished';
     })[0];
+
+    /* Con un partido en marcha, «En juego» ya sale junto al marcador: aquí
+       sobra, y repetirlo dos veces en la misma tarjeta queda mal. */
+    $('round-label').textContent = rodando ? '' : (enJuego ? 'En juego la' : 'Inicio de la');
+    $('round-name').textContent = 'Jornada ' + (round.number || '');
 
     if (rodando) {
       $('round-when').innerHTML = '<span class="round__live">En juego</span>' +
@@ -1627,10 +1630,11 @@
     })[0];
 
     const rotulo = siguiente
-      ? 'próximo · ' + siguiente.home + ' – ' + siguiente.away
+      ? 'próximo partido · <strong class="round__rival">' +
+        escapeHtml(siguiente.home + ' – ' + siguiente.away) + '</strong>'
       : 'próximo partido';
 
-    clock.innerHTML = '<span class="round__next"><small>' + escapeHtml(rotulo) + '</small>' +
+    clock.innerHTML = '<span class="round__next"><small>' + rotulo + '</small>' +
       unidades + '</span>';
   }
 
@@ -2327,8 +2331,15 @@
         '<td class="spark-cell" data-label="Evolución">' +
           sparkline(ultimos(state.priceSeries[venta.playerId], 45), venta.playerId, venta.player) + '</td>' +
         '<td data-label="Queda">' + deadlineCell(venta.until) + '</td>' +
+        /* Lo que vendes tu no se puja; el resto si, con su boton a la derecha. */
+        '<td class="col-pujar">' + (venta.mine ? ''
+          : '<button type="button" class="ambito ambito--pujar" data-pujar="' +
+            escapeHtml(String(venta.playerId)) + '">Pujar</button>') + '</td>' +
       '</tr>';
     }).join('');
+
+    /* La pastilla de ofertas vive en la cabecera del mercado. */
+    pintarBotonOfertas();
 
     Array.prototype.forEach.call(document.querySelectorAll('[data-market-sort]'), function (th) {
       const key = th.getAttribute('data-market-sort');
@@ -2345,6 +2356,315 @@
 
     $('market-note').innerHTML = state.market.length + ' en el mercado' +
       (cierre ? ' \u00b7 se renueva en ' + deadlineCell(cierre, true) : '');
+  }
+
+  /* ---------- Operaciones de verdad en Biwenger ----------
+     Todo lo de aquí escribe en tu cuenta: se manda al Worker, que es quien
+     tiene el token, y nunca sin que lo confirmes en el diálogo. */
+
+  function mandarOperacion(orden) {
+    const config = loadSyncConfig();
+    if (!config.url || !config.key) {
+      return Promise.reject(new Error('Antes hay que conectar con el Worker.'));
+    }
+    return fetch(config.url.replace(/\/+$/, '') + '/?key=' + encodeURIComponent(config.key) + '&operacion=1', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(orden)
+    })
+      .then(function (response) { return response.json(); })
+      .then(function (payload) {
+        if (payload.error) throw new Error(payload.error);
+        if (!payload.hecho) throw new Error(payload.error || 'Biwenger no ha completado la operación.');
+        return payload;
+      });
+  }
+
+  /** Ofertas que te han hecho y siguen esperando respuesta. */
+  const ofertasRecibidas = () => state.offers.filter(function (o) { return o.direction === 'in'; });
+  const pujasEnviadas = () => state.offers.filter(function (o) { return o.direction === 'out'; });
+
+  function pintarBotonOfertas() {
+    const boton = $('btn-ofertas');
+    if (!boton) return;
+    const recibidas = ofertasRecibidas().length;
+    const enviadas = pujasEnviadas().length;
+    boton.hidden = recibidas + enviadas === 0;
+    boton.textContent = recibidas ? 'Ofertas \u00b7 ' + recibidas : 'Ofertas';
+    boton.classList.toggle('ambito--avisa', recibidas > 0);
+  }
+
+  function cerrarOpModal() {
+    const caja = $('op-modal');
+    caja.hidden = true;
+    caja.innerHTML = '';
+    opPendiente = null;
+  }
+
+  function abrirOpModal(html) {
+    const caja = $('op-modal');
+    caja.innerHTML = '<div class="op-card">' + html + '</div>';
+    caja.hidden = false;
+  }
+
+  function opAviso(texto, mal) {
+    const hueco = document.querySelector('#op-modal .op-aviso');
+    if (hueco) {
+      hueco.innerHTML = '<span class="' + (mal ? 'money-neg' : 'money-pos') + '">' +
+        escapeHtml(texto) + '</span>';
+    }
+  }
+
+  const ventaDe = (id) => (state.market || []).filter(function (v) {
+    return String(v.playerId) === String(id);
+  })[0];
+
+  /** Diálogo de puja: dice lo que vale, lo que piden y hasta dónde puedes. */
+  function abrirPuja(playerId) {
+    const venta = ventaDe(playerId);
+    if (!venta) return;
+    const cuentas = simulation();
+    const partida = venta.price || venta.marketValue || 0;
+
+    abrirOpModal(
+      '<div class="op-card__cab">' +
+        '<h3 id="op-modal-titulo">Pujar por ' + escapeHtml(venta.player) + '</h3>' +
+        '<button type="button" class="picker__close" data-op-cerrar aria-label="Cerrar">\u00d7</button>' +
+      '</div>' +
+      '<dl class="op-datos">' +
+        '<div><dt>Valor de mercado</dt><dd>' + money(venta.marketValue || 0) + '</dd></div>' +
+        '<div><dt>' + (venta.free ? 'Precio de salida' : 'Pide ' + escapeHtml(venta.seller)) +
+          '</dt><dd>' + money(venta.price || 0) + '</dd></div>' +
+        '<div><dt>Tu saldo</dt><dd>' + money(cuentas.balance || 0) + '</dd></div>' +
+        '<div><dt>Tu puja máxima</dt><dd><strong>' +
+          (cuentas.maxBid == null ? '\u2014' : money(cuentas.maxBid)) + '</strong></dd></div>' +
+      '</dl>' +
+      '<label class="op-importe"><span>Cuánto ofreces</span>' +
+        '<input type="number" id="op-importe" inputmode="numeric" step="100000" min="0"' +
+          ' value="' + partida + '"></label>' +
+      '<p class="op-aviso"></p>' +
+      '<div class="op-botones">' +
+        '<button type="button" class="btn btn--ghost" data-op-cerrar>Cancelar</button>' +
+        '<button type="button" class="btn btn--primary" data-op-pujar="' +
+          escapeHtml(String(venta.playerId)) + '">Pujar</button>' +
+      '</div>');
+
+    const campo = $('op-importe');
+    if (campo) { campo.focus(); campo.select(); }
+  }
+
+  function confirmarPuja(playerId) {
+    const venta = ventaDe(playerId);
+    const campo = $('op-importe');
+    if (!venta || !campo) return;
+
+    const importe = Math.round(Number(campo.value));
+    if (!(importe > 0)) { opAviso('Pon una cantidad.', true); return; }
+
+    const cuentas = simulation();
+    if (cuentas.maxBid != null && importe > cuentas.maxBid) {
+      opAviso('Eso pasa de tu puja máxima (' + money(cuentas.maxBid) + ').', true);
+      return;
+    }
+
+    opAviso('Enviando la puja\u2026');
+    lanzarOperacion({
+      accion: 'pujar',
+      player: venta.playerId,
+      amount: importe,
+      to: venta.free ? null : venta.sellerId,
+      tipo: venta.saleType === 'auction' ? 'bid' : 'purchase'
+    }, 'Puja de ' + money(importe) + ' por ' + venta.player + ' enviada.');
+  }
+
+  /** Las ofertas recibidas y tus pujas, cada una con lo que se puede hacer. */
+  function abrirOfertas() {
+    const recibidas = ofertasRecibidas();
+    const enviadas = pujasEnviadas();
+
+    const enVentaDe = function (playerId) {
+      return (state.listings || []).filter(function (item) {
+        return String(item.playerId) === String(playerId);
+      })[0];
+    };
+
+    const filaRecibida = function (oferta) {
+      const suya = enVentaDe(oferta.playerId);
+      const valor = suya ? listingValue(suya) : null;
+      const diferencia = valor == null ? null : oferta.amount - valor;
+      return '<div class="op-oferta">' +
+        '<div class="op-oferta__quien">' +
+          '<span class="with-crest">' + playerName(oferta) + crestOf(oferta, 'crest--badge') + '</span>' +
+          '<span class="sub">de ' + escapeHtml(oferta.other || 'Mercado') + '</span>' +
+        '</div>' +
+        '<div class="op-oferta__pasta">' +
+          '<strong class="money-pos">' + money(oferta.amount) + '</strong>' +
+          (diferencia == null || diferencia === 0 ? '' :
+            '<span class="delta ' + (diferencia > 0 ? 'delta--up' : 'delta--down') + '">' +
+            (diferencia > 0 ? '\u25b2 +' : '\u25bc \u2212') + money(Math.abs(diferencia)) + '</span>') +
+        '</div>' +
+        '<div class="op-oferta__botones">' +
+          '<button type="button" class="btn btn--sm btn--ok" data-op="aceptar" data-oferta="' +
+            escapeHtml(oferta.id) + '" title="Aceptar la oferta">\u2713</button>' +
+          '<button type="button" class="btn btn--sm btn--no" data-op="rechazar" data-oferta="' +
+            escapeHtml(oferta.id) + '" title="Rechazar la oferta">\u2715</button>' +
+          (suya
+            ? '<button type="button" class="btn btn--sm btn--otra" data-op="devolver" data-oferta="' +
+              escapeHtml(oferta.id) + '" title="Rechazarla y dejarlo otra vez en el mercado al mismo precio">' +
+              '\u21bb</button>'
+            : '') +
+        '</div>' +
+      '</div>';
+    };
+
+    const filaEnviada = function (oferta) {
+      return '<div class="op-oferta">' +
+        '<div class="op-oferta__quien">' +
+          '<span class="with-crest">' + playerName(oferta) + crestOf(oferta, 'crest--badge') + '</span>' +
+          '<span class="sub">a ' + escapeHtml(oferta.other || 'Mercado') + '</span>' +
+        '</div>' +
+        '<div class="op-oferta__pasta"><strong class="money-neg">\u2212' + money(oferta.amount) + '</strong></div>' +
+        '<div class="op-oferta__botones">' +
+          '<button type="button" class="btn btn--sm btn--no" data-op="retirar" data-oferta="' +
+            escapeHtml(oferta.id) + '" title="Retirar la puja">\u2715</button>' +
+        '</div>' +
+      '</div>';
+    };
+
+    abrirOpModal(
+      '<div class="op-card__cab">' +
+        '<h3 id="op-modal-titulo">Ofertas</h3>' +
+        '<button type="button" class="picker__close" data-op-cerrar aria-label="Cerrar">\u00d7</button>' +
+      '</div>' +
+      (recibidas.length
+        ? '<p class="op-titulillo">Te han ofrecido</p>' + recibidas.map(filaRecibida).join('')
+        : '<p class="muted">No tienes ofertas por resolver.</p>') +
+      (enviadas.length
+        ? '<p class="op-titulillo">Tus pujas</p>' + enviadas.map(filaEnviada).join('')
+        : '') +
+      '<p class="op-aviso"></p>');
+  }
+
+  /* Qué se dice antes de mandar cada operación. */
+  const OPERACIONES = {
+    aceptar:  { texto: 'Aceptar la oferta de %quien% por %jugador%: %importe%.', hecho: 'Oferta aceptada.' },
+    rechazar: { texto: 'Rechazar la oferta de %quien% por %jugador%.', hecho: 'Oferta rechazada.' },
+    devolver: { texto: 'Rechazar las ofertas por %jugador% y dejarlo en venta a %importe%.',
+                hecho: 'Vuelve a estar en el mercado.' },
+    retirar:  { texto: 'Retirar tu puja de %importe% por %jugador%.', hecho: 'Puja retirada.' }
+  };
+
+  let opPendiente = null;
+
+  /** Paso intermedio: enseña qué va a pasar y espera el sí. */
+  function confirmarOperacion(accion, oferta) {
+    const guion = OPERACIONES[accion];
+    if (!guion || !oferta) return;
+
+    const suya = (state.listings || []).filter(function (item) {
+      return String(item.playerId) === String(oferta.playerId);
+    })[0];
+    /* Al devolverlo al mercado se repite el precio que ya tenía puesto. */
+    const importe = accion === 'devolver'
+      ? (suya ? suya.price : oferta.amount)
+      : oferta.amount;
+
+    const texto = guion.texto
+      .replace('%quien%', oferta.other || 'Mercado')
+      .replace('%jugador%', oferta.player || 'ese futbolista')
+      .replace('%importe%', money(importe || 0));
+
+    abrirOpModal(
+      '<div class="op-card__cab">' +
+        '<h3 id="op-modal-titulo">\u00bfSeguro?</h3>' +
+        '<button type="button" class="picker__close" data-op-cerrar aria-label="Cerrar">\u00d7</button>' +
+      '</div>' +
+      '<p class="op-texto">' + escapeHtml(texto) + '</p>' +
+      (accion === 'devolver'
+        ? '<p class="sub op-texto">Se rechazan todas las ofertas que tenga.</p>' : '') +
+      '<p class="op-aviso"></p>' +
+      '<div class="op-botones">' +
+        '<button type="button" class="btn btn--ghost" data-op-volver>Volver</button>' +
+        '<button type="button" class="btn btn--primary" data-op-va>S\u00ed, hazlo</button>' +
+      '</div>');
+
+    opPendiente = {
+      accion: accion,
+      id: oferta.id,
+      playerId: oferta.playerId,
+      importe: importe,
+      hecho: guion.hecho
+    };
+  }
+
+  function lanzarOperacion(orden, mensaje) {
+    Array.prototype.forEach.call(document.querySelectorAll('#op-modal button'), function (b) {
+      b.disabled = true;
+    });
+    mandarOperacion(orden)
+      .then(function () {
+        opAviso(mensaje);
+        opPendiente = null;
+        /* Lo que diga Biwenger manda: se vuelve a preguntar todo. */
+        setTimeout(function () { cerrarOpModal(); syncNow(true); }, 900);
+      })
+      .catch(function (error) {
+        Array.prototype.forEach.call(document.querySelectorAll('#op-modal button'), function (b) {
+          b.disabled = false;
+        });
+        opAviso(String(error.message || error), true);
+      });
+  }
+
+  /** El sí definitivo: aquí ya se escribe en Biwenger. */
+  function ejecutarPendiente() {
+    if (!opPendiente) return;
+    opAviso('Hablando con Biwenger\u2026');
+
+    if (opPendiente.accion === 'devolver') {
+      lanzarOperacion({ accion: 'devolver', player: opPendiente.playerId, price: opPendiente.importe },
+        opPendiente.hecho);
+      return;
+    }
+    lanzarOperacion({ accion: opPendiente.accion, id: opPendiente.id }, opPendiente.hecho);
+  }
+
+  /** Los clics del diálogo y de los botones que lo abren. */
+  function engancharOperaciones() {
+    const mercado = $('market-body');
+    if (mercado) {
+      mercado.addEventListener('click', function (event) {
+        const boton = event.target.closest('[data-pujar]');
+        if (boton) abrirPuja(boton.getAttribute('data-pujar'));
+      });
+    }
+
+    const pastilla = $('btn-ofertas');
+    if (pastilla) pastilla.addEventListener('click', abrirOfertas);
+
+    const caja = $('op-modal');
+    if (!caja) return;
+
+    caja.addEventListener('click', function (event) {
+      if (event.target === caja) { cerrarOpModal(); return; }
+      if (event.target.closest('[data-op-cerrar]')) { cerrarOpModal(); return; }
+      if (event.target.closest('[data-op-volver]')) { abrirOfertas(); return; }
+      if (event.target.closest('[data-op-va]')) { ejecutarPendiente(); return; }
+
+      const puja = event.target.closest('[data-op-pujar]');
+      if (puja) { confirmarPuja(puja.getAttribute('data-op-pujar')); return; }
+
+      const accion = event.target.closest('[data-op]');
+      if (accion) {
+        const id = accion.getAttribute('data-oferta');
+        const oferta = state.offers.filter(function (o) { return String(o.id) === String(id); })[0];
+        confirmarOperacion(accion.getAttribute('data-op'), oferta);
+      }
+    });
+
+    document.addEventListener('keydown', function (event) {
+      if (event.key === 'Escape' && !caja.hidden) cerrarOpModal();
+    });
   }
 
   /* ---------- Suben y bajan hoy ---------- */
@@ -5424,6 +5744,7 @@
   function init() {
     renderManagerFilter();
     bindEvents();
+    engancharOperaciones();
 
     const sync = loadSyncConfig();
     $('sync-url').value = sync.url;
