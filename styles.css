@@ -1433,6 +1433,20 @@ main.wrap { padding-bottom: 3.5rem; }
 .picker--modal { position: fixed; z-index: 60; }
 .modal__card { width: min(100%, 640px); max-height: 85vh; }
 
+/* En las fichas y los menús la barra del sistema canta muchísimo sobre el panel
+   oscuro y se queda ahí fija: se oculta. El contenido se sigue desplazando con
+   la rueda y con el dedo. */
+.picker__card, .barras__cuerpo { scrollbar-width: none; }
+.picker__card::-webkit-scrollbar, .barras__cuerpo::-webkit-scrollbar { width: 0; height: 0; }
+
+/* En las tablas sí conviene verla —dice que hay más a los lados—, pero fina y
+   con los colores del tema. */
+.table-scroll { scrollbar-width: thin; scrollbar-color: var(--border-hover) transparent; }
+.table-scroll::-webkit-scrollbar { width: 6px; height: 6px; }
+.table-scroll::-webkit-scrollbar-track { background: transparent; }
+.table-scroll::-webkit-scrollbar-thumb { background: var(--border-hover); border-radius: 100px; }
+.table-scroll::-webkit-scrollbar-thumb:hover { background: var(--text-faint); }
+
 /* Columna de estado en la ficha de la plantilla. */
 .estado-cell { text-align: center; width: 1%; }
 .mark--cell { position: static; display: inline-grid; width: 19px; height: 19px; }
