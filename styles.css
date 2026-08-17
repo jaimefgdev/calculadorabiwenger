@@ -1269,8 +1269,12 @@ code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft)
 
 /* ---------- Jornadas ---------- */
 .jornadas-wrap { position: relative; }
-/* El menú de jornadas se dibuja sobre su propio panel. */
-.picker--panel { position: absolute; }
+/* El menú de jornadas se dibuja sobre su propio panel, y arriba del todo: la
+   pestaña es muy alta desde que están los partidos, y centrado obligaba a bajar
+   media página para verlo. Se queda a la altura del propio selector. */
+.picker--panel { position: absolute; align-items: start; padding-top: 3.4rem; }
+/* Si aun así no cabe, que se desplace la tarjeta, no la página. */
+.picker--panel .picker__card { max-height: min(70vh, 520px); }
 .picker__grid--rounds { grid-template-columns: repeat(auto-fill, minmax(74px, 1fr)); }
 .jornada-card__num { font-size: 1rem; font-weight: 700; font-variant-numeric: tabular-nums; }
 .jornada-card { padding: .5rem .3rem; }
