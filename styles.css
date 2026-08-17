@@ -1179,6 +1179,11 @@ code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft)
 .table--listings td[data-label="Ofertas"] .bid { display: inline-flex; vertical-align: middle; }
 .table--offers td[data-label="Simular"] .switch { vertical-align: middle; }
 
+/* ---------- Buscador de futbolistas ---------- */
+#jugadores-buscar { min-width: 240px; }
+.table--jugadores .jugador__pos { margin-left: .4rem; font-size: .68rem; }
+.table--jugadores td { padding-block: .3rem; }
+
 /* ---------- Estadísticas de temporada en la ficha ---------- */
 .stats { margin: .6rem 0 .9rem; }
 .stats__cargando { margin: .5rem 0; }
@@ -1199,8 +1204,6 @@ code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft)
 }
 .stat__label { font-size: .64rem; color: var(--text-faint); text-transform: uppercase; letter-spacing: .03em; }
 .stat strong { font-size: .95rem; font-variant-numeric: tabular-nums; }
-.stat--fuerte { background: var(--accent-soft); }
-.stat--fuerte strong { color: var(--accent); }
 
 /* ---------- Partidos de la jornada ---------- */
 .partidos { display: grid; gap: .3rem; }

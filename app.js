@@ -513,6 +513,8 @@
     expandedManager: null,
     expandedPoints: null,   // desglose de puntos por futbolista, en la clasificación
     puntosDetalle: null,    // gráfico de puntos por jornada de un futbolista
+    jugadores: null,        // lista completa de la competición, para el buscador
+    jugadoresCargando: false,
     estadisticas: {},       // resumen de temporada de cada futbolista
     partidos: {},           // partidos de cada jornada, con sus alineaciones
     partidosEstado: '',
@@ -2630,6 +2632,79 @@
     ajustarNombres();
   }
 
+  /* ---------- Buscador de futbolistas ---------- */
+
+  /** Trae la lista completa de la competici\u00f3n; se guarda mientras dure la sesi\u00f3n. */
+  function ensureJugadores() {
+    const config = loadSyncConfig();
+    if (!config.url || !config.key) return;
+    if (state.jugadores || state.jugadoresCargando) return;
+
+    state.jugadoresCargando = true;
+    fetch(config.url.replace(/\/+$/, '') + '/?key=' + encodeURIComponent(config.key) + '&jugadores=1',
+      { headers: { 'accept': 'application/json' } })
+      .then(function (response) { return response.json(); })
+      .then(function (payload) {
+        if (payload.error) throw new Error(payload.error);
+        state.jugadores = payload.players || [];
+        state.jugadoresCargando = false;
+        renderJugadores();
+      })
+      .catch(function () {
+        state.jugadoresCargando = false;
+        state.jugadores = [];
+        renderJugadores();
+      });
+  }
+
+  function renderJugadores() {
+    const cuerpo = $('jugadores-body');
+    if (!cuerpo) return;
+
+    if (!state.jugadores) {
+      cuerpo.innerHTML = '<tr><td colspan="7" class="muted">Cargando futbolistas\u2026</td></tr>';
+      $('jugadores-cuenta').textContent = '';
+      return;
+    }
+
+    /* Se busca sin acentos ni may\u00fasculas, por nombre y por equipo. */
+    const busca = normalize($('jugadores-buscar').value || '');
+    const lista = busca
+      ? state.jugadores.filter(function (jugador) {
+          return normalize(jugador.name).indexOf(busca) !== -1 ||
+            normalize(jugador.teamName || '').indexOf(busca) !== -1;
+        })
+      : state.jugadores;
+
+    $('jugadores-cuenta').textContent = lista.length === state.jugadores.length
+      ? state.jugadores.length + ' futbolistas, del que m\u00e1s puntos lleva al que menos'
+      : lista.length + ' de ' + state.jugadores.length;
+
+    if (lista.length === 0) {
+      cuerpo.innerHTML = '<tr><td colspan="7" class="muted">Ning\u00fan futbolista con ese nombre.</td></tr>';
+      return;
+    }
+
+    cuerpo.innerHTML = lista.map(function (jugador, indice) {
+      const media = jugador.played ? (jugador.points / jugador.played) : null;
+      return '<tr>' +
+        '<td class="col-rank">' + (indice + 1) + '</td>' +
+        '<td><span class="with-crest">' +
+          playerName({ playerId: jugador.id, player: jugador.name }) +
+          crestOf(jugador, 'crest--badge') + '</span>' +
+          '<span class="sub jugador__pos">' +
+            (jugador.position ? POSITION_NAMES[jugador.position] : '\u2014') + '</span></td>' +
+        '<td class="estado-cell">' + statusCell(jugador) + '</td>' +
+        '<td class="num"><strong>' + jugador.points + '</strong></td>' +
+        '<td class="num">' + jugador.played + '</td>' +
+        '<td class="num">' + (media == null ? '<span class="sub">\u2014</span>'
+          : media.toFixed(1).replace('.', ',')) + '</td>' +
+        '<td class="num">' + (jugador.marketValue == null ? '<span class="sub">\u2014</span>'
+          : money(jugador.marketValue)) + '</td>' +
+      '</tr>';
+    }).join('');
+  }
+
   /* ---------- Los partidos de la jornada ----------
      Biwenger numera los lances sin explicarlos; el significado se ha despejado
      cruzándolos con el desglose de puntos y con los resultados. */
@@ -2659,6 +2734,13 @@
 
   /** Una alineaci\u00f3n de las dos del partido. */
   function once(equipo, titulo) {
+    /* De portero a delantero: Biwenger los manda al revés. */
+    const porPuesto = function (lista) {
+      return lista.slice().sort(function (a, b) {
+        return (a.position || 9) - (b.position || 9);
+      });
+    };
+
     const fila = function (jugador) {
       return '<div class="alin__fila">' +
         '<span class="alin__pos">' + (jugador.position ? POSITION_NAMES[jugador.position] : '\u2014') + '</span>' +
@@ -2670,9 +2752,9 @@
 
     return '<div class="alin">' +
       '<h4 class="alin__titulo">' + escapeHtml(titulo) + '</h4>' +
-      equipo.xi.map(fila).join('') +
+      porPuesto(equipo.xi).map(fila).join('') +
       (equipo.bench.length
-        ? '<p class="alin__banquillo">Entraron</p>' + equipo.bench.map(fila).join('')
+        ? '<p class="alin__banquillo">Entraron</p>' + porPuesto(equipo.bench).map(fila).join('')
         : '') +
     '</div>';
   }
@@ -3468,8 +3550,8 @@
       '<div class="stats__grupo">' +
         '<h4 class="stats__titulo">Puntos</h4>' +
         '<div class="stats__rejilla">' +
-          celda('Totales', numero(datos.points), 'stat--fuerte') +
-          celda('Media', decimal(datos.average), 'stat--fuerte') +
+          celda('Totales', numero(datos.points)) +
+          celda('Media', decimal(datos.average)) +
           celda('Casa', numero(datos.home.points)) +
           celda('Media casa', decimal(datos.home.average)) +
           celda('Fuera', numero(datos.away.points)) +
@@ -3480,6 +3562,33 @@
   }
 
   /** Pide las estad\u00edsticas de un futbolista; se guardan mientras dure la sesi\u00f3n. */
+  /**
+   * Abre la ficha del futbolista al que pertenece lo que se ha pulsado. Dice si
+   * la ha abierto, para que quien llame pueda parar ahí.
+   */
+  function abrirFicha(donde) {
+    const quien = donde && donde.closest && donde.closest('[data-player-id]');
+    if (!quien || !quien.getAttribute('data-player-id')) return false;
+
+    const nombre = quien.querySelector('.player-name');
+    state.priceModal = {
+      id: quien.getAttribute('data-player-id'),
+      name: nombre ? nombre.textContent : ''
+    };
+    ensurePriceSeries([state.priceModal.id], renderPriceModal);
+    ensureEstadisticas(state.priceModal.id);
+    renderPriceModal();
+    return true;
+  }
+
+  /** Los puntos jornada a jornada del futbolista, en el mismo gráfico de barras. */
+  function rachaDeTemporada(id) {
+    const datos = state.estadisticas[String(id)];
+    if (!datos || !(datos.rounds || []).length) return '';
+    return '<h4 class="stats__titulo">Puntos por jornada</h4>' +
+      graficoDePuntos({ rounds: datos.rounds, points: datos.points });
+  }
+
   function ensureEstadisticas(id) {
     const config = loadSyncConfig();
     if (!config.url || !config.key || id == null) return;
@@ -3573,6 +3682,7 @@
         '</div>' +
         '<p class="muted ficha__datos">' + datos + '</p>' +
         estadisticasDeTemporada(abierto.id) +
+        rachaDeTemporada(abierto.id) +
         (puntos.length < 2
           ? '<p class="viz__empty">Todavía no hay evolución de este futbolista.</p>'
           : '<div class="viz-hover">' +
@@ -4161,6 +4271,7 @@
     if (name === 'managers') { renderManagers(); renderSquads(); }
     if (name === 'datos') { ensureSquads(); ensureLaLiga(); renderDataKpis(); renderKpiCharts(); renderSpending(); renderRankings(); }
     if (name === 'mercado') { ensureMarket(); renderMarket(); renderMovers(); }
+    if (name === 'jugadores') { ensureJugadores(); renderJugadores(); }
     if (name === 'jornadas') { ensureJornada(state.jornadaVista || 'actual'); renderJornadas(); }
   }
 
@@ -4721,19 +4832,12 @@
       renderPriceModal();
     });
 
-    /* La ficha se abre pulsando el nombre, solo en estas tres tablas. */
-    ['moves-body', 'market-body', 'squads-body'].forEach(function (id) {
-      $(id).addEventListener('click', function (event) {
-        const quien = event.target.closest('[data-player-id]');
-        if (!quien || !quien.getAttribute('data-player-id')) return;
-        state.priceModal = {
-          id: quien.getAttribute('data-player-id'),
-          name: quien.querySelector('.player-name') ? quien.querySelector('.player-name').textContent : ''
-        };
-        ensurePriceSeries([state.priceModal.id], renderPriceModal);
-        ensureEstadisticas(state.priceModal.id);
-        renderPriceModal();
-      });
+    $('jugadores-buscar').addEventListener('input', renderJugadores);
+
+    /* La ficha se abre pulsando el nombre del futbolista, esté donde esté. */
+    ['moves-body', 'market-body', 'squads-body', 'listings-body',
+     'movers-up', 'movers-down', 'jugadores-body'].forEach(function (id) {
+      $(id).addEventListener('click', function (event) { abrirFicha(event.target); });
     });
 
     $('price-modal').addEventListener('click', function (event) {
