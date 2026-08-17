@@ -1762,7 +1762,12 @@
         const mia = state.xi;
         if (mia && mia.savedAt && mia.savedAt >= fuera.savedAt) return;
 
+        /* Ni pisa a la que tengas puesta en Biwenger si esa es posterior. */
+        const oficial = alineacionOficial();
+        if (oficial && oficial.date && oficial.date > fuera.savedAt) return;
+
         state.xi = { type: fuera.type || '4-4-2', slots: fuera.slots, savedAt: fuera.savedAt };
+        ensureXi();          // quita a los que ya no estén en tu plantilla
         persistXi();
         renderLineup();
       })
@@ -1789,19 +1794,42 @@
    * cuando está.
    */
   function alineacionOficial() {
+    const actual = state.lineup;
     const round = state.round;
     const jornada = round && round.id != null ? state.jornadas.datos[round.id] : null;
     const mia = jornada && state.me && (jornada.standings || []).filter(function (fila) {
       return String(fila.id) === String(state.me.id);
     })[0];
 
-    if (mia && mia.type && (mia.xi || []).length === 11) {
-      return { type: mia.type, players: mia.xi };
+    /* Manda la que tienes puesta ahora en Biwenger: la de la jornada es el
+       registro de lo que alineaste ese día y puede tener a gente ya vendida. */
+    if (!actual || !(actual.players || []).length) {
+      return mia && mia.type && (mia.xi || []).length === 11
+        ? { type: mia.type, players: mia.xi, date: null }
+        : actual;
     }
-    return state.lineup;
+
+    /* De la jornada solo se aprovecha el sistema, y solo si son los mismos
+       once: «/user» lo calcula por el puesto de ficha y a veces se equivoca
+       (un 4-6-0 con un delantero de medio se lo devuelve como 4-5-1). */
+    let type = actual.type;
+    if (mia && mia.type && (mia.xi || []).length === (actual.players || []).length) {
+      const suyos = (mia.xi || []).map(function (p) { return String(p.id); }).sort().join(',');
+      const mios = (actual.players || []).map(function (p) { return String(p.id); }).sort().join(',');
+      if (suyos === mios) type = mia.type;
+    }
+
+    return { type: type, players: actual.players, date: actual.date || null };
   }
 
   function ensureXi() {
+    /* Si en Biwenger la has cambiado después de lo que hay guardado aquí, manda
+       Biwenger: es la de verdad, y además ya no tiene a los que vendiste. */
+    const oficial = alineacionOficial();
+    if (state.xi && oficial && oficial.date && state.xi.savedAt && oficial.date > state.xi.savedAt) {
+      state.xi = null;
+    }
+
     /* Lo guardado manda, pero se limpian los que ya no estén en la plantilla
        (vendidos desde la última vez). */
     if (state.xi) {
@@ -1820,20 +1848,25 @@
     const slots = {};
 
     if (lineup && lineup.players) {
+      /* Biwenger manda el once en orden —portero, defensas, medios y
+         delanteros— según el sistema puesto, y el puesto de ficha de cada uno
+         no vale: Berenguer es delantero de ficha y juega de medio, así que
+         repartiendo por ficha se quedaba fuera del 4-6-0. */
       const lines = formationLines(type);
-      const used = { 1: 0, 2: 0, 3: 0, 4: 0 };
-      lineup.players.forEach(function (player) {
-        const pos = player.position || 3;
-        const limit = pos === 1 ? 1 : lines[pos];
-        if (used[pos] < limit) {
-          slots[pos + '-' + used[pos]] = String(player.id);
-          used[pos] += 1;
+      const huecos = [[1, 1], [2, lines[2]], [3, lines[3]], [4, lines[4]]];
+      let indice = 0;
+
+      huecos.forEach(function (par) {
+        const pos = par[0];
+        for (let i = 0; i < par[1] && indice < lineup.players.length; i++) {
+          slots[pos + '-' + i] = String(lineup.players[indice].id);
+          indice += 1;
         }
       });
     }
-    /* Sin hora: es la de Biwenger, no una elección tuya, así que la que venga
-       del otro aparato manda sobre ella. */
-    state.xi = { type: type, slots: slots, savedAt: null };
+    /* Se sella con la fecha en que la guardaste en Biwenger: así, si allí la
+       has tocado después, gana sobre la del otro aparato. */
+    state.xi = { type: type, slots: slots, savedAt: (lineup && lineup.date) || null };
     persistXi();
   }
 
@@ -3528,8 +3561,9 @@
    */
   function estadisticasDeTemporada(id) {
     const datos = state.estadisticas[String(id)];
-    if (datos === undefined) return '<p class="muted stats__cargando">Cargando estad\u00edsticas\u2026</p>';
-    if (datos === null) return '';
+    /* Mientras no estén (o si no llegan) no se dice nada: aparecen solas al
+       llegar, y anunciarlo solo ensucia la ficha. */
+    if (!datos) return '';
 
     /* Sin partidos se ense\u00f1an los mismos huecos a cero: la ficha se lee igual
        antes y despu\u00e9s de que el futbolista juegue. */

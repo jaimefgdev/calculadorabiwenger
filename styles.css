@@ -1230,7 +1230,6 @@ code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft)
 
 /* ---------- Estadísticas de temporada en la ficha ---------- */
 .stats { margin: .6rem 0 .9rem; }
-.stats__cargando { margin: .5rem 0; }
 /* Tres grupos: participación, juego y puntos. */
 .stats__grupo + .stats__grupo { margin-top: .6rem; }
 .stats__titulo {
