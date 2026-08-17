@@ -1473,7 +1473,9 @@ code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft)
 .movers__list { display: flex; flex-direction: column; }
 .mover {
   display: grid; align-items: center; gap: .4rem;
-  grid-template-columns: minmax(0, 1fr) 24px auto auto;
+  /* Las dos últimas columnas van fijas: si se ajustaran al número de cada fila,
+     la del dueño acababa en un sitio distinto en cada una. */
+  grid-template-columns: minmax(0, 1fr) 24px 96px 100px;
   padding: .3rem 0;
   border-bottom: 1px solid var(--border);
   font-size: .82rem;
@@ -1485,8 +1487,11 @@ code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft)
 .mover .crest--badge { width: 18px; height: 18px; opacity: 1; }
 .mover__owner { display: inline-flex; align-items: center; justify-content: center; }
 .mover__owner .avatar { width: 24px; height: 24px; font-size: .58rem; }
-.mover__value { font-variant-numeric: tabular-nums; color: var(--text-soft); white-space: nowrap; font-size: .78rem; }
-.mover .delta { font-size: .7rem; }
+.mover__value {
+  font-variant-numeric: tabular-nums; color: var(--text-soft);
+  white-space: nowrap; font-size: .78rem; text-align: right;
+}
+.mover .delta { font-size: .7rem; text-align: right; justify-self: end; }
 
 /* ---------- Respiración ----------
    El campo iba pegado a la cabecera y la página terminaba en seco. */

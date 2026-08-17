@@ -2661,7 +2661,14 @@
       captain: (state.lineup && state.lineup.captain) || null,
       coach: (state.lineup && state.lineup.coach) || null,
       round: (state.round && state.round.id) || null
-    }, 'Alineación guardada en Biwenger.');
+    }, function (respuesta) {
+      /* El Worker vuelve a leer la alineación después de guardarla: si no
+         coincide con la que se mandó, más vale decirlo que dar por hecho. */
+      if (respuesta && respuesta.comprobada === false) {
+        return 'Biwenger la ha aceptado, pero al releerla sigue con otra. Míralo allí.';
+      }
+      return 'Alineación guardada en Biwenger.';
+    });
   }
 
   /** Las ofertas recibidas y tus pujas, cada una con lo que se puede hacer. */
@@ -2778,8 +2785,8 @@
       b.disabled = true;
     });
     mandarOperacion(orden)
-      .then(function () {
-        opAviso(mensaje);
+      .then(function (respuesta) {
+        opAviso(typeof mensaje === 'function' ? mensaje(respuesta) : mensaje);
         opPendiente = null;
         const volver = trasOperar;
         trasOperar = null;
@@ -2937,8 +2944,9 @@
       '</span>' +
       /* Solo la foto del dueño: el nombre ensanchaba la fila hasta desbordar.
          Queda en el título, al pasar el ratón. */
-      '<span class="mover__owner" title="' + (dueño ? escapeHtml(dueño) : 'Sin dueño en la liga') + '">' +
-        (dueño ? avatar(dueño) : '<span class="sub">—</span>') + '</span>' +
+      /* Sin dueño no se pinta nada: el guion solo ensuciaba la columna. */
+      '<span class="mover__owner"' + (dueño ? ' title="' + escapeHtml(dueño) + '"' : '') + '>' +
+        (dueño ? avatar(dueño) : '') + '</span>' +
       '<span class="mover__value">' + money(player.marketValue || 0) + '</span>' +
       '<span class="delta ' + (sube ? 'delta--up' : 'delta--down') + '">' +
         (sube ? '▲ +' : '▼ −') + money(Math.abs(player.increment)) + '</span>' +
