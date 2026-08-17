@@ -1179,6 +1179,31 @@ code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft)
 .table--listings td[data-label="Ofertas"] .bid { display: inline-flex; vertical-align: middle; }
 .table--offers td[data-label="Simular"] .switch { vertical-align: middle; }
 
+/* ---------- Estadísticas de temporada en la ficha ---------- */
+.stats { margin: .6rem 0 .9rem; }
+.stats__cargando { margin: .5rem 0; }
+/* Los lances, con el mismo icono que en los partidos. */
+.stats__lances {
+  display: flex; flex-wrap: wrap; gap: .9rem;
+  padding-bottom: .6rem; margin-bottom: .6rem;
+  border-bottom: 1px solid var(--border);
+}
+.stats__lance { display: inline-flex; align-items: center; gap: .3rem; font-variant-numeric: tabular-nums; }
+.stats__lance strong { font-size: .95rem; }
+.stats__rejilla {
+  display: grid; gap: .5rem;
+  grid-template-columns: repeat(auto-fit, minmax(88px, 1fr));
+}
+.stat {
+  display: flex; flex-direction: column; gap: .1rem;
+  padding: .35rem .5rem;
+  background: var(--bg-surface); border-radius: var(--radius-sm);
+}
+.stat__label { font-size: .64rem; color: var(--text-faint); text-transform: uppercase; letter-spacing: .03em; }
+.stat strong { font-size: .95rem; font-variant-numeric: tabular-nums; }
+.stat--fuerte { background: var(--accent-soft); }
+.stat--fuerte strong { color: var(--accent); }
+
 /* ---------- Partidos de la jornada ---------- */
 .partidos { display: grid; gap: .3rem; }
 .partido { border: 1px solid var(--border); border-radius: var(--radius-sm); overflow: hidden; }

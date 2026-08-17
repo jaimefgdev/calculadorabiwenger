@@ -513,6 +513,7 @@
     expandedManager: null,
     expandedPoints: null,   // desglose de puntos por futbolista, en la clasificación
     puntosDetalle: null,    // gráfico de puntos por jornada de un futbolista
+    estadisticas: {},       // resumen de temporada de cada futbolista
     partidos: {},           // partidos de cada jornada, con sus alineaciones
     partidosEstado: '',
     partidoAbierto: null,   // el partido cuyo detalle se está viendo
@@ -2005,7 +2006,8 @@
         '<div class="picker__backdrop" data-picker-close></div>' +
         '<div class="picker__card" role="dialog" aria-modal="true" aria-label="Elegir sistema">' +
           '<div class="picker__head"><strong>Sistema</strong>' +
-            '<button type="button" class="btn btn--ghost btn--sm" data-picker-close>Cerrar</button>' +
+            '<button type="button" class="btn btn--ghost btn--close" data-picker-close' +
+              ' title="Cerrar" aria-label="Cerrar">✕</button>' +
           '</div>' +
           '<div class="picker__grid">' + FORMATIONS.map(formationCard).join('') + '</div>' +
         '</div>';
@@ -2038,7 +2040,8 @@
         POSITION_NAMES[open.position] + '">' +
         '<div class="picker__head">' +
           '<strong>' + POSITION_NAMES[open.position] + ' · elige quién juega</strong>' +
-          '<button type="button" class="btn btn--ghost btn--sm" data-picker-close>Cerrar</button>' +
+          '<button type="button" class="btn btn--ghost btn--close" data-picker-close' +
+              ' title="Cerrar" aria-label="Cerrar">✕</button>' +
         '</div>' +
         (cards
           ? '<div class="picker__grid">' + cards + empty + '</div>'
@@ -2943,7 +2946,8 @@
       '<div class="picker__backdrop" data-picker-close></div>' +
       '<div class="picker__card" role="dialog" aria-modal="true" aria-label="Elegir jornada">' +
         '<div class="picker__head"><strong>Jornada</strong>' +
-          '<button type="button" class="btn btn--ghost btn--sm" data-picker-close>Cerrar</button>' +
+          '<button type="button" class="btn btn--ghost btn--close" data-picker-close' +
+              ' title="Cerrar" aria-label="Cerrar">✕</button>' +
         '</div>' +
         (cartas ? '<div class="picker__grid picker__grid--rounds">' + cartas + '</div>'
                 : '<p class="muted">Todavía no hay jornadas: sincroniza primero.</p>') +
@@ -3412,6 +3416,80 @@
     caja.addEventListener('touchend', salir);
   }
 
+  /**
+   * Lo que lleva el futbolista esta temporada. Los lances van con el mismo
+   * icono que en los partidos; lo dem\u00e1s, con su nombre debajo.
+   */
+  function estadisticasDeTemporada(id) {
+    const datos = state.estadisticas[String(id)];
+    if (datos === undefined) return '<p class="muted stats__cargando">Cargando estad\u00edsticas\u2026</p>';
+    if (datos === null) return '';
+    if (!datos.played) return '<p class="muted stats__cargando">Todav\u00eda no ha jugado esta temporada.</p>';
+
+    const conIcono = function (clase, icono, valor, titulo) {
+      return '<span class="stats__lance" title="' + titulo + '">' +
+        '<span class="lance ' + clase + '">' + icono + '</span>' +
+        '<strong>' + valor + '</strong></span>';
+    };
+
+    const celda = function (rotulo, valor, extra) {
+      if (valor == null) return '';
+      return '<div class="stat' + (extra ? ' ' + extra : '') + '">' +
+        '<span class="stat__label">' + rotulo + '</span>' +
+        '<strong>' + valor + '</strong></div>';
+    };
+
+    /* Las porter\u00edas a cero solo dicen algo de porteros y defensas; los goles
+       por partido, de medios y delanteros. */
+    const puesto = datos.position;
+    const atras = puesto === 1 || puesto === 2;
+
+    return '<div class="stats">' +
+      '<div class="stats__lances">' +
+        conIcono('lance--gol', '\u26bd', datos.goals, 'Goles') +
+        conIcono('lance--asist', 'A', datos.assists, 'Asistencias') +
+        conIcono('lance--amarilla', '', datos.yellow, 'Tarjetas amarillas') +
+        conIcono('lance--roja', '', datos.red, 'Tarjetas rojas') +
+        conIcono('lance--entra', '\u25b2', datos.subsIn, 'Veces que ha entrado desde el banquillo') +
+        conIcono('lance--sale', '\u25bc', datos.subsOut, 'Veces que le han sustituido') +
+      '</div>' +
+      '<div class="stats__rejilla">' +
+        celda('Partidos', datos.played) +
+        celda('Minutos', datos.minutes) +
+        (atras ? celda('Porter\u00edas a cero', datos.cleanSheets)
+               : celda('Goles por partido', datos.goalsPerGame == null ? '\u2014' : datos.goalsPerGame.toFixed(1))) +
+        celda('Puntos', datos.points, 'stat--fuerte') +
+        celda('Media', datos.average == null ? '\u2014' : datos.average.toFixed(1), 'stat--fuerte') +
+        celda('Puntos en casa', datos.home.points) +
+        celda('Media en casa', datos.home.average == null ? '\u2014' : datos.home.average.toFixed(1)) +
+        celda('Puntos fuera', datos.away.points) +
+        celda('Media fuera', datos.away.average == null ? '\u2014' : datos.away.average.toFixed(1)) +
+      '</div>' +
+    '</div>';
+  }
+
+  /** Pide las estad\u00edsticas de un futbolista; se guardan mientras dure la sesi\u00f3n. */
+  function ensureEstadisticas(id) {
+    const config = loadSyncConfig();
+    if (!config.url || !config.key || id == null) return;
+    const clave = String(id);
+    if (state.estadisticas[clave] !== undefined) return;
+
+    /* Se marca como pedida para no repetir la llamada en cada repintado. */
+    state.estadisticas[clave] = undefined;
+    fetch(config.url.replace(/\/+$/, '') + '/?key=' + encodeURIComponent(config.key) +
+      '&estadisticas=' + encodeURIComponent(clave), { headers: { 'accept': 'application/json' } })
+      .then(function (response) { return response.json(); })
+      .then(function (payload) {
+        state.estadisticas[clave] = payload && payload.error ? null : payload;
+        renderPriceModal();
+      })
+      .catch(function () {
+        state.estadisticas[clave] = null;
+        renderPriceModal();
+      });
+  }
+
   /** Las operaciones de ese futbolista en la liga, de la más reciente atrás. */
   function playerHistory(ficha) {
     /* Sin operaciones no se dice nada: el hueco vacío ya lo cuenta. */
@@ -3483,6 +3561,7 @@
             ' title="Cerrar" aria-label="Cerrar">✕</button>' +
         '</div>' +
         '<p class="muted ficha__datos">' + datos + '</p>' +
+        estadisticasDeTemporada(abierto.id) +
         (puntos.length < 2
           ? '<p class="viz__empty">Todavía no hay evolución de este futbolista.</p>'
           : '<div class="viz-hover">' +
@@ -4641,6 +4720,7 @@
           name: quien.querySelector('.player-name') ? quien.querySelector('.player-name').textContent : ''
         };
         ensurePriceSeries([state.priceModal.id], renderPriceModal);
+        ensureEstadisticas(state.priceModal.id);
         renderPriceModal();
       });
     });
