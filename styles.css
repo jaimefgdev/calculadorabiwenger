@@ -1582,6 +1582,9 @@ main.wrap { padding-bottom: 3.5rem; }
 /* La cabecera de la alineación: el botón de mandarla y el sistema. */
 .lineup-acciones { display: inline-flex; align-items: center; gap: .6rem; flex-wrap: wrap; }
 
+/* La versión del Worker, discreta, junto al botón de vaciar. */
+.worker-version { margin-left: auto; font-size: .72rem; font-family: var(--mono); }
+
 /* Solo para lectores de pantalla. */
 .sr-only {
   position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;

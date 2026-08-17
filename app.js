@@ -5385,6 +5385,28 @@
       : dateFormat.format(date));
   }
 
+  /** Qué código tiene desplegado el Worker; se enseña en el panel de conexión. */
+  function ensureVersionWorker() {
+    const hueco = $('worker-version');
+    if (!hueco) return;
+    const config = loadSyncConfig();
+    if (!config.url || !config.key) { hueco.textContent = ''; return; }
+
+    fetch(config.url.replace(/\/+$/, '') + '/?key=' + encodeURIComponent(config.key) + '&version=1',
+      { headers: { 'accept': 'application/json' } })
+      .then(function (response) { return response.json(); })
+      .then(function (payload) {
+        const rotulo = payload && payload.version
+          ? 'Worker ' + payload.version
+          : (payload && payload.error) || '';
+        hueco.textContent = rotulo;
+        /* También en el reloj de arriba, para verlo sin abrir la conexión. */
+        const stamp = $('last-sync');
+        if (stamp && rotulo) stamp.title = rotulo;
+      })
+      .catch(function () { hueco.textContent = 'Worker: no responde'; });
+  }
+
   /** Traduce la respuesta del Worker al modelo interno de la calculadora. */
   function applySync(payload) {
     const warnings = [];
@@ -5462,6 +5484,7 @@
     traerXiCompartida();
     /* El recuento trae las amarillas, que hacen falta para el estado. */
     ensureRecuento();
+    ensureVersionWorker();
     /* Los partidos de la jornada que se esté viendo, por si ya hay alineaciones. */
     const viendo = jornadaActiva();
     if (viendo && viendo.round) ensurePartidos(viendo.round.id, true);
@@ -6067,6 +6090,7 @@
     bindEvents();
     engancharOperaciones();
     engancharPresupuesto();
+    ensureVersionWorker();
 
     const sync = loadSyncConfig();
     $('sync-url').value = sync.url;

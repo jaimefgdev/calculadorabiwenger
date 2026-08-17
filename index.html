@@ -16,7 +16,7 @@
 <title>Calculadora Biwenger — Presupuestos de la liga</title>
 <!-- El ?v= se sube en cada publicación: obliga al navegador a bajar el archivo
      nuevo en vez de reutilizar el que tenga en caché. -->
-<link rel="stylesheet" href="styles.css?v=122">
+<link rel="stylesheet" href="styles.css?v=123">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>💰</text></svg>">
 </head>
 <body>
@@ -103,6 +103,8 @@
 
     <div class="input-panel__actions">
       <button id="btn-reset" class="btn btn--ghost btn--sm" type="button">Vaciar todo y volver a 20.000.000 €</button>
+      <!-- Qué versión del Worker está desplegada, para no tener que pedírsela a mano. -->
+      <span id="worker-version" class="muted worker-version"></span>
     </div>
   </section>
 
@@ -538,6 +540,6 @@
 
 </main>
 
-<script src="app.js?v=122"></script>
+<script src="app.js?v=123"></script>
 </body>
 </html>
