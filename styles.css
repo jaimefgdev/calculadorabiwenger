@@ -1179,10 +1179,33 @@ code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft)
 .table--listings td[data-label="Ofertas"] .bid { display: inline-flex; vertical-align: middle; }
 .table--offers td[data-label="Simular"] .switch { vertical-align: middle; }
 
-/* ---------- Buscador de futbolistas ---------- */
+/* ---------- Buscador de futbolistas ----------
+   Cada uno con la misma ficha que en el campo: escudo difuminado detrás de la
+   cara, estado y puntos en sus círculos, y el nombre debajo. */
 #jugadores-buscar { min-width: 240px; }
-.table--jugadores .jugador__pos { margin-left: .4rem; font-size: .68rem; }
-.table--jugadores td { padding-block: .3rem; }
+.jugadores-rejilla {
+  display: grid; gap: 1rem .6rem;
+  grid-template-columns: repeat(auto-fill, minmax(84px, 1fr));
+}
+.jugador-card {
+  position: relative; overflow: hidden;
+  display: flex; flex-direction: column; align-items: center; gap: .25rem;
+  padding: .2rem 0 .35rem;
+  font: inherit; color: inherit; text-align: center;
+  background: transparent; border: 0; border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+.jugador-card:hover { background: var(--bg-surface); }
+.jugador-card:hover .jugador-card__nombre { color: var(--accent); }
+.jugador-card:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+/* La medida la lleva la caja de la cara, igual que en el campo. */
+.jugador-card .face-box { display: block; width: min(92%, 62px); margin: 0 auto; }
+.jugador-card .pic-player { position: relative; z-index: 1; }
+.jugador-card__nombre {
+  position: relative; z-index: 1;
+  font-size: .7rem; font-weight: 600; line-height: 1.15;
+  max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
 
 /* ---------- Estadísticas de temporada en la ficha ---------- */
 .stats { margin: .6rem 0 .9rem; }

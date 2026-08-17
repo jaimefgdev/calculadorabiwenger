@@ -2555,6 +2555,9 @@
     Array.prototype.forEach.call(document.querySelectorAll('.ranking__owner'), function (el) {
       ajustarAlAncho(el, 10.5, 5.5);
     });
+    Array.prototype.forEach.call(document.querySelectorAll('.jugador-card__nombre'), function (el) {
+      ajustarAlAncho(el, 11.2, 7);
+    });
   }
 
   /* La liga son 38 jornadas: los ejes se plantean enteros desde el principio. */
@@ -2658,11 +2661,11 @@
   }
 
   function renderJugadores() {
-    const cuerpo = $('jugadores-body');
-    if (!cuerpo) return;
+    const caja = $('jugadores-body');
+    if (!caja) return;
 
     if (!state.jugadores) {
-      cuerpo.innerHTML = '<tr><td colspan="7" class="muted">Cargando futbolistas\u2026</td></tr>';
+      caja.innerHTML = '<p class="muted">Cargando futbolistas\u2026</p>';
       $('jugadores-cuenta').textContent = '';
       return;
     }
@@ -2681,28 +2684,25 @@
       : lista.length + ' de ' + state.jugadores.length;
 
     if (lista.length === 0) {
-      cuerpo.innerHTML = '<tr><td colspan="7" class="muted">Ning\u00fan futbolista con ese nombre.</td></tr>';
+      caja.innerHTML = '<p class="muted">Ning\u00fan futbolista con ese nombre.</p>';
       return;
     }
 
-    cuerpo.innerHTML = lista.map(function (jugador, indice) {
-      const media = jugador.played ? (jugador.points / jugador.played) : null;
-      return '<tr>' +
-        '<td class="col-rank">' + (indice + 1) + '</td>' +
-        '<td><span class="with-crest">' +
-          playerName({ playerId: jugador.id, player: jugador.name }) +
-          crestOf(jugador, 'crest--badge') + '</span>' +
-          '<span class="sub jugador__pos">' +
-            (jugador.position ? POSITION_NAMES[jugador.position] : '\u2014') + '</span></td>' +
-        '<td class="estado-cell">' + statusCell(jugador) + '</td>' +
-        '<td class="num"><strong>' + jugador.points + '</strong></td>' +
-        '<td class="num">' + jugador.played + '</td>' +
-        '<td class="num">' + (media == null ? '<span class="sub">\u2014</span>'
-          : media.toFixed(1).replace('.', ',')) + '</td>' +
-        '<td class="num">' + (jugador.marketValue == null ? '<span class="sub">\u2014</span>'
-          : money(jugador.marketValue)) + '</td>' +
-      '</tr>';
+    /* Misma ficha que en el campo: escudo difuminado detr\u00e1s, estado arriba a la
+       izquierda, puntos abajo, y el nombre debajo de la cara. */
+    caja.innerHTML = lista.map(function (jugador) {
+      return '<button type="button" class="jugador-card" data-player-id="' +
+          escapeHtml(String(jugador.id)) + '">' +
+        crestOf(jugador, 'crest--ghost') +
+        '<span class="face-box">' + faceOf(jugador.id, 'pitch__face') +
+          statusMark(jugador, 'mark--esquina') + pointsBadge(jugador, 'pts--esquina') +
+        '</span>' +
+        '<span class="jugador-card__nombre player-name">' + escapeHtml(jugador.name) + '</span>' +
+      '</button>';
     }).join('');
+
+    /* Los nombres largos encogen la letra hasta caber, como en las pastillas. */
+    ajustarNombres();
   }
 
   /* ---------- Los partidos de la jornada ----------

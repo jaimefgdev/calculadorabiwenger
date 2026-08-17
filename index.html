@@ -16,7 +16,7 @@
 <title>Calculadora Biwenger — Presupuestos de la liga</title>
 <!-- El ?v= se sube en cada publicación: obliga al navegador a bajar el archivo
      nuevo en vez de reutilizar el que tenga en caché. -->
-<link rel="stylesheet" href="styles.css?v=97">
+<link rel="stylesheet" href="styles.css?v=98">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>💰</text></svg>">
 </head>
 <body>
@@ -459,22 +459,7 @@
         <input id="jugadores-buscar" class="field" type="search" spellcheck="false"
           placeholder="Buscar futbolista o equipo…" aria-label="Buscar futbolista">
       </div>
-      <div class="table-scroll">
-        <table class="table table--jugadores">
-          <thead>
-            <tr>
-              <th class="col-rank">#</th>
-              <th>Futbolista</th>
-              <th>Estado</th>
-              <th class="num">Puntos</th>
-              <th class="num">Partidos</th>
-              <th class="num">Media</th>
-              <th class="num">Valor</th>
-            </tr>
-          </thead>
-          <tbody id="jugadores-body"></tbody>
-        </table>
-      </div>
+      <div id="jugadores-body" class="jugadores-rejilla"></div>
     </section>
   </div>
 
@@ -525,6 +510,6 @@
 
 </main>
 
-<script src="app.js?v=97"></script>
+<script src="app.js?v=98"></script>
 </body>
 </html>
