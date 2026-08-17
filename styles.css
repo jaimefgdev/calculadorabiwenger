@@ -1184,8 +1184,9 @@ code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft)
    cara, estado y puntos en sus círculos, y el nombre debajo. */
 #jugadores-buscar { min-width: 240px; }
 .jugadores-rejilla {
+  /* Seis por fila, en el ordenador y en el móvil. */
   display: grid; gap: 1.1rem .7rem;
-  grid-template-columns: repeat(auto-fill, minmax(122px, 1fr));
+  grid-template-columns: repeat(6, minmax(0, 1fr));
 }
 .jugador-card {
   position: relative; overflow: hidden;
@@ -1204,6 +1205,19 @@ code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft)
 .jugador-card .pic-player { position: relative; z-index: 1; }
 /* El escudo crece con la cara para que la marca de agua siga cuadrando. */
 .jugador-card .crest--ghost { width: 86px; height: 85px; left: calc(50% - 12px); }
+/* Demarcación, arriba a la izquierda de la ficha y con su color. */
+.puesto {
+  position: absolute; top: 0; left: 0; z-index: 2;
+  padding: .05rem .25rem;
+  font-size: .58rem; font-weight: 700; letter-spacing: .03em;
+  color: #fff; border-radius: 4px;
+}
+.puesto--por { background: #f5c518; color: #111; }   /* portero */
+.puesto--def { background: #2a78d6; }                 /* defensa */
+.puesto--med { background: #1baf7a; }                 /* medio */
+.puesto--del { background: #e0142c; }                 /* delantero */
+.puesto--entrenador { background: var(--border-hover); }  /* entrenador */
+
 .jugador-card__nombre {
   position: relative; z-index: 1;
   font-size: .78rem; font-weight: 600; line-height: 1.15;

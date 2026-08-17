@@ -2660,6 +2660,24 @@
       });
   }
 
+  /* Cada demarcación con su color y sus dos letras. */
+  const PUESTO_CHAPA = {
+    1: { texto: 'PT', clase: 'puesto--por' },
+    2: { texto: 'DF', clase: 'puesto--def' },
+    3: { texto: 'MC', clase: 'puesto--med' },
+    4: { texto: 'DL', clase: 'puesto--del' },
+    /* Biwenger mete a los entrenadores en el mismo índice, uno por equipo. */
+    5: { texto: 'EN', clase: 'puesto--entrenador' }
+  };
+
+  function chapaDePuesto(posicion) {
+    const chapa = PUESTO_CHAPA[posicion];
+    if (!chapa) return '';
+    const nombre = POSITION_NAMES[posicion] || 'Entrenador';
+    return '<span class="puesto ' + chapa.clase + '" title="' + nombre + '">' +
+      chapa.texto + '</span>';
+  }
+
   function renderJugadores() {
     const caja = $('jugadores-body');
     if (!caja) return;
@@ -2679,8 +2697,9 @@
         })
       : state.jugadores;
 
+        /* Solo se dice algo cuando se está filtrando. */
     $('jugadores-cuenta').textContent = lista.length === state.jugadores.length
-      ? state.jugadores.length + ' futbolistas, del que m\u00e1s puntos lleva al que menos'
+      ? ''
       : lista.length + ' de ' + state.jugadores.length;
 
     if (lista.length === 0) {
@@ -2693,6 +2712,7 @@
     caja.innerHTML = lista.map(function (jugador) {
       return '<button type="button" class="jugador-card" data-player-id="' +
           escapeHtml(String(jugador.id)) + '">' +
+        chapaDePuesto(jugador.position) +
         crestOf(jugador, 'crest--ghost') +
         '<span class="face-box">' + faceOf(jugador.id, 'pitch__face') +
           statusMark(jugador, 'mark--esquina') + pointsBadge(jugador, 'pts--esquina') +
