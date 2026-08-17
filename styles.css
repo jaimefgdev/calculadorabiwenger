@@ -1207,10 +1207,12 @@ code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft)
 .jugador-card .crest--ghost { width: 86px; height: 85px; left: calc(50% - 12px); }
 /* Demarcación, arriba a la izquierda de la ficha y con su color. */
 .puesto {
-  position: absolute; top: 0; left: 0; z-index: 2;
-  padding: .05rem .25rem;
-  font-size: .58rem; font-weight: 700; letter-spacing: .03em;
-  color: #fff; border-radius: 4px;
+  /* Metida hacia dentro: la ficha tiene las esquinas redondeadas y recorta lo
+     que toca el borde, así que pegada a (0,0) se le comía la esquina. */
+  position: absolute; top: 4px; left: 4px; z-index: 2;
+  padding: .08rem .3rem;
+  font-size: .58rem; font-weight: 700; letter-spacing: .03em; line-height: 1.25;
+  color: #fff; border-radius: 100px;
 }
 .puesto--por { background: #f5c518; color: #111; }   /* portero */
 .puesto--def { background: #2a78d6; }                 /* defensa */

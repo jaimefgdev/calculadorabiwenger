@@ -3541,7 +3541,14 @@
 
     /* Las porter\u00edas a cero solo dicen algo de porteros y defensas; los goles
        por partido, de medios y delanteros. */
-    const atras = datos.position === 1 || datos.position === 2;
+    const portero = datos.position === 1;
+    const atras = portero || datos.position === 2;
+
+    /* Cada cuántos minutos marca; sin goles no hay proporción que dar. */
+    const golCada = function (d) {
+      if (!d.goals || !d.minutes) return '—';
+      return Math.round(d.minutes / d.goals) + ' min';
+    };
 
     return '<div class="stats">' +
       '<div class="stats__grupo">' +
@@ -3558,13 +3565,16 @@
       '<div class="stats__grupo">' +
         '<h4 class="stats__titulo">Juego</h4>' +
         '<div class="stats__rejilla">' +
-          celda('Goles', numero(datos.goals)) +
-          (atras ? celda('Porter\u00edas a cero', numero(datos.cleanSheets))
-                 : celda('Media goles p/p', decimal(datos.goalsPerGame))) +
+          /* Al portero le interesan los goles que le meten, no los que mete. */
+          (portero ? celda('Goles/E', numero(datos.conceded))
+                   : celda('Goles', numero(datos.goals))) +
+          (atras ? celda('Porterías a cero', numero(datos.cleanSheets))
+                 : celda('Gol cada', golCada(datos)) +
+                   celda('Media goles p/p', decimal(datos.goalsPerGame))) +
           celda('Asistencias', numero(datos.assists)) +
           celda('Amarillas', numero(datos.yellow)) +
           celda('Rojas', numero(datos.red)) +
-        '</div>' +
+      '</div>' +
       '</div>' +
 
       '<div class="stats__grupo">' +
