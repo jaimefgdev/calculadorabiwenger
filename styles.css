@@ -122,6 +122,9 @@ code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft)
   cursor: pointer;
   transition: transform .12s, background .15s;
 }
+/* El escudo de Biwenger, en vez del balón. Se deja respirar dentro del
+   cuadrado y manda su propia proporción (es más alto que ancho). */
+.brand__escudo { height: 30px; width: auto; display: block; }
 .brand__logo:hover { transform: scale(1.08); background: color-mix(in srgb, var(--accent) 18%, transparent); }
 .brand__logo:active { transform: scale(.96); }
 .brand__logo:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
@@ -1568,12 +1571,19 @@ main.wrap { padding-bottom: 3.5rem; }
 }
 .op-card {
   width: min(420px, 100%); max-height: 86vh; overflow: auto;
+  scrollbar-width: none;
   background: var(--bg-elev); border: 1px solid var(--border); border-radius: 14px;
   padding: 1rem 1.1rem 1.1rem; box-shadow: 0 18px 50px rgba(0,0,0,.45);
 }
+.op-card::-webkit-scrollbar { width: 0; height: 0; }
 .op-card__cab { display: flex; align-items: center; gap: .6rem; margin-bottom: .7rem; }
 .op-card__cab h3 { margin: 0; font-size: 1rem; }
-.op-card__cab .picker__close { margin-left: auto; }
+.op-card__cab .btn--close { margin-left: auto; flex: none; }
+
+/* Lo que ya has pujado, en la fila del mercado. */
+.pujado { margin-right: .4rem; font-weight: 700; color: var(--neg); white-space: nowrap; }
+.ambito--pujado { border-color: var(--neg); color: var(--neg); }
+
 
 .op-datos { display: grid; grid-template-columns: 1fr 1fr; gap: .5rem .9rem; margin: 0 0 .9rem; }
 .op-datos div { display: flex; flex-direction: column; gap: .1rem; }
