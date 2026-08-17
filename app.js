@@ -651,13 +651,24 @@
      aunque quien la dibuja no la sepa. Se llena con la lista de la competición
      y con las plantillas. */
   const posicionConocida = {};
+  /* Y las de repuesto, para poder pintar las dos chapas en cualquier tabla. */
+  const altConocida = {};
 
   function recordarPosiciones(lista) {
     (lista || []).forEach(function (jugador) {
-      if (jugador && jugador.id != null && jugador.position != null) {
-        posicionConocida[String(jugador.id)] = jugador.position;
+      if (!jugador || jugador.id == null) return;
+      if (jugador.position != null) posicionConocida[String(jugador.id)] = jugador.position;
+      if (jugador.altPositions && jugador.altPositions.length) {
+        altConocida[String(jugador.id)] = jugador.altPositions;
       }
     });
+  }
+
+  /** Las demarcaciones de repuesto de alguien, vengan en el objeto o guardadas. */
+  function otrosPuestosDe(jugador, id) {
+    if (jugador && jugador.altPositions && jugador.altPositions.length) return jugador.altPositions;
+    const clave = String(id != null ? id : (jugador && jugador.id));
+    return altConocida[clave] || [];
   }
 
   /** Nombre del futbolista con su foto del CDN de Biwenger. */
@@ -672,7 +683,8 @@
       : (posicionConocida[String(id)] != null ? posicionConocida[String(id)] : null);
 
     return '<span class="player" data-player-id="' + escapeHtml(String(id || '')) + '">' +
-      (sinChapa ? '' : chapaDePuesto(puesto, 'puesto--fila')) + pic + '<span class="player-name">' +
+      (sinChapa ? '' : chapaDePuesto(puesto, 'puesto--fila',
+        otrosPuestosDe(movement, movement.playerId))) + pic + '<span class="player-name">' +
       escapeHtml(movement.player) + '</span></span>';
   }
 
@@ -2064,7 +2076,7 @@
 
     return '<div class="pitch__slot">' + crestOf(player, 'crest--ghost') +
       '<span class="face-box">' + face +
-        chapaDePuesto(player && player.position, 'puesto--esquina') +
+        chapaDePuesto(player && player.position, 'puesto--esquina', otrosPuestosDe(player)) +
         statusMark(player, 'mark--esquina') + pointsBadge(player, 'pts--esquina') +
       '</span>' +
       '<span class="pitch__name">' + (player ? escapeHtml(player.name) : '—') + '</span>' +
@@ -2325,7 +2337,13 @@
         '<td data-label="Queda">' + deadlineCell(venta.until) + '</td>' +
         /* Lo que vendes tú no se puja; en el resto, si ya has pujado, se ve por
            cuánto y el botón sirve para cambiarla. */
-        '<td class="col-pujar">' + (venta.mine ? '' : (function () {
+        '<td class="col-pujar">' + (venta.mine ? (
+          /* Los tuyos no se pujan: se renuevan o se retiran del mercado. */
+          '<button type="button" class="btn btn--sm btn--otra" data-renovar="' +
+            escapeHtml(String(venta.playerId)) + '" title="Renovar la venta">\u21bb</button>' +
+          '<button type="button" class="btn btn--sm btn--no" data-quitar="' +
+            escapeHtml(String(venta.playerId)) + '" title="Quitar del mercado">\u2715</button>'
+        ) : (function () {
           const mia = miPujaPor(venta.playerId);
           return (mia ? '<span class="pujado" title="Tu puja">' + money(mia.amount) + '</span>' : '') +
             '<button type="button" class="ambito ambito--pujar' + (mia ? ' ambito--pujado' : '') +
@@ -2492,6 +2510,65 @@
     }, 'Puja de ' + money(importe) + ' por ' + venta.player + (mia ? ' cambiada.' : ' enviada.'));
   }
 
+  /** Renovar la venta de uno de los tuyos: mismo precio u otro. */
+  function abrirRenovar(playerId) {
+    const venta = ventaDe(playerId);
+    if (!venta) return;
+
+    abrirOpModal(
+      '<div class="op-card__cab">' +
+        '<h3 id="op-modal-titulo">Renovar la venta de ' + escapeHtml(venta.player) + '</h3>' +
+        '<button type="button" class="btn btn--ghost btn--close" data-op-cerrar' +
+          ' title="Cerrar" aria-label="Cerrar">\u2715</button>' +
+      '</div>' +
+      '<dl class="op-datos">' +
+        '<div><dt>Valor de mercado</dt><dd>' + money(venta.marketValue || 0) + '</dd></div>' +
+        '<div><dt>Precio de ahora</dt><dd><strong>' + money(venta.price || 0) + '</strong></dd></div>' +
+      '</dl>' +
+      '<label class="op-importe"><span>Precio nuevo</span>' +
+        '<input type="number" id="op-importe" inputmode="numeric" step="100000" min="0"' +
+          ' value="' + (venta.price || 0) + '"></label>' +
+      '<p class="sub op-texto">Al renovarla se rechazan las ofertas que tenga.</p>' +
+      '<p class="op-aviso"></p>' +
+      '<div class="op-botones">' +
+        '<button type="button" class="btn btn--ghost" data-op-mismo="' +
+          escapeHtml(String(venta.playerId)) + '">Repetir precio</button>' +
+        '<button type="button" class="btn btn--primary" data-op-vender="' +
+          escapeHtml(String(venta.playerId)) + '">Aceptar</button>' +
+      '</div>');
+
+    const campo = $('op-importe');
+    if (campo) { campo.focus(); campo.select(); }
+  }
+
+  function mandarVenta(playerId, precio) {
+    const venta = ventaDe(playerId);
+    if (!venta || !(precio > 0)) { opAviso('Pon un precio.', true); return; }
+    opAviso('Renovando la venta\u2026');
+    lanzarOperacion({ accion: 'vender', player: playerId, price: precio, rechazar: true },
+      venta.player + ' sigue en venta por ' + money(precio) + '.');
+  }
+
+  /** Quitarlo del mercado, con su confirmación. */
+  function abrirQuitar(playerId) {
+    const venta = ventaDe(playerId);
+    if (!venta) return;
+
+    abrirOpModal(
+      '<div class="op-card__cab">' +
+        '<h3 id="op-modal-titulo">\u00bfSeguro?</h3>' +
+        '<button type="button" class="btn btn--ghost btn--close" data-op-cerrar' +
+          ' title="Cerrar" aria-label="Cerrar">\u2715</button>' +
+      '</div>' +
+      '<p class="op-texto">Quitar a ' + escapeHtml(venta.player) + ' del mercado.</p>' +
+      '<p class="op-aviso"></p>' +
+      '<div class="op-botones">' +
+        '<button type="button" class="btn btn--ghost" data-op-cerrar>Cancelar</button>' +
+        '<button type="button" class="btn btn--primary" data-op-quitar-mercado="' +
+          escapeHtml(String(venta.playerId)) + '">S\u00ed, quitarlo</button>' +
+      '</div>');
+  }
+
   /** Las ofertas recibidas y tus pujas, cada una con lo que se puede hacer. */
   function abrirOfertas() {
     /* Solo lo que te han ofrecido: tus pujas se ven en la fila del mercado. */
@@ -2634,8 +2711,12 @@
     const mercado = $('market-body');
     if (mercado) {
       mercado.addEventListener('click', function (event) {
-        const boton = event.target.closest('[data-pujar]');
-        if (boton) abrirPuja(boton.getAttribute('data-pujar'));
+        const puja = event.target.closest('[data-pujar]');
+        if (puja) { abrirPuja(puja.getAttribute('data-pujar')); return; }
+        const renovar = event.target.closest('[data-renovar]');
+        if (renovar) { abrirRenovar(renovar.getAttribute('data-renovar')); return; }
+        const quitar = event.target.closest('[data-quitar]');
+        if (quitar) abrirQuitar(quitar.getAttribute('data-quitar'));
       });
     }
 
@@ -2654,11 +2735,34 @@
       const puja = event.target.closest('[data-op-pujar]');
       if (puja) { confirmarPuja(puja.getAttribute('data-op-pujar')); return; }
 
-      const quitar = event.target.closest('[data-op-quitar]');
-      if (quitar) {
+      const retirar = event.target.closest('[data-op-quitar]');
+      if (retirar) {
         opAviso('Retirando la puja\u2026');
-        lanzarOperacion({ accion: 'retirar', id: quitar.getAttribute('data-op-quitar') },
+        lanzarOperacion({ accion: 'retirar', id: retirar.getAttribute('data-op-quitar') },
           'Puja retirada.');
+        return;
+      }
+
+      const mismo = event.target.closest('[data-op-mismo]');
+      if (mismo) {
+        const cual = mismo.getAttribute('data-op-mismo');
+        const suya = ventaDe(cual);
+        mandarVenta(cual, suya ? suya.price : 0);
+        return;
+      }
+
+      const vender = event.target.closest('[data-op-vender]');
+      if (vender) {
+        const campo = $('op-importe');
+        mandarVenta(vender.getAttribute('data-op-vender'), Math.round(Number(campo && campo.value)));
+        return;
+      }
+
+      const fuera = event.target.closest('[data-op-quitar-mercado]');
+      if (fuera) {
+        opAviso('Quit\u00e1ndolo del mercado\u2026');
+        lanzarOperacion({ accion: 'quitar', player: fuera.getAttribute('data-op-quitar-mercado') },
+          'Fuera del mercado.');
         return;
       }
 
@@ -3101,12 +3205,42 @@
     5: { texto: 'EN', clase: 'puesto--entrenador' }
   };
 
-  function chapaDePuesto(posicion, extra) {
+  function unaChapa(posicion, extra) {
     const chapa = PUESTO_CHAPA[posicion];
     if (!chapa) return '';
     const nombre = POSITION_NAMES[posicion] || 'Entrenador';
     return '<span class="puesto ' + chapa.clase + (extra ? ' ' + extra : '') +
       '" title="' + nombre + '">' + chapa.texto + '</span>';
+  }
+
+  /**
+   * La demarcación de un futbolista. Los que valen para dos (Marcos Llorente de
+   * defensa o medio, Berenguer de delantero o medio) llevan las dos chapas, con
+   * la suya de siempre delante; Biwenger guarda las otras en altPositions.
+   */
+  function chapaDePuesto(posicion, extra, alternativas) {
+    if (!PUESTO_CHAPA[posicion]) {
+      /* Sin saber su demarcación se deja el hueco vacío: en las tablas, la cara
+         del de al lado no puede bailar por eso. */
+      return extra === 'puesto--fila' ? '<span class="puestos puestos--fila"></span>' : '';
+    }
+
+    const otras = (alternativas || []).filter(function (otra) {
+      return otra !== posicion && PUESTO_CHAPA[otra];
+    });
+
+    /* En las tablas la chapa va siempre dentro del mismo hueco, lleve una
+       demarcación o tres: si no, cada cara empezaba en un sitio distinto y las
+       filas quedaban en escalera. En las fichas no hace falta. */
+    const enFila = extra === 'puesto--fila';
+    if (otras.length === 0 && !enFila) return unaChapa(posicion, extra);
+
+    const donde = extra === 'puesto--esquina' ? 'puestos--esquina'
+      : (enFila ? 'puestos--fila' : '');
+    const apretadas = otras.length > 1 ? ' puestos--tres' : '';
+    return '<span class="puestos ' + donde + apretadas + '">' +
+      unaChapa(posicion) + otras.map(function (otra) { return unaChapa(otra); }).join('') +
+    '</span>';
   }
 
   /**
@@ -3134,7 +3268,7 @@
   function caraDeAlineacion(jugador, claseCara, conDueno) {
     const sinNota = jugador.points == null;
     return '<span class="face-box">' + faceOf(jugador.id, claseCara) +
-      chapaDePuesto(jugador.position, 'puesto--esquina') +
+      chapaDePuesto(jugador.position, 'puesto--esquina', otrosPuestosDe(jugador)) +
       statusMark(jugador, 'mark--esquina') +
       '<span class="pts pts--esquina' + (sinNota ? ' pts--sinnota' : '') + '">' +
         marcaDePuntos(jugador) + '</span>' +
@@ -3145,7 +3279,7 @@
   /** Foto con sus tres chapas, igual en todos los sitios. */
   function caraConChapas(jugador, claseCara) {
     return '<span class="face-box">' + faceOf(jugador.id, claseCara) +
-      chapaDePuesto(jugador.position, 'puesto--esquina') +
+      chapaDePuesto(jugador.position, 'puesto--esquina', otrosPuestosDe(jugador)) +
       statusMark(jugador, 'mark--esquina') + pointsBadge(jugador, 'pts--esquina') +
     '</span>';
   }

@@ -1256,6 +1256,24 @@ code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft)
   top: 0; left: 0; transform: translate(-28%, -12%);
   padding: 0 .22rem; font-size: .52rem; line-height: 1.35;
 }
+/* Dos demarcaciones: mandan las chapas en fila dentro de un envoltorio. */
+.puestos { display: inline-flex; align-items: center; gap: 2px; }
+.puestos .puesto { position: static; transform: none; margin: 0; }
+.puestos--esquina {
+  position: absolute; top: 0; left: 0; z-index: 2;
+  transform: translate(-12%, -12%);
+}
+.puestos--esquina .puesto { padding: 0 .22rem; font-size: .52rem; line-height: 1.35; }
+/* Hueco fijo: así la cara y el nombre empiezan en la misma vertical en todas
+   las filas, lleven una demarcación o tres. */
+.puestos--fila {
+  width: 44px; flex: none; justify-content: flex-start;
+  margin-right: .25rem; vertical-align: middle;
+}
+.puestos--fila .puesto { flex: none; padding: .02rem .26rem; font-size: .56rem; line-height: 1.4; }
+/* Con tres, las letras se aprietan un poco para no salirse del hueco. */
+.puestos--tres.puestos--fila .puesto { padding: .02rem .14rem; font-size: .48rem; letter-spacing: 0; }
+
 /* Sin nota todavía: el circulito se ve, pero apagado. */
 .pts--sinnota { color: #555; }
 
@@ -1579,6 +1597,15 @@ main.wrap { padding-bottom: 3.5rem; }
 .op-card__cab { display: flex; align-items: center; gap: .6rem; margin-bottom: .7rem; }
 .op-card__cab h3 { margin: 0; font-size: 1rem; }
 .op-card__cab .btn--close { margin-left: auto; flex: none; }
+
+/* El propietario ocupaba media tabla y empujaba el botón de pujar fuera. */
+.table--market td:nth-child(2), .table--market th:nth-child(2) { max-width: 116px; }
+.table--market .manager__name {
+  display: inline-block; max-width: 84px; overflow: hidden;
+  text-overflow: ellipsis; white-space: nowrap; vertical-align: middle;
+  font-size: .74rem;
+}
+.table--market .player-name { font-size: .8rem; }
 
 /* Lo que ya has pujado, en la fila del mercado. */
 .pujado { margin-right: .4rem; font-weight: 700; color: var(--neg); white-space: nowrap; }
