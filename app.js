@@ -3424,16 +3424,14 @@
     const datos = state.estadisticas[String(id)];
     if (datos === undefined) return '<p class="muted stats__cargando">Cargando estad\u00edsticas\u2026</p>';
     if (datos === null) return '';
-    if (!datos.played) return '<p class="muted stats__cargando">Todav\u00eda no ha jugado esta temporada.</p>';
 
-    const conIcono = function (clase, icono, valor, titulo) {
-      return '<span class="stats__lance" title="' + titulo + '">' +
-        '<span class="lance ' + clase + '">' + icono + '</span>' +
-        '<strong>' + valor + '</strong></span>';
-    };
+    /* Sin partidos se ense\u00f1an los mismos huecos a cero: la ficha se lee igual
+       antes y despu\u00e9s de que el futbolista juegue. */
+    const numero = function (valor) { return valor == null ? 0 : valor; };
+    /* Con coma, como se escriben los decimales aquí. */
+    const decimal = function (valor) { return (valor == null ? 0 : valor).toFixed(1).replace('.', ','); };
 
     const celda = function (rotulo, valor, extra) {
-      if (valor == null) return '';
       return '<div class="stat' + (extra ? ' ' + extra : '') + '">' +
         '<span class="stat__label">' + rotulo + '</span>' +
         '<strong>' + valor + '</strong></div>';
@@ -3441,29 +3439,42 @@
 
     /* Las porter\u00edas a cero solo dicen algo de porteros y defensas; los goles
        por partido, de medios y delanteros. */
-    const puesto = datos.position;
-    const atras = puesto === 1 || puesto === 2;
+    const atras = datos.position === 1 || datos.position === 2;
 
     return '<div class="stats">' +
-      '<div class="stats__lances">' +
-        conIcono('lance--gol', '\u26bd', datos.goals, 'Goles') +
-        conIcono('lance--asist', 'A', datos.assists, 'Asistencias') +
-        conIcono('lance--amarilla', '', datos.yellow, 'Tarjetas amarillas') +
-        conIcono('lance--roja', '', datos.red, 'Tarjetas rojas') +
-        conIcono('lance--entra', '\u25b2', datos.subsIn, 'Veces que ha entrado desde el banquillo') +
-        conIcono('lance--sale', '\u25bc', datos.subsOut, 'Veces que le han sustituido') +
+      '<div class="stats__grupo">' +
+        '<h4 class="stats__titulo">Participaci\u00f3n</h4>' +
+        '<div class="stats__rejilla">' +
+          celda('Partidos', numero(datos.played)) +
+          celda('Minutos', numero(datos.minutes)) +
+          celda('Titular', numero(datos.played) - numero(datos.subsIn)) +
+          celda('Suplente', numero(datos.subsIn)) +
+          celda('Cambio', numero(datos.subsOut)) +
+        '</div>' +
       '</div>' +
-      '<div class="stats__rejilla">' +
-        celda('Partidos', datos.played) +
-        celda('Minutos', datos.minutes) +
-        (atras ? celda('Porter\u00edas a cero', datos.cleanSheets)
-               : celda('Goles por partido', datos.goalsPerGame == null ? '\u2014' : datos.goalsPerGame.toFixed(1))) +
-        celda('Puntos', datos.points, 'stat--fuerte') +
-        celda('Media', datos.average == null ? '\u2014' : datos.average.toFixed(1), 'stat--fuerte') +
-        celda('Puntos en casa', datos.home.points) +
-        celda('Media en casa', datos.home.average == null ? '\u2014' : datos.home.average.toFixed(1)) +
-        celda('Puntos fuera', datos.away.points) +
-        celda('Media fuera', datos.away.average == null ? '\u2014' : datos.away.average.toFixed(1)) +
+
+      '<div class="stats__grupo">' +
+        '<h4 class="stats__titulo">Juego</h4>' +
+        '<div class="stats__rejilla">' +
+          celda('Goles', numero(datos.goals)) +
+          celda('Asistencias', numero(datos.assists)) +
+          (atras ? celda('Porter\u00edas a cero', numero(datos.cleanSheets))
+                 : celda('Goles por partido', decimal(datos.goalsPerGame))) +
+          celda('Amarillas', numero(datos.yellow)) +
+          celda('Rojas', numero(datos.red)) +
+        '</div>' +
+      '</div>' +
+
+      '<div class="stats__grupo">' +
+        '<h4 class="stats__titulo">Puntos</h4>' +
+        '<div class="stats__rejilla">' +
+          celda('Totales', numero(datos.points), 'stat--fuerte') +
+          celda('Media', decimal(datos.average), 'stat--fuerte') +
+          celda('En casa', numero(datos.home.points)) +
+          celda('Media en casa', decimal(datos.home.average)) +
+          celda('Fuera', numero(datos.away.points)) +
+          celda('Media fuera', decimal(datos.away.average)) +
+        '</div>' +
       '</div>' +
     '</div>';
   }
@@ -3944,7 +3955,7 @@
     const porMedia = conDatos.slice().sort(function (a, b) { return b.media - a.media; });
 
     const enteros = function (j) { return j.points + ' pts'; };
-    const decimales = function (j) { return j.media.toFixed(1); };
+    const decimales = function (j) { return j.media.toFixed(1).replace('.', ','); };
     const veces = function (j) {
       return '<span class="ranking__sub">' + j.played +
         (j.played === 1 ? ' partido' : ' partidos') + '</span>';

@@ -1182,14 +1182,12 @@ code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft)
 /* ---------- Estadísticas de temporada en la ficha ---------- */
 .stats { margin: .6rem 0 .9rem; }
 .stats__cargando { margin: .5rem 0; }
-/* Los lances, con el mismo icono que en los partidos. */
-.stats__lances {
-  display: flex; flex-wrap: wrap; gap: .9rem;
-  padding-bottom: .6rem; margin-bottom: .6rem;
-  border-bottom: 1px solid var(--border);
+/* Tres grupos: participación, juego y puntos. */
+.stats__grupo + .stats__grupo { margin-top: .6rem; }
+.stats__titulo {
+  font-size: .66rem; font-weight: 650; text-transform: uppercase;
+  letter-spacing: .05em; color: var(--text-faint); margin-bottom: .3rem;
 }
-.stats__lance { display: inline-flex; align-items: center; gap: .3rem; font-variant-numeric: tabular-nums; }
-.stats__lance strong { font-size: .95rem; }
 .stats__rejilla {
   display: grid; gap: .5rem;
   grid-template-columns: repeat(auto-fit, minmax(88px, 1fr));
