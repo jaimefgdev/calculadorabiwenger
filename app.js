@@ -2790,7 +2790,6 @@
     caja.innerHTML = lista.map(function (jugador) {
       return '<button type="button" class="jugador-card" data-player-id="' +
           escapeHtml(String(jugador.id)) + '">' +
-        chapaDePuesto(jugador.position) +
         crestOf(jugador, 'crest--ghost') +
         caraConChapas(jugador, 'pitch__face') +
         '<span class="jugador-card__nombre player-name">' + escapeHtml(jugador.name) + '</span>' +
@@ -2968,10 +2967,28 @@
   }
 
   /** Pide los partidos de una jornada; se guardan mientras dure la sesi\u00f3n. */
+  /* Cada cuánto se vuelven a pedir los partidos de una jornada. Las alineaciones
+     se confirman una hora antes del pitido inicial, así que con la jornada
+     encima hay que mirar a menudo; si no hay nada cerca, cada media hora. */
+  function vigenciaPartidos(datos) {
+    if (!datos) return 0;
+    const ahora = Date.now();
+    const cerca = (datos.games || []).some(function (juego) {
+      const empieza = Date.parse(juego.start);
+      if (isNaN(empieza)) return false;
+      /* Desde tres horas antes hasta tres después: alineaciones y resultados. */
+      return ahora > empieza - 3 * 3600e3 && ahora < empieza + 3 * 3600e3;
+    });
+    return cerca ? 2 * 60e3 : 30 * 60e3;
+  }
+
   function ensurePartidos(id, forzar) {
     const config = loadSyncConfig();
     if (!config.url || !config.key || id == null) return;
-    if (state.partidos[id] && !forzar) return;
+
+    const guardado = state.partidos[id];
+    if (guardado && !forzar &&
+      Date.now() - (guardado.pedidoA || 0) < vigenciaPartidos(guardado)) return;
     if (state.partidosEstado === 'cargando') return;
 
     state.partidosEstado = 'cargando';
@@ -2980,6 +2997,7 @@
       .then(function (response) { return response.json(); })
       .then(function (payload) {
         if (payload.error) throw new Error(payload.error);
+        payload.pedidoA = Date.now();
         state.partidos[id] = payload;
         state.partidosEstado = '';
         renderPartidos();
@@ -4633,6 +4651,9 @@
     ensureJornada('actual', true);
     /* Y se mira si has tocado la alineación desde el otro aparato. */
     traerXiCompartida();
+    /* Los partidos de la jornada que se esté viendo, por si ya hay alineaciones. */
+    const viendo = jornadaActiva();
+    if (viendo && viendo.round) ensurePartidos(viendo.round.id, true);
     if (state.tab === 'mercado') ensureMarket(true);
     render();
 
