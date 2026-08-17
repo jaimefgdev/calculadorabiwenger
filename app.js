@@ -18,7 +18,7 @@
     'Izaskun V',
     'Bella Rodriguez',
     'Atlético Jordaan FC',
-    'José Mário dos Santos Mourinho'
+    'José Mário dos Santos Mourinho🐐'
   ];
 
   const INITIAL_BUDGET = 20000000;
@@ -3457,9 +3457,9 @@
         '<h4 class="stats__titulo">Juego</h4>' +
         '<div class="stats__rejilla">' +
           celda('Goles', numero(datos.goals)) +
-          celda('Asistencias', numero(datos.assists)) +
           (atras ? celda('Porter\u00edas a cero', numero(datos.cleanSheets))
-                 : celda('Goles por partido', decimal(datos.goalsPerGame))) +
+                 : celda('Media goles p/p', decimal(datos.goalsPerGame))) +
+          celda('Asistencias', numero(datos.assists)) +
           celda('Amarillas', numero(datos.yellow)) +
           celda('Rojas', numero(datos.red)) +
         '</div>' +
@@ -3470,8 +3470,8 @@
         '<div class="stats__rejilla">' +
           celda('Totales', numero(datos.points), 'stat--fuerte') +
           celda('Media', decimal(datos.average), 'stat--fuerte') +
-          celda('En casa', numero(datos.home.points)) +
-          celda('Media en casa', decimal(datos.home.average)) +
+          celda('Casa', numero(datos.home.points)) +
+          celda('Media casa', decimal(datos.home.average)) +
           celda('Fuera', numero(datos.away.points)) +
           celda('Media fuera', decimal(datos.away.average)) +
         '</div>' +
