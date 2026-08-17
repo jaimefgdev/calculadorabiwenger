@@ -16,7 +16,7 @@
 <title>Calculadora Biwenger — Presupuestos de la liga</title>
 <!-- El ?v= se sube en cada publicación: obliga al navegador a bajar el archivo
      nuevo en vez de reutilizar el que tenga en caché. -->
-<link rel="stylesheet" href="styles.css?v=116">
+<link rel="stylesheet" href="styles.css?v=117">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>💰</text></svg>">
 </head>
 <body>
@@ -130,13 +130,17 @@
   <div id="warnings" class="warnings" hidden></div>
 
   <!-- ============ TABLA DE PRESUPUESTOS ============ -->
-  <section class="panel">
+  <section class="panel" id="budget-panel">
     <div class="panel__head panel__head--row">
       <div>
         <h2>Presupuesto por jugador</h2>
-        <p class="muted">Puja máxima = saldo disponible + 25 % del valor del equipo. Pulsa una cabecera para ordenar y un jugador para ver sus fichajes.</p>
+        <p class="muted" id="budget-sub">Puja máxima = saldo disponible + 25 % del valor del equipo. Pulsa una cabecera para ordenar y un jugador para ver sus fichajes.</p>
       </div>
+      <!-- Se puede plegar; la web recuerda cómo lo dejaste. -->
+      <button type="button" id="budget-toggle" class="ambito" aria-expanded="true"
+        aria-controls="budget-cuerpo">Ocultar</button>
     </div>
+    <div id="budget-cuerpo">
     <div class="table-scroll">
       <table class="table table--budget">
         <thead>
@@ -158,6 +162,7 @@
       </table>
     </div>
     <p id="standings-hint" class="hint">Pega el HTML de la pestaña <strong>Liga</strong> para calcular el valor de equipo y la puja máxima.</p>
+    </div>
   </section>
 
   <!-- ============ MI MERCADO ============ -->
@@ -528,6 +533,6 @@
 
 </main>
 
-<script src="app.js?v=116"></script>
+<script src="app.js?v=117"></script>
 </body>
 </html>

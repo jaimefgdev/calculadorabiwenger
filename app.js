@@ -5032,6 +5032,38 @@
     });
   }
 
+  /* ---------- Plegar el presupuesto ---------- */
+
+  const BUDGET_KEY = 'biwenger-calc-presupuesto';
+
+  function pintarPresupuestoPlegado(oculto) {
+    const cuerpo = $('budget-cuerpo');
+    const boton = $('budget-toggle');
+    const pie = $('budget-sub');
+    if (!cuerpo || !boton) return;
+    cuerpo.hidden = oculto;
+    if (pie) pie.hidden = oculto;
+    boton.textContent = oculto ? 'Mostrar' : 'Ocultar';
+    boton.setAttribute('aria-expanded', oculto ? 'false' : 'true');
+  }
+
+  function engancharPresupuesto() {
+    const boton = $('budget-toggle');
+    if (!boton) return;
+
+    let oculto = false;
+    try { oculto = localStorage.getItem(BUDGET_KEY) === 'oculto'; } catch (error) { /* sin persistencia */ }
+    pintarPresupuestoPlegado(oculto);
+
+    boton.addEventListener('click', function () {
+      const cuerpo = $('budget-cuerpo');
+      const ahora = !cuerpo.hidden;         // si se ve, se esconde
+      pintarPresupuestoPlegado(ahora);
+      /* Se recuerda para la próxima vez que abras la web. */
+      try { localStorage.setItem(BUDGET_KEY, ahora ? 'oculto' : 'visible'); } catch (error) { /* nada */ }
+    });
+  }
+
   /* ---------- Pestañas ---------- */
 
   const TAB_KEY = 'biwenger-calc-tab';
@@ -5887,6 +5919,7 @@
     renderManagerFilter();
     bindEvents();
     engancharOperaciones();
+    engancharPresupuesto();
 
     const sync = loadSyncConfig();
     $('sync-url').value = sync.url;
