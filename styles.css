@@ -1579,7 +1579,12 @@ main.wrap { padding-bottom: 3.5rem; }
 
 .ambito--ofertas { margin-left: auto; }
 .ambito--avisa { background: var(--pos); border-color: var(--pos); color: #08240f; font-weight: 700; }
-.col-pujar { width: 1%; white-space: nowrap; text-align: right; }
+/* Los botones de la última columna, centrados y juntos. La regla general de
+   la tabla alinea a la izquierda y pesa más, así que aquí se nombra la celda. */
+.col-pujar { width: 1%; white-space: nowrap; }
+.table td.col-pujar, .table th.col-pujar { text-align: center; }
+.table td.col-pujar > * { vertical-align: middle; }
+.table td.col-pujar .btn + .btn { margin-left: .25rem; }
 .ambito--pujar { padding: .18rem .7rem; font-size: .72rem; }
 
 .op-modal {
@@ -1598,14 +1603,26 @@ main.wrap { padding-bottom: 3.5rem; }
 .op-card__cab h3 { margin: 0; font-size: 1rem; }
 .op-card__cab .btn--close { margin-left: auto; flex: none; }
 
-/* El propietario ocupaba media tabla y empujaba el botón de pujar fuera. */
-.table--market td:nth-child(2), .table--market th:nth-child(2) { max-width: 116px; }
+/* Propietario: un poco más ancho y con la letra encogida por JS hasta que el
+   nombre entero entra, que hay mánagers con nombres kilométricos. */
+.table--market td:nth-child(2), .table--market th:nth-child(2) { max-width: 184px; }
 .table--market .manager__name {
-  display: inline-block; max-width: 84px; overflow: hidden;
-  text-overflow: ellipsis; white-space: nowrap; vertical-align: middle;
-  font-size: .74rem;
+  display: inline-block; max-width: 150px; overflow: hidden;
+  white-space: nowrap; vertical-align: middle;
 }
 .table--market .player-name { font-size: .8rem; }
+
+/* Estado y Puntos no necesitan más de lo que ocupan: tres cifras y un icono. */
+.table--market td:nth-child(3), .table--market th:nth-child(3),
+.table--market td:nth-child(4), .table--market th:nth-child(4) {
+  width: 1%; white-space: nowrap;
+}
+.table--market th:nth-child(3), .table--market th:nth-child(4) {
+  padding-left: .35rem; padding-right: .35rem; text-align: center;
+}
+.table--market td:nth-child(3) { text-align: center; }
+.table--market td:nth-child(3) .mark { margin: 0 auto; }
+.table--market td:nth-child(4) { text-align: center; padding-left: .35rem; padding-right: .35rem; }
 
 /* Lo que ya has pujado, en la fila del mercado. */
 .pujado { margin-right: .4rem; font-weight: 700; color: var(--neg); white-space: nowrap; }

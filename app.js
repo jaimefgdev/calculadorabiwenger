@@ -2250,7 +2250,9 @@
       .then(function (payload) {
         if (payload.error) throw new Error(payload.error);
         state.market = payload.sales || [];
-        recordarPosiciones(state.market.map(function (v) { return { id: v.playerId, position: v.position }; }));
+        recordarPosiciones(state.market.map(function (v) {
+          return { id: v.playerId, position: v.position, altPositions: v.altPositions };
+        }));
         state.marketState = '';
         renderMarket();
         ensurePriceSeries(state.market.map(function (v) { return v.playerId; }), renderMarket);
@@ -2369,7 +2371,10 @@
       .map(function (v) { return v.until; })
       .sort()[0] || null;
 
-    /* Cu\u00e1ntos hay no dice gran cosa; lo que importa es cu\u00e1nto queda. */
+    /* Los nombres largos de los duenos se encogen hasta caber enteros. */
+    ajustarNombres();
+
+    /* Cuantos hay no dice gran cosa: lo que importa es lo que queda. */
     $('market-note').innerHTML = cierre
       ? 'Se renueva en ' + deadlineCell(cierre, true)
       : '';
@@ -2799,7 +2804,8 @@
     /* Mismo formato que el resto de tablas: foto, nombre y escudo detrás. */
     return '<div class="mover">' +
       '<span class="with-crest">' +
-        playerName({ playerId: player.id, player: player.name }) +
+        playerName({ playerId: player.id, player: player.name,
+          position: player.position, altPositions: player.altPositions }) +
         crestOf(player, 'crest--badge') +
         statusMark(player, 'mark--row') +
       '</span>' +
@@ -3087,6 +3093,10 @@
     });
     Array.prototype.forEach.call(document.querySelectorAll('.jugador-card__nombre'), function (el) {
       ajustarAlAncho(el, 12.5, 8);
+    });
+    /* El dueño de cada venta: hay nombres larguísimos y la columna es estrecha. */
+    Array.prototype.forEach.call(document.querySelectorAll('.table--market .manager__name'), function (el) {
+      ajustarAlAncho(el, 11.5, 6);
     });
     /* «Media goles p/p» y «Goles encajados» no caben a tamaño normal. */
     Array.prototype.forEach.call(document.querySelectorAll('.stat__label'), function (el) {
@@ -5302,6 +5312,9 @@
     state.lineup = payload.lineup || null;
     state.round = payload.round || state.round;
     state.movers = payload.movers || state.movers;
+    /* De aquí salen demarcaciones que no están en ninguna plantilla. */
+    recordarPosiciones((state.movers && state.movers.up) || []);
+    recordarPosiciones((state.movers && state.movers.down) || []);
     state.me = payload.me || null;
     state.leagueStart = (payload.league && payload.league.startDay) || state.leagueStart;
     state.warnings = warnings;
