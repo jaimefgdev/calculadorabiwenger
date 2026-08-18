@@ -3112,7 +3112,11 @@
         if (payload.error) throw new Error(payload.error);
         const id = mergeJornada(payload);
         state.jornadaEstado = '';
-        if (id != null) state.jornadaVista = id;
+        /* Solo se cambia de vista si es la que se pidió: si el Worker
+           contestara con otra, quedarse mirando esa despistaba. */
+        if (id != null && (String(cual) === 'actual' || String(cual) === String(id))) {
+          state.jornadaVista = id;
+        }
         renderJornadas();
         /* La jornada llega después de la sincronización, y con ella los puntos
            que se suman a la clasificación y las clasificaciones de futbolistas:
