@@ -5568,10 +5568,8 @@
         const rotulo = payload && payload.version
           ? 'Worker ' + payload.version
           : (payload && payload.error) || '';
+        /* Solo en el panel de conexión: encima del reloj estorbaba. */
         hueco.textContent = rotulo;
-        /* También en el reloj de arriba, para verlo sin abrir la conexión. */
-        const stamp = $('last-sync');
-        if (stamp && rotulo) stamp.title = rotulo;
       })
       .catch(function () { hueco.textContent = 'Worker: no responde'; });
   }
