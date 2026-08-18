@@ -1197,6 +1197,24 @@ code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft)
 .table--listings .switch[aria-pressed="true"] span { transform: translateX(13px); }
 .table--offers td[data-label="Operación"] { white-space: normal; }
 
+/* Estas dos tablas tienen que caber enteras, sin barra horizontal. Por debajo
+   de 940 px se apilan solas (cada celda con su rótulo), así que aquí solo hay
+   que quitar el desplazable y dejar que el texto parta. */
+#offers-panel .table-scroll,
+#listings-panel .table-scroll { overflow-x: hidden; }
+
+/* Entre 940 y 720 px siguen siendo tabla: ahí se reparten a lo ancho. */
+@media (min-width: 941px) and (max-width: 1180px) {
+  .table--offers, .table--listings { width: 100%; table-layout: fixed; }
+  .table--offers th, .table--offers td,
+  .table--listings th, .table--listings td {
+    padding-inline: .25rem; white-space: normal; word-break: break-word;
+  }
+  .table--offers .player-name, .table--listings .player-name {
+    white-space: normal; overflow: visible; text-overflow: clip;
+  }
+}
+
 /* Las columnas de reloj, interruptor y ofertas llevan piezas de anchos muy
    distintos: pegadas a la izquierda quedan desiguales fila a fila, así que se
    centran con su cabecera y forman columna. */

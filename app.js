@@ -3097,7 +3097,10 @@
 
     const guardada = cual !== 'actual' && state.jornadas.datos[cual];
     if (guardada && !forzar) { state.jornadaVista = cual; return; }
-    if (state.jornadaEstado === 'cargando') return;
+    /* Solo se frena si ya se está pidiendo esa misma: antes, con una jornada
+       a medio traer, elegir otra no hacía nada. */
+    if (state.jornadaEstado === 'cargando' && state.jornadaPidiendo === String(cual)) return;
+    state.jornadaPidiendo = String(cual);
 
     state.jornadaEstado = 'cargando';
     renderJornadas();
@@ -3125,13 +3128,28 @@
 
   /** La jornada que se está mirando, ya sea recién traída o guardada. */
   function jornadaActiva() {
-    const id = state.jornadaVista != null ? state.jornadaVista : state.jornadas.actual;
+    const id = jornadaVistaId();
     return id != null ? state.jornadas.datos[id] : null;
+  }
+
+  /** Qué jornada se está mirando, se haya descargado o no su clasificación. */
+  function jornadaVistaId() {
+    return state.jornadaVista != null ? state.jornadaVista : state.jornadas.actual;
+  }
+
+  /* Puntos de toda la temporada, los que da Biwenger en la clasificación. */
+  function puntosGenerales(nombre) {
+    const equipo = state.teams[nombre];
+    return equipo && equipo.points != null ? equipo.points : null;
   }
 
   const ROUND_VALUES = {
     name: function (row) { return (row.name || '').toLowerCase(); },
     points: function (row) { return row.points == null ? -Infinity : row.points; },
+    general: function (row) {
+      const total = puntosGenerales(row.name);
+      return total == null ? -Infinity : total;
+    },
     played: function (row) { return row.played == null ? -Infinity : row.played; },
     xiValue: function (row) { return row.xiValue || 0; }
   };
@@ -3338,6 +3356,7 @@
       .then(function (payload) {
         if (payload.error) throw new Error(payload.error);
         state.jugadores = payload.players || [];
+        state.jugadoresAt = Date.now();
         recordarPosiciones(state.jugadores);
         state.jugadoresCargando = false;
         renderJugadores();
@@ -3588,8 +3607,7 @@
     const caja = $('jornada-partidos');
     if (!caja) return;
 
-    const jornada = jornadaActiva();
-    const id = jornada && jornada.round ? jornada.round.id : null;
+    const id = jornadaVistaId();
     if (id == null) { caja.hidden = true; caja.innerHTML = ''; return; }
 
     const datos = state.partidos[id];
@@ -3719,10 +3737,11 @@
        inglés. */
     renderBestXi(jornada);
 
-    /* Los partidos van entre la clasificación y el once ideal. */
-    if (jornada && jornada.round && jornada.round.id != null) {
-      ensurePartidos(jornada.round.id);
-    }
+    /* Los partidos van entre la clasificación y el once ideal, y se piden por
+       el id de la jornada elegida: no hacen falta ni su clasificación ni sus
+       alineaciones, que es lo que tardaba en llegar. */
+    const cual = jornadaVistaId();
+    if (cual != null) ensurePartidos(cual);
     renderPartidos();
 
     boton.textContent = jornada && jornada.round
@@ -3730,11 +3749,11 @@
       : '—';
 
     if (state.jornadaEstado === 'cargando' && !jornada) {
-      cuerpo.innerHTML = '<tr><td colspan="5" class="muted">Cargando la jornada…</td></tr>';
+      cuerpo.innerHTML = '<tr><td colspan="6" class="muted">Cargando la jornada…</td></tr>';
       return;
     }
     if (!jornada) {
-      cuerpo.innerHTML = '<tr><td colspan="5" class="muted">' +
+      cuerpo.innerHTML = '<tr><td colspan="6" class="muted">' +
         (state.jornadaEstado === 'error'
           ? 'No se ha podido traer la jornada.'
           : 'Sincroniza para traer la jornada.') + '</td></tr>';
@@ -3743,14 +3762,14 @@
 
     const filas = sortJornada(jornada.standings || []);
     if (filas.length === 0) {
-      cuerpo.innerHTML = '<tr><td colspan="5" class="muted">Esta jornada todavía no tiene clasificación.</td></tr>';
+      cuerpo.innerHTML = '<tr><td colspan="6" class="muted">Esta jornada todavía no tiene clasificación.</td></tr>';
       return;
     }
 
     cuerpo.innerHTML = filas.map(function (fila, indice) {
       const abierta = state.jornadaAbierta === fila.id;
       const detalle = !abierta ? '' :
-        '<tr class="detail-row"><td class="detail-cell" colspan="5"><div class="detail">' +
+        '<tr class="detail-row"><td class="detail-cell" colspan="6"><div class="detail">' +
           jornadaDetalle(fila) + '</div></td></tr>';
 
       return '<tr class="' + (abierta ? 'row-open' : '') + '">' +
@@ -3762,8 +3781,12 @@
             '<span class="manager">' + avatar(fila.name) +
               '<span class="manager__name">' + escapeHtml(fila.name) + '</span></span>' +
           '</button></td>' +
-        '<td class="num" data-label="Puntos"><strong>' +
+        '<td class="num" data-label="Jornada"><strong>' +
           (fila.points == null ? '—' : fila.points) + '</strong></td>' +
+        '<td class="num" data-label="General">' + (function () {
+          const total = puntosGenerales(fila.name);
+          return total == null ? '<span class="sub">—</span>' : total;
+        })() + '</td>' +
         '<td class="num" data-label="Jugadores">' +
           (fila.played == null ? '<span class="sub">—</span>' : fila.played) + '</td>' +
         '<td class="num" data-label="Valor del once">' +
@@ -4409,6 +4432,7 @@
       .then(function (response) { return response.json(); })
       .then(function (payload) {
         state.estadisticas[clave] = payload && payload.error ? null : payload;
+        state.estadisticasAt = Date.now();
         renderPriceModal();
       })
       .catch(function () {
@@ -4948,6 +4972,7 @@
       .then(function (payload) {
         if (payload.error) throw new Error(payload.error);
         state.recuento = payload.players || [];
+        state.recuentoAt = Date.now();
         recordarPosiciones(state.recuento);
         state.recuento.forEach(function (j) { amarillasDe[String(j.id)] = j.yellow || 0; });
         state.recuentoCargando = false;
@@ -5108,6 +5133,7 @@
       .then(function (payload) {
         if (payload.error) throw new Error(payload.error);
         state.laliga = payload.players || [];
+        state.laligaAt = Date.now();
         recordarPosiciones(state.laliga);
         state.laligaCargando = false;
         renderLaLiga();
@@ -5278,6 +5304,7 @@
     if (state.tab === 'fichajes') { renderDataKpis(); renderKpiCharts(); renderSpending(); }
     if (state.tab === 'datos') { ensureSquads(); ensureLaLiga(); ensureRecuento(); renderRankings(); renderRankingsTemporada(); }
     if (state.tab === 'mercado') { renderMarket(); renderMovers(); }
+    if (state.tab === 'jugadores') { ensureJugadores(); renderJugadores(); }
   }
 
   /* ---------- Persistencia ---------- */
@@ -5417,6 +5444,21 @@
       .catch(function () { hueco.textContent = 'Worker: no responde'; });
   }
 
+  /* Cinco minutos: lo que tarda el Worker en volver a mirar. Con la pestaña
+     abierta toda la tarde, sin esto los partidos del día no entraban nunca
+     porque cada bloque se pedía una sola vez por carga. */
+  const FRESCURA = 5 * 60 * 1000;
+
+  function caducarEstadisticas() {
+    const ahora = Date.now();
+    const viejo = function (sello) { return sello && ahora - sello > FRESCURA; };
+
+    if (viejo(state.recuentoAt)) { state.recuento = null; state.recuentoAt = 0; }
+    if (viejo(state.jugadoresAt)) { state.jugadores = null; state.jugadoresAt = 0; }
+    if (viejo(state.laligaAt)) { state.laliga = null; state.laligaAt = 0; }
+    if (viejo(state.estadisticasAt)) { state.estadisticas = {}; state.estadisticasAt = 0; }
+  }
+
   /** Traduce la respuesta del Worker al modelo interno de la calculadora. */
   function applySync(payload) {
     const warnings = [];
@@ -5492,6 +5534,9 @@
     ensureJornada('actual', true);
     /* Y se mira si has tocado la alineación desde el otro aparato. */
     traerXiCompartida();
+    /* Lo que se pidió hace rato se vuelve a pedir: si no, con la pestaña
+       abierta las estadísticas se quedan en la foto de cuando la abriste. */
+    caducarEstadisticas();
     /* El recuento trae las amarillas, que hacen falta para el estado. */
     ensureRecuento();
     ensureVersionWorker();
@@ -5906,7 +5951,9 @@
       state.pickerJornada = false;
       state.jornadaAbierta = null;
       const id = carta.getAttribute('data-jornada');
-      state.jornadaVista = state.jornadas.datos[id] ? id : null;
+      /* Se cambia de jornada siempre: los partidos no dependen de que su
+         clasificación esté descargada. */
+      state.jornadaVista = id;
       renderJornadaPicker();
       ensureJornada(id);
       renderJornadas();
