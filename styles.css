@@ -1276,9 +1276,15 @@ code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft)
 .puesto--entrenador { background: var(--border-hover); }  /* entrenador */
 
 /* La misma chapa, pequeña, sobre las caras de las alineaciones. */
+/* A este tamaño (8 px de letra) los medios píxeles se notan: si la chapa cae
+   en una coordenada rota, el navegador redondea la tinta hacia arriba o hacia
+   abajo y unas parecen subidas y otras bajadas. Por eso van con alto entero,
+   relleno en píxeles y desplazamiento entero, no en porcentaje. */
 .puesto--esquina {
-  top: 0; left: 0; transform: translate(-28%, -12%);
-  padding: .25em .38em .14em; font-size: .52rem;
+  top: 0; left: 0; transform: translate(-3px, -1px);
+  /* 13 px de alto: con 6 de tinta, quedan 3,5 arriba y 3,5 abajo, clavado. */
+  box-sizing: border-box; height: 13px;
+  padding: 0 .38em; font-size: .52rem;
 }
 /* Dos demarcaciones: mandan las chapas en fila dentro de un envoltorio. */
 .puestos { display: inline-flex; align-items: center; gap: 2px; }
@@ -1287,10 +1293,14 @@ code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft)
    no, la segunda o la tercera se meten debajo del estado, que va a la derecha. */
 .puestos--esquina {
   position: absolute; top: 0; left: 0; z-index: 2;
-  transform: translate(-16%, -12%);
+  transform: translate(-3px, -1px);
   gap: 1px;
 }
-.puestos--esquina .puesto { padding: .25em .34em .14em; font-size: .46rem; letter-spacing: .01em; }
+.puestos--esquina .puesto {
+  /* Con 12 de alto y 1 arriba, la tinta queda a 3 y 3. */
+  box-sizing: border-box; height: 12px;
+  padding: 1px .34em 0; font-size: .46rem; letter-spacing: .01em;
+}
 /* Con tres demarcaciones caben dos arriba y la tercera debajo, centrada. */
 .puestos--tres.puestos--esquina {
   flex-wrap: wrap; justify-content: center; row-gap: 1px;
