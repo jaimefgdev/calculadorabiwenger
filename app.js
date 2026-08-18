@@ -3212,11 +3212,12 @@
       '</div>';
     };
 
-    const cuantas = Math.min(3, datos.jornadas);
+    /* El rótulo es siempre el mismo aunque todavía no se hayan jugado tres:
+       se suman las que haya y, al llegar a tres, cuadra solo. */
     caja.innerHTML =
       lista('Más jornadas ganadas', datos.ganadas, '') +
-      lista('Mejor racha <span class="ranking__matiz">(\u00faltimas ' + cuantas +
-        (cuantas === 1 ? ' jornada' : ' jornadas') + ')</span>', datos.racha, ' pts');
+      lista('Mejor racha <span class="ranking__matiz">(últimas 3 jornadas)</span>',
+        datos.racha, ' pts');
 
     ajustarNombres();
   }
@@ -4954,14 +4955,14 @@
     });
 
     const todos = candidatos.slice(0, 24);
-    const rotulo = !busca && puesto != null
-      ? '<p class="comparar__nota">' + escapeHtml(POSITION_NAMES[puesto] || '') +
-        ', de más puntos a menos. Busca por nombre para comparar con cualquier otro.</p>'
-      : '';
 
     return '<div class="comparar">' +
-      '<input type="search" id="comparar-buscar" class="field" placeholder="Buscar futbolista…"' +
-        ' value="' + escapeHtml(state.priceModal.busca || '') + '">' + rotulo +
+      '<div class="comparar__barra">' +
+        '<input type="search" id="comparar-buscar" class="field" placeholder="Buscar futbolista…"' +
+          ' value="' + escapeHtml(state.priceModal.busca || '') + '">' +
+        '<button type="button" class="btn btn--ghost btn--close" data-comparar-cerrar' +
+          ' title="Cerrar" aria-label="Cerrar">✕</button>' +
+      '</div>' +
       (state.jugadores
         ? (todos.length
             ? '<div class="comparar__lista">' + todos.map(function (j) {
@@ -5065,8 +5066,11 @@
             '<strong>' + escapeHtml(abierto.name) + '</strong>' +
             crestOf(ficha, 'crest--badge') + statusMark(ficha, 'mark--row') +
           '</span>' +
-          '<button type="button" class="ambito ficha__comparar" data-comparar>' +
-            (abierto.comparar ? 'Quitar comparación' : 'Comparar') + '</button>' +
+          /* Mientras se elige rival, la pastilla estorba: su sitio lo ocupa el
+             aspa que hay junto al buscador. */
+          (abierto.eligiendo ? '' :
+            '<button type="button" class="ambito ficha__comparar" data-comparar>' +
+              (abierto.comparar ? 'Quitar comparación' : 'Comparar') + '</button>') +
           '<button type="button" class="btn btn--ghost btn--close" data-price-close' +
             ' title="Cerrar" aria-label="Cerrar">✕</button>' +
         '</div>' +
@@ -6495,6 +6499,13 @@
           state.priceModal.eligiendo = !state.priceModal.eligiendo;
           ensureJugadores();
         }
+        renderPriceModal();
+        return;
+      }
+
+      if (event.target.closest('[data-comparar-cerrar]')) {
+        state.priceModal.eligiendo = false;
+        state.priceModal.busca = '';
         renderPriceModal();
         return;
       }

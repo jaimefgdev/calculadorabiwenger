@@ -1711,8 +1711,9 @@ main.wrap { padding-bottom: 3.5rem; }
 /* ---------- Comparar dos futbolistas ---------- */
 .ficha__comparar { margin-left: auto; }
 .comparar { margin: .6rem 0; }
-.comparar .field { width: 100%; margin-bottom: .5rem; }
-.comparar__nota { margin: 0 0 .45rem; font-size: .72rem; color: var(--text-faint); }
+.comparar__barra { display: flex; align-items: center; gap: .4rem; margin-bottom: .5rem; }
+.comparar__barra .field { flex: 1; min-width: 0; }
+.comparar__barra .btn--close { flex: none; }
 .comparar__lista {
   display: grid; gap: .4rem; max-height: 240px; overflow: auto;
   grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
