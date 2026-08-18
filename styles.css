@@ -2009,18 +2009,32 @@ main.wrap { padding-bottom: 3.5rem; }
   .table--market .manager { gap: .3rem; }
 }
 
-/* ---------- Mis pujas y ofertas / Mis jugadores en venta ----------
-   En el móvil (que se sirve a 1024 px forzados) estas dos tablas no pueden
-   sacar barra horizontal pase lo que pase: se les permite partir el texto en
-   dos líneas —crecen hacia abajo, que sobra sitio— y se cierra el desplazable.
-   Va al final para que no la pise ninguna regla anterior. */
-@media (max-width: 1180px) {
-  #offers-panel .table-scroll,
-  #listings-panel .table-scroll { overflow-x: hidden; }
-  .market-grid .table { width: 100%; }
-  .market-grid .table th, .market-grid .table td { white-space: normal; }
-  .market-grid .table .num { white-space: normal; }
-  .market-grid .deadline { white-space: nowrap; }
-  /* El nombre del futbolista sigue en una línea: lo encoge el propio JS. */
-  .market-grid .player-name { white-space: nowrap; }
+/* ---------- Ninguna tabla saca barra horizontal ----------
+   Ni en el móvil (que se sirve a 1024 px forzados) ni en el ordenador. Las
+   tablas se ajustan al ancho que tengan y, si el contenido no cabe en una
+   línea, parte en dos: la fila crece hacia abajo, que es donde sobra sitio.
+   Va al final del fichero para que no la pise ninguna regla anterior. */
+.table-scroll { overflow-x: hidden; }
+.table { width: 100%; }
+.table th, .table td { white-space: normal; }
+
+/* Lo que nunca debe partirse: etiquetas, relojes, chapas y botones. */
+.table .deadline, .table .tag, .table .delta, .table .puesto, .table .puestos,
+.table .ambito, .table .btn, .table .switch, .table .pujado,
+.table .player-name, .table .manager__name { white-space: nowrap; }
+
+/* Las caras, escudos e interruptores tienen medida fija: que no se estiren. */
+.table .pic-player, .table .crest--badge, .table .avatar, .table .switch { flex: none; }
+
+/* Con la tabla apilada (móviles estrechos de verdad), los anchos fijos de
+   algunas columnas sobran: cada celda ocupa su fila entera. */
+@media (max-width: 940px) {
+  .table td, .table th { width: auto !important; max-width: none !important; }
+  .table td { min-width: 0; flex-wrap: wrap; }
+  .table--market .spark-cell { width: auto !important; }
+  /* Y los nombres largos parten de línea: aquí no hay a dónde encogerlos. */
+  .table .player-name, .table .manager__name {
+    white-space: normal; overflow-wrap: anywhere; max-width: none;
+  }
+  .table .with-crest, .table .manager { flex-wrap: wrap; min-width: 0; }
 }
