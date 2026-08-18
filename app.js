@@ -4563,10 +4563,13 @@
               const celdas = PERIODOS.map(function (periodo) {
                 const cambio = variacion(serie, periodo.dias);
                 if (cambio == null) return '';
-                const arriba = cambio >= 0;
+                const arriba = cambio > 0;
+                const marca = cambio === 0
+                  ? '<span class="delta delta--igual">– ' + compactMoney(0) + '</span>'
+                  : '<span class="delta ' + (arriba ? 'delta--up' : 'delta--down') + '">' +
+                    (arriba ? '+' : '−') + compactMoney(Math.abs(cambio)) + '</span>';
                 return '<span class="periodo"><span class="periodo__label">' + periodo.label + '</span>' +
-                  '<span class="delta ' + (arriba ? 'delta--up' : 'delta--down') + '">' +
-                  (arriba ? '+' : '−') + compactMoney(cambio) + '</span></span>';
+                  marca + '</span>';
               }).join('');
               return '<div class="viz-periodos">' +
                 '<span class="periodo periodo--dias"><strong>' + puntos.length + ' días</strong></span>' +
@@ -4651,9 +4654,11 @@
             })() + '</td>' +
             '<td class="num"><strong>' + (player.marketValue == null ? '—' : money(player.marketValue)) + '</strong></td>' +
             '<td class="spark-cell">' + sparkline(ultimos(state.priceSeries[player.id], 45), player.id, player.name) + '</td>' +
-            '<td class="num">' + (diff == null ? '<span class="sub">—</span>' :
-              '<span class="delta ' + (diff >= 0 ? 'delta--up' : 'delta--down') + '">' +
-              (diff >= 0 ? '▲ +' : '▼ −') + money(Math.abs(diff)) + '</span>') + '</td>' +
+            '<td class="num">' + (diff == null ? '<span class="sub">—</span>' : (diff === 0
+              /* Sin cambio no hay flecha ni verde: un guion y el número normal. */
+              ? '<span class="delta delta--igual">– ' + money(0) + '</span>'
+              : '<span class="delta ' + (diff > 0 ? 'delta--up' : 'delta--down') + '">' +
+                (diff > 0 ? '▲ +' : '▼ −') + money(Math.abs(diff)) + '</span>')) + '</td>' +
           '</tr>';
         }).join('') + '</tbody></table></div></td></tr>';
 

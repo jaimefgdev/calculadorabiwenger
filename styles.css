@@ -205,6 +205,8 @@ code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft)
 .delta { font-size: .72rem; font-weight: 640; white-space: nowrap; }
 .delta--up { color: var(--pos); }
 .delta--down { color: var(--neg); }
+/* Sin cambio: el guion y la cifra en el color normal del texto. */
+.delta--igual { color: var(--text); }
 
 .btn--icon { display: inline-grid; place-items: center; padding: .45rem .55rem; line-height: 0; }
 .bid { display: inline-flex; align-items: center; gap: .4rem; margin-right: .6rem; }
@@ -1257,8 +1259,12 @@ code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft)
   /* Metida hacia dentro: la ficha tiene las esquinas redondeadas y recorta lo
      que toca el borde, así que pegada a (0,0) se le comía la esquina. */
   position: absolute; top: 4px; left: 4px; z-index: 2;
-  padding: .1rem .38rem;
-  font-size: .68rem; font-weight: 700; letter-spacing: .03em; line-height: 1.25;
+  display: inline-flex; align-items: center; justify-content: center;
+  /* Las dos letras son mayúsculas y no bajan del renglón, así que el hueco de
+     los rabillos las dejaba altas. Se compensa arriba, y en `em` para que
+     valga igual en las chapas grandes que en las de las caras. */
+  padding: .25em .42em .14em;
+  font-size: .68rem; font-weight: 700; letter-spacing: .03em; line-height: 1;
   color: #fff; border-radius: 100px;
 }
 /* Amarillo más oscuro que el de las tarjetas: sobre el claro, las letras
@@ -1272,7 +1278,7 @@ code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft)
 /* La misma chapa, pequeña, sobre las caras de las alineaciones. */
 .puesto--esquina {
   top: 0; left: 0; transform: translate(-28%, -12%);
-  padding: 0 .22rem; font-size: .52rem; line-height: 1.35;
+  padding: .25em .38em .14em; font-size: .52rem;
 }
 /* Dos demarcaciones: mandan las chapas en fila dentro de un envoltorio. */
 .puestos { display: inline-flex; align-items: center; gap: 2px; }
@@ -1284,7 +1290,7 @@ code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft)
   transform: translate(-16%, -12%);
   gap: 1px;
 }
-.puestos--esquina .puesto { padding: 0 .16rem; font-size: .46rem; line-height: 1.4; letter-spacing: .01em; }
+.puestos--esquina .puesto { padding: .25em .34em .14em; font-size: .46rem; letter-spacing: .01em; }
 /* Con tres demarcaciones caben dos arriba y la tercera debajo, centrada. */
 .puestos--tres.puestos--esquina {
   flex-wrap: wrap; justify-content: center; row-gap: 1px;
@@ -1296,9 +1302,9 @@ code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft)
   width: 44px; flex: none; justify-content: flex-start;
   margin-right: .25rem; vertical-align: middle;
 }
-.puestos--fila .puesto { flex: none; padding: .02rem .26rem; font-size: .56rem; line-height: 1.4; }
+.puestos--fila .puesto { flex: none; padding: .25em .4em .14em; font-size: .56rem; }
 /* Con tres, las letras se aprietan un poco para no salirse del hueco. */
-.puestos--tres.puestos--fila .puesto { padding: .02rem .14rem; font-size: .48rem; letter-spacing: 0; }
+.puestos--tres.puestos--fila .puesto { padding: .25em .24em .14em; font-size: .48rem; letter-spacing: 0; }
 
 /* Sin nota todavía: el circulito se ve, pero apagado. */
 .pts--sinnota { color: #555; }
@@ -1306,8 +1312,8 @@ code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft)
 /* En las tablas va delante del nombre, en la misma línea. */
 .puesto--fila {
   position: static; flex: none;
-  padding: .02rem .26rem; margin-right: .25rem;
-  font-size: .56rem; line-height: 1.4;
+  padding: .25em .4em .14em; margin-right: .25rem;
+  font-size: .56rem;
 }
 
 
