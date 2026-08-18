@@ -420,6 +420,70 @@
   /* ---------- Ordenación de tablas ---------- */
 
   /* Valor por el que ordena cada columna. Devolver null manda la fila al final. */
+  /**
+   * Desempates de Biwenger (ligas normales y clásicas), tal cual los publica:
+   *
+   * Clasificación general
+   *   1. Más puntos.
+   *   2. Mayor valor de equipo + saldo.
+   *   3. El más veterano en la liga.
+   *
+   * Clasificación de la jornada
+   *   1. Más puntos.
+   *   2. Mayor valor de la alineación.
+   *   3. Más puntos en la general.
+   *   4. Mayor valor de equipo.
+   *   5. Mejor puesto en la general.
+   *   6. Más saldo.
+   *   7. El más veterano.
+   *
+   * La antigüedad no la publica su API, así que ese último escalón se resuelve
+   * con el orden que da Biwenger en su propia clasificación, que ya la aplica.
+   */
+  function desempateGeneral(a, b) {
+    const equipoA = state.teams[a.name] || {};
+    const equipoB = state.teams[b.name] || {};
+    const patrimonio = function (equipo) {
+      return (equipo.value != null ? equipo.value : (equipo.teamValue || 0)) + (equipo.balance || 0);
+    };
+    const porPatrimonio = patrimonio(equipoB) - patrimonio(equipoA);
+    if (porPatrimonio) return porPatrimonio;
+    /* Sin fecha de alta, manda el orden que da Biwenger. */
+    return (a.position != null ? a.position : 99) - (b.position != null ? b.position : 99);
+  }
+
+  function desempateJornada(a, b) {
+    /* 2. Valor de la alineación de esa jornada. */
+    const porOnce = (b.xiValue || 0) - (a.xiValue || 0);
+    if (porOnce) return porOnce;
+
+    const equipoA = state.teams[a.name] || {};
+    const equipoB = state.teams[b.name] || {};
+
+    /* 3. Puntos en la general. */
+    const generalA = puntosGenerales(a.name);
+    const generalB = puntosGenerales(b.name);
+    const porGeneral = (generalB || 0) - (generalA || 0);
+    if (porGeneral) return porGeneral;
+
+    /* 4. Valor de equipo. */
+    const valorA = equipoA.value != null ? equipoA.value : (equipoA.teamValue || 0);
+    const valorB = equipoB.value != null ? equipoB.value : (equipoB.teamValue || 0);
+    if (valorB - valorA) return valorB - valorA;
+
+    /* 5. Puesto en la general. */
+    const puestoA = a.position != null ? a.position : 99;
+    const puestoB = b.position != null ? b.position : 99;
+    if (puestoA !== puestoB) return puestoA - puestoB;
+
+    /* 6. Saldo. */
+    const saldo = (equipoB.balance || 0) - (equipoA.balance || 0);
+    if (saldo) return saldo;
+
+    /* 7. Antigüedad: no la publica, así que se deja el orden de Biwenger. */
+    return 0;
+  }
+
   const SORT_VALUES = {
     budget: {
       name:      function (row) { return row.name; },
@@ -482,7 +546,15 @@
         const cmp = typeof x === 'string' || typeof y === 'string'
           ? String(x).localeCompare(String(y), 'es')
           : x - y;
-        return cmp === 0 ? a.index - b.index : cmp * sort.dir;
+        if (cmp !== 0) return cmp * sort.dir;
+        /* Empatados a puntos en la clasificación: valor de equipo + saldo, y
+           luego la antigüedad, que no se publica. */
+        if (table === 'managers' && sort.key === 'points') {
+          const patrimonio = function (row) { return (row.teamValue || 0) + (row.balance || 0); };
+          const diff = patrimonio(b.row) - patrimonio(a.row);
+          if (diff) return diff;
+        }
+        return a.index - b.index;
       })
       .map(function (entry) { return entry.row; });
   }
@@ -3344,13 +3416,9 @@
       const x = valor(a);
       const y = valor(b);
       if (x === y) {
-        /* Empate a puntos: manda el puesto que les da Biwenger. Sus criterios
-           de desempate no los publica, así que no se inventa ninguno: se
-           respeta su orden y, si no lo diera, va por nombre. */
-        const pa = a.position != null ? a.position : 99;
-        const pb = b.position != null ? b.position : 99;
-        if (pa !== pb) return pa - pb;
-        return (a.name || '').localeCompare(b.name || '');
+        /* Empate: los criterios oficiales de Biwenger, en su orden. */
+        const criterio = sort.key === 'general' ? desempateGeneral : desempateJornada;
+        return criterio(a, b) || (a.name || '').localeCompare(b.name || '');
       }
       if (typeof x === 'string') return sort.dir * x.localeCompare(y);
       return sort.dir * (x < y ? -1 : 1);
