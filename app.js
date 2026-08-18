@@ -1371,7 +1371,8 @@
       '<td class="num" data-label="Saldo">' + money(totals.balance) + '</td>' +
       '<td class="num" data-label="Valor equipo">' + (totals.teamValue ? money(totals.teamValue) : '<span class="unknown">—</span>') + '</td>' +
       '<td class="num" data-label="Jug.">' + (totals.players || '') + '</td>' +
-      '<td class="num" data-label="Puja máxima"></td>' +
+      '<td class="num" data-label="Puja máxima">' +
+        '<span class="pie-nota">(saldo + 25 % valor equipo)</span></td>' +
     '</tr>';
 
     $('standings-hint').hidden = Object.keys(state.teams).length > 0;
@@ -3729,7 +3730,7 @@
     });
 
     const grafico = series.length === 0
-      ? '<p class="viz__empty">Elige a quién comparar.</p>'
+      ? ''
       : '<div class="viz__legend">' + series.map(function (linea) {
           return '<span class="viz__key"><span class="chip__dot" style="background:' + linea.color + '"></span>' +
             escapeHtml(linea.label) + '</span>';

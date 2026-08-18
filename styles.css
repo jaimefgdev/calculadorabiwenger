@@ -1747,6 +1747,19 @@ main.wrap { padding-bottom: 3.5rem; }
 .ambito--vender { color: var(--neg); border-color: var(--neg); }
 .ambito--vender:hover { background: var(--neg-soft); border-color: var(--neg); }
 
+/* Dos apartados en el mismo cuadro: el segundo con su aire y su raya. */
+.panel__head--separado {
+  margin-top: 1.4rem; padding-top: 1rem;
+  border-top: 1px solid var(--border);
+}
+
+/* La aclaración de la puja máxima, al pie de su columna. */
+/* Parte en dos líneas si hace falta: si no, ensancha la columna y saca barra. */
+.pie-nota {
+  display: block; font-size: .58rem; font-weight: 400;
+  color: var(--text-faint); white-space: normal; line-height: 1.2;
+}
+
 /* Solo para lectores de pantalla. */
 .sr-only {
   position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
@@ -1994,4 +2007,20 @@ main.wrap { padding-bottom: 3.5rem; }
   .table--market .manager__name { max-width: 92px; }
   .table--market .avatar { width: 18px; height: 18px; font-size: .55rem; }
   .table--market .manager { gap: .3rem; }
+}
+
+/* ---------- Mis pujas y ofertas / Mis jugadores en venta ----------
+   En el móvil (que se sirve a 1024 px forzados) estas dos tablas no pueden
+   sacar barra horizontal pase lo que pase: se les permite partir el texto en
+   dos líneas —crecen hacia abajo, que sobra sitio— y se cierra el desplazable.
+   Va al final para que no la pise ninguna regla anterior. */
+@media (max-width: 1180px) {
+  #offers-panel .table-scroll,
+  #listings-panel .table-scroll { overflow-x: hidden; }
+  .market-grid .table { width: 100%; }
+  .market-grid .table th, .market-grid .table td { white-space: normal; }
+  .market-grid .table .num { white-space: normal; }
+  .market-grid .deadline { white-space: nowrap; }
+  /* El nombre del futbolista sigue en una línea: lo encoge el propio JS. */
+  .market-grid .player-name { white-space: nowrap; }
 }

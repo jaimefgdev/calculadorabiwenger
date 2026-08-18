@@ -16,7 +16,7 @@
 <title>Calculadora Biwenger — Presupuestos de la liga</title>
 <!-- El ?v= se sube en cada publicación: obliga al navegador a bajar el archivo
      nuevo en vez de reutilizar el que tenga en caché. -->
-<link rel="stylesheet" href="styles.css?v=149">
+<link rel="stylesheet" href="styles.css?v=151">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>💰</text></svg>">
 </head>
 <body>
@@ -136,7 +136,7 @@
     <div class="panel__head panel__head--row">
       <div>
         <h2>Presupuesto por jugador</h2>
-        <p class="muted" id="budget-sub">Puja máxima = saldo disponible + 25 % del valor del equipo. Pulsa una cabecera para ordenar y un jugador para ver sus fichajes.</p>
+        <p class="muted" id="budget-sub">Pulsa una cabecera para ordenar y un jugador para ver sus fichajes.</p>
       </div>
       <!-- Se puede plegar; la web recuerda cómo lo dejaste. -->
       <button type="button" id="budget-toggle" class="ambito" aria-expanded="true"
@@ -484,18 +484,16 @@
 
     <h2 class="seccion__titulo">Puntos</h2>
 
-    <!-- Los futbolistas que más y menos rinden: primero los nuestros. -->
+    <!-- Los que más y menos rinden: los nuestros y los de toda LaLiga, en el
+         mismo cuadro, como los rankings. -->
     <section class="panel">
       <div class="panel__head">
         <h2>Nuestra liga</h2>
       </div>
       <div id="ambitos-nuestra"></div>
       <div id="rankings-jugadores" class="rankings"></div>
-    </section>
 
-    <!-- Y lo mismo con todos los futbolistas de la competición. -->
-    <section class="panel">
-      <div class="panel__head">
+      <div class="panel__head panel__head--separado">
         <h2>LaLiga</h2>
       </div>
       <div id="ambitos-laliga"></div>
@@ -574,6 +572,6 @@
 
 </main>
 
-<script src="app.js?v=149"></script>
+<script src="app.js?v=151"></script>
 </body>
 </html>
