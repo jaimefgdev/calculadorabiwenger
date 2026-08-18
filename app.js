@@ -3141,10 +3141,17 @@
     return state.jornadaVista != null ? state.jornadaVista : state.jornadas.actual;
   }
 
-  /* Puntos de toda la temporada, los que da Biwenger en la clasificación. */
+  /**
+   * Puntos de toda la temporada. Biwenger no suma la jornada en curso al total
+   * hasta que la cierra, así que se le añade lo que lleve ahora mismo: es lo
+   * que enseña su app y lo que se espera ver aquí.
+   */
   function puntosGenerales(nombre) {
     const equipo = state.teams[nombre];
-    return equipo && equipo.points != null ? equipo.points : null;
+    if (!equipo) return null;
+    const base = equipo.points != null ? equipo.points : null;
+    const total = conJornadaEnJuego(equipo, base);
+    return total != null ? total : base;
   }
 
   const ROUND_VALUES = {
