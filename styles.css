@@ -1110,17 +1110,21 @@ code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft)
   .market-grid .crest--badge { width: 12px; height: 12px; }
   .market-grid .with-crest { gap: .2rem; }
   .market-grid .delta { font-size: .58rem; }
-  .market-grid .puestos--fila { width: 32px; margin-right: .12rem; }
+  /* El hueco de las chapas cabe entero: con tres demarcaciones se salía y se
+     montaba encima de la cara del futbolista. */
+  .market-grid .puestos--fila { width: 44px; margin-right: .2rem; }
   .market-grid .puestos--fila .puesto { padding: .25em .18em .14em; font-size: .46rem; }
+  /* Nombrando las dos clases para ganarle a la regla general, que va después. */
+  .market-grid .puestos--tres.puestos--fila .puesto {
+    font-size: .4rem; padding: .25em .14em .14em; letter-spacing: 0;
+  }
+  /* Y el sitio sale de apretar etiquetas, relojes y cabeceras. */
+  .market-grid .table--offers td[data-label="Operación"] .tag { font-size: .58rem; padding-inline: .3rem; }
+  .market-grid td[data-label="Queda"] { font-size: .58rem; }
+  .market-grid .table th { font-size: .56rem; }
   .market-grid .switch { width: 24px; height: 15px; }
   .market-grid .switch span { width: 9px; height: 9px; }
   .market-grid .switch[aria-pressed="true"] span { transform: translateX(11px); }
-  /* El mercado grande, en el ancho de 1024 del móvil, se pasaba por poco. */
-  .table--market th, .table--market td { padding-inline: .2rem; }
-  .table--market .pujado { font-size: .7rem; margin-right: .25rem; }
-  .table--market .ambito--pujar { padding: .16rem .5rem; font-size: .68rem; }
-  .table--market .spark-cell { width: 74px; }
-  .table--market td:nth-child(2), .table--market th:nth-child(2) { max-width: 150px; }
   .manager__name {
     /* Enteros también aquí: en vez de cortarlos, se aprieta la letra. */
     font-size: .92em;
@@ -1634,11 +1638,15 @@ main.wrap { padding-bottom: 3.5rem; }
 #squad-panel .table-scroll { overflow-x: auto; }
 @media (max-width: 940px) { #squad-panel .table-scroll { overflow-x: hidden; } }
 
-/* El nombre entero encima del gráfico de puntos: en la fila puede ir cortado. */
+/* Fila abierta: el nombre entero ocupa el sitio de la cara y el escudo. */
 .ranking__nombre {
-  margin: .1rem .2rem .3rem; font-size: .82rem; font-weight: 620;
+  flex: 1; min-width: 0; text-align: left;
+  font-size: .82rem; font-weight: 620; line-height: 1.25;
 }
 .ranking__nombre .sub { font-weight: 400; }
+/* Las estadísticas desplegadas dentro del propio ranking. */
+.ranking__ficha { padding: .1rem .2rem .5rem; }
+.ranking__ficha .stats__titulo { margin-top: .6rem; }
 
 /* Solo para lectores de pantalla. */
 .sr-only {
@@ -1872,3 +1880,19 @@ main.wrap { padding-bottom: 3.5rem; }
 }
 .movers__titulo:hover { color: var(--text); }
 .movers__titulo[aria-expanded="true"] .round__caret { transform: rotate(90deg); }
+
+/* ---------- El mercado en pantallas estrechas ----------
+   Va al final del fichero a propósito: las reglas generales de la tabla de
+   mercado están más abajo que la tanda de arriba y, con el mismo peso, ganaba
+   la última. Aquí ya no hay quien la pise. */
+@media (max-width: 1180px) {
+  .table--market th, .table--market td { padding-inline: .2rem; }
+  .table--market .pujado { font-size: .7rem; margin-right: .25rem; }
+  .table--market .ambito--pujar { padding: .16rem .5rem; font-size: .68rem; }
+  .table--market .spark-cell { width: 74px; }
+  /* Con nombres kilométricos el propietario se iba a 178 px y sacaba barra. */
+  .table--market td:nth-child(2), .table--market th:nth-child(2) { max-width: 122px; }
+  .table--market .manager__name { max-width: 92px; }
+  .table--market .avatar { width: 18px; height: 18px; font-size: .55rem; }
+  .table--market .manager { gap: .3rem; }
+}

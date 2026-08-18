@@ -4588,13 +4588,6 @@
    * Abre la ficha del futbolista al que pertenece lo que se ha pulsado. Dice si
    * la ha abierto, para que quien llame pueda parar ahí.
    */
-  /** Ficha con solo las estadísticas, para los rankings de la temporada. */
-  function abrirFichaDeDatos(id, nombre) {
-    state.priceModal = { id: String(id), name: nombre || '', soloDatos: true };
-    ensureEstadisticas(state.priceModal.id);
-    renderPriceModal();
-  }
-
   function abrirFicha(donde) {
     const quien = donde && donde.closest && donde.closest('[data-player-id]');
     if (!quien || !quien.getAttribute('data-player-id')) return false;
@@ -4633,6 +4626,8 @@
         state.estadisticas[clave] = payload && payload.error ? null : payload;
         state.estadisticasAt = Date.now();
         renderPriceModal();
+        /* Puede estar abierta dentro de un ranking en vez de en la ficha. */
+        if (state.datosDetalle) renderRankingsTemporada();
       })
       .catch(function () {
         state.estadisticas[clave] = null;
@@ -5053,21 +5048,22 @@
       return '<li class="ranking__row' + (abierto ? ' ranking__row--abierta' : '') + '">' +
         '<button type="button" class="ranking__boton" data-puntos="' + escapeHtml(clave) + '"' +
           ' aria-expanded="' + (abierto ? 'true' : 'false') + '">' +
-          '<span class="ranking__quien">' +
-            '<span class="with-crest">' +
-              playerName({ playerId: jugador.id, player: jugador.name, position: jugador.position }) +
-              crestOf(jugador, 'crest--badge') +
-            '</span>' +
-            '<span class="ranking__owner">' + escapeHtml(jugador.owner) + '</span>' +
-          '</span>' +
+          /* Cerrada: cara, escudo y nombre, que puede salir cortado. Abierta:
+             solo el nombre, entero, que es lo que hacía falta leer. */
+          (abierto
+            ? '<span class="ranking__nombre">' + escapeHtml(jugador.name) +
+                (jugador.teamName ? ' <span class="sub">· ' + escapeHtml(jugador.teamName) + '</span>' : '') +
+              '</span>'
+            : '<span class="ranking__quien">' +
+                '<span class="with-crest">' +
+                  playerName({ playerId: jugador.id, player: jugador.name, position: jugador.position }) +
+                  crestOf(jugador, 'crest--badge') +
+                '</span>' +
+                '<span class="ranking__owner">' + escapeHtml(jugador.owner) + '</span>' +
+              '</span>') +
           '<strong class="ranking__value">' + valor(jugador) + '</strong>' +
         '</button>' +
-        /* En la fila el nombre puede salir cortado; al abrirlo se pone entero. */
-        (abierto
-          ? '<p class="ranking__nombre">' + escapeHtml(jugador.name) +
-              (jugador.teamName ? ' <span class="sub">· ' + escapeHtml(jugador.teamName) + '</span>' : '') +
-            '</p>' + graficoDePuntos(jugador)
-          : '') +
+        (abierto ? graficoDePuntos(jugador) : '') +
       '</li>';
     }).join('') + '</ol>';
   }
@@ -5240,18 +5236,25 @@
           const valor = ranking.decimal
             ? (jugador[ranking.campo] || 0).toFixed(2).replace('.', ',')
             : (jugador[ranking.campo] || 0);
-          return '<li class="ranking__row">' +
+          const clave = ranking.campo + ':' + jugador.id;
+          const abierto = state.datosDetalle === clave;
+          return '<li class="ranking__row' + (abierto ? ' ranking__row--abierta' : '') + '">' +
             '<button type="button" class="ranking__boton" data-ficha="' +
-              escapeHtml(String(jugador.id)) + '" data-ficha-nombre="' +
-              escapeHtml(jugador.name) + '">' +
-              '<span class="ranking__quien">' +
-                '<span class="with-crest">' +
-                  playerName({ playerId: jugador.id, player: jugador.name, position: jugador.position }) +
-                  crestOf(jugador, 'crest--badge') +
-                '</span>' +
-              '</span>' +
+              escapeHtml(clave) + '" aria-expanded="' + (abierto ? 'true' : 'false') + '">' +
+              (abierto
+                ? '<span class="ranking__nombre">' + escapeHtml(jugador.name) +
+                    (jugador.teamName ? ' <span class="sub">· ' + escapeHtml(jugador.teamName) + '</span>' : '') +
+                  '</span>'
+                : '<span class="ranking__quien">' +
+                    '<span class="with-crest">' +
+                      playerName({ playerId: jugador.id, player: jugador.name, position: jugador.position }) +
+                      crestOf(jugador, 'crest--badge') +
+                    '</span>' +
+                  '</span>') +
               '<strong class="ranking__value">' + valor + '</strong>' +
             '</button>' +
+            /* Se abre aquí mismo, hacia abajo, y solo con las estadísticas. */
+            (abierto ? '<div class="ranking__ficha">' + estadisticasDeTemporada(jugador.id) + '</div>' : '') +
           '</li>';
         }).join('') + '</ol>' +
       '</div>';
@@ -6039,7 +6042,10 @@
       tandas.addEventListener('click', function (event) {
         const boton = event.target.closest('[data-ficha]');
         if (!boton) return;
-        abrirFichaDeDatos(boton.getAttribute('data-ficha'), boton.getAttribute('data-ficha-nombre'));
+        const clave = boton.getAttribute('data-ficha');
+        state.datosDetalle = state.datosDetalle === clave ? null : clave;
+        if (state.datosDetalle) ensureEstadisticas(clave.split(':')[1]);
+        renderRankingsTemporada();
       });
     }
 
