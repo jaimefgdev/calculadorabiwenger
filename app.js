@@ -3150,7 +3150,11 @@
    * jornadas, el recuento se completa solo.
    */
   function tandasDeLaLiga() {
-    const jornadas = jornadasGuardadas();
+    /* Solo las jugadas: las que aún no han empezado traen la clasificación a
+       ceros y colaban en el recuento como si contaran. */
+    const jornadas = jornadasGuardadas().filter(function (jornada) {
+      return (jornada.standings || []).some(function (fila) { return (fila.points || 0) !== 0; });
+    });
     const ganadas = {};
     const ultimas = {};
 
@@ -3187,7 +3191,7 @@
       return;
     }
 
-    const lista = function (titulo, mapa, sufijo, pie) {
+    const lista = function (titulo, mapa, sufijo) {
       const filas = MANAGERS.map(function (nombre) {
         return { name: nombre, valor: mapa[nombre] || 0 };
       }).sort(function (a, b) {
@@ -3205,16 +3209,14 @@
             '</span>' +
           '</li>';
         }).join('') + '</ol>' +
-        '<p class="muted ranking__pie">' + pie + '</p>' +
       '</div>';
     };
 
     const cuantas = Math.min(3, datos.jornadas);
     caja.innerHTML =
-      lista('Más jornadas ganadas', datos.ganadas, '',
-        datos.jornadas + (datos.jornadas === 1 ? ' jornada contada' : ' jornadas contadas')) +
-      lista('Mejor racha', datos.racha, ' pts',
-        'Puntos de ' + (cuantas === 1 ? 'la última jornada' : 'las ' + cuantas + ' últimas jornadas'));
+      lista('Más jornadas ganadas', datos.ganadas, '') +
+      lista('Mejor racha <span class="ranking__matiz">(\u00faltimas ' + cuantas +
+        (cuantas === 1 ? ' jornada' : ' jornadas') + ')</span>', datos.racha, ' pts');
 
     ajustarNombres();
   }
@@ -4622,6 +4624,19 @@
       ficha.team = ficha.team != null ? ficha.team : enTablon[0].team;
       ficha.teamName = ficha.teamName || enTablon[0].teamName;
     }
+    /* Y si no está ni en plantillas, ni en el mercado, ni en el tablón, se mira
+       la lista completa de la competición, que la tiene la pestaña Jugadores. */
+    const enLista = (state.jugadores || []).filter(function (j) { return String(j.id) === clave; })[0];
+    if (enLista) {
+      ficha.name = ficha.name || enLista.name;
+      ficha.position = ficha.position != null ? ficha.position : enLista.position;
+      ficha.status = ficha.status || enLista.status;
+      ficha.team = ficha.team != null ? ficha.team : enLista.team;
+      ficha.teamName = ficha.teamName || enLista.teamName;
+      ficha.marketValue = ficha.marketValue != null ? ficha.marketValue : enLista.marketValue;
+      ficha.points = ficha.points != null ? ficha.points : enLista.points;
+    }
+
     ficha.moves = enTablon.slice().sort(function (a, b) { return (b.timestamp || 0) - (a.timestamp || 0); });
 
     return ficha;
@@ -4917,6 +4932,75 @@
     '</div>';
   }
 
+  /** Lista para elegir con quién comparar, con su buscador. */
+  function selectorDeComparacion(id) {
+    const busca = normalize(state.priceModal.busca || '');
+    const todos = (state.jugadores || []).filter(function (j) {
+      return String(j.id) !== String(id) &&
+        (!busca || normalize(j.name).indexOf(busca) !== -1 ||
+         normalize(j.teamName || '').indexOf(busca) !== -1);
+    }).slice(0, 24);
+
+    return '<div class="comparar">' +
+      '<input type="search" id="comparar-buscar" class="field" placeholder="Buscar futbolista…"' +
+        ' value="' + escapeHtml(state.priceModal.busca || '') + '">' +
+      (state.jugadores
+        ? (todos.length
+            ? '<div class="comparar__lista">' + todos.map(function (j) {
+                return '<button type="button" class="comparar__uno" data-comparar-con="' +
+                  escapeHtml(String(j.id)) + '">' +
+                  faceOf(j.id, 'picker__face') +
+                  '<span class="comparar__nombre">' + escapeHtml(j.name) + '</span>' +
+                  '<span class="sub">' + escapeHtml(j.teamName || '') + '</span>' +
+                '</button>';
+              }).join('') + '</div>'
+            : '<p class="muted">Ningún futbolista con ese nombre.</p>')
+        : '<p class="muted">Cargando futbolistas\u2026</p>') +
+    '</div>';
+  }
+
+  /** Las estadísticas de los dos, en dos columnas. */
+  function comparativaDeFichas(unoId, otroId) {
+    const uno = playerInfo(unoId);
+    const otro = playerInfo(otroId);
+    const datosUno = state.estadisticas[String(unoId)];
+    const datosOtro = state.estadisticas[String(otroId)];
+
+    if (datosUno === undefined || datosOtro === undefined) {
+      return '<p class="muted">Cargando estad\u00edsticas\u2026</p>';
+    }
+
+    const filas = [
+      { rotulo: 'Puntos', valor: function (d, f) { return d ? d.points : (f.points || 0); } },
+      { rotulo: 'Media', valor: function (d) { return d && d.played ? (d.points / d.played).toFixed(1).replace('.', ',') : '0,0'; } },
+      { rotulo: 'Partidos', valor: function (d) { return d ? d.played : 0; } },
+      { rotulo: 'Minutos', valor: function (d) { return d ? d.minutes : 0; } },
+      { rotulo: 'Goles', valor: function (d) { return d ? d.goals : 0; } },
+      { rotulo: 'Asistencias', valor: function (d) { return d ? d.assists : 0; } },
+      { rotulo: 'Valor', valor: function (d, f) { return money(f.marketValue || 0); }, texto: true }
+    ];
+
+    const cabecera = function (ficha, id) {
+      return '<div class="versus__quien">' + faceOf(id, 'ficha__face') +
+        '<strong>' + escapeHtml(ficha.name || '') + '</strong>' +
+        '<span class="sub">' + escapeHtml(ficha.teamName || '') + '</span></div>';
+    };
+
+    return '<div class="versus">' +
+      '<div class="versus__cab">' + cabecera(uno, unoId) + cabecera(otro, otroId) + '</div>' +
+      '<div class="versus__filas">' + filas.map(function (fila) {
+        const a = fila.valor(datosUno, uno);
+        const b = fila.valor(datosOtro, otro);
+        const gana = fila.texto ? 0 : (Number(String(a).replace(',', '.')) - Number(String(b).replace(',', '.')));
+        return '<div class="versus__fila">' +
+          '<span class="versus__dato' + (gana > 0 ? ' versus__dato--mejor' : '') + '">' + a + '</span>' +
+          '<span class="versus__label">' + fila.rotulo + '</span>' +
+          '<span class="versus__dato' + (gana < 0 ? ' versus__dato--mejor' : '') + '">' + b + '</span>' +
+        '</div>';
+      }).join('') + '</div>' +
+    '</div>';
+  }
+
   function renderPriceModal() {
     const caja = $('price-modal');
     const abierto = state.priceModal;
@@ -4963,10 +5047,15 @@
             '<strong>' + escapeHtml(abierto.name) + '</strong>' +
             crestOf(ficha, 'crest--badge') + statusMark(ficha, 'mark--row') +
           '</span>' +
+          '<button type="button" class="ambito ficha__comparar" data-comparar>' +
+            (abierto.comparar ? 'Quitar comparación' : 'Comparar') + '</button>' +
           '<button type="button" class="btn btn--ghost btn--close" data-price-close' +
             ' title="Cerrar" aria-label="Cerrar">✕</button>' +
         '</div>' +
         '<p class="muted ficha__datos">' + datos + '</p>' +
+        /* Elegido el rival, sus estadísticas van al lado de las de este. */
+        (abierto.comparar ? comparativaDeFichas(abierto.id, abierto.comparar) : '') +
+        (abierto.eligiendo ? selectorDeComparacion(abierto.id) : '') +
         (abierto.soloPrecio ? '' : estadisticasDeTemporada(abierto.id) + rachaDeTemporada(abierto.id)) +
         /* Desde los rankings solo interesan las estadísticas: ni el valor de
            mercado ni su evolución pintan nada ahí. */
@@ -6367,7 +6456,42 @@
       $(id).addEventListener('click', function (event) { abrirFicha(event.target); });
     });
 
+    $('price-modal').addEventListener('input', function (event) {
+      if (event.target && event.target.id === 'comparar-buscar') {
+        state.priceModal.busca = event.target.value;
+        renderPriceModal();
+        const campo = $('comparar-buscar');
+        if (campo) { campo.focus(); campo.setSelectionRange(campo.value.length, campo.value.length); }
+      }
+    });
+
     $('price-modal').addEventListener('click', function (event) {
+      if (!state.priceModal) return;
+
+      if (event.target.closest('[data-comparar]')) {
+        /* Si ya hay comparación, la pastilla la quita; si no, abre la lista. */
+        if (state.priceModal.comparar) {
+          state.priceModal.comparar = null;
+          state.priceModal.eligiendo = false;
+        } else {
+          state.priceModal.eligiendo = !state.priceModal.eligiendo;
+          ensureJugadores();
+        }
+        renderPriceModal();
+        return;
+      }
+
+      const elegido = event.target.closest('[data-comparar-con]');
+      if (elegido) {
+        state.priceModal.comparar = elegido.getAttribute('data-comparar-con');
+        state.priceModal.eligiendo = false;
+        state.priceModal.busca = '';
+        ensureEstadisticas(state.priceModal.id);
+        ensureEstadisticas(state.priceModal.comparar);
+        renderPriceModal();
+        return;
+      }
+
       if (!event.target.closest('[data-price-close]')) return;
       state.priceModal = null;
       renderPriceModal();
