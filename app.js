@@ -2565,9 +2565,11 @@
           ' value="' + (venta.price || 0) + '"></label>' +
       '<p class="op-aviso"></p>' +
       '<div class="op-botones">' +
-        '<button type="button" class="btn btn--ghost" data-op-mismo="' +
-          escapeHtml(String(venta.playerId)) + '">' +
-          (yaEstaba ? 'Repetir precio' : 'Valor de mercado') + '</button>' +
+        /* Repetir precio solo tiene sentido si ya estaba puesto. */
+        (yaEstaba
+          ? '<button type="button" class="btn btn--ghost" data-op-mismo="' +
+            escapeHtml(String(venta.playerId)) + '">Repetir precio</button>'
+          : '') +
         '<button type="button" class="btn btn--primary" data-op-vender="' +
           escapeHtml(String(venta.playerId)) + '">Aceptar</button>' +
       '</div>');
@@ -2698,15 +2700,22 @@
   }
 
   /** Las ofertas recibidas y tus pujas, cada una con lo que se puede hacer. */
-  function abrirOfertas() {
-    /* Solo lo que te han ofrecido: tus pujas se ven en la fila del mercado. */
-    const recibidas = ofertasRecibidas();
+  function abrirOfertas(soloDe) {
+    /* Solo lo que te han ofrecido: tus pujas se ven en la fila del mercado.
+       Con `soloDe` se enseñan únicamente las de ese futbolista. */
+    const todas = ofertasRecibidas();
+    const recibidas = soloDe
+      ? todas.filter(function (o) { return String(o.playerId) === String(soloDe); })
+      : todas;
+    const suyo = soloDe ? miJugador(soloDe) : null;
 
     const enVentaDe = function (playerId) {
       return (state.listings || []).filter(function (item) {
         return String(item.playerId) === String(playerId);
       })[0];
     };
+
+    recibidas.sort(function (a, b) { return b.amount - a.amount; });
 
     const filaRecibida = function (oferta) {
       const suya = enVentaDe(oferta.playerId);
@@ -2739,14 +2748,21 @@
 
     abrirOpModal(
       '<div class="op-card__cab">' +
-        '<h3 id="op-modal-titulo">Ofertas</h3>' +
+        '<h3 id="op-modal-titulo">' +
+          (suyo ? 'Ofertas por ' + escapeHtml(suyo.name) : 'Ofertas') + '</h3>' +
         '<button type="button" class="btn btn--ghost btn--close" data-op-cerrar' +
           ' title="Cerrar" aria-label="Cerrar">\u2715</button>' +
       '</div>' +
       (recibidas.length
-        ? recibidas.map(filaRecibida).join('')
+        ? (recibidas.length > 1
+            ? '<p class="op-titulillo">' + recibidas.length + ' ofertas</p>'
+            : '') +
+          recibidas.map(filaRecibida).join('')
         : '<p class="muted">No tienes ofertas por resolver.</p>') +
       '<p class="op-aviso"></p>');
+
+    /* Al responder una, se vuelve a esta misma lista. */
+    volverA = function () { abrirOfertas(soloDe); };
   }
 
   /* Qué se dice antes de mandar cada operación. */
@@ -2759,6 +2775,8 @@
   };
 
   let opPendiente = null;
+  /* Cómo volver a la lista de ofertas que se estaba mirando (con su filtro). */
+  let volverA = null;
 
   /** Paso intermedio: enseña qué va a pasar y espera el sí. */
   function confirmarOperacion(accion, oferta, desdeOfertas) {
@@ -2847,7 +2865,7 @@
     opAviso('Hablando con Biwenger\u2026');
     /* Las tres respuestas a una oferta devuelven a la lista de ofertas. */
     if (['aceptar', 'rechazar', 'devolver'].indexOf(opPendiente.accion) !== -1) {
-      trasOperar = abrirOfertas;
+      trasOperar = volverA || abrirOfertas;
     }
 
     if (opPendiente.accion === 'devolver') {
@@ -2881,7 +2899,7 @@
     }
 
     const pastilla = $('btn-ofertas');
-    if (pastilla) pastilla.addEventListener('click', abrirOfertas);
+    if (pastilla) pastilla.addEventListener('click', function () { abrirOfertas(); });
 
     const plantilla = $('squad-body');
     if (plantilla) {
@@ -2891,7 +2909,7 @@
         const quitar = event.target.closest('[data-quitar]');
         if (quitar) { abrirQuitar(quitar.getAttribute('data-quitar')); return; }
         const ofertas = event.target.closest('[data-ofertas-de]');
-        if (ofertas) { abrirOfertas(); return; }
+        if (ofertas) { abrirOfertas(ofertas.getAttribute('data-ofertas-de')); return; }
       });
     }
 
@@ -2906,7 +2924,7 @@
       if (event.target.closest('[data-op-cerrar]')) { cerrarOpModal(); return; }
       if (event.target.closest('[data-op-volver]')) {
         /* Se vuelve a la lista solo si se salió de ella. */
-        if (opPendiente && opPendiente.desdeOfertas) abrirOfertas();
+        if (opPendiente && opPendiente.desdeOfertas) (volverA || abrirOfertas)();
         else cerrarOpModal();
         return;
       }
