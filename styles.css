@@ -1650,7 +1650,9 @@ main.wrap { padding-bottom: 3.5rem; }
 .ranking__ficha .stats__titulo { margin-top: .6rem; }
 
 /* Avisos de la alineación: rojos y con el triángulo de alerta. */
-.avisos { display: grid; gap: .4rem; margin: 0 0 .8rem; }
+/* El recuadro acaba donde acaba el texto, no al final de la pantalla. */
+.avisos { display: grid; gap: .4rem; margin: 0 0 .8rem; justify-items: start; }
+.aviso { max-width: 100%; }
 .aviso {
   display: flex; align-items: flex-start; gap: .5rem;
   margin: 0; padding: .5rem .7rem;
@@ -1697,8 +1699,10 @@ main.wrap { padding-bottom: 3.5rem; }
 /* «(últimas 3 jornadas)» en pequeño, dentro del propio título. */
 .ranking__matiz { font-size: .72rem; font-weight: 400; color: var(--text-faint); }
 
-/* El título de cada tanda, centrado sobre su lista. */
+/* El título de cada tanda, centrado sobre su lista. Los dos de la pestaña
+   Liga se quedan a la izquierda, como estaban. */
 .ranking__title { text-align: center; }
+.rankings--dos .ranking__title { text-align: left; }
 
 /* Máximo y mínimo históricos, centrados también. */
 .topes { justify-content: center; }
@@ -1708,6 +1712,7 @@ main.wrap { padding-bottom: 3.5rem; }
 .ficha__comparar { margin-left: auto; }
 .comparar { margin: .6rem 0; }
 .comparar .field { width: 100%; margin-bottom: .5rem; }
+.comparar__nota { margin: 0 0 .45rem; font-size: .72rem; color: var(--text-faint); }
 .comparar__lista {
   display: grid; gap: .4rem; max-height: 240px; overflow: auto;
   grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
@@ -1736,6 +1741,11 @@ main.wrap { padding-bottom: 3.5rem; }
   font-size: .66rem; color: var(--text-faint);
   text-transform: uppercase; letter-spacing: .04em;
 }
+
+/* «Vender» en rojo: es la acción que saca al futbolista de tu plantilla. El
+   de cambiar precio se queda como estaba, que no vende nada. */
+.ambito--vender { color: var(--neg); border-color: var(--neg); }
+.ambito--vender:hover { background: var(--neg-soft); border-color: var(--neg); }
 
 /* Solo para lectores de pantalla. */
 .sr-only {

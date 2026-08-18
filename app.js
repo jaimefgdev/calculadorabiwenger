@@ -3288,7 +3288,7 @@
               escapeHtml(String(jugador.id)) + '">Cambiar</button>' +
             '<button type="button" class="btn btn--sm btn--no" data-quitar="' +
               escapeHtml(String(jugador.id)) + '" title="Quitar del mercado">\u2715</button>'
-          : '<button type="button" class="ambito ambito--pujar" data-vender="' +
+          : '<button type="button" class="ambito ambito--pujar ambito--vender" data-vender="' +
               escapeHtml(String(jugador.id)) + '">Vender</button>') + '</td>' +
       '</tr>';
     }).join('');
@@ -4935,15 +4935,33 @@
   /** Lista para elegir con quién comparar, con su buscador. */
   function selectorDeComparacion(id) {
     const busca = normalize(state.priceModal.busca || '');
-    const todos = (state.jugadores || []).filter(function (j) {
-      return String(j.id) !== String(id) &&
-        (!busca || normalize(j.name).indexOf(busca) !== -1 ||
-         normalize(j.teamName || '').indexOf(busca) !== -1);
-    }).slice(0, 24);
+    const suyo = playerInfo(id);
+    const puesto = suyo && suyo.position != null
+      ? suyo.position
+      : posicionConocida[String(id)];
+
+    const candidatos = (state.jugadores || []).filter(function (j) {
+      if (String(j.id) === String(id)) return false;
+      if (busca) {
+        return normalize(j.name).indexOf(busca) !== -1 ||
+          normalize(j.teamName || '').indexOf(busca) !== -1;
+      }
+      /* Sin buscar nada, se proponen los de su misma demarcación: comparar un
+         portero con un delantero no dice gran cosa. */
+      if (puesto == null) return true;
+      return j.position === puesto ||
+        (j.altPositions || []).indexOf(puesto) !== -1;
+    });
+
+    const todos = candidatos.slice(0, 24);
+    const rotulo = !busca && puesto != null
+      ? '<p class="comparar__nota">' + escapeHtml(POSITION_NAMES[puesto] || '') +
+        ', de más puntos a menos. Busca por nombre para comparar con cualquier otro.</p>'
+      : '';
 
     return '<div class="comparar">' +
       '<input type="search" id="comparar-buscar" class="field" placeholder="Buscar futbolista…"' +
-        ' value="' + escapeHtml(state.priceModal.busca || '') + '">' +
+        ' value="' + escapeHtml(state.priceModal.busca || '') + '">' + rotulo +
       (state.jugadores
         ? (todos.length
             ? '<div class="comparar__lista">' + todos.map(function (j) {
