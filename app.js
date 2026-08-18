@@ -965,6 +965,10 @@
     valid.forEach(function (point) {
       fields.forEach(function (field) { if (point[field] != null) values.push(point[field]); });
     });
+    /* Lo que se pagó por él va marcado en el gráfico: entra en la escala para
+       que el punto no se salga por arriba ni por abajo. */
+    if (opts.mark && opts.mark.paid != null) values.push(opts.mark.paid);
+
     let min = Math.min.apply(null, values);
     let max = Math.max.apply(null, values);
     // Las barras arrancan siempre en cero: si no, exageran diferencias pequeñas.
@@ -1091,10 +1095,16 @@
       if (i !== -1 && points[i][key] != null) {
         const mx = x(i);
         const my = y(points[i][key]);
+        /* Sobre la misma raya, a la altura de lo que pagaste: de un vistazo se
+           ve si lo compraste por encima o por debajo de lo que valía. */
+        const pagado = opts.mark.paid != null
+          ? '<circle class="viz__markpaid" cx="' + mx.toFixed(1) + '" cy="' + y(opts.mark.paid).toFixed(1) +
+              '" r="5"><title>Pagaste ' + escapeHtml(money(opts.mark.paid)) + '</title></circle>'
+          : '';
         marca = '<line class="viz__mark" x1="' + mx.toFixed(1) + '" x2="' + mx.toFixed(1) +
             '" y1="' + padTop + '" y2="' + (H - padBottom) + '"></line>' +
           '<circle class="viz__markdot" cx="' + mx.toFixed(1) + '" cy="' + my.toFixed(1) + '" r="6"></circle>' +
-          '';
+          pagado;
       }
     }
 
@@ -2314,6 +2324,50 @@
       return sum + ((player && player.marketValue) || 0);
     }, 0);
     $('lineup-count').textContent = titulares + ' de 11 titulares · ' + money(valor) + ' de valor en el campo';
+
+    pintarAvisosDeAlineacion(titulares);
+  }
+
+  /**
+   * Los dos avisos de antes de la jornada: que no llegues en negativo y que no
+   * te dejes huecos en el once. Solo se pintan cuando hay algo que arreglar.
+   */
+  /** «: quedan 7h 59m», solo en las últimas horas antes de la jornada. */
+  function rotuloCuentaAtras(cerca, round) {
+    if (!cerca) return '';
+    const queda = timeLeft(round.start);
+    return queda ? ': quedan <strong>' + escapeHtml(queda.text) + '</strong>' : '';
+  }
+
+  function pintarAvisosDeAlineacion(titulares) {
+    const caja = $('lineup-avisos');
+    if (!caja) return;
+
+    const avisos = [];
+    const saldo = state.me && state.me.balance != null ? state.me.balance : null;
+    const round = state.round;
+    const empieza = round && round.start ? Date.parse(round.start) : null;
+    const faltan = empieza ? empieza - Date.now() : null;
+    /* La cuenta atrás aparece en las últimas doce horas, que es cuando corre
+       prisa; antes basta con el aviso. */
+    const cerca = faltan != null && faltan > 0 && faltan <= 12 * 3600e3;
+
+    if (saldo != null && saldo < 0) {
+      avisos.push('Tienes el saldo en negativo (' + money(saldo) + '). ' +
+        'Hay que estar en positivo antes de que empiece la jornada' + rotuloCuentaAtras(cerca, round) + '.');
+    }
+
+    if (titulares < 11) {
+      const huecos = 11 - titulares;
+      avisos.push('Te ' + (huecos === 1 ? 'falta 1 jugador' : 'faltan ' + huecos + ' jugadores') +
+        ' en el once' + rotuloCuentaAtras(cerca, round) + '.');
+    }
+
+    caja.hidden = avisos.length === 0;
+    caja.innerHTML = avisos.map(function (texto) {
+      return '<p class="aviso aviso--rojo"><span class="aviso__icono" aria-hidden="true">\u26a0</span>' +
+        '<span>' + texto + '</span></p>';
+    }).join('');
   }
 
   /* ---------- Mercado ---------- */
@@ -3078,6 +3132,91 @@
     document.addEventListener('keydown', function (event) {
       if (event.key === 'Escape' && !caja.hidden) cerrarOpModal();
     });
+  }
+
+  /* ---------- Cómo va la liga ---------- */
+
+  /** Las jornadas guardadas, de la más antigua a la más nueva. */
+  function jornadasGuardadas() {
+    return Object.keys(state.jornadas.datos)
+      .map(function (id) { return state.jornadas.datos[id]; })
+      .filter(function (j) { return j && j.round && (j.standings || []).length; })
+      .sort(function (a, b) { return (a.round.number || 0) - (b.round.number || 0); });
+  }
+
+  /**
+   * Quién ha ganado cada jornada y qué lleva cada uno en las tres últimas.
+   * Se cuenta con lo que haya descargado la web; según se vayan mirando
+   * jornadas, el recuento se completa solo.
+   */
+  function tandasDeLaLiga() {
+    const jornadas = jornadasGuardadas();
+    const ganadas = {};
+    const ultimas = {};
+
+    jornadas.forEach(function (jornada) {
+      const filas = (jornada.standings || []).filter(function (f) { return f.points != null; });
+      if (!filas.length) return;
+
+      /* El ganador se decide con los criterios oficiales, no solo por puntos. */
+      const orden = filas.slice().sort(function (a, b) {
+        return (b.points - a.points) || desempateJornada(a, b);
+      });
+      const campeon = orden[0];
+      if (campeon) ganadas[campeon.name] = (ganadas[campeon.name] || 0) + 1;
+    });
+
+    /* Racha: lo sumado en las tres últimas jornadas guardadas. */
+    jornadas.slice(-3).forEach(function (jornada) {
+      (jornada.standings || []).forEach(function (fila) {
+        if (fila.points == null) return;
+        ultimas[fila.name] = (ultimas[fila.name] || 0) + fila.points;
+      });
+    });
+
+    return { jornadas: jornadas.length, ganadas: ganadas, racha: ultimas };
+  }
+
+  function renderTandasDeLiga() {
+    const caja = $('liga-tandas');
+    if (!caja) return;
+
+    const datos = tandasDeLaLiga();
+    if (!datos.jornadas) {
+      caja.innerHTML = '<p class="muted">Todavía no hay jornadas guardadas.</p>';
+      return;
+    }
+
+    const lista = function (titulo, mapa, sufijo, pie) {
+      const filas = MANAGERS.map(function (nombre) {
+        return { name: nombre, valor: mapa[nombre] || 0 };
+      }).sort(function (a, b) {
+        return (b.valor - a.valor) || a.name.localeCompare(b.name, 'es');
+      });
+
+      return '<div class="ranking">' +
+        '<h3 class="ranking__title">' + titulo + '</h3>' +
+        '<ol class="ranking__list">' + filas.map(function (fila) {
+          return '<li class="ranking__row">' +
+            '<span class="ranking__boton ranking__boton--fijo">' +
+              '<span class="ranking__quien"><span class="manager">' + avatar(fila.name) +
+                '<span class="manager__name">' + escapeHtml(fila.name) + '</span></span></span>' +
+              '<strong class="ranking__value">' + fila.valor + sufijo + '</strong>' +
+            '</span>' +
+          '</li>';
+        }).join('') + '</ol>' +
+        '<p class="muted ranking__pie">' + pie + '</p>' +
+      '</div>';
+    };
+
+    const cuantas = Math.min(3, datos.jornadas);
+    caja.innerHTML =
+      lista('Más jornadas ganadas', datos.ganadas, '',
+        datos.jornadas + (datos.jornadas === 1 ? ' jornada contada' : ' jornadas contadas')) +
+      lista('Mejor racha', datos.racha, ' pts',
+        'Puntos de ' + (cuantas === 1 ? 'la última jornada' : 'las ' + cuantas + ' últimas jornadas'));
+
+    ajustarNombres();
   }
 
   /* ---------- Mi plantilla ---------- */
@@ -4748,6 +4887,36 @@
   }
 
   /** Ficha del futbolista: quién lo tiene, cuánto vale y por dónde ha pasado. */
+  /** El día en que se tocó un precio, escrito en corto: «14 ago 2026». */
+  function diaLargo(dia) {
+    const fecha = new Date(dia + 'T12:00:00');
+    return isNaN(fecha) ? dia : fecha.toLocaleDateString('es-ES',
+      { day: 'numeric', month: 'short', year: 'numeric' });
+  }
+
+  /** Máximo y mínimo históricos de la serie de precios, con su fecha. */
+  function topesDePrecio(puntos) {
+    if (!puntos || puntos.length < 2) return '';
+
+    let alto = puntos[0];
+    let bajo = puntos[0];
+    puntos.forEach(function (punto) {
+      if (punto.price > alto.price) alto = punto;
+      if (punto.price < bajo.price) bajo = punto;
+    });
+
+    const celda = function (rotulo, punto, clase) {
+      return '<span class="tope"><span class="tope__label">' + rotulo + '</span>' +
+        '<strong class="' + clase + '">' + money(punto.price) + '</strong>' +
+        '<span class="sub">' + escapeHtml(diaLargo(punto.day)) + '</span></span>';
+    };
+
+    return '<div class="topes">' +
+      celda('Máximo', alto, 'money-pos') +
+      celda('Mínimo', bajo, 'money-neg') +
+    '</div>';
+  }
+
   function renderPriceModal() {
     const caja = $('price-modal');
     const abierto = state.priceModal;
@@ -4779,7 +4948,7 @@
       ficha.position ? POSITION_NAMES[ficha.position] : null,
       ficha.teamName,
       ficha.points != null ? ficha.points + (ficha.points === 1 ? ' punto' : ' puntos') : null,
-      ficha.owner ? 'de <strong>' + escapeHtml(ficha.owner) + '</strong>' : '<strong>Libre</strong>'
+      ficha.owner ? '<strong>' + escapeHtml(ficha.owner) + '</strong>' : '<strong>Libre</strong>'
     ].filter(Boolean).join(' · ');
 
     caja.hidden = false;
@@ -4807,7 +4976,10 @@
           : '<div class="viz-hover">' +
               lineChart(puntos, 'price', sube ? 'var(--pos)' : 'var(--neg)', 'Valor de mercado',
                 { height: 260, ticks: 7, fullTicks: true, padX: 96, hover: true,
-                  mark: diaLlegada ? { day: diaLlegada, label: llegada.paid == null ? 'reparto' : 'fichaje' } : null }) +
+                  mark: diaLlegada
+                    ? { day: diaLlegada, label: llegada.paid == null ? 'reparto' : 'fichaje',
+                        paid: llegada.paid != null ? llegada.paid : null }
+                    : null }) +
               '<div class="viz-tip" hidden></div>' +
             '</div>' +
             '<p class="muted viz-resumen">De ' + money(primero) + ' a <strong>' + money(ultimo) + '</strong>' +
@@ -4828,7 +5000,9 @@
               return '<div class="viz-periodos">' +
                 '<span class="periodo periodo--dias"><strong>' + puntos.length + ' días</strong></span>' +
                 celdas + '</div>';
-            })())) +
+            })() +
+            /* Lo más alto y lo más bajo que ha llegado a valer, con su fecha. */
+            topesDePrecio(puntos))) +
         (ficha.moves && ficha.moves.length
           ? '<h3 class="bench__title">En la liga</h3>' + playerHistory(ficha)
           : '') +
@@ -5224,6 +5398,10 @@
      Salen del recuento de lances de cada jornada. Los minutos no est\u00e1n:
      Biwenger solo los da en la ficha de cada futbolista, uno a uno. */
   const RANKINGS = [
+    /* Rendimiento por lo que cuesta y forma de las tres ultimas jornadas: los
+       dos que de verdad sirven para decidir fichajes. */
+    { titulo: 'Puntos por millón', campo: 'pointsPerMillion', sufijo: '', decimal: true, minimo: 1 },
+    { titulo: 'En racha',           campo: 'racha',        sufijo: ' pts' },
     { titulo: 'M\u00e1s goles',          campo: 'goals',        sufijo: '' },
     { titulo: 'M\u00e1s asistencias',    campo: 'assists',      sufijo: '' },
     { titulo: 'Goles por partido',  campo: 'goalsPerGame', sufijo: '', decimal: true, minimo: 1 },
@@ -5544,7 +5722,7 @@
     Array.prototype.forEach.call(document.querySelectorAll('[data-panel]'), function (panel) {
       panel.hidden = panel.getAttribute('data-panel') !== name;
     });
-    if (name === 'managers') { renderManagers(); renderSquads(); }
+    if (name === 'managers') { renderManagers(); renderSquads(); renderTandasDeLiga(); }
     if (name === 'fichajes') { renderDataKpis(); renderKpiCharts(); renderSpending(); }
     if (name === 'datos') { ensureSquads(); ensureLaLiga(); ensureRecuento(); renderRankings(); renderRankingsTemporada(); }
     if (name === 'mercado') { ensureMarket(); renderMarket(); renderMovers(); }
@@ -5586,7 +5764,7 @@
     renderLineup();
     renderPlantilla();
     renderWarnings();
-    if (state.tab === 'managers') { renderManagers(); renderSquads(); }
+    if (state.tab === 'managers') { renderManagers(); renderSquads(); renderTandasDeLiga(); }
     if (state.tab === 'fichajes') { renderDataKpis(); renderKpiCharts(); renderSpending(); }
     if (state.tab === 'datos') { ensureSquads(); ensureLaLiga(); ensureRecuento(); renderRankings(); renderRankingsTemporada(); }
     if (state.tab === 'mercado') { renderMarket(); renderMovers(); }
@@ -6185,7 +6363,7 @@
 
     /* La ficha se abre pulsando el nombre del futbolista, esté donde esté. */
     ['moves-body', 'market-body', 'squads-body', 'listings-body',
-     'movers-up', 'movers-down', 'jugadores-body'].forEach(function (id) {
+     'movers-up', 'movers-down', 'jugadores-body', 'squad-body'].forEach(function (id) {
       $(id).addEventListener('click', function (event) { abrirFicha(event.target); });
     });
 

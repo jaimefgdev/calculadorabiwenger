@@ -16,7 +16,7 @@
 <title>Calculadora Biwenger — Presupuestos de la liga</title>
 <!-- El ?v= se sube en cada publicación: obliga al navegador a bajar el archivo
      nuevo en vez de reutilizar el que tenga en caché. -->
-<link rel="stylesheet" href="styles.css?v=141">
+<link rel="stylesheet" href="styles.css?v=143">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>💰</text></svg>">
 </head>
 <body>
@@ -233,6 +233,9 @@
       </span>
     </div>
 
+    <!-- Solo salen si hay algo que arreglar antes de que empiece la jornada. -->
+    <div id="lineup-avisos" class="avisos" hidden></div>
+
     <!-- Campo a la izquierda, suplentes a la derecha. -->
     <div class="lineup-grid">
       <!-- El selector de cambios se dibuja sobre el propio campo. -->
@@ -442,6 +445,15 @@
         </table>
       </div>
     </section>
+  <!-- Quién gana jornadas y quién está en racha. -->
+  <section class="panel">
+    <div class="panel__head">
+      <h2>Cómo va la liga</h2>
+      <p class="muted">Con las jornadas que tengas guardadas.</p>
+    </div>
+    <div class="rankings rankings--dos" id="liga-tandas"></div>
+  </section>
+
     <section class="panel">
       <div class="panel__head">
         <h2>Plantillas</h2>
@@ -566,6 +578,6 @@
 
 </main>
 
-<script src="app.js?v=141"></script>
+<script src="app.js?v=143"></script>
 </body>
 </html>
