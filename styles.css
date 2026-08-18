@@ -1699,10 +1699,9 @@ main.wrap { padding-bottom: 3.5rem; }
 /* «(últimas 3 jornadas)» en pequeño, dentro del propio título. */
 .ranking__matiz { font-size: .72rem; font-weight: 400; color: var(--text-faint); }
 
-/* El título de cada tanda, centrado sobre su lista. Los dos de la pestaña
-   Liga se quedan a la izquierda, como estaban. */
-.ranking__title { text-align: center; }
-.rankings--dos .ranking__title { text-align: left; }
+/* Los títulos de las tandas, a la izquierda: centrados quedaban descolgados
+   de la lista, porque los nombres empiezan pasados el número y las chapas. */
+.ranking__title { text-align: left; }
 
 /* Máximo y mínimo históricos, centrados también. */
 .topes { justify-content: center; }
