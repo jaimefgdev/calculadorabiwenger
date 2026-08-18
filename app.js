@@ -4588,6 +4588,13 @@
    * Abre la ficha del futbolista al que pertenece lo que se ha pulsado. Dice si
    * la ha abierto, para que quien llame pueda parar ahí.
    */
+  /** Ficha con solo las estadísticas, para los rankings de la temporada. */
+  function abrirFichaDeDatos(id, nombre) {
+    state.priceModal = { id: String(id), name: nombre || '', soloDatos: true };
+    ensureEstadisticas(state.priceModal.id);
+    renderPriceModal();
+  }
+
   function abrirFicha(donde) {
     const quien = donde && donde.closest && donde.closest('[data-player-id]');
     if (!quien || !quien.getAttribute('data-player-id')) return false;
@@ -4729,6 +4736,9 @@
         '</div>' +
         '<p class="muted ficha__datos">' + datos + '</p>' +
         (abierto.soloPrecio ? '' : estadisticasDeTemporada(abierto.id) + rachaDeTemporada(abierto.id)) +
+        /* Desde los rankings solo interesan las estadísticas: ni el valor de
+           mercado ni su evolución pintan nada ahí. */
+        (abierto.soloDatos ? '' :
         (puntos.length < 2
           ? '<p class="viz__empty">Todavía no hay evolución de este futbolista.</p>'
           : '<div class="viz-hover">' +
@@ -4755,7 +4765,7 @@
               return '<div class="viz-periodos">' +
                 '<span class="periodo periodo--dias"><strong>' + puntos.length + ' días</strong></span>' +
                 celdas + '</div>';
-            })()) +
+            })())) +
         (ficha.moves && ficha.moves.length
           ? '<h3 class="bench__title">En la liga</h3>' + playerHistory(ficha)
           : '') +
@@ -5052,7 +5062,12 @@
           '</span>' +
           '<strong class="ranking__value">' + valor(jugador) + '</strong>' +
         '</button>' +
-        (abierto ? graficoDePuntos(jugador) : '') +
+        /* En la fila el nombre puede salir cortado; al abrirlo se pone entero. */
+        (abierto
+          ? '<p class="ranking__nombre">' + escapeHtml(jugador.name) +
+              (jugador.teamName ? ' <span class="sub">· ' + escapeHtml(jugador.teamName) + '</span>' : '') +
+            '</p>' + graficoDePuntos(jugador)
+          : '') +
       '</li>';
     }).join('') + '</ol>';
   }
@@ -5226,7 +5241,9 @@
             ? (jugador[ranking.campo] || 0).toFixed(2).replace('.', ',')
             : (jugador[ranking.campo] || 0);
           return '<li class="ranking__row">' +
-            '<span class="ranking__boton ranking__boton--fijo">' +
+            '<button type="button" class="ranking__boton" data-ficha="' +
+              escapeHtml(String(jugador.id)) + '" data-ficha-nombre="' +
+              escapeHtml(jugador.name) + '">' +
               '<span class="ranking__quien">' +
                 '<span class="with-crest">' +
                   playerName({ playerId: jugador.id, player: jugador.name, position: jugador.position }) +
@@ -5234,7 +5251,7 @@
                 '</span>' +
               '</span>' +
               '<strong class="ranking__value">' + valor + '</strong>' +
-            '</span>' +
+            '</button>' +
           '</li>';
         }).join('') + '</ol>' +
       '</div>';
@@ -6015,6 +6032,17 @@
     });
 
     /* En las clasificaciones de futbolistas, cada uno abre su gráfico. */
+    /* Los rankings de la temporada abren la ficha del futbolista con sus
+       estadísticas, sin el gráfico de valor de mercado. */
+    const tandas = $('rankings-temporada');
+    if (tandas) {
+      tandas.addEventListener('click', function (event) {
+        const boton = event.target.closest('[data-ficha]');
+        if (!boton) return;
+        abrirFichaDeDatos(boton.getAttribute('data-ficha'), boton.getAttribute('data-ficha-nombre'));
+      });
+    }
+
     ['rankings-jugadores', 'rankings-laliga', 'ambitos-nuestra', 'ambitos-laliga'].forEach(function (id) {
       $(id).addEventListener('click', function (event) {
         const mando = event.target.closest('[data-ambito], [data-puesto]');

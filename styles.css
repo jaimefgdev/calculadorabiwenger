@@ -165,11 +165,7 @@ code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft)
   #panel-inicio .market-grid { gap: .8rem; }
   #panel-inicio .market-grid .panel { padding: .9rem; }
 }
-/* En el móvil la página se sirve con ancho forzado de 1024 px (vista de
-   escritorio escalada), y ahí las dos tablas del mercado no caben una al lado
-   de la otra: pedían unos 50 px más de los que tenían y salía la barra de
-   desplazamiento. Por debajo de 1120 px van una debajo de otra. */
-@media (max-width: 1120px) { #panel-inicio .market-grid { grid-template-columns: 1fr; } }
+@media (max-width: 720px) { #panel-inicio .market-grid { grid-template-columns: 1fr; } }
 /* Apiladas solo cuando la pantalla es de verdad estrecha. */
 @media (max-width: 720px) {
   .market-grid { grid-template-columns: 1fr; }
@@ -1104,13 +1100,27 @@ code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft)
   .table thead th { font-size: .62rem; letter-spacing: .01em; }
   .avatar { width: 22px; height: 22px; font-size: .62rem; }
   .manager { gap: .4rem; min-width: 0; }
-  /* En las tablas de mi mercado cada píxel cuenta: van de dos en dos. */
-  .market-grid .table { font-size: .7rem; }
-  .market-grid .table th, .market-grid .table td { padding: .4rem .25rem; }
-  .market-grid .pic-player { width: 20px; height: 20px; }
-  .market-grid .switch { width: 30px; height: 17px; }
-  .market-grid .switch span { width: 11px; }
-  .market-grid .switch[aria-pressed="true"] span { transform: translateX(13px); }
+  /* En las tablas de mi mercado cada píxel cuenta: van de dos en dos, y en el
+     móvil la página se sirve a 1024 px forzados (vista de escritorio), así que
+     el sitio real es la mitad de eso. Medido ahí: con estos tamaños entran las
+     dos enteras sin barra de desplazamiento. */
+  .market-grid .table { font-size: .62rem; }
+  .market-grid .table th, .market-grid .table td { padding: .35rem .12rem; }
+  .market-grid .pic-player { width: 18px; height: 18px; }
+  .market-grid .crest--badge { width: 12px; height: 12px; }
+  .market-grid .with-crest { gap: .2rem; }
+  .market-grid .delta { font-size: .58rem; }
+  .market-grid .puestos--fila { width: 32px; margin-right: .12rem; }
+  .market-grid .puestos--fila .puesto { padding: .25em .18em .14em; font-size: .46rem; }
+  .market-grid .switch { width: 24px; height: 15px; }
+  .market-grid .switch span { width: 9px; height: 9px; }
+  .market-grid .switch[aria-pressed="true"] span { transform: translateX(11px); }
+  /* El mercado grande, en el ancho de 1024 del móvil, se pasaba por poco. */
+  .table--market th, .table--market td { padding-inline: .2rem; }
+  .table--market .pujado { font-size: .7rem; margin-right: .25rem; }
+  .table--market .ambito--pujar { padding: .16rem .5rem; font-size: .68rem; }
+  .table--market .spark-cell { width: 74px; }
+  .table--market td:nth-child(2), .table--market th:nth-child(2) { max-width: 150px; }
   .manager__name {
     /* Enteros también aquí: en vez de cortarlos, se aprieta la letra. */
     font-size: .92em;
@@ -1623,6 +1633,12 @@ main.wrap { padding-bottom: 3.5rem; }
 .table--squad .estado-cell { text-align: center; }
 #squad-panel .table-scroll { overflow-x: auto; }
 @media (max-width: 940px) { #squad-panel .table-scroll { overflow-x: hidden; } }
+
+/* El nombre entero encima del gráfico de puntos: en la fila puede ir cortado. */
+.ranking__nombre {
+  margin: .1rem .2rem .3rem; font-size: .82rem; font-weight: 620;
+}
+.ranking__nombre .sub { font-weight: 400; }
 
 /* Solo para lectores de pantalla. */
 .sr-only {
