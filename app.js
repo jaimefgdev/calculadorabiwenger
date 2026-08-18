@@ -2463,14 +2463,37 @@
     return o.direction === 'out' && String(o.playerId) === String(id);
   })[0];
 
+  /**
+   * Lo que te queda de puja máxima. Las pujas que ya has enviado están
+   * comprometidas: si ganas dos, pagas las dos, así que se descuentan. La del
+   * futbolista que estás mirando no cuenta, porque cambiarla la sustituye.
+   *
+   * Las que tengas marcadas en el simulador ya las resta `simulation()`.
+   */
+  function topeDePuja(playerId) {
+    const cuentas = simulation();
+    if (cuentas.maxBid == null) return { tope: null, comprometido: 0 };
+
+    const comprometido = pujasEnviadas().reduce(function (suma, oferta) {
+      if (state.sim[oferta.id]) return suma;                       // ya descontada
+      if (playerId != null && String(oferta.playerId) === String(playerId)) return suma;
+      return suma + oferta.amount;
+    }, 0);
+
+    return { tope: cuentas.maxBid - comprometido, comprometido: comprometido, cuentas: cuentas };
+  }
+
   /** Diálogo de puja: dice lo que vale, lo que piden y hasta dónde puedes. */
   function abrirPuja(playerId) {
     const venta = ventaDe(playerId);
     if (!venta) return;
-    const cuentas = simulation();
     const mia = miPujaPor(playerId);
+    const limite = topeDePuja(playerId);
+    const cuentas = limite.cuentas || simulation();
     /* Si ya pujaste, se parte de tu puja; si no, del precio que piden. */
     const partida = mia ? mia.amount : (venta.price || venta.marketValue || 0);
+    /* En rojo cuando no da para lo que piden por él. */
+    const corto = limite.tope != null && limite.tope < (venta.price || 0);
 
     abrirOpModal(
       '<div class="op-card__cab">' +
@@ -2484,8 +2507,12 @@
         '<div><dt>' + (venta.free ? 'Precio de salida' : 'Pide ' + escapeHtml(venta.seller)) +
           '</dt><dd>' + money(venta.price || 0) + '</dd></div>' +
         '<div><dt>Tu saldo</dt><dd>' + money(cuentas.balance || 0) + '</dd></div>' +
-        '<div><dt>Tu puja máxima</dt><dd><strong>' +
-          (cuentas.maxBid == null ? '\u2014' : money(cuentas.maxBid)) + '</strong></dd></div>' +
+        '<div><dt>Tu puja máxima</dt><dd><strong' + (corto ? ' class="money-neg"' : '') + '>' +
+          (limite.tope == null ? '\u2014' : money(limite.tope)) + '</strong></dd></div>' +
+        (limite.comprometido
+          ? '<div><dt>En pujas enviadas</dt><dd class="money-neg">\u2212' +
+            money(limite.comprometido) + '</dd></div>'
+          : '') +
         (mia ? '<div><dt>Tu puja de ahora</dt><dd><strong class="money-neg">' +
           money(mia.amount) + '</strong></dd></div>' : '') +
       '</dl>' +
@@ -2511,9 +2538,10 @@
     const importe = Math.round(Number(campo.value));
     if (!(importe > 0)) { opAviso('Pon una cantidad.', true); return; }
 
-    const cuentas = simulation();
-    if (cuentas.maxBid != null && importe > cuentas.maxBid) {
-      opAviso('Eso pasa de tu puja máxima (' + money(cuentas.maxBid) + ').', true);
+    const limite = topeDePuja(playerId);
+    if (limite.tope != null && importe > limite.tope) {
+      opAviso('Eso pasa de tu puja máxima (' + money(limite.tope) +
+        (limite.comprometido ? ', ya con las pujas que tienes enviadas' : '') + ').', true);
       return;
     }
 

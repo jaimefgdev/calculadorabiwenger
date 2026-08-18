@@ -165,7 +165,11 @@ code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft)
   #panel-inicio .market-grid { gap: .8rem; }
   #panel-inicio .market-grid .panel { padding: .9rem; }
 }
-@media (max-width: 720px) { #panel-inicio .market-grid { grid-template-columns: 1fr; } }
+/* En el móvil la página se sirve con ancho forzado de 1024 px (vista de
+   escritorio escalada), y ahí las dos tablas del mercado no caben una al lado
+   de la otra: pedían unos 50 px más de los que tenían y salía la barra de
+   desplazamiento. Por debajo de 1120 px van una debajo de otra. */
+@media (max-width: 1120px) { #panel-inicio .market-grid { grid-template-columns: 1fr; } }
 /* Apiladas solo cuando la pantalla es de verdad estrecha. */
 @media (max-width: 720px) {
   .market-grid { grid-template-columns: 1fr; }
@@ -1300,7 +1304,7 @@ code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft)
 /* Hueco fijo: así la cara y el nombre empiezan en la misma vertical en todas
    las filas, lleven una demarcación o tres. */
 .puestos--fila {
-  width: 44px; flex: none; justify-content: flex-start;
+  width: 50px; flex: none; justify-content: flex-start;
   margin-right: .25rem; vertical-align: middle;
 }
 .puestos--fila .puesto { flex: none; padding: .25em .4em .14em; font-size: .56rem; }
