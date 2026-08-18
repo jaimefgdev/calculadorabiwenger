@@ -3298,13 +3298,32 @@
     xiValue: function (row) { return row.xiValue || 0; }
   };
 
+  /**
+   * Con qué columna se ordena si no has tocado ninguna cabecera: en las
+   * jornadas por jugar los puntos son todo ceros y no dicen nada, así que
+   * manda la general; en las que están en juego o ya jugadas, la jornada.
+   */
+  function ordenDeJornada(filas) {
+    if (state.sort.roundsManual) return state.sort.rounds;
+    const jugada = (filas || []).some(function (fila) { return (fila.points || 0) !== 0; });
+    return { key: jugada ? 'points' : 'general', dir: -1 };
+  }
+
   function sortJornada(filas) {
-    const sort = state.sort.rounds;
+    const sort = ordenDeJornada(filas);
     const valor = ROUND_VALUES[sort.key] || ROUND_VALUES.points;
     return filas.slice().sort(function (a, b) {
       const x = valor(a);
       const y = valor(b);
-      if (x === y) return (a.name || '').localeCompare(b.name || '');
+      if (x === y) {
+        /* Empate a puntos: manda el puesto que les da Biwenger. Sus criterios
+           de desempate no los publica, así que no se inventa ninguno: se
+           respeta su orden y, si no lo diera, va por nombre. */
+        const pa = a.position != null ? a.position : 99;
+        const pb = b.position != null ? b.position : 99;
+        if (pa !== pb) return pa - pb;
+        return (a.name || '').localeCompare(b.name || '');
+      }
       if (typeof x === 'string') return sort.dir * x.localeCompare(y);
       return sort.dir * (x < y ? -1 : 1);
     });
@@ -3943,7 +3962,8 @@
   }
 
   function updateRoundHeaders() {
-    const sort = state.sort.rounds;
+    const jornada = jornadaActiva();
+    const sort = ordenDeJornada(jornada ? jornada.standings : []);
     Array.prototype.forEach.call(document.querySelectorAll('[data-round-sort]'), function (th) {
       const key = th.getAttribute('data-round-sort');
       th.setAttribute('aria-sort', key !== sort.key ? 'none' : (sort.dir === 1 ? 'ascending' : 'descending'));
@@ -6144,8 +6164,10 @@
       if (!th) return;
       const key = th.getAttribute('data-round-sort');
       const sort = state.sort.rounds;
-      if (sort.key === key) sort.dir = -sort.dir;
+      if (state.sort.roundsManual && sort.key === key) sort.dir = -sort.dir;
       else { sort.key = key; sort.dir = key === 'name' ? 1 : -1; }
+      /* A partir de aquí manda lo que hayas elegido tú. */
+      state.sort.roundsManual = true;
       renderJornadas();
     });
 
