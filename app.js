@@ -2530,20 +2530,35 @@
     }, 'Puja de ' + money(importe) + ' por ' + venta.player + (mia ? ' cambiada.' : ' enviada.'));
   }
 
-  /** Renovar la venta de uno de los tuyos: mismo precio u otro. */
+  /**
+   * Poner en venta, cambiar el precio o renovarla: es el mismo diálogo. Los
+   * datos salen del mercado si ya está puesto y, si no, de tu plantilla.
+   */
   function abrirRenovar(playerId) {
-    const venta = ventaDe(playerId);
+    const enMercado = ventaDe(playerId);
+    const mio = miJugador(playerId);
+    const listado = miVentaDe(playerId);
+    const venta = enMercado || (mio ? {
+      playerId: String(mio.id), player: mio.name,
+      marketValue: mio.marketValue,
+      price: listado ? listado.price : mio.marketValue
+    } : null);
     if (!venta) return;
+
+    const yaEstaba = !!(enMercado || listado);
 
     abrirOpModal(
       '<div class="op-card__cab">' +
-        '<h3 id="op-modal-titulo">Renovar la venta de ' + escapeHtml(venta.player) + '</h3>' +
+        '<h3 id="op-modal-titulo">' + (yaEstaba ? 'Cambiar la venta de ' : 'Poner en venta a ') +
+          escapeHtml(venta.player) + '</h3>' +
         '<button type="button" class="btn btn--ghost btn--close" data-op-cerrar' +
           ' title="Cerrar" aria-label="Cerrar">\u2715</button>' +
       '</div>' +
       '<dl class="op-datos">' +
         '<div><dt>Valor de mercado</dt><dd>' + money(venta.marketValue || 0) + '</dd></div>' +
-        '<div><dt>Precio de ahora</dt><dd><strong>' + money(venta.price || 0) + '</strong></dd></div>' +
+        (yaEstaba
+          ? '<div><dt>Precio de ahora</dt><dd><strong>' + money(venta.price || 0) + '</strong></dd></div>'
+          : '') +
       '</dl>' +
       '<label class="op-importe"><span>Precio nuevo</span>' +
         '<input type="number" id="op-importe" inputmode="numeric" step="100000" min="0"' +
@@ -2551,7 +2566,8 @@
       '<p class="op-aviso"></p>' +
       '<div class="op-botones">' +
         '<button type="button" class="btn btn--ghost" data-op-mismo="' +
-          escapeHtml(String(venta.playerId)) + '">Repetir precio</button>' +
+          escapeHtml(String(venta.playerId)) + '">' +
+          (yaEstaba ? 'Repetir precio' : 'Valor de mercado') + '</button>' +
         '<button type="button" class="btn btn--primary" data-op-vender="' +
           escapeHtml(String(venta.playerId)) + '">Aceptar</button>' +
       '</div>');
@@ -2561,16 +2577,21 @@
   }
 
   function mandarVenta(playerId, precio) {
+    const mio = miJugador(playerId);
     const venta = ventaDe(playerId);
-    if (!venta || !(precio > 0)) { opAviso('Pon un precio.', true); return; }
-    opAviso('Renovando la venta\u2026');
-    lanzarOperacion({ accion: 'vender', player: playerId, price: precio, rechazar: true },
-      venta.player + ' sigue en venta por ' + money(precio) + '.');
+    const quien = (venta && venta.player) || (mio && mio.name) || 'El futbolista';
+    if (!(precio > 0)) { opAviso('Pon un precio.', true); return; }
+
+    const yaEstaba = !!(venta || miVentaDe(playerId));
+    opAviso(yaEstaba ? 'Cambiando la venta\u2026' : 'Poniéndolo en el mercado\u2026');
+    lanzarOperacion({ accion: 'vender', player: playerId, price: precio, rechazar: yaEstaba },
+      quien + ' en venta por ' + money(precio) + '.');
   }
 
   /** Quitarlo del mercado, con su confirmación. */
   function abrirQuitar(playerId) {
-    const venta = ventaDe(playerId);
+    const mio = miJugador(playerId);
+    const venta = ventaDe(playerId) || (mio ? { playerId: String(mio.id), player: mio.name } : null);
     if (!venta) return;
 
     abrirOpModal(
@@ -2862,6 +2883,18 @@
     const pastilla = $('btn-ofertas');
     if (pastilla) pastilla.addEventListener('click', abrirOfertas);
 
+    const plantilla = $('squad-body');
+    if (plantilla) {
+      plantilla.addEventListener('click', function (event) {
+        const vender = event.target.closest('[data-vender]');
+        if (vender) { abrirRenovar(vender.getAttribute('data-vender')); return; }
+        const quitar = event.target.closest('[data-quitar]');
+        if (quitar) { abrirQuitar(quitar.getAttribute('data-quitar')); return; }
+        const ofertas = event.target.closest('[data-ofertas-de]');
+        if (ofertas) { abrirOfertas(); return; }
+      });
+    }
+
     const enviar = $('lineup-enviar');
     if (enviar) enviar.addEventListener('click', abrirEnviarOnce);
 
@@ -2894,8 +2927,10 @@
       const mismo = event.target.closest('[data-op-mismo]');
       if (mismo) {
         const cual = mismo.getAttribute('data-op-mismo');
-        const suya = ventaDe(cual);
-        mandarVenta(cual, suya ? suya.price : 0);
+        const suya = ventaDe(cual) || miVentaDe(cual);
+        const mio = miJugador(cual);
+        const precio = suya ? suya.price : (mio ? mio.marketValue : 0);
+        mandarVenta(cual, precio);
         return;
       }
 
@@ -2925,6 +2960,86 @@
     document.addEventListener('keydown', function (event) {
       if (event.key === 'Escape' && !caja.hidden) cerrarOpModal();
     });
+  }
+
+  /* ---------- Mi plantilla ---------- */
+
+  /** Uno de los míos, por su id. */
+  const miJugador = (id) => mySquad().filter(function (j) {
+    return String(j.id) === String(id);
+  })[0];
+
+  /** Lo que tengo puesto en venta de ese futbolista, si es que lo está. */
+  const miVentaDe = (id) => (state.listings || []).filter(function (item) {
+    return String(item.playerId) === String(id);
+  })[0];
+
+  /** Ofertas recibidas por él, de mayor a menor. */
+  const ofertasPor = (id) => state.offers.filter(function (o) {
+    return o.direction === 'in' && String(o.playerId) === String(id);
+  }).sort(function (a, b) { return b.amount - a.amount; });
+
+  function renderPlantilla() {
+    const seccion = $('squad-panel');
+    const cuerpo = $('squad-body');
+    if (!seccion || !cuerpo) return;
+
+    const plantilla = mySquad();
+    if (!plantilla.length) { seccion.hidden = true; return; }
+    seccion.hidden = false;
+
+    /* Por demarcación —portero, defensas, medios, delanteros— y dentro de cada
+       una, el que más vale primero. */
+    const lista = plantilla.slice().sort(function (a, b) {
+      return ((a.position || 9) - (b.position || 9)) ||
+        ((b.marketValue || 0) - (a.marketValue || 0)) ||
+        String(a.name || '').localeCompare(String(b.name || ''), 'es');
+    });
+
+    cuerpo.innerHTML = lista.map(function (jugador) {
+      const venta = miVentaDe(jugador.id);
+      const ofertas = ofertasPor(jugador.id);
+      const mejor = ofertas[0];
+      const sube = (jugador.increment || 0) > 0;
+
+      return '<tr' + (venta ? ' class="row-mine"' : '') + '>' +
+        '<td data-label="Futbolista"><span class="with-crest">' +
+          playerName({ playerId: jugador.id, player: jugador.name,
+            position: jugador.position, altPositions: jugador.altPositions }) +
+          crestOf(jugador, 'crest--badge') + '</span></td>' +
+        '<td class="num" data-label="Puntos">' +
+          (jugador.points == null ? '<span class="sub">—</span>' : jugador.points) + '</td>' +
+        '<td class="estado-cell" data-label="Estado">' + statusCell(jugador) + '</td>' +
+        '<td class="num" data-label="Valor"><strong>' + money(jugador.marketValue || 0) + '</strong></td>' +
+        '<td class="num" data-label="Hoy">' + (jugador.increment
+          ? '<span class="delta ' + (sube ? 'delta--up' : 'delta--down') + '">' +
+            (sube ? '▲ +' : '▼ −') + money(Math.abs(jugador.increment)) + '</span>'
+          : '<span class="delta delta--igual">– ' + money(0) + '</span>') + '</td>' +
+        '<td class="num" data-label="En venta">' + (venta
+          ? '<strong>' + money(venta.price) + '</strong>'
+          : '<span class="sub">—</span>') + '</td>' +
+        '<td data-label="Ofertas">' + (mejor
+          ? '<button type="button" class="btn btn--sm btn--ok" data-ofertas-de="' +
+            escapeHtml(String(jugador.id)) + '" title="Ver las ofertas por ' +
+            escapeHtml(jugador.name) + '">' + money(mejor.amount) +
+            (ofertas.length > 1 ? ' (' + ofertas.length + ')' : '') + '</button>'
+          : '<span class="sub">—</span>') + '</td>' +
+        '<td class="col-pujar">' + (venta
+          ? '<button type="button" class="ambito ambito--pujar" data-vender="' +
+              escapeHtml(String(jugador.id)) + '">Cambiar</button>' +
+            '<button type="button" class="btn btn--sm btn--no" data-quitar="' +
+              escapeHtml(String(jugador.id)) + '" title="Quitar del mercado">\u2715</button>'
+          : '<button type="button" class="ambito ambito--pujar" data-vender="' +
+              escapeHtml(String(jugador.id)) + '">Vender</button>') + '</td>' +
+      '</tr>';
+    }).join('');
+
+    const enVenta = lista.filter(function (j) { return !!miVentaDe(j.id); }).length;
+    const valor = lista.reduce(function (suma, j) { return suma + (j.marketValue || 0); }, 0);
+    $('squad-count').textContent = lista.length + ' futbolistas · ' + money(valor) +
+      (enVenta ? ' · ' + enVenta + (enVenta === 1 ? ' en venta' : ' en venta') : '');
+
+    ajustarNombres();
   }
 
   /* ---------- Suben y bajan hoy ---------- */
@@ -5315,6 +5430,7 @@
     renderListings();
     renderRound();
     renderLineup();
+    renderPlantilla();
     renderWarnings();
     if (state.tab === 'managers') { renderManagers(); renderSquads(); }
     if (state.tab === 'fichajes') { renderDataKpis(); renderKpiCharts(); renderSpending(); }

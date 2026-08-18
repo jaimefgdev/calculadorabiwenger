@@ -16,7 +16,7 @@
 <title>Calculadora Biwenger — Presupuestos de la liga</title>
 <!-- El ?v= se sube en cada publicación: obliga al navegador a bajar el archivo
      nuevo en vez de reutilizar el que tenga en caché. -->
-<link rel="stylesheet" href="styles.css?v=131">
+<link rel="stylesheet" href="styles.css?v=132">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>💰</text></svg>">
 </head>
 <body>
@@ -244,6 +244,31 @@
         <h3 class="bench__title">Suplentes</h3>
         <div id="bench" class="bench"></div>
       </div>
+    </div>
+  </section>
+
+  <!-- ============ MI PLANTILLA ============ -->
+  <section id="squad-panel" class="panel" hidden>
+    <div class="panel__head">
+      <h2>Mi plantilla</h2>
+      <p class="muted" id="squad-count">&nbsp;</p>
+    </div>
+    <div class="table-scroll">
+      <table class="table table--squad">
+        <thead>
+          <tr>
+            <th>Futbolista</th>
+            <th class="num">Puntos</th>
+            <th>Estado</th>
+            <th class="num">Valor</th>
+            <th class="num" title="Lo que ha subido o bajado hoy">Hoy</th>
+            <th class="num" title="Precio al que lo tienes en venta">En venta</th>
+            <th title="Ofertas recibidas por él">Ofertas</th>
+            <th class="col-pujar"><span class="sr-only">Acciones</span></th>
+          </tr>
+        </thead>
+        <tbody id="squad-body"></tbody>
+      </table>
     </div>
   </section>
 
@@ -541,6 +566,6 @@
 
 </main>
 
-<script src="app.js?v=131"></script>
+<script src="app.js?v=132"></script>
 </body>
 </html>
