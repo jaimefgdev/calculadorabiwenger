@@ -1585,8 +1585,10 @@ main.wrap { padding-bottom: 3.5rem; }
 .tag--free { background: var(--bg-surface); color: var(--text-soft); }
 
 /* Minigráfica de la evolución del precio de un futbolista. */
-.spark { display: inline-block; line-height: 0; }
-.spark svg { display: block; }
+/* El gráfico se dibuja a 76 px pero se adapta al hueco que tenga: así en el
+   móvil se encoge en vez de salirse de su celda. */
+.spark { display: inline-block; line-height: 0; max-width: 100%; }
+.spark svg { display: block; width: 100%; height: auto; }
 .spark-cell { width: 1%; padding-block: .15rem !important; }
 /* En pantallas muy estrechas la ficha ya va justa: la minigráfica se retira. */
 @media (max-width: 560px) {
@@ -2039,7 +2041,11 @@ main.wrap { padding-bottom: 3.5rem; }
 /* Con la tabla apilada (móviles estrechos de verdad), los anchos fijos de
    algunas columnas sobran: cada celda ocupa su fila entera. */
 @media (max-width: 940px) {
-  .table td, .table th { width: auto !important; max-width: none !important; }
+  /* El detalle de plantilla queda fuera: es una tabla de verdad, no apilada,
+     y necesita sus anchos para que quepan todas sus columnas. */
+  .table:not(.detail-table) td, .table:not(.detail-table) th {
+    width: auto !important; max-width: none !important;
+  }
   .table td { min-width: 0; flex-wrap: wrap; }
   .table--market .spark-cell { width: auto !important; }
   /* Y los nombres largos parten de línea: aquí no hay a dónde encogerlos. */
@@ -2083,4 +2089,73 @@ main.wrap { padding-bottom: 3.5rem; }
   .table--listings .switch { width: 22px; height: 14px; }
   .table--listings .switch span { width: 8px; height: 8px; }
   .table--listings .switch[aria-pressed="true"] span { transform: translateX(10px); }
+}
+
+/* ---------- La plantilla desplegada, ajustada a cualquier ancho ----------
+   Es una tabla dentro de otra y no se apila, así que en pantallas estrechas
+   se pasaba y cortaba «Evolución» y «Diferencia». Se aprieta hasta que entra:
+   la letra, el relleno, el gráfico y las caras. */
+.detail-table { table-layout: auto; }
+.detail-table td, .detail-table th { overflow: hidden; }
+/* Las cabeceras del detalle son celdas de tabla, no bloques: la regla de las
+   cabeceras ordenables las convertía en «inline-block» y descuadraba el
+   reparto de columnas en el móvil. */
+.detail-table thead th, .detail-table thead th.sortable { display: table-cell; }
+
+@media (max-width: 1180px) {
+  .detail-table { font-size: .74rem; }
+  .detail-table td, .detail-table thead th { padding: .25rem .25rem; }
+  .detail-table .pic-player { width: 20px; height: 20px; }
+  .detail-table .crest--badge { width: 13px; height: 13px; }
+  .detail-table .spark-cell { width: 62px; }
+  .detail-table .spark { width: 60px; }
+  .detail-table .delta { font-size: .64rem; }
+  .detail-table .puestos--fila { width: 34px; margin-right: .12rem; }
+  .detail-table .puestos--fila .puesto { font-size: .44rem; padding: .25em .16em .14em; }
+}
+
+@media (max-width: 900px) {
+  .detail-table { font-size: .68rem; }
+  .detail-table td, .detail-table thead th { padding: .22rem .18rem; }
+  .detail-table .pic-player { width: 18px; height: 18px; }
+  .detail-table .spark-cell, .detail-table .spark { width: 48px; }
+  /* «Método» y «Desde» son lo primero que sobra cuando falta sitio. Con
+     `thead`/`tbody` delante para ganarle a la regla de las cabeceras
+     ordenables, que si no las vuelve a mostrar. */
+  .detail-table thead th:nth-child(5), .detail-table tbody td:nth-child(5),
+  .detail-table thead th:nth-child(6), .detail-table tbody td:nth-child(6) { display: none; }
+}
+
+@media (max-width: 620px) {
+  .detail-table { font-size: .62rem; }
+  .detail-table .spark-cell, .detail-table .spark { width: 40px; }
+  /* Y después, el estado. */
+  .detail-table thead th:nth-child(3), .detail-table tbody td:nth-child(3) { display: none; }
+}
+
+/* En pantallas de teléfono la tabla se queda con lo imprescindible: quién,
+   cuánto vale, cómo va y cuánto ha cambiado. La demarcación y los puntos se
+   ven en la plantilla de arriba, así que aquí sobran. */
+@media (max-width: 520px) {
+  .detail-table { font-size: .58rem; }
+  .detail-table td, .detail-table thead th { padding: .2rem .12rem; }
+  .detail-table thead th:nth-child(1), .detail-table tbody td:nth-child(1),
+  .detail-table thead th:nth-child(4), .detail-table tbody td:nth-child(4) { display: none; }
+  .detail-table .spark-cell, .detail-table .spark { width: 34px; }
+  .detail-table .pic-player { width: 16px; height: 16px; }
+  .detail-table .crest--badge { width: 11px; height: 11px; }
+  .detail-table .puestos--fila { width: 26px; }
+  .detail-table .delta { font-size: .56rem; }
+  /* Los rótulos largos parten en dos líneas antes que ensanchar la tabla. */
+  .detail-table thead th { white-space: normal; line-height: 1.15; }
+  .detail-table .player-name { white-space: normal; overflow-wrap: anywhere; }
+  /* Y el detalle pega menos margen a los lados, que ahí se iban 29 px. */
+  .detail { padding-inline: .35rem; }
+  /* Cabe con el reparto natural: solo hay que dejar que el nombre pase a dos
+     líneas en vez de empujar la tabla a lo ancho. */
+  .detail-table .with-crest { flex-wrap: wrap; row-gap: 0; }
+  .detail-table .spark-cell, .detail-table .spark { width: 30px; }
+  /* Los dos últimos píxeles salen del rótulo largo de la columna de valor. */
+  .detail-table thead th { font-size: .54rem; letter-spacing: 0; }
+  .detail-table td, .detail-table thead th { padding: .2rem .08rem; }
 }
