@@ -4186,22 +4186,34 @@
     lesion: '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M9.6 3h4.8v6.6H21v4.8h-6.6V21H9.6v-6.6H3V9.6h6.6z"/></svg>',
     /* Silbato del árbitro, para el penalti cometido. */
     silbato: '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M2 9.5A2.5 2.5 0 0 1 4.5 7H12l4.4-3.2a1 1 0 0 1 1.6.8V7h2a2 2 0 0 1 2 2v1.5a2 2 0 0 1-2 2h-1.2A6.3 6.3 0 1 1 6 9.3H4.5A2.5 2.5 0 0 1 2 9.5zm10 1.8a4.2 4.2 0 1 0 0 8.4 4.2 4.2 0 0 0 0-8.4zm0 2.2a2 2 0 1 1 0 4 2 2 0 0 1 0-4z"/></svg>',
+    /* Al palo: la escuadra de la portería con el balón rebotando. */
+    palo: '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M3 3h2.4v18H3zM3 3h14v2.4H3z"/><circle cx="15" cy="14" r="4" fill="currentColor"/></svg>',
+    /* Penalti parado: el guante del portero. */
+    guante: '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M6 10V5.5a1.6 1.6 0 0 1 3.2 0V9h.9V4a1.6 1.6 0 0 1 3.2 0v5h.9V5.4a1.6 1.6 0 0 1 3.2 0V13a7 7 0 0 1-7 7 7 7 0 0 1-7-7v-1.6a1.6 1.6 0 0 1 2.6-1.3z"/></svg>',
     /* La A de asistencia, dibujada para que quede clavada en el círculo. */
     asist: '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 3.5l6.4 17h-3.6l-1.2-3.6H10.4L9.2 20.5H5.6L12 3.5zm0 5.6l-1.2 4.4h2.4L12 9.1z"/></svg>'
   };
 
+  /* Los números son los de Biwenger, sacados de su propio código: antes había
+     tipos sin identificar que salían como «Lance 10». */
   const LANCES = {
-    1:  { dibujo: 'balon',   clase: 'lance--gol',      nombre: 'Gol' },
-    2:  { dibujo: 'balon',   clase: 'lance--penalti',  nombre: 'Gol de penalti' },
-    3:  { dibujo: 'asist',   clase: 'lance--asist',    nombre: 'Asistencia' },
-    4:  { dibujo: 'sale',    clase: 'lance--sale',     nombre: 'Sale' },
-    5:  { dibujo: 'entra',   clase: 'lance--entra',    nombre: 'Entra' },
-    6:  { icono: '',         clase: 'lance--amarilla', nombre: 'Tarjeta amarilla' },
-    7:  { icono: '',         clase: 'lance--roja',     nombre: 'Tarjeta roja' },
-    14: { dibujo: 'lesion',  clase: 'lance--lesion',   nombre: 'Lesi\u00f3n' },
-    16: { dibujo: 'silbato', clase: 'lance--fallo',    nombre: 'Penalti cometido' },
-    /* Penalti fallado: el balón con el punto rojo. */
-    17: { dibujo: 'balon',   clase: 'lance--penfallado', nombre: 'Penalti fallado' }
+    1:  { dibujo: 'balon',   clase: 'lance--gol',       nombre: 'Gol' },
+    2:  { dibujo: 'balon',   clase: 'lance--penalti',   nombre: 'Gol de penalti' },
+    3:  { dibujo: 'asist',   clase: 'lance--asist',     nombre: 'Asistencia' },
+    4:  { dibujo: 'sale',    clase: 'lance--sale',      nombre: 'Sale' },
+    5:  { dibujo: 'entra',   clase: 'lance--entra',     nombre: 'Entra' },
+    6:  { icono: '',         clase: 'lance--amarilla',  nombre: 'Tarjeta amarilla' },
+    7:  { icono: '',         clase: 'lance--roja',      nombre: 'Tarjeta roja' },
+    8:  { icono: '',         clase: 'lance--doble',     nombre: 'Roja por doble amarilla' },
+    9:  { dibujo: 'balon',   clase: 'lance--propia',    nombre: 'Gol en propia' },
+    10: { dibujo: 'palo',    clase: 'lance--palo',      nombre: 'Al palo' },
+    11: { dibujo: 'balon',   clase: 'lance--penfallado', nombre: 'Penalti fallado' },
+    12: { dibujo: 'guante',  clase: 'lance--parado',    nombre: 'Penalti parado' },
+    13: { dibujo: 'balon',   clase: 'lance--anulado',   nombre: 'Gol anulado' },
+    14: { dibujo: 'lesion',  clase: 'lance--lesion',    nombre: 'Lesi\u00f3n' },
+    15: { dibujo: 'balon',   clase: 'lance--penalti',   nombre: 'Gol en la tanda de penaltis' },
+    16: { dibujo: 'silbato', clase: 'lance--fallo',     nombre: 'Penalti cometido' },
+    17: { dibujo: 'balon',   clase: 'lance--penfallado', nombre: 'Penalti fallado en la tanda' }
   };
 
   /** El dibujo de un lance, o su carácter si no lo tiene (las tarjetas). */
@@ -4230,7 +4242,10 @@
     });
 
     /* Por importancia, no por minuto: primero lo que se recuerda del partido. */
-    const ORDEN = { 1: 0, 2: 1, 17: 2, 3: 3, 6: 4, 7: 5, 16: 6, 14: 7, 5: 8, 4: 9 };
+    const ORDEN = {
+      1: 0, 2: 1, 15: 2, 9: 3, 13: 4, 11: 5, 17: 6, 12: 7, 10: 8,
+      3: 9, 6: 10, 8: 11, 7: 12, 16: 13, 14: 14, 5: 15, 4: 16
+    };
     grupos.sort(function (a, b) {
       const x = ORDEN[a.type] != null ? ORDEN[a.type] : 50;
       const y = ORDEN[b.type] != null ? ORDEN[b.type] : 50;

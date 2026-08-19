@@ -1435,8 +1435,8 @@ code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft)
   margin-top: .1rem; z-index: 3;
 }
 .pitch__lances .lance, .bench__lances .lance { width: 13px; height: 13px; font-size: .52rem; }
-.pitch__lances .lance--amarilla, .pitch__lances .lance--roja,
-.bench__lances .lance--amarilla, .bench__lances .lance--roja { width: 9px; height: 12px; }
+.pitch__lances .lance--amarilla, .pitch__lances .lance--roja, .pitch__lances .lance--doble,
+.bench__lances .lance--amarilla, .bench__lances .lance--roja, .bench__lances .lance--doble { width: 9px; height: 12px; }
 /* Los dos campos de un partido, uno al lado del otro. */
 .alineaciones .pitch-wrap { margin-top: .3rem; }
 /* Los suplentes, de tres en tres: con cuatro se aprietan demasiado. */
@@ -2329,3 +2329,29 @@ main.wrap { padding-bottom: 3.5rem; }
 #budget-panel:has(#budget-cuerpo[hidden]) .panel__head { margin-bottom: 0; }
 #budget-panel:has(#budget-cuerpo[hidden]) { padding-bottom: 1.05rem; }
 #budget-panel:has(#budget-cuerpo[hidden]) .panel__head--row { align-items: center; }
+
+/* ---------- Lances que faltaban por identificar ---------- */
+/* Roja por doble amarilla: tarjeta roja con una esquina amarilla. */
+.lance--doble {
+  width: 10px; height: 14px; border-radius: 2px;
+  background: linear-gradient(135deg, #f5c518 0 45%, #e0142c 45% 100%);
+}
+/* Gol en propia: el balón con el punto rojo, como los que restan. */
+.lance--propia { background: #fff; }
+.lance--propia::after {
+  content: ''; position: absolute; top: -1px; right: -1px;
+  width: 6px; height: 6px; border-radius: 50%;
+  background: var(--neg); box-shadow: 0 0 0 1px var(--bg-elev);
+}
+/* Gol anulado: el balón apagado y tachado. */
+.lance--anulado { background: #fff; opacity: .75; }
+.lance--anulado::after {
+  content: ''; position: absolute; left: 50%; top: 50%;
+  width: 130%; height: 2px; background: var(--neg);
+  transform: translate(-50%, -50%) rotate(-45deg);
+}
+/* Al palo y penalti parado. */
+.lance--palo { background: #fff; color: #111; }
+.lance--parado { background: #2a78d6; color: #fff; }
+.lance--palo svg { width: 74%; height: 74%; }
+.lance--parado svg { width: 70%; height: 70%; }
