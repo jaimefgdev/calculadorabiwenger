@@ -2910,6 +2910,14 @@
         '<div class="op-oferta__quien">' +
           '<span class="with-crest">' + playerName(oferta) + crestOf(oferta, 'crest--badge') + '</span>' +
           '<span class="sub">de ' + escapeHtml(oferta.other || 'Mercado') + '</span>' +
+          /* Cuánto le queda a la oferta antes de caducar. Si ya venció, se
+             dice tal cual en vez de «caduca en vencida». */
+          (oferta.until
+            ? '<span class="sub">' +
+                (Date.parse(oferta.until) <= Date.now() ? 'Vencida' : 'Caduca en ') +
+                (Date.parse(oferta.until) <= Date.now() ? '' : deadlineCell(oferta.until)) +
+              '</span>'
+            : '') +
         '</div>' +
         '<div class="op-oferta__pasta">' +
           '<strong class="money-pos">' + money(oferta.amount) + '</strong>' +
