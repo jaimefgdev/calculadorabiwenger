@@ -1567,8 +1567,15 @@
 
     if (boton) boton.textContent = enLaLiga ? 'Mi liga' : 'LaLiga';
     if (titulo) titulo.textContent = enLaLiga ? 'Altas y bajas en LaLiga' : 'Todos los fichajes y ventas';
-    /* Los filtros son de la liga: con los movimientos de LaLiga no pintan nada. */
-    if (filtros) filtros.hidden = enLaLiga;
+    /* Los filtros son de la liga: con los movimientos de LaLiga no pintan nada.
+       Se ocultan uno a uno, no el bloque entero: la pastilla vive dentro y con
+       ella desaparecía la única forma de volver. */
+    if (filtros) {
+      filtros.hidden = false;
+      Array.prototype.forEach.call(filtros.querySelectorAll('.field'), function (campo) {
+        campo.hidden = enLaLiga;
+      });
+    }
 
     const cabecera = document.querySelector('#panel-fichajes .table--moves thead tr');
     if (cabecera) {
@@ -4327,20 +4334,82 @@
   }
 
   /** El once ideal de la jornada, cuando Biwenger ya ha puntuado. */
+  /**
+   * El mejor once posible con los futbolistas que alinearon los mánagers de
+   * la liga esa jornada. Se prueban todos los sistemas permitidos y se queda
+   * el que más puntos suma; si un futbolista lo alinearon varios, cuenta una
+   * sola vez.
+   */
+  function onceIdealDeLaLiga(jornada) {
+    const porPuesto = { 1: [], 2: [], 3: [], 4: [] };
+    const vistos = {};
+
+    (jornada.standings || []).forEach(function (fila) {
+      (fila.xi || []).forEach(function (jugador) {
+        if (!jugador || jugador.points == null) return;
+        const clave = String(jugador.id);
+        if (vistos[clave]) return;
+        vistos[clave] = true;
+
+        const puesto = jugador.position || 3;
+        (porPuesto[puesto] || porPuesto[3]).push(Object.assign({}, jugador, { dueno: fila.name }));
+      });
+    });
+
+    /* De más a menos puntos dentro de cada demarcación. */
+    Object.keys(porPuesto).forEach(function (puesto) {
+      porPuesto[puesto].sort(function (a, b) {
+        return (b.points - a.points) || ((b.marketValue || 0) - (a.marketValue || 0));
+      });
+    });
+
+    if (!porPuesto[1].length) return null;
+
+    let mejor = null;
+    FORMATIONS.forEach(function (sistema) {
+      const lineas = formationLines(sistema);
+      /* Sin gente suficiente para esa demarcación, ese sistema no vale. */
+      if (porPuesto[2].length < lineas[2] || porPuesto[3].length < lineas[3] ||
+          porPuesto[4].length < lineas[4]) return;
+
+      const elegidos = [porPuesto[1][0]]
+        .concat(porPuesto[2].slice(0, lineas[2]))
+        .concat(porPuesto[3].slice(0, lineas[3]))
+        .concat(porPuesto[4].slice(0, lineas[4]));
+
+      const total = elegidos.reduce(function (suma, j) { return suma + (j.points || 0); }, 0);
+      if (!mejor || total > mejor.points) mejor = { type: sistema, points: total, players: elegidos };
+    });
+
+    return mejor;
+  }
+
   function renderBestXi(jornada) {
     const caja = $('jornada-best');
     const once = jornada && jornada.bestXi;
-    if (!once || !once.players || once.players.length === 0) {
+    const nuestro = jornada ? onceIdealDeLaLiga(jornada) : null;
+
+    if ((!once || !once.players || once.players.length === 0) && !nuestro) {
       caja.hidden = true;
       caja.innerHTML = '';
       return;
     }
 
+    const campo = function (titulo, datos) {
+      if (!datos || !datos.players || !datos.players.length) return '';
+      return '<div class="once">' +
+        '<div class="panel__head panel__head--center"><h2>' + titulo + '</h2>' +
+          '<p class="muted">' + escapeHtml(datos.type || '') + (datos.type ? ' · ' : '') +
+            '<strong>' + datos.points + ' puntos</strong></p></div>' +
+        '<div class="pitch-wrap">' + staticPitch(datos.type, datos.players) + '</div>' +
+      '</div>';
+    };
+
     caja.hidden = false;
-    caja.innerHTML = '<div class="panel__head panel__head--center"><h2>Once ideal</h2>' +
-      '<p class="muted">' + escapeHtml(once.type || '') + (once.type ? ' · ' : '') +
-        '<strong>' + once.points + ' puntos</strong></p></div>' +
-      '<div class="pitch-wrap">' + staticPitch(once.type, once.players) + '</div>';
+    caja.innerHTML = '<div class="onces">' +
+      campo('Once ideal', once) +
+      campo('Once ideal de mi liga', nuestro) +
+    '</div>';
   }
 
   function renderJornadas() {
