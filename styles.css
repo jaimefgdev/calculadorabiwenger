@@ -249,10 +249,14 @@ code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft)
 }
 .round__game {
   display: grid; grid-template-columns: 3.4rem 1fr auto;
-  align-items: baseline; gap: .6rem;
+  /* Centrado, que ahora hay escudos y con «baseline» quedaban descolgados. */
+  align-items: center; gap: .6rem;
   padding: .3rem 0; font-size: .86rem;
   border-bottom: 1px solid var(--border);
 }
+.round__teams { display: inline-flex; align-items: center; }
+.round__equipo { display: inline-flex; align-items: center; }
+.round__escudo { width: 22px; height: 22px; object-fit: contain; display: block; }
 .round__game:last-child { border-bottom: 0; }
 .round__hour { font-family: var(--mono); color: var(--text-soft); }
 .round__vs { margin: 0 .35rem; color: var(--text-faint); }
@@ -1769,7 +1773,9 @@ main.wrap { padding-bottom: 3.5rem; }
 }
 
 /* El próximo partido de la jornada, junto a la cuenta atrás. */
-.round__rival { color: #fff; font-weight: 700; font-size: inherit; }
+.round__rival { display: inline-flex; align-items: center; vertical-align: middle; }
+.round__rival .round__escudo { width: 18px; height: 18px; }
+.round__rival .round__vs { margin: 0 .25rem; }
 
 /* ---------- Operaciones: pujar y responder ofertas ---------- */
 

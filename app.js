@@ -1652,6 +1652,15 @@
   }
 
   /** Los diez partidos, agrupados por día: hora, marcador y dónde se ve. */
+  /** El escudo de un equipo; el nombre queda en el título, al pasar por encima. */
+  function escudoDeEquipo(id, nombre) {
+    if (id == null) return '<span class="round__equipo">' + escapeHtml(nombre || '') + '</span>';
+    return '<span class="round__equipo" title="' + escapeHtml(nombre || '') + '">' +
+      '<img class="round__escudo" src="' + escapeHtml(crestUrl(id)) + '" alt="' +
+        escapeHtml(nombre || '') + '" loading="lazy">' +
+    '</span>';
+  }
+
   function roundGames(matches) {
     let day = '';
     return matches.map(function (match) {
@@ -1675,11 +1684,11 @@
         '<div class="round__game' + (rodando ? ' round__game--live' : '') +
           (acabado ? ' round__game--done' : '') + '">' +
           '<span class="round__hour">' + timeFormat.format(when) + '</span>' +
-          '<span class="round__teams">' + escapeHtml(match.home) +
+          '<span class="round__teams">' + escudoDeEquipo(match.homeId, match.home) +
             (hayMarcador
               ? '<span class="round__vs round__score">' + match.homeScore + '–' + match.awayScore + '</span>'
               : '<span class="round__vs">–</span>') +
-            escapeHtml(match.away) + '</span>' +
+            escudoDeEquipo(match.awayId, match.away) + '</span>' +
           '<span class="round__tv">' + estado + '</span>' +
         '</div>';
     }).join('');
@@ -1731,8 +1740,10 @@
     const deOtra = siguiente && siguiente.otraJornada && siguiente.number
       ? ' (jornada ' + siguiente.number + ')' : '';
     const rotulo = siguiente
-      ? 'próximo partido' + deOtra + ' · <strong class="round__rival">' +
-        escapeHtml(siguiente.home + ' – ' + siguiente.away) + '</strong>'
+      ? 'próximo partido' + deOtra + ' · <span class="round__rival">' +
+        escudoDeEquipo(siguiente.homeId, siguiente.home) +
+        '<span class="round__vs">–</span>' +
+        escudoDeEquipo(siguiente.awayId, siguiente.away) + '</span>'
       : 'próximo partido';
 
     clock.innerHTML = '<span class="round__next"><small>' + rotulo + '</small>' +
@@ -3231,22 +3242,27 @@
    * Se cuenta con lo que haya descargado la web; según se vayan mirando
    * jornadas, el recuento se completa solo.
    */
+  /** ¿Esta jornada ha terminado y ya tiene los puntos repartidos? */
+  function jornadaCerrada(jornada) {
+    if (!jornada || !jornada.round) return false;
+    if (jornada.round.status) return jornada.round.status === 'finished';
+    /* Sin estado, se mira si es la que está en juego ahora mismo. */
+    return !(state.round && String(state.round.id) === String(jornada.round.id));
+  }
+
   function tandasDeLaLiga() {
-    /* Solo las jugadas: las que aún no han empezado traen la clasificación a
-       ceros y colaban en el recuento como si contaran. */
-    const jornadas = jornadasGuardadas().filter(function (jornada) {
-      /* Solo las terminadas: mientras rueda, el ganador aún puede cambiar. */
-      const acabada = jornada.round && jornada.round.status
-        ? jornada.round.status === 'finished'
-        : !(state.round && jornada.round && String(state.round.id) === String(jornada.round.id));
-      return acabada && (jornada.standings || []).some(function (fila) {
-        return (fila.points || 0) !== 0;
-      });
+    /* Con puntos en alguna fila: las que ni han empezado no cuentan para nada. */
+    const conPuntos = jornadasGuardadas().filter(function (jornada) {
+      return (jornada.standings || []).some(function (fila) { return (fila.points || 0) !== 0; });
     });
+
     const ganadas = {};
     const ultimas = {};
 
-    jornadas.forEach(function (jornada) {
+    /* Jornadas ganadas: solo las cerradas. Mientras rueda, el ganador puede
+       cambiar con cada partido, así que no se cuenta hasta que Biwenger la
+       da por acabada y reparte los puntos. */
+    conPuntos.filter(jornadaCerrada).forEach(function (jornada) {
       const filas = (jornada.standings || []).filter(function (f) { return f.points != null; });
       if (!filas.length) return;
 
@@ -3258,15 +3274,16 @@
       if (campeon) ganadas[campeon.name] = (ganadas[campeon.name] || 0) + 1;
     });
 
-    /* Racha: lo sumado en las tres últimas jornadas guardadas. */
-    jornadas.slice(-3).forEach(function (jornada) {
+    /* Racha: los puntos de las tres últimas jornadas, incluida la que está en
+       juego con lo que lleve. Al empezar la cuarta, la primera deja de contar. */
+    conPuntos.slice(-3).forEach(function (jornada) {
       (jornada.standings || []).forEach(function (fila) {
         if (fila.points == null) return;
         ultimas[fila.name] = (ultimas[fila.name] || 0) + fila.points;
       });
     });
 
-    return { jornadas: jornadas.length, ganadas: ganadas, racha: ultimas };
+    return { jornadas: conPuntos.length, ganadas: ganadas, racha: ultimas };
   }
 
   function renderTandasDeLiga() {
