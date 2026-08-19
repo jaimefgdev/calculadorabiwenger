@@ -4064,10 +4064,40 @@
   }
 
   /** El manager que lo tiene en su plantilla, en un círculo con su foto. */
+  /* Quién está alineado esta jornada por alguno de los ocho mánagers. Se
+     recalcula solo cuando cambian los datos de la jornada. */
+  let alineadosMemo = null;
+  let alineadosDe = null;
+
+  function alineadosEnLaJornada() {
+    const jornada = jornadaActiva();
+    if (alineadosDe === jornada && alineadosMemo) return alineadosMemo;
+
+    const quienes = {};
+    ((jornada && jornada.standings) || []).forEach(function (fila) {
+      (fila.xi || []).forEach(function (jugador) {
+        if (jugador && jugador.id != null) quienes[String(jugador.id)] = true;
+      });
+    });
+
+    alineadosDe = jornada;
+    alineadosMemo = quienes;
+    return quienes;
+  }
+
+  /**
+   * El dueño del futbolista. Si lo tiene alguien pero no lo ha alineado esta
+   * jornada, su foto sale en blanco y negro: se ve de un vistazo quién está
+   * puntuando y quién se ha quedado en el banquillo de su mánager.
+   */
   function chapaDeManager(jugador, extra) {
     const dueno = jugador && duenoDe(jugador.id);
     if (!dueno) return '';
-    return '<span class="dueno ' + (extra || '') + '" title="' + escapeHtml(dueno) + '">' +
+
+    const juega = alineadosEnLaJornada()[String(jugador.id)];
+    const apagado = juega ? '' : ' dueno--fuera';
+    return '<span class="dueno ' + (extra || '') + apagado + '"' +
+      ' title="' + escapeHtml(dueno) + (juega ? '' : ' (no lo ha alineado)') + '">' +
       avatar(dueno) + '</span>';
   }
 

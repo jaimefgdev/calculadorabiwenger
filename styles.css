@@ -1896,6 +1896,9 @@ main.wrap { padding-bottom: 3.5rem; }
 /* En el once ideal de la liga, el dueño va arriba a la derecha. */
 .dueno--alto { position: absolute; right: 0; top: 0; transform: translate(26%, -14%); z-index: 3; }
 .dueno--fila { margin-left: .3rem; vertical-align: middle; }
+/* Su mánager no lo ha alineado esta jornada: la foto, en blanco y negro. */
+.dueno--fuera .avatar { filter: grayscale(1); opacity: .75; }
+.dueno--fuera .avatar__pic { filter: grayscale(1); }
 .dueno--fila .avatar { width: 16px; height: 16px; }
 
 /* A una de sanción: una tarjeta amarilla, con forma de tarjeta. */
