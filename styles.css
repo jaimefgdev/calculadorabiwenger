@@ -1890,11 +1890,20 @@ main.wrap { padding-bottom: 3.5rem; }
 .dueno--fila .avatar { width: 16px; height: 16px; }
 
 /* A una de sanción: una tarjeta amarilla, con forma de tarjeta. */
+/* Proporción de tarjeta real: 2 de ancho por 3 de alto. Antes era demasiado
+   estrecha y alargada y no se reconocía. */
 .mark--amarillas {
-  background: #f5c518; border-radius: 3px;
-  width: 12px; height: 16px;
+  background: #f5c518; border-radius: 2px;
+  width: 12px; height: 15px;
 }
-.mark--amarillas.mark--cell { width: 13px; height: 17px; }
+.mark--amarillas.mark--cell { width: 14px; height: 17px; }
+
+/* La roja de sancionado, igual: una tarjeta, no una barra. */
+.mark--sanctioned {
+  color: transparent; background: #d80030; border-radius: 2px;
+  width: 12px; height: 15px; box-shadow: 0 1px 2px rgba(0,0,0,.35);
+}
+.mark--sanctioned.mark--cell { width: 14px; height: 17px; }
 
 /* Disponible: círculo verde con el visto en blanco. */
 .mark--ok { color: #fff; background: var(--pos); box-shadow: 0 1px 2px rgba(0,0,0,.35); }

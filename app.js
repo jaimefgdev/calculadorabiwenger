@@ -573,6 +573,9 @@
 
   const state = {
     movements: [],
+    /* Altas y bajas de LaLiga, y cuál de las dos vistas se está mirando. */
+    laligaMoves: [],
+    ambitoFichajes: 'liga',
     teams: {},
     warnings: [],
     filters: { text: '', manager: '', type: '' },
@@ -1518,6 +1521,73 @@
     $('offers-count').textContent = parts.join(' · ');
 
     renderSimulation();
+  }
+
+  /**
+   * Altas y bajas de LaLiga: quién ha fichado por un club, quién lo ha dejado
+   * y quién ha cambiado de equipo. No tiene nada que ver con nuestra liga.
+   */
+  function renderMovimientosLaLiga() {
+    const cuerpo = $('moves-body');
+    const lista = state.laligaMoves || [];
+
+    if (lista.length === 0) {
+      cuerpo.innerHTML = '<tr><td colspan="6" class="muted">' +
+        'Todavía no hay movimientos de LaLiga en el tablón.</td></tr>';
+      return;
+    }
+
+    cuerpo.innerHTML = lista.map(function (mov) {
+      const alta = mov.tipo !== 'baja';
+      return '<tr>' +
+        '<td data-label="Futbolista"><span class="with-crest">' +
+          playerName({ playerId: mov.playerId, player: mov.player,
+            position: mov.position, altPositions: mov.altPositions }) +
+          crestOf(mov, 'crest--badge') + '</span></td>' +
+        '<td class="estado-cell" data-label="Estado">' +
+          statusCell({ id: mov.playerId, status: mov.status }) + '</td>' +
+        '<td data-label="Acción"><span class="tag ' + (alta ? 'tag--buy' : 'tag--sell') + '">' +
+          (alta ? 'Ficha' : 'Se va') +
+          (mov.teamName || mov.desde
+            ? ' <span class="tag__otro">(' + escapeHtml(alta ? (mov.teamName || '') : (mov.desde || '')) + ')</span>'
+            : '') + '</span></td>' +
+        '<td data-label="Equipo">' + escapeHtml(alta ? (mov.teamName || '—') : (mov.desde || '—')) + '</td>' +
+        '<td class="num" data-label="Valor">' +
+          (mov.marketValue == null ? '<span class="sub">—</span>' : money(mov.marketValue)) + '</td>' +
+        '<td data-label="Fecha">' + escapeHtml(mov.date ? dateFormat.format(new Date(mov.date)) : '—') + '</td>' +
+      '</tr>';
+    }).join('');
+
+    ajustarNombres();
+  }
+
+  /** Alterna entre los fichajes de la liga y los movimientos de LaLiga. */
+  function pintarFichajes() {
+    const enLaLiga = state.ambitoFichajes === 'laliga';
+    const boton = $('moves-ambito');
+    const titulo = $('moves-titulo');
+    const filtros = document.querySelector('#panel-fichajes .filters');
+
+    if (boton) boton.textContent = enLaLiga ? 'Mi liga' : 'LaLiga';
+    if (titulo) titulo.textContent = enLaLiga ? 'Altas y bajas en LaLiga' : 'Todos los fichajes y ventas';
+    /* Los filtros son de la liga: con los movimientos de LaLiga no pintan nada. */
+    if (filtros) filtros.hidden = enLaLiga;
+
+    const cabecera = document.querySelector('#panel-fichajes .table--moves thead tr');
+    if (cabecera) {
+      cabecera.innerHTML = enLaLiga
+        ? '<th>Futbolista</th><th>Estado</th><th>Movimiento</th>' +
+          '<th>Equipo</th><th class="num">Valor</th><th>Fecha</th>'
+        : '<th class="sortable" data-sort="player" tabindex="0" aria-sort="none">Futbolista</th>' +
+          '<th title="Cómo estaba el futbolista cuando se hizo la operación">Estado</th>' +
+          '<th class="sortable" data-sort="type" tabindex="0" aria-sort="none">Acción</th>' +
+          '<th class="sortable" data-sort="manager" tabindex="0" aria-sort="none">Jugador</th>' +
+          '<th class="num sortable" data-sort="amount" tabindex="0" aria-sort="none">Importe</th>' +
+          '<th class="sortable" data-sort="date" tabindex="0" aria-sort="none">Fecha</th>';
+    }
+
+    if (enLaLiga) renderMovimientosLaLiga();
+    else renderMovements();
   }
 
   /** Cómo quedarías si se cerrasen las operaciones marcadas: saldo y plantilla. */
@@ -2810,6 +2880,11 @@
       '</div>');
   }
 
+  /**
+   * Poner en venta, renovar o cambiar el precio. Nunca rechaza ofertas: eso
+   * solo lo hace el boton de «devolver al mercado» del panel de ofertas, que
+   * es donde tiene sentido tumbarlas.
+   */
   function mandarVenta(playerId, precio) {
     const mio = miJugador(playerId);
     const venta = ventaDe(playerId);
@@ -2817,8 +2892,8 @@
     if (!(precio > 0)) { opAviso('Pon un precio.', true); return; }
 
     const yaEstaba = !!(venta || miVentaDe(playerId));
-    opAviso(yaEstaba ? 'Cambiando la venta\u2026' : 'Poniéndolo en el mercado\u2026');
-    lanzarOperacion({ accion: 'vender', player: playerId, price: precio, rechazar: yaEstaba },
+    opAviso(yaEstaba ? 'Renovando la venta…' : 'Poniendolo en el mercado…');
+    lanzarOperacion({ accion: 'vender', player: playerId, price: precio, rechazar: false },
       quien + ' en venta por ' + money(precio) + '.');
   }
 
@@ -3020,6 +3095,8 @@
   let opPendiente = null;
   /* Cómo volver a la lista de ofertas que se estaba mirando (con su filtro). */
   let volverA = null;
+  /* Qué quitar de la pantalla en cuanto la operación salga bien. */
+  let trasOperarLimpia = null;
 
   /** Paso intermedio: enseña qué va a pasar y espera el sí. */
   function confirmarOperacion(accion, oferta, desdeOfertas) {
@@ -3074,6 +3151,8 @@
     mandarOperacion(orden)
       .then(function (respuesta) {
         opAviso(typeof mensaje === 'function' ? mensaje(respuesta) : mensaje);
+        /* Fuera de la pantalla lo que acaba de resolverse. */
+        if (trasOperarLimpia) { trasOperarLimpia(); trasOperarLimpia = null; }
         opPendiente = null;
         const volver = trasOperar;
         trasOperar = null;
@@ -3090,6 +3169,8 @@
         }, 900);
       })
       .catch(function (error) {
+        /* Si falla no se quita nada: la oferta sigue donde estaba. */
+        trasOperarLimpia = null;
         Array.prototype.forEach.call(document.querySelectorAll('#op-modal button'), function (b) {
           b.disabled = false;
         });
@@ -3109,6 +3190,21 @@
     /* Las tres respuestas a una oferta devuelven a la lista de ofertas. */
     if (['aceptar', 'rechazar', 'devolver'].indexOf(opPendiente.accion) !== -1) {
       trasOperar = volverA || abrirOfertas;
+
+      /* Y la oferta respondida se quita de la lista en cuanto Biwenger dice
+         que sí: esperar a la siguiente sincronización la dejaba unos segundos
+         ahí, como si no hubiera pasado nada. */
+      const respondida = opPendiente.id;
+      const devuelto = opPendiente.accion === 'devolver' ? opPendiente.playerId : null;
+      trasOperarLimpia = function () {
+        state.offers = state.offers.filter(function (o) {
+          if (String(o.id) === String(respondida)) return false;
+          /* Al devolverlo al mercado se tumban todas las suyas, no solo esta. */
+          if (devuelto && o.direction === 'in' && String(o.playerId) === String(devuelto)) return false;
+          return true;
+        });
+        render();
+      };
     }
 
     if (opPendiente.accion === 'devolver') {
@@ -3145,6 +3241,14 @@
 
     const pastilla = $('btn-ofertas');
     if (pastilla) pastilla.addEventListener('click', function () { abrirOfertas(); });
+
+    const ambito = $('moves-ambito');
+    if (ambito) {
+      ambito.addEventListener('click', function () {
+        state.ambitoFichajes = state.ambitoFichajes === 'laliga' ? 'liga' : 'laliga';
+        pintarFichajes();
+      });
+    }
 
     const plantilla = $('squad-body');
     if (plantilla) {
@@ -4238,7 +4342,7 @@
     caja.hidden = false;
     caja.innerHTML = '<div class="panel__head panel__head--center"><h2>Once ideal</h2>' +
       '<p class="muted">' + escapeHtml(once.type || '') + (once.type ? ' · ' : '') +
-        once.points + ' puntos entre los once</p></div>' +
+        '<strong>' + once.points + ' puntos</strong></p></div>' +
       '<div class="pitch-wrap">' + staticPitch(once.type, once.players) + '</div>';
   }
 
@@ -5945,7 +6049,7 @@
       panel.hidden = panel.getAttribute('data-panel') !== name;
     });
     if (name === 'managers') { renderManagers(); renderSquads(); renderTandasDeLiga(); }
-    if (name === 'fichajes') { renderDataKpis(); renderKpiCharts(); renderSpending(); }
+    if (name === 'fichajes') { renderDataKpis(); renderKpiCharts(); renderSpending(); pintarFichajes(); }
     if (name === 'datos') { ensureSquads(); ensureLaLiga(); ensureRecuento(); renderRankings(); renderRankingsTemporada(); }
     if (name === 'mercado') { ensureMarket(); renderMarket(); renderMovers(); }
     if (name === 'jugadores') { ensureJugadores(); renderJugadores(); }
@@ -5987,7 +6091,7 @@
     renderPlantilla();
     renderWarnings();
     if (state.tab === 'managers') { renderManagers(); renderSquads(); renderTandasDeLiga(); }
-    if (state.tab === 'fichajes') { renderDataKpis(); renderKpiCharts(); renderSpending(); }
+    if (state.tab === 'fichajes') { renderDataKpis(); renderKpiCharts(); renderSpending(); pintarFichajes(); }
     if (state.tab === 'datos') { ensureSquads(); ensureLaLiga(); ensureRecuento(); renderRankings(); renderRankingsTemporada(); }
     if (state.tab === 'mercado') { renderMarket(); renderMovers(); }
     if (state.tab === 'jugadores') { ensureJugadores(); renderJugadores(); }
@@ -6206,6 +6310,8 @@
     state.lineup = payload.lineup || null;
     state.round = payload.round || state.round;
     state.movers = payload.movers || state.movers;
+    /* Altas y bajas de LaLiga: van en su propia vista dentro de Fichajes. */
+    state.laligaMoves = payload.laligaMoves || state.laligaMoves || [];
     /* De aquí salen demarcaciones que no están en ninguna plantilla. */
     recordarPosiciones((state.movers && state.movers.up) || []);
     recordarPosiciones((state.movers && state.movers.down) || []);

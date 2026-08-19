@@ -16,7 +16,7 @@
 <title>Calculadora Biwenger — Presupuestos de la liga</title>
 <!-- El ?v= se sube en cada publicación: obliga al navegador a bajar el archivo
      nuevo en vez de reutilizar el que tenga en caché. -->
-<link rel="stylesheet" href="styles.css?v=162">
+<link rel="stylesheet" href="styles.css?v=163">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>💰</text></svg>">
 </head>
 <body>
@@ -304,8 +304,10 @@
   <section class="panel">
     <div class="panel__head panel__head--row">
       <div>
-        <h2>Todos los fichajes y ventas</h2>
+        <h2 id="moves-titulo">Todos los fichajes y ventas</h2>
       </div>
+      <!-- Cambia entre los fichajes de la liga y los movimientos de LaLiga. -->
+      <button type="button" id="moves-ambito" class="ambito">LaLiga</button>
       <div class="filters">
         <input id="filter-text" class="field" type="search" placeholder="Buscar futbolista o jugador…">
         <select id="filter-manager" class="field"><option value="">Todos los jugadores</option></select>
@@ -488,7 +490,7 @@
          mismo cuadro, como los rankings. -->
     <section class="panel">
       <div class="panel__head">
-        <h2>Nuestra liga</h2>
+        <h2>Mi liga</h2>
       </div>
       <div id="ambitos-nuestra"></div>
       <div id="rankings-jugadores" class="rankings"></div>
@@ -572,6 +574,6 @@
 
 </main>
 
-<script src="app.js?v=162"></script>
+<script src="app.js?v=163"></script>
 </body>
 </html>
