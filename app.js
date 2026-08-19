@@ -1550,9 +1550,12 @@
           playerName({ playerId: mov.playerId, player: mov.player,
             position: mov.position, altPositions: mov.altPositions }) +
           crestOf(mov, 'crest--badge') + '</span></td>' +
+        /* El estado solo dice algo si el futbolista sigue en LaLiga: en una baja
+           definitiva no hay nada que avisar. */
         '<td class="estado-cell" data-label="Estado">' +
-          statusCell({ id: mov.playerId, status: mov.status }) + '</td>' +
-        '<td data-label="Movimiento"><span class="tag ' + (alta ? 'tag--buy' : 'tag--sell') + '">' +
+          (alta || mov.sigue ? statusCell({ id: mov.playerId, status: mov.status }) : '') + '</td>' +
+        /* Alta en verde, baja en rojo. */
+        '<td data-label="Movimiento"><span class="tag ' + (alta ? 'tag--sell' : 'tag--buy') + '">' +
           (alta ? 'Alta' : 'Baja') + '</span></td>' +
         '<td data-label="Equipo">' + escapeHtml(alta ? (mov.teamName || '—') : (mov.desde || '—')) + '</td>' +
         '<td class="num" data-label="Valor">' +

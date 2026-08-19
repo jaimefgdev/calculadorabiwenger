@@ -1251,9 +1251,9 @@ code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft)
    cara, estado y puntos en sus círculos, y el nombre debajo. */
 #jugadores-buscar { min-width: 240px; }
 .jugadores-rejilla {
-  /* Seis por fila, en el ordenador y en el móvil. */
+  /* Cinco por fila, en el ordenador y en el móvil. */
   display: grid; gap: 1.1rem .7rem;
-  grid-template-columns: repeat(6, minmax(0, 1fr));
+  grid-template-columns: repeat(5, minmax(0, 1fr));
 }
 .jugador-card {
   position: relative; overflow: hidden;
@@ -2279,7 +2279,15 @@ main.wrap { padding-bottom: 3.5rem; }
 
 /* El botón de actualizar: mismo rojo, pero con la flecha en vez del texto y
    un poco más ancho que alto, para que no quede cuadrado. */
-.btn--recargar {
-  padding: .38rem 1.1rem;
-  font-size: 1.05rem; font-weight: 800; line-height: 1;
+/* Con el contenedor delante para ganarle a «.topbar__actions .btn», que si no
+   lo deja en 0,8 rem. */
+.topbar__actions .btn--recargar, .btn--recargar {
+  /* Menos relleno a los lados: con la letra grande se iba a 57 px de ancho y
+     quedaba demasiado alargado. */
+  padding: .22rem .7rem;
+  font-size: 1.5rem; font-weight: 800; line-height: 1;
 }
+
+/* Presupuesto plegado: la cabecera deja de reservar el hueco que separaba del
+   contenido, que ya no está. Así el borde de abajo queda como el de arriba. */
+#budget-panel:has(#budget-cuerpo[hidden]) .panel__head { margin-bottom: 0; }
