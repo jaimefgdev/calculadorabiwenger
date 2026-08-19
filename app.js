@@ -2478,20 +2478,27 @@
         /* Lo que vendes tú no se puja; en el resto, si ya has pujado, se ve por
            cuánto y el botón sirve para cambiarla. */
         '<td class="col-pujar">' + (venta.mine ? (
-          /* Los tuyos no se pujan: se renuevan o se retiran del mercado. */
-          '<button type="button" class="btn btn--sm btn--otra" data-renovar="' +
-            escapeHtml(String(venta.playerId)) + '" title="Renovar la venta">\u21bb</button>' +
-          '<button type="button" class="btn btn--sm btn--no" data-quitar="' +
-            escapeHtml(String(venta.playerId)) + '" title="Quitar del mercado">\u2715</button>'
+          /* Los tuyos no se pujan: se renuevan, se cambian o se retiran. */
+          '<span class="acciones">' +
+            '<button type="button" class="btn btn--sm btn--otra" data-renueva="' +
+              escapeHtml(String(venta.playerId)) + '" title="Renovar la venta por ' +
+              money(venta.price) + '">\u21bb</button>' +
+            '<button type="button" class="btn btn--sm btn--otra" data-renovar="' +
+              escapeHtml(String(venta.playerId)) + '" title="Cambiar el precio">\u270e</button>' +
+            '<button type="button" class="btn btn--sm btn--no" data-quitar="' +
+              escapeHtml(String(venta.playerId)) + '" title="Quitar del mercado">\u2715</button>' +
+          '</span>'
         ) : (function () {
           const mia = miPujaPor(venta.playerId);
-          return (mia ? '<span class="pujado" title="Tu puja">' + money(mia.amount) + '</span>' : '') +
+          return '<span class="acciones">' +
+            (mia ? '<span class="pujado" title="Tu puja">' + money(mia.amount) + '</span>' : '') +
             '<button type="button" class="ambito ambito--pujar' + (mia ? ' ambito--pujado' : '') +
               '" data-pujar="' + escapeHtml(String(venta.playerId)) + '">' +
               (mia ? 'Cambiar' : 'Pujar') + '</button>' +
             /* Con puja hecha, al lado va el aspa para retirarla. */
             (mia ? '<button type="button" class="btn btn--sm btn--no" data-retirar="' +
-              escapeHtml(mia.id) + '" title="Retirar la puja">✕</button>' : '');
+              escapeHtml(mia.id) + '" title="Retirar la puja">✕</button>' : '') +
+          '</span>';
         })()) + '</td>' +
       '</tr>';
     }).join('');
@@ -2731,6 +2738,29 @@
 
     const campo = $('op-importe');
     if (campo) { campo.focus(); campo.select(); }
+  }
+
+  /** Renovar la venta al mismo precio: solo pide confirmación. */
+  function confirmarRenovar(playerId) {
+    const suya = ventaDe(playerId) || miVentaDe(playerId);
+    const mio = miJugador(playerId);
+    const precio = suya ? suya.price : (mio ? mio.marketValue : 0);
+    const quien = (suya && suya.player) || (mio && mio.name) || 'El futbolista';
+    if (!(precio > 0)) return;
+
+    abrirOpModal(
+      '<div class="op-card__cab">' +
+        '<h3 id="op-modal-titulo">Renovar la venta</h3>' +
+        '<button type="button" class="btn btn--ghost btn--close" data-op-cerrar' +
+          ' title="Cerrar" aria-label="Cerrar">✕</button>' +
+      '</div>' +
+      '<p class="op-texto">Dejar a ' + escapeHtml(quien) + ' en venta por <strong>' +
+        money(precio) + '</strong>.</p>' +
+      '<p class="op-aviso"></p>' +
+      '<div class="op-botones">' +
+        '<button type="button" class="btn btn--primary" data-op-mismo="' +
+          escapeHtml(String(playerId)) + '">Sí</button>' +
+      '</div>');
   }
 
   function mandarVenta(playerId, precio) {
@@ -3038,6 +3068,8 @@
       mercado.addEventListener('click', function (event) {
         const puja = event.target.closest('[data-pujar]');
         if (puja) { abrirPuja(puja.getAttribute('data-pujar')); return; }
+        const renueva = event.target.closest('[data-renueva]');
+        if (renueva) { confirmarRenovar(renueva.getAttribute('data-renueva')); return; }
         const renovar = event.target.closest('[data-renovar]');
         if (renovar) { abrirRenovar(renovar.getAttribute('data-renovar')); return; }
         const retirar = event.target.closest('[data-retirar]');
@@ -3059,6 +3091,8 @@
     const plantilla = $('squad-body');
     if (plantilla) {
       plantilla.addEventListener('click', function (event) {
+        const renueva = event.target.closest('[data-renueva]');
+        if (renueva) { confirmarRenovar(renueva.getAttribute('data-renueva')); return; }
         const vender = event.target.closest('[data-vender]');
         if (vender) { abrirRenovar(vender.getAttribute('data-vender')); return; }
         const quitar = event.target.closest('[data-quitar]');
@@ -3286,12 +3320,20 @@
             (ofertas.length > 1 ? ' (' + ofertas.length + ')' : '') + '</button>'
           : '<span class="sub">—</span>') + '</td>' +
         '<td class="col-pujar">' + (venta
-          ? '<button type="button" class="ambito ambito--pujar" data-vender="' +
-              escapeHtml(String(jugador.id)) + '">Cambiar</button>' +
-            '<button type="button" class="btn btn--sm btn--no" data-quitar="' +
-              escapeHtml(String(jugador.id)) + '" title="Quitar del mercado">\u2715</button>'
-          : '<button type="button" class="ambito ambito--pujar ambito--vender" data-vender="' +
-              escapeHtml(String(jugador.id)) + '">Vender</button>') + '</td>' +
+          /* Renovar al mismo precio, cambiar el precio o sacarlo del mercado. */
+          ? '<span class="acciones">' +
+              '<button type="button" class="btn btn--sm btn--otra" data-renueva="' +
+                escapeHtml(String(jugador.id)) + '" title="Renovar la venta por ' +
+                money(venta.price) + '">\u21bb</button>' +
+              '<button type="button" class="btn btn--sm btn--otra" data-vender="' +
+                escapeHtml(String(jugador.id)) + '" title="Cambiar el precio">\u270e</button>' +
+              '<button type="button" class="btn btn--sm btn--no" data-quitar="' +
+                escapeHtml(String(jugador.id)) + '" title="Quitar del mercado">\u2715</button>' +
+            '</span>'
+          : '<span class="acciones">' +
+              '<button type="button" class="ambito ambito--pujar ambito--vender" data-vender="' +
+                escapeHtml(String(jugador.id)) + '">Vender</button>' +
+            '</span>') + '</td>' +
       '</tr>';
     }).join('');
 

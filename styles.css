@@ -2046,3 +2046,39 @@ main.wrap { padding-bottom: 3.5rem; }
   }
   .table .with-crest, .table .manager { flex-wrap: wrap; min-width: 0; }
 }
+
+/* ---------- Botones de acción, siempre en una fila ----------
+   La regla que permite partir el texto —la que mata las barras horizontales—
+   hacía que estos botones se apilaran uno encima de otro. Van dentro de un
+   envoltorio que no se parte nunca, ni en el móvil apilado ni en el ordenador. */
+.acciones {
+  display: inline-flex; align-items: center; justify-content: center;
+  gap: .25rem; flex-wrap: nowrap; white-space: nowrap;
+}
+.acciones > * { flex: none; }
+.table td.col-pujar { white-space: nowrap; }
+@media (max-width: 940px) {
+  .table td.col-pujar { flex-wrap: nowrap; }
+}
+
+/* Con tres botones por fila hace falta un poco más de sitio: en pantallas
+   estrechas se aprietan, que es mejor que sacar barra o partirlos. */
+@media (max-width: 1180px) {
+  .acciones { gap: .15rem; }
+  .acciones .btn--sm { padding: .18rem .34rem; font-size: .72rem; }
+  .acciones .ambito--pujar { padding: .16rem .42rem; font-size: .66rem; }
+  .table--market .spark-cell { width: 62px; }
+  .table--market td:nth-child(2), .table--market th:nth-child(2) { max-width: 104px; }
+  .table--market .manager__name { max-width: 76px; }
+}
+
+/* «Mis jugadores en venta»: la columna de ofertas lleva importe, diferencia e
+   interruptor, y a poco que aprieten se pasa. Se le recorta lo justo. */
+@media (max-width: 1180px) {
+  .table--listings .bid { gap: .2rem; margin-right: .15rem; }
+  .table--listings .bid strong { font-size: .74rem; }
+  .table--listings .delta { font-size: .58rem; }
+  .table--listings .switch { width: 22px; height: 14px; }
+  .table--listings .switch span { width: 8px; height: 8px; }
+  .table--listings .switch[aria-pressed="true"] span { transform: translateX(10px); }
+}
