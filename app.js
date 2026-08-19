@@ -2914,8 +2914,11 @@
              dice tal cual en vez de «caduca en vencida». */
           (oferta.until
             ? '<span class="sub">' +
-                (Date.parse(oferta.until) <= Date.now() ? 'Vencida' : 'Caduca en ') +
-                (Date.parse(oferta.until) <= Date.now() ? '' : deadlineCell(oferta.until)) +
+                (Date.parse(oferta.until) <= Date.now()
+                  ? '<span class="op-caduca">Vencida</span>'
+                  /* El rótulo en gris y el tiempo en rojo, que es lo que urge. */
+                  : 'Caduca en <span class="op-caduca">' +
+                    escapeHtml((timeLeft(oferta.until) || {}).text || '') + '</span>') +
               '</span>'
             : '') +
         '</div>' +
