@@ -2469,8 +2469,9 @@
     const cerca = faltan != null && faltan > 0 && faltan <= 12 * 3600e3;
 
     if (saldo != null && saldo < 0) {
-      avisos.push('Saldo negativo (' + money(saldo) + '). Tienes que estar en positivo ' +
-        'al comienzo de la jornada para puntuar.' + rotuloCuentaAtras(cerca, round));
+      /* El saldo ya se ve arriba: aquí solo el aviso. */
+      avisos.push('Tienes que estar en positivo al comienzo de la jornada para puntuar.' +
+        rotuloCuentaAtras(cerca, round));
     }
 
     if (titulares < 11) {
@@ -5364,7 +5365,8 @@
       return '<p class="muted">Todavía no hay partidos suyos esta temporada.</p>';
     }
 
-    const filas = datos.matches.slice().reverse().map(function (juego) {
+    /* De la primera jornada a la última, en orden. */
+    const filas = datos.matches.slice().map(function (juego) {
       const jugado = juego.homeScore != null && juego.awayScore != null;
       const suyos = juego.enCasa ? juego.homeScore : juego.awayScore;
       const otros = juego.enCasa ? juego.awayScore : juego.homeScore;
@@ -5944,8 +5946,8 @@
      Biwenger solo los da en la ficha de cada futbolista, uno a uno. */
   const RANKINGS = [
     { titulo: 'M\u00e1s goles',          campo: 'goals',        sufijo: '' },
-    { titulo: 'M\u00e1s asistencias',    campo: 'assists',      sufijo: '' },
     { titulo: 'Goles por partido',  campo: 'goalsPerGame', sufijo: '', decimal: true, minimo: 1 },
+    { titulo: 'M\u00e1s asistencias',    campo: 'assists',      sufijo: '' },
     { titulo: 'M\u00e1s partidos',       campo: 'played',       sufijo: '' },
     { titulo: 'M\u00e1s amarillas',      campo: 'yellow',       sufijo: '' },
     { titulo: 'M\u00e1s rojas',          campo: 'red',          sufijo: '' },
