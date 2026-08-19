@@ -2219,9 +2219,19 @@ main.wrap { padding-bottom: 3.5rem; }
   font-family: var(--mono); font-size: .7rem; color: var(--text-soft); text-align: right;
 }
 
-/* Cuántas veces se repite un lance: «×2» pegado al icono. */
-.lance__veces { position: absolute; transform: translate(9px, -7px); font-size: .5rem; color: var(--text); }
+/* Cuántas veces se repite un lance. Antes iba encima del icono y se pisaba:
+   ahora va al lado, fuera del círculo, con su propio hueco. */
 .lance { position: relative; }
+.lance__veces {
+  position: static; margin-left: .12rem;
+  font-size: .68rem; font-weight: 700; color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+/* El icono deja de ser un círculo fijo cuando lleva contador: crece a su lado. */
+.lance:has(.lance__veces) {
+  width: auto; min-width: 15px; padding-right: .2rem;
+  border-radius: 100px; grid-auto-flow: column; gap: 0;
+}
 
 /* Gol de penalti: el balón con un punto verde arriba a la derecha. */
 .lance--penalti { background: #fff; }
@@ -2251,3 +2261,11 @@ main.wrap { padding-bottom: 3.5rem; }
 .nota--cero { background: #d8d8d8; color: #111; }
 .nota--roja { background: var(--neg); color: #fff; }
 .nota--sin { background: transparent; color: var(--text-faint); font-weight: 400; }
+
+/* Los bloques de Puntos, en dos filas de tres. */
+.rankings--tres {
+  display: grid; gap: 1rem;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+.rankings--tres + .rankings--tres { margin-top: 1.2rem; }
+@media (max-width: 900px) { .rankings--tres { grid-template-columns: 1fr; } }

@@ -4167,6 +4167,14 @@
       grupos.push(porTipo[clave]);
     });
 
+    /* Por importancia, no por minuto: primero lo que se recuerda del partido. */
+    const ORDEN = { 1: 0, 2: 1, 17: 2, 3: 3, 6: 4, 7: 5, 16: 6, 14: 7, 5: 8, 4: 9 };
+    grupos.sort(function (a, b) {
+      const x = ORDEN[a.type] != null ? ORDEN[a.type] : 50;
+      const y = ORDEN[b.type] != null ? ORDEN[b.type] : 50;
+      return x - y;
+    });
+
     return grupos.map(function (grupo) {
       const ficha = LANCES[grupo.type];
       const cuando = grupo.minutos.length ? ' ' + grupo.minutos.join(', ') : '';
@@ -5371,10 +5379,11 @@
             (jugado ? juego.homeScore + '\u2013' + juego.awayScore : '\u2013') + '</span>' +
           escudoDeEquipo(juego.awayId, juego.away) +
         '</span>' +
-        '<span class="partido-jug__lances">' + lancesDe(juego) + '</span>' +
+        /* Si no jugó ni un minuto, esas casillas se quedan vacías. */
+        '<span class="partido-jug__lances">' + (juego.alineado ? lancesDe(juego) : '') + '</span>' +
         '<span class="partido-jug__min">' +
-          (juego.minutes != null ? juego.minutes + "'" : '') + '</span>' +
-        notaDePartido(juego.alineado ? juego.points : null) +
+          (juego.minutes ? juego.minutes + "'" : '') + '</span>' +
+        (juego.alineado ? notaDePartido(juego.points) : '<span class="nota nota--sin"></span>') +
       '</div>';
     }).join('');
 
@@ -5451,22 +5460,28 @@
           /* Mientras se elige rival, la pastilla estorba: su sitio lo ocupa el
              aspa que hay junto al buscador. */
           (abierto.eligiendo ? '' :
+            /* Con los partidos abiertos, comparar estorba: se deja solo la
+             pastilla para volver. */
+          (abierto.partidos ? '' :
             '<button type="button" class="ambito ficha__comparar" data-comparar>' +
-              (abierto.comparar ? 'Quitar comparación' : 'Comparar') + '</button>' +
-            '<button type="button" class="ambito" data-partidos-de>' +
+              (abierto.comparar ? 'Quitar comparación' : 'Comparar') + '</button>') +
+            '<button type="button" class="ambito' + (abierto.partidos ? ' ficha__comparar' : '') +
+              '" data-partidos-de>' +
               (abierto.partidos ? 'Ocultar partidos' : 'Partidos') + '</button>') +
           '<button type="button" class="btn btn--ghost btn--close" data-price-close' +
             ' title="Cerrar" aria-label="Cerrar">✕</button>' +
         '</div>' +
         '<p class="muted ficha__datos">' + datos + '</p>' +
         /* Elegido el rival, sus estadísticas van al lado de las de este. */
-        (abierto.comparar ? comparativaDeFichas(abierto.id, abierto.comparar) : '') +
+        (abierto.comparar && !abierto.partidos ? comparativaDeFichas(abierto.id, abierto.comparar) : '') +
         (abierto.partidos ? listaDePartidos(abierto.id) : '') +
         (abierto.eligiendo ? selectorDeComparacion(abierto.id) : '') +
-        (abierto.soloPrecio ? '' : estadisticasDeTemporada(abierto.id) + rachaDeTemporada(abierto.id)) +
+        /* Los partidos van solos: ni estadísticas ni gráficos. */
+        (abierto.partidos || abierto.soloPrecio
+          ? '' : estadisticasDeTemporada(abierto.id) + rachaDeTemporada(abierto.id)) +
         /* Desde los rankings solo interesan las estadísticas: ni el valor de
            mercado ni su evolución pintan nada ahí. */
-        (abierto.soloDatos ? '' :
+        (abierto.soloDatos || abierto.partidos ? '' :
         (puntos.length < 2
           /* Biwenger no publica el histórico de todos —los que están sin club,
              por ejemplo—, pero el valor de hoy sí se sabe: se enseña eso. */
@@ -5515,7 +5530,7 @@
             })() +
             /* Lo más alto y lo más bajo que ha llegado a valer, con su fecha. */
             topesDePrecio(puntos))) +
-        (ficha.moves && ficha.moves.length
+        (!abierto.partidos && ficha.moves && ficha.moves.length
           ? '<h3 class="bench__title">En la liga</h3>' + playerHistory(ficha)
           : '') +
       '</div>';
@@ -5879,11 +5894,22 @@
       return '<p class="muted">Sin datos todavía para eso.</p>';
     }
 
+    /* Racha: lo sumado en los últimos cinco partidos suyos con nota. */
+    const conRacha = conDatos.map(function (j) {
+      const ultimos = (j.rounds || []).filter(function (r) { return r && r.points != null; }).slice(-5);
+      return Object.assign({}, j, {
+        racha: ultimos.reduce(function (suma, r) { return suma + r.points; }, 0),
+        rachaPartidos: ultimos.length
+      });
+    }).filter(function (j) { return j.rachaPartidos > 0; });
+
     const porPuntos = conDatos.slice().sort(function (a, b) { return b.points - a.points; });
     const porMedia = conDatos.slice().sort(function (a, b) { return b.media - a.media; });
+    const porRacha = conRacha.slice().sort(function (a, b) { return b.racha - a.racha; });
 
     const enteros = function (j) { return j.points + ' pts'; };
     const decimales = function (j) { return j.media.toFixed(1).replace('.', ','); };
+    const racha = function (j) { return j.racha + ' pts'; };
     const veces = function (j) {
       return '<span class="ranking__sub">' + j.played +
         (j.played === 1 ? ' partido' : ' partidos') + '</span>';
@@ -5899,20 +5925,24 @@
       '</div>';
     };
 
-    return bloque('Más puntos', 'mas', porPuntos, enteros) +
-      bloque('Mejor media', 'media', porMedia, decimales) +
-      bloque('Menos puntos', 'menos', porPuntos.slice().reverse(), enteros) +
-      bloque('Peor media', 'peormedia', porMedia.slice().reverse(), decimales);
+    /* Dos filas de tres: arriba lo mejor, abajo lo peor. */
+    const matiz = '<span class="ranking__matiz">(últimos 5 partidos)</span>';
+    return '<div class="rankings--tres">' +
+        bloque('Más puntos', 'mas', porPuntos, enteros) +
+        bloque('Mejor media', 'media', porMedia, decimales) +
+        bloque('Mejor racha ' + matiz, 'racha', porRacha, racha) +
+      '</div>' +
+      '<div class="rankings--tres">' +
+        bloque('Menos puntos', 'menos', porPuntos.slice().reverse(), enteros) +
+        bloque('Peor media', 'peormedia', porMedia.slice().reverse(), decimales) +
+        bloque('Peor racha ' + matiz, 'peorracha', porRacha.slice().reverse(), racha) +
+      '</div>';
   }
 
   /* ---------- Rankings de la temporada ----------
      Salen del recuento de lances de cada jornada. Los minutos no est\u00e1n:
      Biwenger solo los da en la ficha de cada futbolista, uno a uno. */
   const RANKINGS = [
-    /* Rendimiento por lo que cuesta y forma de las tres ultimas jornadas: los
-       dos que de verdad sirven para decidir fichajes. */
-    { titulo: 'Puntos por millón', campo: 'pointsPerMillion', sufijo: '', decimal: true, minimo: 1 },
-    { titulo: 'En racha',           campo: 'racha',        sufijo: ' pts' },
     { titulo: 'M\u00e1s goles',          campo: 'goals',        sufijo: '' },
     { titulo: 'M\u00e1s asistencias',    campo: 'assists',      sufijo: '' },
     { titulo: 'Goles por partido',  campo: 'goalsPerGame', sufijo: '', decimal: true, minimo: 1 },
