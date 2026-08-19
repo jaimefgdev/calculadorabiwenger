@@ -3810,7 +3810,7 @@
     return jugador.pending ? '?' : '–';
   }
 
-  function staticPitch(type, jugadores) {
+  function staticPitch(type, jugadores, conDueno) {
     const porLinea = { 1: [], 2: [], 3: [], 4: [] };
     jugadores.forEach(function (jugador) {
       const pos = jugador.position || 3;
@@ -3821,7 +3821,7 @@
       const huecos = porLinea[pos].map(function (jugador) {
         return '<div class="pitch__slot">' +
           crestOf(jugador, 'crest--ghost') +
-          caraDeAlineacion(jugador, 'pitch__face') +
+          caraDeAlineacion(jugador, 'pitch__face', conDueno) +
           '<span class="pitch__name">' + escapeHtml(jugador.name) + '</span>' +
         '</div>';
       }).join('');
@@ -4075,10 +4075,11 @@
     const sinNota = jugador.points == null;
     return '<span class="face-box">' + faceOf(jugador.id, claseCara) +
       chapaDePuesto(jugador.position, 'puesto--esquina', otrosPuestosDe(jugador)) +
-      statusMark(jugador, 'mark--esquina') +
+      /* Con el dueño puesto, él ocupa la esquina de arriba a la derecha y el
+         estado se calla: en el once ideal de una jornada ya jugada no aporta. */
+      (conDueno ? chapaDeManager(jugador, 'dueno--alto') : statusMark(jugador, 'mark--esquina')) +
       '<span class="pts pts--esquina' + (sinNota ? ' pts--sinnota' : '') + '">' +
         marcaDePuntos(jugador) + '</span>' +
-      (conDueno ? chapaDeManager(jugador, 'dueno--esquina') : '') +
     '</span>';
   }
 
@@ -4219,7 +4220,8 @@
     const fila = function (jugador) {
       return '<div class="alin__fila">' +
         '<span class="alin__pos">' + (jugador.position ? POSITION_NAMES[jugador.position] : '\u2014') + '</span>' +
-        '<span class="with-crest">' + playerName({ playerId: jugador.id, player: jugador.name }) +
+        '<span class="with-crest">' + playerName({ playerId: jugador.id, player: jugador.name,
+          position: jugador.position, altPositions: jugador.altPositions }) +
           chapaDeManager(jugador, 'dueno--fila') + '</span>' +
         '<span class="alin__lances">' + lancesDe(jugador) + '</span>' +
         '<span class="alin__pts">' + (jugador.points == null ? '<span class="sub">\u2013</span>' : jugador.points) + '</span>' +
@@ -4327,7 +4329,10 @@
               '</button>' +
               (abierto
                 ? '<div class="partido__detalle">' +
-                    (jugado ? '' : '<p class="muted alin__aviso">Alineaciones probables: el partido no se ha jugado.</p>') +
+                    (jugado ? ''
+                      : '<p class="muted alin__aviso">' +
+                        (juego.confirmadas ? 'Alineación confirmada.' : 'Alineaciones probables.') +
+                        '</p>') +
                     (function () {
                       /* Solo se ofrece la otra vista: campo a la derecha, tabla
                          a la izquierda. */
@@ -4452,20 +4457,21 @@
       return;
     }
 
-    const campo = function (titulo, datos) {
+    const campo = function (titulo, datos, conDueno) {
       if (!datos || !datos.players || !datos.players.length) return '';
       return '<div class="once">' +
         '<div class="panel__head panel__head--center"><h2>' + titulo + '</h2>' +
           '<p class="muted">' + escapeHtml(datos.type || '') + (datos.type ? ' · ' : '') +
             '<strong>' + datos.points + ' puntos</strong></p></div>' +
-        '<div class="pitch-wrap">' + staticPitch(datos.type, datos.players) + '</div>' +
+        '<div class="pitch-wrap">' + staticPitch(datos.type, datos.players, conDueno) + '</div>' +
       '</div>';
     };
 
     caja.hidden = false;
     caja.innerHTML = '<div class="onces">' +
       campo('Once ideal', once) +
-      campo('Once ideal de mi liga', nuestro) +
+      /* En el nuestro, la foto de quién lo tiene en su plantilla. */
+      campo('Once ideal de mi liga', nuestro, true) +
     '</div>';
   }
 
@@ -4697,7 +4703,8 @@
             '<td class="detail-rank">' +
               (jugador.position ? POSITION_NAMES[jugador.position] : '—') + '</td>' +
             '<td><span class="with-crest">' +
-              playerName({ playerId: jugador.id, player: jugador.name }) +
+              playerName({ playerId: jugador.id, player: jugador.name,
+                position: jugador.position, altPositions: jugador.altPositions }) +
               crestOf(jugador, 'crest--badge') + '</span></td>' +
             '<td class="num"><strong>' + jugador.points + '</strong></td>' +
             '<td class="num">' + jugador.played + '</td>' +

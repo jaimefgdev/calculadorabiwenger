@@ -520,7 +520,9 @@ code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft)
 .pitch__area--top::after { top: 72%; }
 .pitch__area--bottom::after { bottom: 72%; }
 .pitch__line { position: relative; z-index: 1; }
-.pitch__line { display: flex; justify-content: space-evenly; gap: .25rem; }
+/* Si en una línea no caben todos —un 4-6-0 en pantalla estrecha—, pasan a la
+   siguiente en vez de encogerse hasta no leerse. */
+.pitch__line { display: flex; flex-wrap: wrap; justify-content: space-evenly; gap: .25rem; }
 /* El hueco se mide en porcentaje de la línea (cinco caben en la más poblada)
    y la cara ocupa casi todo el hueco: así crecen con el campo en vez de
    quedarse en un tamaño fijo. */
@@ -1891,6 +1893,8 @@ main.wrap { padding-bottom: 3.5rem; }
   box-shadow: 0 1px 3px rgba(0,0,0,.35);
 }
 .dueno--esquina { position: absolute; right: 0; bottom: 0; transform: translate(26%, 14%); z-index: 3; }
+/* En el once ideal de la liga, el dueño va arriba a la derecha. */
+.dueno--alto { position: absolute; right: 0; top: 0; transform: translate(26%, -14%); z-index: 3; }
 .dueno--fila { margin-left: .3rem; vertical-align: middle; }
 .dueno--fila .avatar { width: 16px; height: 16px; }
 
