@@ -1692,12 +1692,30 @@
 
   /* ---------- Cuenta atrás de la jornada ---------- */
 
+  /**
+   * ¿Lo siguiente que pasa es que arranca una jornada?
+   *
+   * Son dos casos: que la de la tarjeta no haya empezado todavía, o que ya esté
+   * jugada y el próximo pitido sea de la siguiente. En los dos, la lista de
+   * partidos no aporta nada y lo que interesa es la cuenta atrás.
+   */
+  function jornadaPorEmpezar(round) {
+    if (!round) return false;
+    /* Lo dice el Worker, que es quien ve las dos jornadas a la vez. */
+    if (round.proximo && round.proximo.arranca != null) return !!round.proximo.arranca;
+    /* Si contesta un Worker viejo, se apaña con lo que hay: vale para la
+       jornada de la propia tarjeta, no para una aplazada. */
+    return !round.live && (round.played || 0) === 0;
+  }
+
   function renderRound() {
     const section = $('round-panel');
     const round = state.round;
     if (!round || !round.start) { section.hidden = true; return; }
 
     section.hidden = false;
+    const porEmpezar = jornadaPorEmpezar(round);
+    section.classList.toggle('round--porempezar', porEmpezar);
     /* Con la jornada empezada no interesa el arranque de la siguiente, sino
        cómo va la de ahora. */
     const enJuego = !!round.live;
@@ -1725,12 +1743,15 @@
 
     const matches = round.matches || [];
     const toggle = $('round-toggle');
-    toggle.hidden = false;
-    toggle.setAttribute('aria-expanded', state.roundOpen && matches.length ? 'true' : 'false');
+    /* Si la jornada aún no ha arrancado, los partidos jugados y los horarios no
+       tienen nada que contar: se quitan y la cuenta atrás se queda sola. */
+    toggle.hidden = porEmpezar;
+    toggle.setAttribute('aria-expanded',
+      !porEmpezar && state.roundOpen && matches.length ? 'true' : 'false');
     toggle.disabled = matches.length === 0;
 
     const box = $('round-games');
-    box.hidden = !(state.roundOpen && matches.length);
+    box.hidden = porEmpezar || !(state.roundOpen && matches.length);
     if (!box.hidden) box.innerHTML = roundGames(matches);
     tickRound();
   }
@@ -1821,14 +1842,20 @@
       return Date.parse(partido.start) === Date.parse(round.start);
     })[0];
 
-    const deOtra = siguiente && siguiente.otraJornada && siguiente.number
+    /* Sin la lista de partidos al lado, el número de jornada no se ve en ningún
+       otro sitio: lo dice el propio rótulo del reloj. */
+    const porEmpezar = jornadaPorEmpezar(round);
+    const cual = (siguiente && siguiente.number) || round.number || null;
+    const cabecera = porEmpezar && cual ? 'Jornada ' + cual + ' · ' : '';
+
+    const deOtra = !porEmpezar && siguiente && siguiente.otraJornada && siguiente.number
       ? ' (jornada ' + siguiente.number + ')' : '';
     const rotulo = siguiente
-      ? 'próximo partido' + deOtra + ' · <span class="round__rival">' +
+      ? cabecera + 'próximo partido' + deOtra + ' · <span class="round__rival">' +
         escudoDeEquipo(siguiente.homeId, siguiente.home) +
         '<span class="round__vs">–</span>' +
         escudoDeEquipo(siguiente.awayId, siguiente.away) + '</span>'
-      : 'próximo partido';
+      : cabecera + 'próximo partido';
 
     clock.innerHTML = '<span class="round__next"><small>' + rotulo + '</small>' +
       unidades + '</span>';

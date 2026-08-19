@@ -2355,3 +2355,16 @@ main.wrap { padding-bottom: 3.5rem; }
 .lance--parado { background: #2a78d6; color: #fff; }
 .lance--palo svg { width: 74%; height: 74%; }
 .lance--parado svg { width: 70%; height: 70%; }
+
+/* ---------- Inicio: la tarjeta cambia según el momento ---------- */
+/* Con la jornada en juego manda la lista de partidos (izquierda) y el reloj
+   acompaña a la derecha. Antes de que arranque no hay nada que listar, así que
+   el reloj se queda solo y pegado a la izquierda. */
+.round--porempezar .round__top { justify-content: flex-start; }
+
+/* El botón es flex, y eso le gana al display:none del atributo hidden: sin esta
+   regla, ocultarlo desde el JS no haría nada. */
+.round__toggle[hidden] { display: none; }
+
+/* Solo en ese caso el rótulo puede crecer, que lleva el número de jornada. */
+.round--porempezar .round__next small { font-size: .74rem; color: var(--text-soft); }
