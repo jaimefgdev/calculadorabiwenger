@@ -2263,9 +2263,15 @@ main.wrap { padding-bottom: 3.5rem; }
 .nota--sin { background: transparent; color: var(--text-faint); font-weight: 400; }
 
 /* Los bloques de Puntos, en dos filas de tres. */
+/* Dos filas de tres. El contenedor de Puntos era una rejilla de cuatro
+   columnas y metía las dos filas dentro como celdas: salían las seis listas
+   en una sola línea. Con las dos filas dentro, el contenedor deja de repartir
+   y cada fila hace sus tres columnas. */
+.rankings--filas { display: block; }
 .rankings--tres {
   display: grid; gap: 1rem;
   grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 .rankings--tres + .rankings--tres { margin-top: 1.2rem; }
-@media (max-width: 900px) { .rankings--tres { grid-template-columns: 1fr; } }
+/* En pantallas estrechas, las tres pasan a una sola columna. */
+@media (max-width: 700px) { .rankings--tres { grid-template-columns: 1fr; } }

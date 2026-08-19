@@ -6055,6 +6055,8 @@
     if (!caja) return;
 
     const todos = futbolistasAlineados(null);
+    /* Con las dos filas dentro, el contenedor no reparte columnas. */
+    caja.classList.add('rankings--filas');
     caja.innerHTML = todos.length === 0
       ? '<p class="muted">Todavía no hay jornadas guardadas con alineaciones.</p>'
       : cuatroListas(todos, 'nuestra', state.ambito.nuestra, state.puesto.nuestra);
@@ -6116,6 +6118,7 @@
       };
     });
 
+    caja.classList.add('rankings--filas');
     caja.innerHTML = lista.length === 0
       ? '<p class="muted">Todavía no ha jugado nadie.</p>'
       : cuatroListas(lista, 'laliga', state.ambito.laliga, state.puesto.laliga);
