@@ -2605,16 +2605,27 @@
    * Las que tengas marcadas en el simulador ya las resta `simulation()`.
    */
   function topeDePuja(playerId) {
-    const cuentas = simulation();
-    if (cuentas.maxBid == null) return { tope: null, comprometido: 0 };
+    /* Ojo: aquí NO vale `simulation()`. El simulador es un juguete para ver
+       «qué pasaría si»; lo que se puede pujar de verdad sale del saldo y del
+       valor de equipo que tienes ahora mismo en Biwenger. Marcar una venta en
+       el simulador no te da dinero. */
+    const mio = state.teams[myName()] || {};
+    const saldo = state.me && state.me.balance != null ? state.me.balance
+      : (mio.balance != null ? mio.balance : null);
+    const valorEquipo = mio.value != null ? mio.value : (mio.teamValue != null ? mio.teamValue : null);
 
+    if (saldo == null || valorEquipo == null) return { tope: null, comprometido: 0, saldo: saldo };
+
+    const maximo = saldo + valorEquipo * TEAM_VALUE_SHARE;
+
+    /* Las pujas ya enviadas están comprometidas: si te entran, las pagas. La
+       del futbolista que estás mirando no cuenta, porque la sustituyes. */
     const comprometido = pujasEnviadas().reduce(function (suma, oferta) {
-      if (state.sim[oferta.id]) return suma;                       // ya descontada
       if (playerId != null && String(oferta.playerId) === String(playerId)) return suma;
       return suma + oferta.amount;
     }, 0);
 
-    return { tope: cuentas.maxBid - comprometido, comprometido: comprometido, cuentas: cuentas };
+    return { tope: maximo - comprometido, comprometido: comprometido, saldo: saldo, maximo: maximo };
   }
 
   /** Diálogo de puja: dice lo que vale, lo que piden y hasta dónde puedes. */
@@ -2623,7 +2634,6 @@
     if (!venta) return;
     const mia = miPujaPor(playerId);
     const limite = topeDePuja(playerId);
-    const cuentas = limite.cuentas || simulation();
     /* Si ya pujaste, se parte de tu puja; si no, del precio que piden. */
     const partida = mia ? mia.amount : (venta.price || venta.marketValue || 0);
     /* En rojo cuando no da para lo que piden por él. */
@@ -2640,9 +2650,12 @@
         '<div><dt>Valor de mercado</dt><dd>' + money(venta.marketValue || 0) + '</dd></div>' +
         '<div><dt>' + (venta.free ? 'Precio de salida' : 'Pide ' + escapeHtml(venta.seller)) +
           '</dt><dd>' + money(venta.price || 0) + '</dd></div>' +
-        '<div><dt>Tu saldo</dt><dd>' + money(cuentas.balance || 0) + '</dd></div>' +
-        '<div><dt>Tu puja máxima</dt><dd><strong' + (corto ? ' class="money-neg"' : '') + '>' +
-          (limite.tope == null ? '\u2014' : money(limite.tope)) + '</strong></dd></div>' +
+        '<div><dt>Tu saldo</dt><dd>' + money(limite.saldo || 0) + '</dd></div>' +
+        /* Se recalcula al vuelo según lo que vayas escribiendo. */
+        '<div><dt>Te quedaría</dt><dd><strong id="op-restante"' + (corto ? ' class="money-neg"' : '') + '>' +
+          (limite.tope == null ? '\u2014' : money(limite.tope - partida)) + '</strong></dd></div>' +
+        '<div><dt>Tu puja máxima</dt><dd>' +
+          (limite.tope == null ? '\u2014' : money(limite.tope)) + '</dd></div>' +
         (limite.comprometido
           ? '<div><dt>En pujas enviadas</dt><dd class="money-neg">\u2212' +
             money(limite.comprometido) + '</dd></div>'
@@ -6530,6 +6543,20 @@
     ['moves-body', 'market-body', 'squads-body', 'listings-body',
      'movers-up', 'movers-down', 'jugadores-body', 'squad-body'].forEach(function (id) {
       $(id).addEventListener('click', function (event) { abrirFicha(event.target); });
+    });
+
+    $('op-modal').addEventListener('input', function (event) {
+      if (!event.target || event.target.id !== 'op-importe') return;
+      const hueco = $('op-restante');
+      const puja = event.target.closest('.op-card').querySelector('[data-op-pujar]');
+      if (!hueco || !puja) return;
+
+      const limite = topeDePuja(puja.getAttribute('data-op-pujar'));
+      if (limite.tope == null) return;
+      const queda = limite.tope - Math.round(Number(event.target.value) || 0);
+      hueco.textContent = money(queda);
+      /* En rojo en cuanto te pasas de lo que puedes gastar. */
+      hueco.classList.toggle('money-neg', queda < 0);
     });
 
     $('price-modal').addEventListener('input', function (event) {
