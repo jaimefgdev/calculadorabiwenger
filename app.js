@@ -1296,8 +1296,7 @@
             '<td class="detail-rank">' + (index + 1) + '</td>' +
             '<td><span class="with-crest">' + playerName(movement) +
               crestOf(movement, 'crest--badge') + '</span></td>' +
-            '<td><span class="tag ' + (buy ? 'tag--buy' : 'tag--sell') + '">' +
-              (buy ? '↓ Fichado' : '↑ Vendido') + '</span></td>' +
+            '<td>' + etiquetaDeOperacion(movement) + '</td>' +
             '<td class="num">' + (buy
               ? '<span class="money-neg">−' + money(movement.amount) + '</span>'
               : '<span class="money-pos">+' + money(movement.amount) + '</span>') + '</td>' +
@@ -1407,8 +1406,7 @@
         '<td class="estado-cell" data-label="Estado">' +
           statusCell({ id: movement.playerId,
             status: state.moveStatus[moveKey(movement)] || movement.status }) + '</td>' +
-        '<td data-label="Acción"><span class="tag ' + (buy ? 'tag--buy' : 'tag--sell') + '">' +
-          (buy ? '↓ Fichado' : '↑ Vendido') + '</span></td>' +
+        '<td data-label="Acción">' + etiquetaDeOperacion(movement) + '</td>' +
         '<td data-label="Futbolista">' + managerCell + '</td>' +
         '<td class="num" data-label="Importe">' +
           (buy ? '<span class="money-neg">−' + money(movement.amount) + '</span>'
@@ -1462,6 +1460,18 @@
       maxBid: teamValue == null ? null : base + delta + teamValue * TEAM_VALUE_SHARE,
       squad: squad == null ? null : squad + squadDelta
     };
+  }
+
+  /**
+   * Etiqueta de una operación: «Compra» o «Venta» y, entre paréntesis, con
+   * quién se hizo. Sin contraparte fue con el mercado.
+   */
+  function etiquetaDeOperacion(movimiento) {
+    const compra = movimiento.type !== 'sell';
+    const otro = movimiento.otro || 'Mercado';
+    return '<span class="tag ' + (compra ? 'tag--buy' : 'tag--sell') + '">' +
+      (compra ? 'Compra' : 'Venta') +
+      ' <span class="tag__otro">(' + escapeHtml(otro) + ')</span></span>';
   }
 
   /** @param {string} tone 'in' para ventas (verde) y 'out' para pujas (rojo). */
@@ -2333,11 +2343,23 @@
    * Los dos avisos de antes de la jornada: que no llegues en negativo y que no
    * te dejes huecos en el once. Solo se pintan cuando hay algo que arreglar.
    */
-  /** «: quedan 7h 59m», solo en las últimas horas antes de la jornada. */
+  /**
+   * Cuándo empieza la jornada de verdad: el primer partido, no el siguiente
+   * que quede por jugar. Es la hora que cuenta para alinear.
+   */
+  function arranqueDeJornada(round) {
+    const horas = (round.matches || [])
+      .map(function (partido) { return Date.parse(partido.start); })
+      .filter(function (t) { return !isNaN(t); });
+    if (horas.length) return new Date(Math.min.apply(null, horas)).toISOString();
+    return round.start || null;
+  }
+
+  /** «5h 12m» en negrita, solo cuando la jornada está encima. */
   function rotuloCuentaAtras(cerca, round) {
     if (!cerca) return '';
-    const queda = timeLeft(round.start);
-    return queda ? ': quedan <strong>' + escapeHtml(queda.text) + '</strong>' : '';
+    const queda = timeLeft(arranqueDeJornada(round));
+    return queda ? ' <strong>' + escapeHtml(queda.text) + '</strong>' : '';
   }
 
   function pintarAvisosDeAlineacion(titulares) {
@@ -2347,21 +2369,22 @@
     const avisos = [];
     const saldo = state.me && state.me.balance != null ? state.me.balance : null;
     const round = state.round;
-    const empieza = round && round.start ? Date.parse(round.start) : null;
+    const arranque = round ? arranqueDeJornada(round) : null;
+    const empieza = arranque ? Date.parse(arranque) : null;
     const faltan = empieza ? empieza - Date.now() : null;
     /* La cuenta atrás aparece en las últimas doce horas, que es cuando corre
        prisa; antes basta con el aviso. */
     const cerca = faltan != null && faltan > 0 && faltan <= 12 * 3600e3;
 
     if (saldo != null && saldo < 0) {
-      avisos.push('Tienes el saldo en negativo (' + money(saldo) + '). ' +
-        'Hay que estar en positivo antes de que empiece la jornada' + rotuloCuentaAtras(cerca, round) + '.');
+      avisos.push('Saldo negativo (' + money(saldo) + '). Hay que estar en positivo ' +
+        'para puntuar.' + rotuloCuentaAtras(cerca, round));
     }
 
     if (titulares < 11) {
       const huecos = 11 - titulares;
       avisos.push('Te ' + (huecos === 1 ? 'falta 1 jugador' : 'faltan ' + huecos + ' jugadores') +
-        ' en el once' + rotuloCuentaAtras(cerca, round) + '.');
+        ' en el once.' + rotuloCuentaAtras(cerca, round));
     }
 
     caja.hidden = avisos.length === 0;
@@ -3212,7 +3235,13 @@
     /* Solo las jugadas: las que aún no han empezado traen la clasificación a
        ceros y colaban en el recuento como si contaran. */
     const jornadas = jornadasGuardadas().filter(function (jornada) {
-      return (jornada.standings || []).some(function (fila) { return (fila.points || 0) !== 0; });
+      /* Solo las terminadas: mientras rueda, el ganador aún puede cambiar. */
+      const acabada = jornada.round && jornada.round.status
+        ? jornada.round.status === 'finished'
+        : !(state.round && jornada.round && String(state.round.id) === String(jornada.round.id));
+      return acabada && (jornada.standings || []).some(function (fila) {
+        return (fila.points || 0) !== 0;
+      });
     });
     const ganadas = {};
     const ultimas = {};
@@ -4934,8 +4963,7 @@
         const compra = movimiento.type === 'buy';
         return '<tr>' +
           '<td class="detail-date">' + escapeHtml(movimiento.date || '—') + '</td>' +
-          '<td><span class="tag ' + (compra ? 'tag--buy' : 'tag--sell') + '">' +
-            (compra ? '↓ Fichado' : '↑ Vendido') + '</span></td>' +
+          '<td>' + etiquetaDeOperacion(movimiento) + '</td>' +
           '<td>' + (movimiento.manager
             ? '<span class="manager">' + avatar(movimiento.manager) +
               '<span class="manager__name">' + escapeHtml(movimiento.manager) + '</span></span>'
@@ -5254,9 +5282,8 @@
                 const valia = state.startPrices[player.id];
                 return '<span class="sub">reparto' + (valia ? ' · ' + money(valia) : '') + '</span>';
               }
-              const quien = !player.from || player.from === 'Mercado' ? 'mercado' : player.from;
-              return '<span class="sub">compra ' + escapeHtml(quien) + '</span>' +
-                ' <span class="sub">·</span> ' + money(player.paid);
+              /* Solo «compra» y el importe: de quién fue ya se ve en Fichajes. */
+              return '<span class="sub">compra</span> ' + money(player.paid);
             })() + '</td>' +
             '<td class="num"><strong>' + (player.marketValue == null ? '—' : money(player.marketValue)) + '</strong></td>' +
             '<td class="spark-cell">' + sparkline(ultimos(state.priceSeries[player.id], 45), player.id, player.name) + '</td>' +
@@ -6113,6 +6140,8 @@
         player: item.player || 'Jugador desconocido',
         type: item.type === 'sell' ? 'sell' : 'buy',
         manager: manager,
+        /* Con quién se hizo la operación: otro mánager, o el mercado. */
+        otro: item.otro ? (findManager(item.otro, null) || item.otro) : null,
         amount: Math.round(item.amount || 0),
         date: isNaN(time) ? '' : dateFormat.format(new Date(time)),
         timestamp: isNaN(time) ? null : time,

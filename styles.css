@@ -2159,3 +2159,6 @@ main.wrap { padding-bottom: 3.5rem; }
   .detail-table thead th { font-size: .54rem; letter-spacing: 0; }
   .detail-table td, .detail-table thead th { padding: .2rem .08rem; }
 }
+
+/* Con quién se hizo la operación, dentro de la propia etiqueta. */
+.tag__otro { font-weight: 400; opacity: .85; }
