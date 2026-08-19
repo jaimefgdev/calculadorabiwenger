@@ -1092,8 +1092,13 @@ code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft)
 .col-bid { background: color-mix(in srgb, var(--accent) 6%, transparent); }
 .table tfoot .col-bid { background: transparent; }
 
-.filters { display: flex; gap: .5rem; flex-wrap: wrap; }
+/* La pastilla de ámbito va con los filtros, centrada con el buscador. */
+.filters { display: flex; align-items: center; gap: .4rem; flex-wrap: wrap; }
 .filters .field { max-width: 220px; }
+/* Los desplegables, un pelín más estrechos; el buscador, casi igual. */
+.filters #filter-text { max-width: 208px; }
+.filters #filter-manager, .filters #filter-type { max-width: 176px; font-size: .8rem; }
+.filters .ambito { flex: none; margin-right: .1rem; }
 
 .empty { text-align: center; color: var(--text-faint); padding: 2rem 0; font-size: .9rem; }
 

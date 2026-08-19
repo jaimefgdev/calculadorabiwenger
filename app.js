@@ -1546,11 +1546,8 @@
           crestOf(mov, 'crest--badge') + '</span></td>' +
         '<td class="estado-cell" data-label="Estado">' +
           statusCell({ id: mov.playerId, status: mov.status }) + '</td>' +
-        '<td data-label="Acción"><span class="tag ' + (alta ? 'tag--buy' : 'tag--sell') + '">' +
-          (alta ? 'Ficha' : 'Se va') +
-          (mov.teamName || mov.desde
-            ? ' <span class="tag__otro">(' + escapeHtml(alta ? (mov.teamName || '') : (mov.desde || '')) + ')</span>'
-            : '') + '</span></td>' +
+        '<td data-label="Movimiento"><span class="tag ' + (alta ? 'tag--buy' : 'tag--sell') + '">' +
+          (alta ? 'Alta' : 'Baja') + '</span></td>' +
         '<td data-label="Equipo">' + escapeHtml(alta ? (mov.teamName || '—') : (mov.desde || '—')) + '</td>' +
         '<td class="num" data-label="Valor">' +
           (mov.marketValue == null ? '<span class="sub">—</span>' : money(mov.marketValue)) + '</td>' +
@@ -4774,7 +4771,8 @@
     for (let i = 0; i < faltan.length; i += 25) {
       const tanda = faltan.slice(i, i + 25);
       fetch(config.url.replace(/\/+$/, '') + '/?key=' + encodeURIComponent(config.key) +
-        '&historial=' + encodeURIComponent(tanda.join(',')) + '&dias=400',
+        /* La serie entera: desde que el futbolista salió al mercado. */
+        '&historial=' + encodeURIComponent(tanda.join(',')) + '&dias=todo',
         { headers: { 'accept': 'application/json' } })
         .then(function (response) { return response.json(); })
         .then(function (payload) {
