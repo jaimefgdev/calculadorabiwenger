@@ -2282,12 +2282,17 @@ main.wrap { padding-bottom: 3.5rem; }
 /* Con el contenedor delante para ganarle a «.topbar__actions .btn», que si no
    lo deja en 0,8 rem. */
 .topbar__actions .btn--recargar, .btn--recargar {
-  /* Menos relleno a los lados: con la letra grande se iba a 57 px de ancho y
-     quedaba demasiado alargado. */
-  padding: .22rem .7rem;
+  /* Rejilla con el icono centrado: con el relleno normal, el glifo de la
+     flecha quedaba caído hacia abajo. Menos relleno a los lados, además,
+     que con la letra grande se iba a 57 px de ancho. */
+  display: grid; place-items: center;
+  padding: 0 .7rem; height: 34px;
   font-size: 1.5rem; font-weight: 800; line-height: 1;
 }
 
 /* Presupuesto plegado: la cabecera deja de reservar el hueco que separaba del
-   contenido, que ya no está. Así el borde de abajo queda como el de arriba. */
+   contenido, que ya no está. Y el relleno de abajo se recorta lo que el botón
+   «Mostrar» sobresale del título, para que el texto quede centrado en la caja. */
 #budget-panel:has(#budget-cuerpo[hidden]) .panel__head { margin-bottom: 0; }
+#budget-panel:has(#budget-cuerpo[hidden]) { padding-bottom: 1.05rem; }
+#budget-panel:has(#budget-cuerpo[hidden]) .panel__head--row { align-items: center; }
