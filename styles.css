@@ -2224,7 +2224,8 @@ main.wrap { padding-bottom: 3.5rem; }
 .lance { position: relative; }
 .lance__veces {
   position: static; margin-left: .12rem;
-  font-size: .68rem; font-weight: 700; color: var(--text);
+  /* Siempre negro: va sobre el fondo claro del icono, y en blanco no se veía. */
+  font-size: .68rem; font-weight: 700; color: #111;
   font-variant-numeric: tabular-nums;
 }
 /* El icono deja de ser un círculo fijo cuando lleva contador: crece a su lado. */
