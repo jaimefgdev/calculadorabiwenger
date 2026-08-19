@@ -4213,7 +4213,10 @@
     14: { dibujo: 'lesion',  clase: 'lance--lesion',    nombre: 'Lesi\u00f3n' },
     15: { dibujo: 'balon',   clase: 'lance--penalti',   nombre: 'Gol en la tanda de penaltis' },
     16: { dibujo: 'silbato', clase: 'lance--fallo',     nombre: 'Penalti cometido' },
-    17: { dibujo: 'balon',   clase: 'lance--penfallado', nombre: 'Penalti fallado en la tanda' }
+    17: { dibujo: 'balon',   clase: 'lance--penfallado', nombre: 'Penalti fallado en la tanda' },
+    /* Biwenger no distingue el gol de falta: este tipo se lo pone el Worker
+       cruzando la jornada con ESPN, que sí cuenta cómo fue cada gol. */
+    101: { dibujo: 'balon',  clase: 'lance--falta',     nombre: 'Gol de falta' }
   };
 
   /** El dibujo de un lance, o su carácter si no lo tiene (las tarjetas). */
@@ -4243,8 +4246,8 @@
 
     /* Por importancia, no por minuto: primero lo que se recuerda del partido. */
     const ORDEN = {
-      1: 0, 2: 1, 15: 2, 9: 3, 13: 4, 11: 5, 17: 6, 12: 7, 10: 8,
-      3: 9, 6: 10, 8: 11, 7: 12, 16: 13, 14: 14, 5: 15, 4: 16
+      1: 0, 101: 1, 2: 2, 15: 3, 9: 4, 13: 5, 11: 6, 17: 7, 12: 8, 10: 9,
+      3: 10, 6: 11, 8: 12, 7: 13, 16: 14, 14: 15, 5: 16, 4: 17
     };
     grupos.sort(function (a, b) {
       const x = ORDEN[a.type] != null ? ORDEN[a.type] : 50;
