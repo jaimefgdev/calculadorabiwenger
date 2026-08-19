@@ -2018,10 +2018,18 @@ main.wrap { padding-bottom: 3.5rem; }
 .table { width: 100%; }
 .table th, .table td { white-space: normal; }
 
-/* Lo que nunca debe partirse: etiquetas, relojes, chapas y botones. */
+/* Lo que nunca debe partirse: importes, etiquetas, relojes, chapas y botones.
+   Las cifras, las primeras: un «15.649.700 €» con el euro en la línea de abajo
+   queda fatal y encima se lee peor. */
+.table .num, .table .num strong, .table .money-pos, .table .money-neg,
+.table .money-market, .table .bid, .table .bid strong,
 .table .deadline, .table .tag, .table .delta, .table .puesto, .table .puestos,
 .table .ambito, .table .btn, .table .switch, .table .pujado,
 .table .player-name, .table .manager__name { white-space: nowrap; }
+
+/* Si algo tiene que ceder, que sea el nombre —que ya se encoge solo— y no la
+   cifra. */
+.table .with-crest { min-width: 0; }
 
 /* Las caras, escudos e interruptores tienen medida fija: que no se estiren. */
 .table .pic-player, .table .crest--badge, .table .avatar, .table .switch { flex: none; }
