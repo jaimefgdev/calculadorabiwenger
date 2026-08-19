@@ -576,6 +576,8 @@
     /* Altas y bajas de LaLiga, y cuál de las dos vistas se está mirando. */
     laligaMoves: [],
     ambitoFichajes: 'liga',
+    /* Partidos de cada futbolista, para la píldora de su ficha. */
+    partidosJugador: {},
     teams: {},
     warnings: [],
     filters: { text: '', manager: '', type: '' },
@@ -1527,6 +1529,10 @@
    * Altas y bajas de LaLiga: quién ha fichado por un club, quién lo ha dejado
    * y quién ha cambiado de equipo. No tiene nada que ver con nuestra liga.
    */
+  /* «19 ago 2026», sin hora: en las altas y bajas de LaLiga no hace falta. */
+  const fechaCorta = new Intl.DateTimeFormat('es-ES', { day: 'numeric', month: 'short', year: 'numeric' });
+  const diaCorto = (fecha) => fechaCorta.format(new Date(fecha));
+
   function renderMovimientosLaLiga() {
     const cuerpo = $('moves-body');
     const lista = state.laligaMoves || [];
@@ -1551,7 +1557,8 @@
         '<td data-label="Equipo">' + escapeHtml(alta ? (mov.teamName || '—') : (mov.desde || '—')) + '</td>' +
         '<td class="num" data-label="Valor">' +
           (mov.marketValue == null ? '<span class="sub">—</span>' : money(mov.marketValue)) + '</td>' +
-        '<td data-label="Fecha">' + escapeHtml(mov.date ? dateFormat.format(new Date(mov.date)) : '—') + '</td>' +
+        /* Aquí la hora no aporta nada: basta con el día. */
+        '<td data-label="Fecha">' + escapeHtml(mov.date ? diaCorto(mov.date) : '—') + '</td>' +
       '</tr>';
     }).join('');
 
@@ -2462,8 +2469,8 @@
     const cerca = faltan != null && faltan > 0 && faltan <= 12 * 3600e3;
 
     if (saldo != null && saldo < 0) {
-      avisos.push('Saldo negativo (' + money(saldo) + '). Hay que estar en positivo ' +
-        'para puntuar.' + rotuloCuentaAtras(cerca, round));
+      avisos.push('Saldo negativo (' + money(saldo) + '). Tienes que estar en positivo ' +
+        'al comienzo de la jornada para puntuar.' + rotuloCuentaAtras(cerca, round));
     }
 
     if (titulares < 11) {
@@ -4135,19 +4142,57 @@
     6:  { icono: '',       clase: 'lance--amarilla', nombre: 'Tarjeta amarilla' },
     7:  { icono: '',       clase: 'lance--roja',     nombre: 'Tarjeta roja' },
     14: { icono: '\u002b', clase: 'lance--lesion',   nombre: 'Lesi\u00f3n' },
-    16: { icono: '\u26bd', clase: 'lance--fallo',    nombre: 'Penalti cometido' }
+    16: { icono: '\u26bd', clase: 'lance--fallo',    nombre: 'Penalti cometido' },
+    /* Penalti fallado: el mismo balón, tachado. */
+    17: { icono: '\u26bd', clase: 'lance--penfallado', nombre: 'Penalti fallado' }
   };
 
+  /**
+   * Los lances de un futbolista en un partido. Los repetidos no se pintan uno
+   * detrás de otro: se agrupan con «×2», que se lee mejor y ocupa menos.
+   */
   function lancesDe(jugador) {
-    return (jugador.events || []).map(function (lance) {
-      const ficha = LANCES[lance.type];
+    const grupos = [];
+    const porTipo = {};
+
+    (jugador.events || []).forEach(function (lance) {
+      const clave = String(lance.type);
       const minuto = lance.minute != null ? lance.minute + "'" : '';
-      if (!ficha) {
-        return '<span class="lance lance--otro" title="Lance ' + lance.type + ' ' + minuto + '">\u00b7</span>';
+      if (porTipo[clave]) {
+        porTipo[clave].veces += 1;
+        if (minuto) porTipo[clave].minutos.push(minuto);
+        return;
       }
-      return '<span class="lance ' + ficha.clase + '" title="' + ficha.nombre + ' ' + minuto + '">' +
-        ficha.icono + '</span>';
+      porTipo[clave] = { type: lance.type, veces: 1, minutos: minuto ? [minuto] : [] };
+      grupos.push(porTipo[clave]);
+    });
+
+    return grupos.map(function (grupo) {
+      const ficha = LANCES[grupo.type];
+      const cuando = grupo.minutos.length ? ' ' + grupo.minutos.join(', ') : '';
+      const veces = grupo.veces > 1
+        ? '<span class="lance__veces">\u00d7' + grupo.veces + '</span>' : '';
+
+      if (!ficha) {
+        return '<span class="lance lance--otro" title="Lance ' + grupo.type + cuando + '">\u00b7' +
+          veces + '</span>';
+      }
+      return '<span class="lance ' + ficha.clase + '" title="' + ficha.nombre + cuando + '">' +
+        ficha.icono + veces + '</span>';
     }).join('');
+  }
+
+  /**
+   * La nota de un partido, en su pastilla de color: azul de 10 para arriba,
+   * verde de 6 a 9, naranja de 1 a 5, gris el cero y rojo los negativos.
+   */
+  function notaDePartido(puntos) {
+    if (puntos == null) return '<span class="nota nota--sin">–</span>';
+    const clase = puntos >= 10 ? 'nota--azul'
+      : (puntos >= 6 ? 'nota--verde'
+        : (puntos >= 1 ? 'nota--naranja'
+          : (puntos === 0 ? 'nota--cero' : 'nota--roja')));
+    return '<span class="nota ' + clase + '">' + puntos + '</span>';
   }
 
   /** Una alineaci\u00f3n de las dos del partido. */
@@ -5303,6 +5348,60 @@
     '</div>';
   }
 
+  /** Los partidos del futbolista, con su rival, resultado y lo que hizo. */
+  function listaDePartidos(id) {
+    const datos = state.partidosJugador[String(id)];
+    if (datos === undefined) return '<p class="muted">Cargando partidos\u2026</p>';
+    if (!datos || !datos.matches || !datos.matches.length) {
+      return '<p class="muted">Todavía no hay partidos suyos esta temporada.</p>';
+    }
+
+    const filas = datos.matches.slice().reverse().map(function (juego) {
+      const jugado = juego.homeScore != null && juego.awayScore != null;
+      const suyos = juego.enCasa ? juego.homeScore : juego.awayScore;
+      const otros = juego.enCasa ? juego.awayScore : juego.homeScore;
+      const resultado = !jugado ? '–'
+        : (suyos > otros ? 'gano' : (suyos < otros ? 'pierdo' : 'empato'));
+
+      return '<div class="partido-jug' + (jugado ? ' partido-jug--' + resultado : '') + '">' +
+        '<span class="partido-jug__jornada">J' + (juego.number || '') + '</span>' +
+        '<span class="partido-jug__equipos">' +
+          escudoDeEquipo(juego.homeId, juego.home) +
+          '<span class="partido-jug__marcador">' +
+            (jugado ? juego.homeScore + '\u2013' + juego.awayScore : '\u2013') + '</span>' +
+          escudoDeEquipo(juego.awayId, juego.away) +
+        '</span>' +
+        '<span class="partido-jug__lances">' + lancesDe(juego) + '</span>' +
+        '<span class="partido-jug__min">' +
+          (juego.minutes != null ? juego.minutes + "'" : '') + '</span>' +
+        notaDePartido(juego.alineado ? juego.points : null) +
+      '</div>';
+    }).join('');
+
+    return '<div class="partidos-jug">' + filas + '</div>';
+  }
+
+  /** Pide al Worker los partidos de ese futbolista; se guardan por sesión. */
+  function ensurePartidosDe(id) {
+    const config = loadSyncConfig();
+    if (!config.url || !config.key || id == null) return;
+    const clave = String(id);
+    if (state.partidosJugador[clave] !== undefined) return;
+
+    state.partidosJugador[clave] = undefined;
+    fetch(config.url.replace(/\/+$/, '') + '/?key=' + encodeURIComponent(config.key) +
+      '&partidosDe=' + encodeURIComponent(clave), { headers: { 'accept': 'application/json' } })
+      .then(function (response) { return response.json(); })
+      .then(function (payload) {
+        state.partidosJugador[clave] = payload && payload.error ? null : payload;
+        renderPriceModal();
+      })
+      .catch(function () {
+        state.partidosJugador[clave] = null;
+        renderPriceModal();
+      });
+  }
+
   function renderPriceModal() {
     const caja = $('price-modal');
     const abierto = state.priceModal;
@@ -5353,20 +5452,39 @@
              aspa que hay junto al buscador. */
           (abierto.eligiendo ? '' :
             '<button type="button" class="ambito ficha__comparar" data-comparar>' +
-              (abierto.comparar ? 'Quitar comparación' : 'Comparar') + '</button>') +
+              (abierto.comparar ? 'Quitar comparación' : 'Comparar') + '</button>' +
+            '<button type="button" class="ambito" data-partidos-de>' +
+              (abierto.partidos ? 'Ocultar partidos' : 'Partidos') + '</button>') +
           '<button type="button" class="btn btn--ghost btn--close" data-price-close' +
             ' title="Cerrar" aria-label="Cerrar">✕</button>' +
         '</div>' +
         '<p class="muted ficha__datos">' + datos + '</p>' +
         /* Elegido el rival, sus estadísticas van al lado de las de este. */
         (abierto.comparar ? comparativaDeFichas(abierto.id, abierto.comparar) : '') +
+        (abierto.partidos ? listaDePartidos(abierto.id) : '') +
         (abierto.eligiendo ? selectorDeComparacion(abierto.id) : '') +
         (abierto.soloPrecio ? '' : estadisticasDeTemporada(abierto.id) + rachaDeTemporada(abierto.id)) +
         /* Desde los rankings solo interesan las estadísticas: ni el valor de
            mercado ni su evolución pintan nada ahí. */
         (abierto.soloDatos ? '' :
         (puntos.length < 2
-          ? '<p class="viz__empty">Todavía no hay evolución de este futbolista.</p>'
+          /* Biwenger no publica el histórico de todos —los que están sin club,
+             por ejemplo—, pero el valor de hoy sí se sabe: se enseña eso. */
+          ? '<div class="viz-sinserie">' +
+              '<div class="stat"><span class="stat__label">Valor de mercado</span>' +
+                '<strong>' + money(ficha.marketValue || 0) + '</strong></div>' +
+              '<div class="stat"><span class="stat__label">Hoy</span><strong>' +
+                (ficha.increment
+                  ? '<span class="delta ' + (sube2 ? 'delta--up' : 'delta--down') + '">' +
+                    (sube2 ? '▲ +' : '▼ −') + money(Math.abs(ficha.increment)) + '</span>'
+                  : '<span class="delta delta--igual">– ' + money(0) + '</span>') +
+              '</strong></div>' +
+            '</div>' +
+            '<p class="viz__empty">' + (puntos.length === 1
+              /* Recién llegado al mercado: un solo día no dibuja una línea. */
+              ? 'Apareció en el mercado el ' + escapeHtml(diaLargo(puntos[0].day)) +
+                ': aún no hay evolución que enseñar.'
+              : 'Biwenger no publica la evolución de este futbolista.') + '</p>'
           : '<div class="viz-hover">' +
               lineChart(puntos, 'price', sube ? 'var(--pos)' : 'var(--neg)', 'Valor de mercado',
                 { height: 260, ticks: 7, fullTicks: true, padX: 96, hover: true,
@@ -6789,6 +6907,13 @@
 
     $('price-modal').addEventListener('click', function (event) {
       if (!state.priceModal) return;
+
+      if (event.target.closest('[data-partidos-de]')) {
+        state.priceModal.partidos = !state.priceModal.partidos;
+        if (state.priceModal.partidos) ensurePartidosDe(state.priceModal.id);
+        renderPriceModal();
+        return;
+      }
 
       if (event.target.closest('[data-comparar]')) {
         /* Si ya hay comparación, la pastilla la quita; si no, abre la lista. */
