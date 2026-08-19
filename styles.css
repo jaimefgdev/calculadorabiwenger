@@ -2282,12 +2282,14 @@ main.wrap { padding-bottom: 3.5rem; }
 /* Con el contenedor delante para ganarle a «.topbar__actions .btn», que si no
    lo deja en 0,8 rem. */
 .topbar__actions .btn--recargar, .btn--recargar {
-  /* Rejilla con el icono centrado: con el relleno normal, el glifo de la
-     flecha quedaba caído hacia abajo. Menos relleno a los lados, además,
-     que con la letra grande se iba a 57 px de ancho. */
+  /* La flecha va dibujada y centrada por geometría: así se ve igual en el
+     ordenador y en el móvil, sin depender de la fuente del aparato. */
   display: grid; place-items: center;
   padding: 0 .7rem; height: 34px;
-  font-size: 1.5rem; font-weight: 800; line-height: 1;
+}
+.btn--recargar svg {
+  display: block; width: 21px; height: 21px;
+  fill: currentColor;
 }
 
 /* Presupuesto plegado: la cabecera deja de reservar el hueco que separaba del
