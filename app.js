@@ -4095,10 +4095,14 @@
     if (!dueno) return '';
 
     const juega = alineadosEnLaJornada()[String(jugador.id)];
-    const apagado = juega ? '' : ' dueno--fuera';
-    return '<span class="dueno ' + (extra || '') + apagado + '"' +
+    return '<span class="dueno ' + (extra || '') + (juega ? '' : ' dueno--fuera') + '"' +
       ' title="' + escapeHtml(dueno) + (juega ? '' : ' (no lo ha alineado)') + '">' +
-      avatar(dueno) + '</span>';
+      avatar(dueno) +
+      /* Sin alinear: su foto tal cual, con un aspa roja al lado. */
+      (juega ? '' : '<span class="dueno__x" aria-hidden="true">' +
+        '<svg viewBox="0 0 24 24"><path fill="currentColor" d="M18.3 5.7L12 12l6.3 6.3-2.1 2.1L9.9 14.1 3.6 20.4l-2.1-2.1L7.8 12 1.5 5.7l2.1-2.1L9.9 9.9l6.3-6.3z"/></svg>' +
+      '</span>') +
+    '</span>';
   }
 
   function caraDeAlineacion(jugador, claseCara, conDueno) {
@@ -4168,19 +4172,42 @@
   /* ---------- Los partidos de la jornada ----------
      Biwenger numera los lances sin explicarlos; el significado se ha despejado
      cruzándolos con el desglose de puntos y con los resultados. */
-  const LANCES = {
-    1:  { icono: '\u26bd', clase: 'lance--gol',      nombre: 'Gol' },
-    2:  { icono: '\u26bd', clase: 'lance--penalti',  nombre: 'Gol de penalti' },
-    3:  { icono: 'A',      clase: 'lance--asist',    nombre: 'Asistencia' },
-    4:  { icono: '\u25bc', clase: 'lance--sale',     nombre: 'Sale' },
-    5:  { icono: '\u25b2', clase: 'lance--entra',    nombre: 'Entra' },
-    6:  { icono: '',       clase: 'lance--amarilla', nombre: 'Tarjeta amarilla' },
-    7:  { icono: '',       clase: 'lance--roja',     nombre: 'Tarjeta roja' },
-    14: { icono: '\u002b', clase: 'lance--lesion',   nombre: 'Lesi\u00f3n' },
-    16: { icono: '\u26bd', clase: 'lance--fallo',    nombre: 'Penalti cometido' },
-    /* Penalti fallado: el mismo balón, tachado. */
-    17: { icono: '\u26bd', clase: 'lance--penfallado', nombre: 'Penalti fallado' }
+  /* Los iconos van dibujados, no como caracteres: los emojis y los símbolos
+     cambian de forma y de altura según la fuente del aparato, y en el móvil
+     salían descentrados. */
+  const DIBUJOS = {
+    /* Balón: círculo con sus pentágonos insinuados. */
+    balon: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10" fill="#fff"/>' +
+      '<path fill="#111" d="M12 5.6l3.6 2.6-1.4 4.2H9.8L8.4 8.2 12 5.6zm-6.9 4l2.2.6 1.3 4-2 1.7A8 8 0 0 1 5.1 9.6zm13.8 0a8 8 0 0 1-1.5 6.3l-2-1.7 1.3-4 2.2-.6zM9.4 18.9l1-2h3.2l1 2a8 8 0 0 1-5.2 0z"/></svg>',
+    /* Flechas de cambio. */
+    entra: '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 4l7 9h-4.5v7h-5v-7H5z"/></svg>',
+    sale:  '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 20l-7-9h4.5V4h5v7H19z"/></svg>',
+    /* Cruz de lesión, centrada por geometría. */
+    lesion: '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M9.6 3h4.8v6.6H21v4.8h-6.6V21H9.6v-6.6H3V9.6h6.6z"/></svg>',
+    /* Silbato del árbitro, para el penalti cometido. */
+    silbato: '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M2 9.5A2.5 2.5 0 0 1 4.5 7H12l4.4-3.2a1 1 0 0 1 1.6.8V7h2a2 2 0 0 1 2 2v1.5a2 2 0 0 1-2 2h-1.2A6.3 6.3 0 1 1 6 9.3H4.5A2.5 2.5 0 0 1 2 9.5zm10 1.8a4.2 4.2 0 1 0 0 8.4 4.2 4.2 0 0 0 0-8.4zm0 2.2a2 2 0 1 1 0 4 2 2 0 0 1 0-4z"/></svg>',
+    /* La A de asistencia, dibujada para que quede clavada en el círculo. */
+    asist: '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 3.5l6.4 17h-3.6l-1.2-3.6H10.4L9.2 20.5H5.6L12 3.5zm0 5.6l-1.2 4.4h2.4L12 9.1z"/></svg>'
   };
+
+  const LANCES = {
+    1:  { dibujo: 'balon',   clase: 'lance--gol',      nombre: 'Gol' },
+    2:  { dibujo: 'balon',   clase: 'lance--penalti',  nombre: 'Gol de penalti' },
+    3:  { dibujo: 'asist',   clase: 'lance--asist',    nombre: 'Asistencia' },
+    4:  { dibujo: 'sale',    clase: 'lance--sale',     nombre: 'Sale' },
+    5:  { dibujo: 'entra',   clase: 'lance--entra',    nombre: 'Entra' },
+    6:  { icono: '',         clase: 'lance--amarilla', nombre: 'Tarjeta amarilla' },
+    7:  { icono: '',         clase: 'lance--roja',     nombre: 'Tarjeta roja' },
+    14: { dibujo: 'lesion',  clase: 'lance--lesion',   nombre: 'Lesi\u00f3n' },
+    16: { dibujo: 'silbato', clase: 'lance--fallo',    nombre: 'Penalti cometido' },
+    /* Penalti fallado: el balón con el punto rojo. */
+    17: { dibujo: 'balon',   clase: 'lance--penfallado', nombre: 'Penalti fallado' }
+  };
+
+  /** El dibujo de un lance, o su carácter si no lo tiene (las tarjetas). */
+  function pintaDeLance(ficha) {
+    return ficha.dibujo ? DIBUJOS[ficha.dibujo] : (ficha.icono || '');
+  }
 
   /**
    * Los lances de un futbolista en un partido. Los repetidos no se pintan uno
@@ -4221,7 +4248,7 @@
           veces + '</span>';
       }
       return '<span class="lance ' + ficha.clase + '" title="' + ficha.nombre + cuando + '">' +
-        ficha.icono + veces + '</span>';
+        pintaDeLance(ficha) + veces + '</span>';
     }).join('');
   }
 

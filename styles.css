@@ -1451,18 +1451,28 @@ code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft)
   color: #111; background: #fff;
 }
 .lance--gol { background: #fff; }
-.lance--penalti { background: var(--marca); }
-.lance--fallo { background: var(--neg); color: #fff; }
+.lance--penalti { background: #fff; }
+/* Penalti cometido: el silbato del árbitro, rojo sobre blanco. */
+.lance--fallo { background: #fff; color: var(--neg); }
 /* Asistencia: círculo azul con la A en blanco. */
 .lance--asist { background: #2a78d6; color: #fff; }
-.lance--entra { background: var(--pos); color: #fff; font-size: .5rem; }
-.lance--sale { background: var(--neg); color: #fff; font-size: .5rem; }
+.lance--entra { background: var(--pos); color: #fff; }
+.lance--sale { background: var(--neg); color: #fff; }
+
+/* Los dibujos se centran solos dentro del círculo y miden lo mismo en el
+   móvil que en el ordenador, porque no dependen de la fuente del aparato. */
+.lance svg { display: block; width: 72%; height: 72%; }
+.lance--gol svg, .lance--penalti svg,
+.lance--penfallado svg, .lance--falta svg { width: 90%; height: 90%; }
+.lance--lesion svg { width: 62%; height: 62%; }
+.lance--fallo svg { width: 80%; height: 80%; }
+.lance--asist svg { width: 66%; height: 66%; }
 /* Las tarjetas no son redondas: son tarjetas. */
 .lance--amarilla, .lance--roja { width: 10px; height: 14px; border-radius: 2px; }
 .lance--amarilla { background: #f5c518; }
 .lance--roja { background: #e0142c; }
 /* Lesión: círculo blanco con la cruz en rojo. */
-.lance--lesion { background: #fff; color: var(--neg); font-size: .72rem; }
+.lance--lesion { background: #fff; color: var(--neg); }
 .lance--otro { background: var(--border-strong); color: var(--text-soft); }
 
 /* ---------- Jornadas ---------- */
@@ -1896,9 +1906,15 @@ main.wrap { padding-bottom: 3.5rem; }
 /* En el once ideal de la liga, el dueño va arriba a la derecha. */
 .dueno--alto { position: absolute; right: 0; top: 0; transform: translate(26%, -14%); z-index: 3; }
 .dueno--fila { margin-left: .3rem; vertical-align: middle; }
-/* Su mánager no lo ha alineado esta jornada: la foto, en blanco y negro. */
-.dueno--fuera .avatar { filter: grayscale(1); opacity: .75; }
-.dueno--fuera .avatar__pic { filter: grayscale(1); }
+/* Su mánager no lo ha alineado esta jornada: la foto normal y un aspa roja
+   pegada al lado, que se entiende mejor que apagar la imagen. */
+.dueno--fuera { position: relative; }
+.dueno__x {
+  position: absolute; right: -6px; bottom: -3px;
+  display: grid; place-items: center;
+  width: 11px; height: 11px; color: var(--neg);
+}
+.dueno__x svg { display: block; width: 100%; height: 100%; }
 .dueno--fila .avatar { width: 16px; height: 16px; }
 
 /* A una de sanción: una tarjeta amarilla, con forma de tarjeta. */
@@ -2248,12 +2264,20 @@ main.wrap { padding-bottom: 3.5rem; }
   width: 6px; height: 6px; border-radius: 50%;
   background: var(--pos); box-shadow: 0 0 0 1px var(--bg-elev);
 }
-/* Penalti fallado: el balón tachado con un aspa roja. */
+/* Penalti fallado: el balon con el punto rojo arriba a la derecha. */
 .lance--penfallado { background: #fff; }
 .lance--penfallado::after {
-  content: '¹5'; position: absolute; inset: 0;
-  display: grid; place-items: center;
-  color: var(--neg); font-size: .7rem; font-weight: 800;
+  content: ''; position: absolute; top: -1px; right: -1px;
+  width: 6px; height: 6px; border-radius: 50%;
+  background: var(--neg); box-shadow: 0 0 0 1px var(--bg-elev);
+}
+
+/* Gol de falta: el mismo balon con el punto azul. */
+.lance--falta { background: #fff; }
+.lance--falta::after {
+  content: ''; position: absolute; top: -1px; right: -1px;
+  width: 6px; height: 6px; border-radius: 50%;
+  background: #2a78d6; box-shadow: 0 0 0 1px var(--bg-elev);
 }
 
 /* La nota del partido, en su pastilla de color. */
