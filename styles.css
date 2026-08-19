@@ -2276,3 +2276,10 @@ main.wrap { padding-bottom: 3.5rem; }
 .rankings--tres + .rankings--tres { margin-top: 1.2rem; }
 /* En pantallas estrechas, las tres pasan a una sola columna. */
 @media (max-width: 700px) { .rankings--tres { grid-template-columns: 1fr; } }
+
+/* El botón de actualizar: mismo rojo, pero con la flecha en vez del texto y
+   un poco más ancho que alto, para que no quede cuadrado. */
+.btn--recargar {
+  padding: .38rem 1.1rem;
+  font-size: 1.05rem; font-weight: 800; line-height: 1;
+}
