@@ -578,6 +578,7 @@
     ambitoFichajes: 'liga',
     /* Partidos de cada futbolista, para la píldora de su ficha. */
     partidosJugador: {},
+    faltas: {},             // goles de falta por dia (AAAAMMDD), según ESPN
     teams: {},
     warnings: [],
     filters: { text: '', manager: '', type: '' },
@@ -4221,6 +4222,161 @@
     asist: '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 3.5l6.4 17h-3.6l-1.2-3.6H10.4L9.2 20.5H5.6L12 3.5zm0 5.6l-1.2 4.4h2.4L12 9.1z"/></svg>'
   };
 
+  /* ---------- Goles de falta ----------
+   *
+   * Biwenger no los distingue: para él un gol de falta y uno de cabeza son los
+   * dos «type 1» a secas. ESPN sí lo dice, y además deja que se lo pregunte el
+   * navegador (manda cabeceras CORS).
+   *
+   * Se pregunta desde aquí y no desde el Worker a propósito: desde Cloudflare la
+   * respuesta llegaba vacía, y por el camino gastaba peticiones externas de las
+   * que Cloudflare tiene un tope por visita. Desde el navegador sale con tu
+   * propia conexión, que es la que ESPN atiende sin rechistar.
+   */
+  const ESPN = 'https://site.api.espn.com/apis/site/v2/sports/soccer/esp.1';
+
+  /** Tipo propio: los de Biwenger llegan al 17, del 100 en adelante no chocan. */
+  const GOL_DE_FALTA = 101;
+
+  /** Sin tildes ni puntuación, para poder comparar nombres entre las dos webs. */
+  function llano(texto) {
+    return String(texto || '')
+      .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+      .toLowerCase().replace(/[^a-z0-9 ]/g, ' ').replace(/\s+/g, ' ').trim();
+  }
+
+  /** El minuto de ESPN («85'», «90'+3'») en el mismo número que da Biwenger. */
+  function minutoDeEspn(reloj) {
+    const trozos = String(reloj || '').match(/(\d+)(?:'?\s*\+\s*(\d+))?/);
+    if (!trozos) return null;
+    return Number(trozos[1]) + (trozos[2] ? Number(trozos[2]) : 0);
+  }
+
+  /**
+   * Los goles de falta de un día. Una sola petición: el marcador de la jornada
+   * ya trae cómo fue cada gol, sin tener que pedir el resumen de cada partido.
+   */
+  function faltasDelDia(dia) {
+    if (state.faltas[dia] !== undefined) return Promise.resolve(state.faltas[dia]);
+
+    return fetch(ESPN + '/scoreboard?dates=' + dia)
+      .then(function (respuesta) {
+        if (!respuesta.ok) throw new Error('ESPN ' + respuesta.status);
+        return respuesta.json();
+      })
+      .then(function (cuerpo) {
+        const encontradas = [];
+        (cuerpo.events || []).forEach(function (evento) {
+          const juego = (evento.competitions || [])[0] || {};
+          (juego.details || []).forEach(function (lance) {
+            if (!lance.scoringPlay) return;
+            const como = (lance.type && lance.type.text) || '';
+            if (!/free.?kick/i.test(como)) return;
+            /* Un penalti también se lanza parado: si ESPN lo llama penalti, fuera. */
+            if (lance.penaltyKick || /penalty/i.test(como)) return;
+
+            const minuto = minutoDeEspn(lance.clock && lance.clock.displayValue);
+            if (minuto == null) return;
+            const quien = (lance.athletesInvolved || [])[0] || {};
+            encontradas.push({ minuto: minuto, nombre: quien.displayName || quien.shortName || '' });
+          });
+        });
+        state.faltas[dia] = encontradas;
+        return encontradas;
+      })
+      .catch(function () {
+        /* Si ESPN no contesta no se guarda nada, para poder reintentarlo luego:
+           dejar una lista vacía guardada sería dar por hecho que no hubo goles. */
+        return [];
+      });
+  }
+
+  /** Junta los goles de falta de varios días. */
+  function faltasDeLosDias(dias) {
+    return Promise.all(dias.map(faltasDelDia)).then(function (tandas) {
+      return tandas.reduce(function (todas, unas) { return todas.concat(unas); }, []);
+    });
+  }
+
+  /** Los días (AAAAMMDD) en los que se juega una lista de partidos. */
+  function diasDe(partidos) {
+    const dias = {};
+    (partidos || []).forEach(function (partido) {
+      if (partido && partido.start) dias[String(partido.start).slice(0, 10).replace(/-/g, '')] = true;
+    });
+    return Object.keys(dias);
+  }
+
+  /** ¿Este gol fue de falta? Por minuto (con holgura, por el descuento) y apellido. */
+  function esDeFalta(faltas, minuto, nombre) {
+    if (!faltas || !faltas.length || minuto == null) return false;
+    const mios = llano(nombre).split(' ').filter(function (p) { return p.length >= 3; });
+    if (!mios.length) return false;
+
+    return faltas.some(function (falta) {
+      if (Math.abs(Number(falta.minuto) - Number(minuto)) > 2) return false;
+      const suyos = llano(falta.nombre).split(' ');
+      return mios.some(function (palabra) { return suyos.indexOf(palabra) !== -1; });
+    });
+  }
+
+  /**
+   * Pasa a tipo propio los goles de falta de una lista de futbolistas.
+   * Devuelve si ha cambiado algo, para repintar solo cuando haga falta.
+   */
+  function marcaFaltas(jugadores, faltas) {
+    let tocado = false;
+    (jugadores || []).forEach(function (jugador) {
+      (jugador.events || []).forEach(function (lance) {
+        if (lance.type !== 1) return;
+        if (!esDeFalta(faltas, lance.minute, jugador.name)) return;
+        lance.type = GOL_DE_FALTA;
+        tocado = true;
+      });
+    });
+    return tocado;
+  }
+
+  /** Marca los goles de falta en los once y suplentes de una jornada. */
+  function marcaFaltasDeJornada(datos) {
+    if (!datos || !datos.games || !datos.games.length) return Promise.resolve(false);
+
+    return faltasDeLosDias(diasDe(datos.games)).then(function (faltas) {
+      if (!faltas.length) return false;
+      let tocado = false;
+      datos.games.forEach(function (juego) {
+        [juego.home, juego.away].forEach(function (lado) {
+          if (!lado) return;
+          if (marcaFaltas(lado.xi, faltas)) tocado = true;
+          if (marcaFaltas(lado.bench, faltas)) tocado = true;
+        });
+      });
+      return tocado;
+    });
+  }
+
+  /** Y en la lista de partidos de un futbolista, donde el nombre es siempre el suyo. */
+  function marcaFaltasDeFicha(datos) {
+    const jugados = ((datos && datos.matches) || []).filter(function (partido) {
+      return (partido.events || []).some(function (lance) { return lance.type === 1; });
+    });
+    if (!jugados.length) return Promise.resolve(false);
+
+    return faltasDeLosDias(diasDe(jugados)).then(function (faltas) {
+      if (!faltas.length) return false;
+      let tocado = false;
+      jugados.forEach(function (partido) {
+        partido.events.forEach(function (lance) {
+          if (lance.type !== 1) return;
+          if (!esDeFalta(faltas, lance.minute, datos.name)) return;
+          lance.type = GOL_DE_FALTA;
+          tocado = true;
+        });
+      });
+      return tocado;
+    });
+  }
+
   /* Los números son los de Biwenger, sacados de su propio código: antes había
      tipos sin identificar que salían como «Lance 10». */
   const LANCES = {
@@ -4490,6 +4646,11 @@
         state.partidos[id] = payload;
         state.partidosEstado = '';
         renderPartidos();
+        /* Los goles de falta llegan de ESPN, que es otra web: se pintan en
+           cuanto contesta, sin hacer esperar al resto de la jornada. */
+        marcaFaltasDeJornada(payload).then(function (tocado) {
+          if (tocado && state.partidos[id] === payload) renderPartidos();
+        });
       })
       .catch(function () {
         state.partidosEstado = 'error';
@@ -5516,8 +5677,15 @@
       '&partidosDe=' + encodeURIComponent(clave), { headers: { 'accept': 'application/json' } })
       .then(function (response) { return response.json(); })
       .then(function (payload) {
-        state.partidosJugador[clave] = payload && payload.error ? null : payload;
+        const datos = payload && payload.error ? null : payload;
+        state.partidosJugador[clave] = datos;
         renderPriceModal();
+        /* Igual que en la jornada: los goles de falta los pone ESPN despues. */
+        if (datos) {
+          marcaFaltasDeFicha(datos).then(function (tocado) {
+            if (tocado && state.partidosJugador[clave] === datos) renderPriceModal();
+          });
+        }
       })
       .catch(function () {
         state.partidosJugador[clave] = null;
