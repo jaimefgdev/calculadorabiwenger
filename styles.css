@@ -2364,7 +2364,7 @@ main.wrap { padding-top: 1.15rem; padding-bottom: 3.5rem; }
    el reloj se queda solo y pegado a la izquierda. */
 /* Antes de empezar manda el «Inicio de la jornada N», que es quien la nombra y
    abre los partidos; los escudos y el reloj lo acompañan a su derecha. */
-.round--porempezar .round__top { justify-content: flex-start; gap: 1.6rem; }
+.round--porempezar .round__top { justify-content: flex-start; gap: .85rem; }
 
 /* El botón es flex, y eso le gana al display:none del atributo hidden: sin esta
    regla, ocultarlo desde el JS no haría nada. */
@@ -2378,15 +2378,21 @@ main.wrap { padding-top: 1.15rem; padding-bottom: 3.5rem; }
 /* Y que el guion tenga tamano propio, para no depender de lo que herede. */
 .round__rival .round__vs { font-size: .8rem; line-height: 1; }
 
-/* Escudos y contador, a la misma altura que el titulo. Por defecto esto se
-   alinea por linea base, y la de una imagen es su borde inferior mientras que
-   la de un numero es la del texto: por eso los escudos subian y el reloj
-   bailaba. Centrados unos con otros, todo queda a la misma altura. */
+/* Escudos y contador, a la misma altura que el titulo.
+   Las dos mitades de la tarjeta se centran una con otra, pero por dentro cada
+   una manda lo suyo: el texto del titulo por linea base (centrarlo dejaba
+   «Inicio de la» descolgado respecto a «Jornada 2») y los escudos con el
+   contador por centro, porque la linea base de una imagen es su borde
+   inferior y la de un numero la del texto, y asi no cuadraban nunca. */
 .round--porempezar .round__top { align-items: center; }
-.round--porempezar .round__toggle { align-items: center; }
+.round--porempezar .round__toggle { align-items: baseline; }
 .round--porempezar .round__clock { align-items: center; }
 .round--porempezar .round__next { align-items: center; }
 .round--porempezar .round__unit { align-items: baseline; }
+
+/* Sin fecha, el hueco de la fecha sigue siendo un elemento del flex y aporta
+   su separacion: por eso «Jornada 2» quedaba lejisimos de los escudos. */
+.round__when:empty { display: none; }
 
 /* ---------- Rankings: ámbito y desplegado ---------- */
 .rankings__mando {
