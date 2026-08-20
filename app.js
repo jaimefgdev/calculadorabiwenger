@@ -6262,10 +6262,11 @@
      Biwenger solo los da en la ficha de cada futbolista, uno a uno. */
   const RANKINGS = [
     { titulo: 'M\u00e1s goles',          campo: 'goals',        sufijo: '' },
-    /* Por minuto en vez de por partido: mide mejor a quien juega a ratos. Se
-       enseña por cada 90 minutos, que es una cifra legible; el crudo sería
-       0,01 goles por minuto y no dice nada. */
-    { titulo: 'Goles por minuto',   campo: 'goalsPer90',   sufijo: '', decimal: true, minimo: 1 },
+    /* Por minuto en vez de por partido: mide mejor a quien juega a ratos. Va en
+       minutos por gol («1 cada 33'»), que es como se dice; y ordenado al revés,
+       porque aquí gana el que menos tarda. */
+    { titulo: 'Goles por minuto',   campo: 'minutesPerGoal', sufijo: '',
+      menor: true, requiere: 'goals', cada: true, minimo: 1 },
     { titulo: 'M\u00e1s asistencias',    campo: 'assists',      sufijo: '' },
     { titulo: 'M\u00e1s partidos',       campo: 'played',       sufijo: '' },
     { titulo: 'M\u00e1s amarillas',      campo: 'yellow',       sufijo: '' },
@@ -6371,7 +6372,6 @@
     const caja = $('rankings-temporada');
     if (!caja) return;
 
-    /* La píldora y su explicación, que sin ella los números despistan. */
     const deLaLiga = state.rankingsAmbito === 'liga';
     const boton = $('rankings-ambito');
     if (boton) {
@@ -6379,13 +6379,6 @@
       boton.setAttribute('aria-pressed', deLaLiga ? 'true' : 'false');
       boton.classList.toggle('ambito--on', deLaLiga);
     }
-    const pista = $('rankings-pista');
-    if (pista) {
-      pista.textContent = deLaLiga
-        ? 'Solo lo que hizo cada uno estando alineado en la liga.'
-        : 'Todo lo de LaLiga, lo alineara alguien o no.';
-    }
-
     const todos = recuentoActivo();
     if (!todos) {
       caja.innerHTML = deLaLiga && state.recuentoLigaCargando
@@ -6407,6 +6400,9 @@
         /* En los «más», un cero no es un dato: si solo hay dos con rojas, se
            enseñan dos. En «menos encajados» el cero sí dice algo. */
         if (!ranking.menor && !(j[ranking.campo] > 0)) return false;
+        /* Los «menos» admiten el cero, pero minutos por gol sin ningún gol no
+           es un cero: es que no hay dato. */
+        if (ranking.requiere && !(j[ranking.requiere] > 0)) return false;
         return true;
       }).sort(function (a, b) {
         const diferencia = ranking.menor ? a[ranking.campo] - b[ranking.campo]
@@ -6435,9 +6431,11 @@
           (hayMas ? '<span class="ranking__caret" aria-hidden="true">▸</span>' : '') +
         '</button>' +
         '<ol class="ranking__list">' + vistos.map(function (jugador) {
-          const valor = ranking.decimal
-            ? (jugador[ranking.campo] || 0).toFixed(2).replace('.', ',')
-            : (jugador[ranking.campo] || 0);
+          const valor = ranking.cada
+            ? '1 cada ' + (jugador[ranking.campo] || 0) + '′'
+            : (ranking.decimal
+              ? (jugador[ranking.campo] || 0).toFixed(2).replace('.', ',')
+              : (jugador[ranking.campo] || 0));
           const clave = ranking.campo + ':' + jugador.id;
           const abierto = state.datosDetalle === clave;
           return '<li class="ranking__row' + (abierto ? ' ranking__row--abierta' : '') + '">' +
