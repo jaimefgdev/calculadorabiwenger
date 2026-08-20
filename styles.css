@@ -1562,7 +1562,9 @@ code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft)
    El campo iba pegado a la cabecera y la página terminaba en seco. */
 .pitch-wrap { margin-top: .9rem; }
 .lineup-bench { margin-top: .2rem; }
-main.wrap { padding-bottom: 3.5rem; }
+/* La barra de arriba es pegajosa: sin este aire, la primera tarjeta de cada
+   pestaña queda pegada al menú y parece que se mete debajo. */
+main.wrap { padding-top: 1.15rem; padding-bottom: 3.5rem; }
 #jornada-chart { margin-top: 1.5rem; }
 .viz-block .panel__head { margin-bottom: .6rem; }
 
