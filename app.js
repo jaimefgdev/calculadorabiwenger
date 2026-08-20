@@ -6302,6 +6302,31 @@
       });
   }
 
+  /**
+   * Desempate de «más goles» y «más asistencias». Todo por dentro: en la lista
+   * se sigue viendo solo el número que da título al ranking.
+   *
+   * Con los goles iguales gana quien los hizo en menos partidos; si también
+   * empatan los partidos, quien los hizo en menos minutos; luego las
+   * asistencias, y al final el nombre.
+   */
+  function desempata(campo, a, b) {
+    const porPartido = function (j) {
+      return (j.played || 0) ? (j[campo] || 0) / j.played : 0;
+    };
+    if (porPartido(a) !== porPartido(b)) return porPartido(b) - porPartido(a);
+
+    /* Los minutos son aproximados y los calcula el Worker: si contesta uno
+       viejo que aún no los manda, este criterio se salta solo. */
+    const porMinuto = function (j) {
+      return (j.minutes || 0) ? (j[campo] || 0) / j.minutes : 0;
+    };
+    if (porMinuto(a) !== porMinuto(b)) return porMinuto(b) - porMinuto(a);
+
+    if ((a.assists || 0) !== (b.assists || 0)) return (b.assists || 0) - (a.assists || 0);
+    return String(a.name).localeCompare(String(b.name), 'es');
+  }
+
   function renderRankingsTemporada() {
     const caja = $('rankings-temporada');
     if (!caja) return;
@@ -6327,7 +6352,12 @@
       }).sort(function (a, b) {
         const diferencia = ranking.menor ? a[ranking.campo] - b[ranking.campo]
                                          : b[ranking.campo] - a[ranking.campo];
-        return diferencia || String(a.name).localeCompare(String(b.name), 'es');
+        if (diferencia) return diferencia;
+        /* Goles y asistencias tienen desempate propio; los demás, por nombre. */
+        if (ranking.campo === 'goals' || ranking.campo === 'assists') {
+          return desempata(ranking.campo, a, b);
+        }
+        return String(a.name).localeCompare(String(b.name), 'es');
       }).slice(0, 10);
 
       if (lista.length === 0) return '';
