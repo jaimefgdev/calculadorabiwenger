@@ -1740,9 +1740,12 @@
           '<strong class="round__score">' + rodando.homeScore + '–' + rodando.awayScore + '</strong>' +
           escapeHtml(rodando.away) + '</span>';
     } else {
-      $('round-when').textContent = enJuego
-        ? (round.played || 0) + ' de ' + (round.games || 0) + ' partidos jugados'
-        : dateFormat.format(new Date(round.start));
+      /* Antes de arrancar, ni fecha ni hora: la cuenta atras de al lado ya dice
+         cuanto queda, que es lo que se mira, y la fecha solo hacia ruido. */
+      $('round-when').textContent = porEmpezar ? ''
+        : (enJuego
+          ? (round.played || 0) + ' de ' + (round.games || 0) + ' partidos jugados'
+          : dateFormat.format(new Date(round.start)));
     }
 
     const matches = round.matches || [];

@@ -2378,6 +2378,16 @@ main.wrap { padding-top: 1.15rem; padding-bottom: 3.5rem; }
 /* Y que el guion tenga tamano propio, para no depender de lo que herede. */
 .round__rival .round__vs { font-size: .8rem; line-height: 1; }
 
+/* Escudos y contador, a la misma altura que el titulo. Por defecto esto se
+   alinea por linea base, y la de una imagen es su borde inferior mientras que
+   la de un numero es la del texto: por eso los escudos subian y el reloj
+   bailaba. Centrados unos con otros, todo queda a la misma altura. */
+.round--porempezar .round__top { align-items: center; }
+.round--porempezar .round__toggle { align-items: center; }
+.round--porempezar .round__clock { align-items: center; }
+.round--porempezar .round__next { align-items: center; }
+.round--porempezar .round__unit { align-items: baseline; }
+
 /* ---------- Rankings: ámbito y desplegado ---------- */
 .rankings__mando {
   display: flex; align-items: center; gap: .6rem;
