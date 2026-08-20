@@ -2841,6 +2841,32 @@
 
     const mia = miPujaPor(playerId);
     opAviso(mia ? 'Cambiando la puja\u2026' : 'Enviando la puja\u2026');
+
+    /* El mercado se pone al día en cuanto Biwenger dice que sí. Antes había que
+       esperar a la siguiente sincronización y la fila se quedaba unos segundos
+       con la puja vieja, como si no hubiera pasado nada. Lo que llegue luego
+       manda: esto es solo para no mirar un dato caducado mientras tanto. */
+    trasOperarLimpia = function () {
+      if (mia) {
+        mia.amount = importe;
+      } else {
+        state.offers.push({
+          id: 'nueva-' + venta.playerId,   // hasta que llegue el suyo
+          playerId: String(venta.playerId),
+          player: venta.player,
+          amount: importe,
+          direction: 'out',
+          other: venta.free ? 'Mercado' : venta.seller,
+          until: venta.until || null,
+          team: venta.team != null ? venta.team : null,
+          teamName: venta.teamName || null
+        });
+      }
+      /* Ordenadas por importe, igual que las manda el Worker. */
+      state.offers.sort(function (a, b) { return b.amount - a.amount; });
+      render();
+    };
+
     lanzarOperacion({
       accion: 'pujar',
       /* Con id, Biwenger la corrige en vez de crear otra. */
@@ -3331,8 +3357,15 @@
       const retirar = event.target.closest('[data-op-quitar]');
       if (retirar) {
         opAviso('Retirando la puja\u2026');
-        lanzarOperacion({ accion: 'retirar', id: retirar.getAttribute('data-op-quitar') },
-          'Puja retirada.');
+        /* Igual que al pujar: fuera de la lista en cuanto Biwenger confirme. */
+        const quitada = retirar.getAttribute('data-op-quitar');
+        trasOperarLimpia = function () {
+          state.offers = state.offers.filter(function (o) {
+            return String(o.id) !== String(quitada);
+          });
+          render();
+        };
+        lanzarOperacion({ accion: 'retirar', id: quitada }, 'Puja retirada.');
         return;
       }
 
