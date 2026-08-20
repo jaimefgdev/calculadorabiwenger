@@ -581,7 +581,7 @@
     faltas: {},             // goles de falta por dia (AAAAMMDD), según ESPN
     recuentoLiga: null,     // el mismo recuento, pero solo de lo hecho alineado
     rankingsAmbito: 'laliga',
-    rankingAbierto: null,   // que ranking se ha desplegado a cincuenta
+    rankingsAbiertos: {},   // que rankings se han desplegado, uno por campo
     teams: {},
     warnings: [],
     filters: { text: '', manager: '', type: '' },
@@ -3641,6 +3641,8 @@
 
   const MOVERS_CORTO = 25;
   const MOVERS_LARGO = 150;
+  /* Lo pedido: los rankings de Datos despliegan hasta setenta y cinco. */
+  const RANKING_LARGO = 75;
 
   function renderMovers() {
     const datos = state.movers || { up: [], down: [] };
@@ -6422,9 +6424,13 @@
 
       if (lista.length === 0) return '';
 
-      /* Diez de primeras; la cabecera despliega hasta cincuenta. */
-      const desplegado = state.rankingAbierto === ranking.campo;
-      const vistos = lista.slice(0, desplegado ? 50 : 10);
+      /* Diez de primeras; la cabecera despliega hasta setenta y cinco. Mismo
+         patrón que «los que más suben y bajan»: se abre pulsando el título y
+         se cierra con el «Ver menos» de abajo, para que la web se comporte
+         igual en todos los desplegables largos. */
+      const desplegado = !!state.rankingsAbiertos[ranking.campo];
+      const tope = desplegado ? RANKING_LARGO : 10;
+      const vistos = lista.slice(0, tope);
       const hayMas = lista.length > 10;
 
       return '<div class="ranking' + (desplegado ? ' ranking--desplegado' : '') + '">' +
@@ -6462,6 +6468,12 @@
             (abierto ? '<div class="ranking__ficha">' + estadisticasDeTemporada(jugador.id) + '</div>' : '') +
           '</li>';
         }).join('') + '</ol>' +
+        /* Mismo «Ver menos» que en «suben y bajan», y en el mismo sitio: al
+           final de la lista desplegada, para volver a los diez de siempre. */
+        (desplegado && hayMas
+          ? '<button type="button" class="btn btn--ghost btn--sm ranking__mas" data-mas="' +
+            escapeHtml(ranking.campo) + '">Ver menos</button>'
+          : '') +
       '</div>';
     }).join('');
   }
@@ -7255,7 +7267,7 @@
         state.rankingsAmbito = state.rankingsAmbito === 'liga' ? 'laliga' : 'liga';
         /* Al cambiar de ámbito los números son otros: se cierra lo desplegado
            y la ficha abierta, que ya no dicen lo mismo. */
-        state.rankingAbierto = null;
+        state.rankingsAbiertos = {};
         state.datosDetalle = null;
         ensureRecuento();
         renderRankingsTemporada();
@@ -7267,8 +7279,10 @@
       tandas.addEventListener('click', function (event) {
         const mas = event.target.closest('[data-mas]');
         if (mas) {
+          /* Mismo botón para abrir y para «Ver menos»: los dos llevan el mismo
+             data-mas, así que basta con invertir si estaba abierto. */
           const cual = mas.getAttribute('data-mas');
-          state.rankingAbierto = state.rankingAbierto === cual ? null : cual;
+          state.rankingsAbiertos[cual] = !state.rankingsAbiertos[cual];
           renderRankingsTemporada();
           return;
         }
