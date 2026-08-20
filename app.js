@@ -1735,10 +1735,12 @@
     $('round-name').textContent = 'Jornada ' + (round.number || '');
 
     if (rodando) {
+      /* Escudos, igual que en el resto de la tarjeta: el nombre en texto
+         desentonaba con el próximo partido de al lado, que va con escudos. */
       $('round-when').innerHTML = '<span class="round__live">En juego</span>' +
-        '<span class="round__ahora">' + escapeHtml(rodando.home) +
+        '<span class="round__ahora">' + escudoDeEquipo(rodando.homeId, rodando.home) +
           '<strong class="round__score">' + rodando.homeScore + '–' + rodando.awayScore + '</strong>' +
-          escapeHtml(rodando.away) + '</span>';
+          escudoDeEquipo(rodando.awayId, rodando.away) + '</span>';
     } else {
       /* Antes de arrancar, ni fecha ni hora: la cuenta atras de al lado ya dice
          cuanto queda, que es lo que se mira, y la fecha solo hacia ruido. */
@@ -4209,12 +4211,13 @@
 
   function caraDeAlineacion(jugador, claseCara, conDueno) {
     const sinNota = jugador.points == null;
+    const negativa = jugador.points != null && jugador.points < 0;
     return '<span class="face-box">' + faceOf(jugador.id, claseCara) +
       chapaDePuesto(jugador.position, 'puesto--esquina', otrosPuestosDe(jugador)) +
       /* Con el dueño puesto, él ocupa la esquina de arriba a la derecha y el
          estado se calla: en el once ideal de una jornada ya jugada no aporta. */
       (conDueno ? chapaDeManager(jugador, 'dueno--alto') : statusMark(jugador, 'mark--esquina')) +
-      '<span class="pts pts--esquina' + (sinNota ? ' pts--sinnota' : '') + '">' +
+      '<span class="pts pts--esquina' + (sinNota ? ' pts--sinnota' : '') + (negativa ? ' pts--neg' : '') + '">' +
         marcaDePuntos(jugador) + '</span>' +
     '</span>';
   }
@@ -4556,7 +4559,9 @@
           position: jugador.position, altPositions: jugador.altPositions }) +
           chapaDeManager(jugador, 'dueno--fila') + '</span>' +
         '<span class="alin__lances">' + lancesDe(jugador) + '</span>' +
-        '<span class="alin__pts">' + (jugador.points == null ? '<span class="sub">\u2013</span>' : jugador.points) + '</span>' +
+        '<span class="alin__pts">' + (jugador.points == null
+          ? (jugador.pending ? '<span class="sub">?</span>' : '<span class="sub">\u2013</span>')
+          : notaDePartido(jugador.points)) + '</span>' +
       '</div>';
     };
 
