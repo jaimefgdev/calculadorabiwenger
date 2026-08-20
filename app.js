@@ -1817,12 +1817,24 @@
     const enJuego = !!round.live;
 
     if (left <= 0) {
-      clock.innerHTML = enJuego
-        ? '<span class="round__live">En juego</span>'
-        : '<span class="round__unit"><span class="round__value">¡Ya!</span>' +
-          '<small>en juego</small></span>';
+      if (enJuego) {
+        clock.innerHTML = '<span class="round__live">En juego</span>';
+        state.pidiendoArranque = false;
+        return;
+      }
+      /* El reloj ha llegado a cero pero el Worker todavía no ha puesto la
+         jornada «en juego»: Biwenger tarda un poco en avisar. Se adelanta
+         una sincronización para que se ponga al día cuanto antes, y mientras
+         tanto no se dice nada contradictorio como «¡Ya! en juego». */
+      if (!state.pidiendoArranque) {
+        state.pidiendoArranque = true;
+        syncNow(true);
+      }
+      clock.innerHTML = '<span class="round__unit"><span class="round__value">…</span>' +
+        '<small>empezando</small></span>';
       return;
     }
+    state.pidiendoArranque = false;
 
     const days = Math.floor(left / 86400); left -= days * 86400;
     const hours = Math.floor(left / 3600); left -= hours * 3600;
@@ -3273,6 +3285,9 @@
          ahí, como si no hubiera pasado nada. */
       const respondida = opPendiente.id;
       const devuelto = opPendiente.accion === 'devolver' ? opPendiente.playerId : null;
+      /* Aceptar una oferta recibida es vender: ese jugador sale de tu plantilla
+         y de tu alineación ahora mismo, no cuando llegue la siguiente sincronía. */
+      const vendido = opPendiente.accion === 'aceptar' ? opPendiente.playerId : null;
       trasOperarLimpia = function () {
         state.offers = state.offers.filter(function (o) {
           if (String(o.id) === String(respondida)) return false;
@@ -3280,6 +3295,16 @@
           if (devuelto && o.direction === 'in' && String(o.playerId) === String(devuelto)) return false;
           return true;
         });
+        if (vendido != null) {
+          const mio = state.me && state.me.id;
+          (squadList() || []).forEach(function (squad) {
+            if (squad.id !== mio) return;
+            squad.players = (squad.players || []).filter(function (p) {
+              return String(p.id) !== String(vendido);
+            });
+          });
+          ensureXi();
+        }
         render();
       };
     }
@@ -4165,7 +4190,13 @@
     const dueno = jugador && duenoDe(jugador.id);
     if (!dueno) return '';
 
-    const juega = alineadosEnLaJornada()[String(jugador.id)];
+    /* Antes de que se cierren las alineaciones de esa jornada, «no alineado»
+       no significa nada: es que todavía no ha llegado el momento de elegir
+       once. Sin eso, cualquier jornada futura marcaba a todo el mundo fuera. */
+    const jornada = jornadaActiva();
+    const empezada = !!(jornada && jornada.round && jornada.round.status &&
+      jornada.round.status !== 'pending');
+    const juega = !empezada || alineadosEnLaJornada()[String(jugador.id)];
     return '<span class="dueno ' + (extra || '') + (juega ? '' : ' dueno--fuera') + '"' +
       ' title="' + escapeHtml(dueno) + (juega ? '' : ' (no lo ha alineado)') + '">' +
       avatar(dueno) +
