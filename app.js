@@ -1846,20 +1846,22 @@
       return Date.parse(partido.start) === Date.parse(round.start);
     })[0];
 
-    /* Sin la lista de partidos al lado, el número de jornada no se ve en ningún
-       otro sitio: lo dice el propio rótulo del reloj. */
+    /* Cuando la jornada va a empezar, el botón de al lado ya dice cuál es y
+       cuándo: repetir «próximo partido · Jornada 2» era decirlo dos veces. Se
+       quedan solo los escudos y la cuenta atrás. */
     const porEmpezar = jornadaPorEmpezar(round);
-    const cual = (siguiente && siguiente.number) || round.number || null;
-    const cabecera = porEmpezar && cual ? ' · Jornada ' + cual : '';
-
-    const deOtra = !porEmpezar && siguiente && siguiente.otraJornada && siguiente.number
-      ? ' (jornada ' + siguiente.number + ')' : '';
-    const rotulo = siguiente
-      ? 'próximo partido' + cabecera + deOtra + ' · <span class="round__rival">' +
+    const escudos = siguiente
+      ? '<span class="round__rival">' +
         escudoDeEquipo(siguiente.homeId, siguiente.home) +
         '<span class="round__vs">–</span>' +
         escudoDeEquipo(siguiente.awayId, siguiente.away) + '</span>'
-      : 'próximo partido' + cabecera;
+      : '';
+
+    const deOtra = siguiente && siguiente.otraJornada && siguiente.number
+      ? ' (jornada ' + siguiente.number + ')' : '';
+    const rotulo = porEmpezar
+      ? escudos
+      : (siguiente ? 'próximo partido' + deOtra + ' · ' + escudos : 'próximo partido');
 
     clock.innerHTML = '<span class="round__next"><small>' + rotulo + '</small>' +
       unidades + '</span>';

@@ -2362,18 +2362,21 @@ main.wrap { padding-top: 1.15rem; padding-bottom: 3.5rem; }
 /* Con la jornada en juego manda la lista de partidos (izquierda) y el reloj
    acompaña a la derecha. Antes de que arranque no hay nada que listar, así que
    el reloj se queda solo y pegado a la izquierda. */
-.round--porempezar .round__top { justify-content: flex-start; gap: 1.4rem; }
-/* Se intercambian de sitio sin tocar el HTML: el reloj primero y el botón de
-   los partidos detrás, que sigue abriendo horarios y tele. */
-.round--porempezar .round__clock { order: 1; }
-.round--porempezar .round__toggle { order: 2; }
+/* Antes de empezar manda el «Inicio de la jornada N», que es quien la nombra y
+   abre los partidos; los escudos y el reloj lo acompañan a su derecha. */
+.round--porempezar .round__top { justify-content: flex-start; gap: 1.6rem; }
 
 /* El botón es flex, y eso le gana al display:none del atributo hidden: sin esta
    regla, ocultarlo desde el JS no haría nada. */
 .round__toggle[hidden] { display: none; }
 
 /* Solo en ese caso el rótulo puede crecer, que lleva el número de jornada. */
-.round--porempezar .round__next small { font-size: .74rem; color: var(--text-soft); }
+/* Aqui el <small> ya solo lleva los escudos, sin texto delante. No se le pone
+   font-size: 0 para encogerlo: el guion de entre los escudos es texto y se
+   quedaria invisible. */
+.round--porempezar .round__next small { display: inline-flex; align-items: center; }
+/* Y que el guion tenga tamano propio, para no depender de lo que herede. */
+.round__rival .round__vs { font-size: .8rem; line-height: 1; }
 
 /* ---------- Rankings: ámbito y desplegado ---------- */
 .rankings__mando {
