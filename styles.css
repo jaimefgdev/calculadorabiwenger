@@ -233,7 +233,11 @@ code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft)
 /* El reloj es texto, no una fila de cajas: números algo mayores y en el
    color de acento; la unidad, discreta al lado. */
 .round__clock {
-  display: flex; align-items: baseline; gap: .9rem; flex-wrap: wrap;
+  /* Centrado, no «baseline»: en juego lleva escudos al lado de los números, y
+     la base de una imagen es su borde inferior, no la de un dígito. Antes
+     esto solo se arreglaba con la jornada por empezar; en juego se quedaba
+     descolgado otra vez. */
+  display: flex; align-items: center; gap: .9rem; flex-wrap: wrap;
   font-family: var(--mono);
   font-variant-numeric: tabular-nums;
 }
@@ -292,7 +296,7 @@ code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft)
 
 /* El reloj pasa a contar al siguiente partido, y lo dice. En móvil el aviso de
    «en juego» y la cuenta no caben de una: se deja que caiga a otra línea. */
-.round__next { display: inline-flex; align-items: baseline; gap: .55rem; flex-wrap: wrap; }
+.round__next { display: inline-flex; align-items: center; gap: .55rem; flex-wrap: wrap; }
 .round__next small {
   font-family: var(--font); font-size: .68rem; color: var(--text-faint);
 }
