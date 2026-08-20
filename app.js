@@ -6301,8 +6301,9 @@
   }
 
   /* ---------- Rankings de la temporada ----------
-     Salen del recuento de lances de cada jornada. Los minutos no est\u00e1n:
-     Biwenger solo los da en la ficha de cada futbolista, uno a uno. */
+     Salen del recuento de lances de cada jornada; los minutos se aproximan
+     ah\u00ed mismo a partir de los cambios (entra/sale), sin pedir la ficha de
+     cada futbolista uno a uno. */
   const RANKINGS = [
     { titulo: 'M\u00e1s goles',          campo: 'goals',        sufijo: '' },
     /* Por minuto en vez de por partido: mide mejor a quien juega a ratos. Va en
@@ -6311,7 +6312,7 @@
     { titulo: 'Goles por minuto',   campo: 'minutesPerGoal', sufijo: '',
       menor: true, requiere: 'goals', cada: true, minimo: 1 },
     { titulo: 'M\u00e1s asistencias',    campo: 'assists',      sufijo: '' },
-    { titulo: 'M\u00e1s partidos',       campo: 'played',       sufijo: '' },
+    { titulo: 'M\u00e1s minutos',        campo: 'minutes',      sufijo: '' },
     { titulo: 'M\u00e1s amarillas',      campo: 'yellow',       sufijo: '' },
     { titulo: 'M\u00e1s rojas',          campo: 'red',          sufijo: '' },
     { titulo: 'M\u00e1s sustituciones',  campo: 'subsOut',      sufijo: '' },
