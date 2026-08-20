@@ -2362,7 +2362,11 @@ main.wrap { padding-top: 1.15rem; padding-bottom: 3.5rem; }
 /* Con la jornada en juego manda la lista de partidos (izquierda) y el reloj
    acompaña a la derecha. Antes de que arranque no hay nada que listar, así que
    el reloj se queda solo y pegado a la izquierda. */
-.round--porempezar .round__top { justify-content: flex-start; }
+.round--porempezar .round__top { justify-content: flex-start; gap: 1.4rem; }
+/* Se intercambian de sitio sin tocar el HTML: el reloj primero y el botón de
+   los partidos detrás, que sigue abriendo horarios y tele. */
+.round--porempezar .round__clock { order: 1; }
+.round--porempezar .round__toggle { order: 2; }
 
 /* El botón es flex, y eso le gana al display:none del atributo hidden: sin esta
    regla, ocultarlo desde el JS no haría nada. */
@@ -2370,3 +2374,36 @@ main.wrap { padding-top: 1.15rem; padding-bottom: 3.5rem; }
 
 /* Solo en ese caso el rótulo puede crecer, que lleva el número de jornada. */
 .round--porempezar .round__next small { font-size: .74rem; color: var(--text-soft); }
+
+/* ---------- Rankings: ámbito y desplegado ---------- */
+.rankings__mando {
+  display: flex; align-items: center; gap: .6rem;
+  flex-wrap: wrap; margin-bottom: 1rem;
+}
+.rankings__pista { font-size: .8rem; }
+/* La píldora encendida cuando manda el ámbito de la liga. */
+.ambito--on {
+  background: var(--accent); border-color: var(--accent); color: #fff;
+}
+
+/* La cabecera es un botón, pero tiene que seguir leyéndose como un título. */
+.ranking__title--mando {
+  display: flex; align-items: baseline; gap: .3rem;
+  width: 100%; background: none; border: 0; padding: 0; margin: 0;
+  color: inherit; font: inherit; font-size: .9rem; font-weight: 650;
+  text-align: left; cursor: pointer;
+}
+.ranking__title--mando:disabled { cursor: default; }
+.ranking__caret {
+  font-size: .62rem; color: var(--text-faint);
+  transition: transform .15s ease;
+}
+.ranking__title--mando[aria-expanded="true"] .ranking__caret { transform: rotate(90deg); }
+
+/* Desplegado a cincuenta: se le pone tope y scroll propio, que si no la
+   página entera se vuelve interminable. */
+.ranking--desplegado .ranking__list {
+  max-height: 26rem; overflow-y: auto;
+  /* Solo vertical: la horizontal no aparece por ningún lado. */
+  overflow-x: hidden;
+}

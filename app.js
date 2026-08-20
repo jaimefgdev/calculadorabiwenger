@@ -579,6 +579,9 @@
     /* Partidos de cada futbolista, para la píldora de su ficha. */
     partidosJugador: {},
     faltas: {},             // goles de falta por dia (AAAAMMDD), según ESPN
+    recuentoLiga: null,     // el mismo recuento, pero solo de lo hecho alineado
+    rankingsAmbito: 'laliga',
+    rankingAbierto: null,   // que ranking se ha desplegado a cincuenta
     teams: {},
     warnings: [],
     filters: { text: '', manager: '', type: '' },
@@ -1744,15 +1747,15 @@
 
     const matches = round.matches || [];
     const toggle = $('round-toggle');
-    /* Si la jornada aún no ha arrancado, los partidos jugados y los horarios no
-       tienen nada que contar: se quitan y la cuenta atrás se queda sola. */
-    toggle.hidden = porEmpezar;
-    toggle.setAttribute('aria-expanded',
-      !porEmpezar && state.roundOpen && matches.length ? 'true' : 'false');
+    /* Antes de que arranque la jornada la cuenta atrás pasa a la izquierda, pero
+       el botón se queda: los horarios y la tele siguen haciendo falta, que es
+       justo lo que se mira cuando aún no ha empezado. */
+    toggle.hidden = false;
+    toggle.setAttribute('aria-expanded', state.roundOpen && matches.length ? 'true' : 'false');
     toggle.disabled = matches.length === 0;
 
     const box = $('round-games');
-    box.hidden = porEmpezar || !(state.roundOpen && matches.length);
+    box.hidden = !(state.roundOpen && matches.length);
     if (!box.hidden) box.innerHTML = roundGames(matches);
     tickRound();
   }
@@ -6259,7 +6262,10 @@
      Biwenger solo los da en la ficha de cada futbolista, uno a uno. */
   const RANKINGS = [
     { titulo: 'M\u00e1s goles',          campo: 'goals',        sufijo: '' },
-    { titulo: 'Goles por partido',  campo: 'goalsPerGame', sufijo: '', decimal: true, minimo: 1 },
+    /* Por minuto en vez de por partido: mide mejor a quien juega a ratos. Se
+       enseña por cada 90 minutos, que es una cifra legible; el crudo sería
+       0,01 goles por minuto y no dice nada. */
+    { titulo: 'Goles por minuto',   campo: 'goalsPer90',   sufijo: '', decimal: true, minimo: 1 },
     { titulo: 'M\u00e1s asistencias',    campo: 'assists',      sufijo: '' },
     { titulo: 'M\u00e1s partidos',       campo: 'played',       sufijo: '' },
     { titulo: 'M\u00e1s amarillas',      campo: 'yellow',       sufijo: '' },
@@ -6270,9 +6276,17 @@
     { titulo: 'Menos goles encajados', campo: 'conceded',   sufijo: '', porteros: true, menor: true }
   ];
 
+  /** El recuento del ámbito que se esté mirando. */
+  function recuentoActivo() {
+    return state.rankingsAmbito === 'liga' ? state.recuentoLiga : state.recuento;
+  }
+
   function ensureRecuento() {
     const config = loadSyncConfig();
     if (!config.url || !config.key) return;
+    /* El de la liga es otra consulta y se guarda aparte: son dos recuentos
+       distintos, no el mismo filtrado. */
+    if (state.rankingsAmbito === 'liga') { ensureRecuentoDeLiga(); return; }
     if (state.recuento || state.recuentoCargando) return;
 
     state.recuentoCargando = true;
@@ -6302,6 +6316,30 @@
       });
   }
 
+  /** Lo mismo, pero contando solo lo que cada uno hizo estando alineado aquí. */
+  function ensureRecuentoDeLiga() {
+    const config = loadSyncConfig();
+    if (!config.url || !config.key) return;
+    if (state.recuentoLiga || state.recuentoLigaCargando) return;
+
+    state.recuentoLigaCargando = true;
+    renderRankingsTemporada();
+    fetch(config.url.replace(/\/+$/, '') + '/?key=' + encodeURIComponent(config.key) + '&recuento=liga',
+      { headers: { 'accept': 'application/json' } })
+      .then(function (response) { return response.json(); })
+      .then(function (payload) {
+        if (payload.error) throw new Error(payload.error);
+        state.recuentoLiga = payload.players || [];
+        state.recuentoLigaCargando = false;
+        renderRankingsTemporada();
+      })
+      .catch(function () {
+        state.recuentoLigaCargando = false;
+        state.recuentoLiga = [];
+        renderRankingsTemporada();
+      });
+  }
+
   /**
    * Desempate de «más goles» y «más asistencias». Todo por dentro: en la lista
    * se sigue viendo solo el número que da título al ranking.
@@ -6311,17 +6349,19 @@
    * asistencias, y al final el nombre.
    */
   function desempata(campo, a, b) {
-    const porPartido = function (j) {
-      return (j.played || 0) ? (j[campo] || 0) / j.played : 0;
-    };
-    if (porPartido(a) !== porPartido(b)) return porPartido(b) - porPartido(a);
-
-    /* Los minutos son aproximados y los calcula el Worker: si contesta uno
+    /* Primero por minuto, que afina más que por partido: dos con los mismos
+       goles en los mismos partidos pueden llevar minutos muy distintos.
+       Los minutos son aproximados y los calcula el Worker; si contesta uno
        viejo que aún no los manda, este criterio se salta solo. */
     const porMinuto = function (j) {
       return (j.minutes || 0) ? (j[campo] || 0) / j.minutes : 0;
     };
     if (porMinuto(a) !== porMinuto(b)) return porMinuto(b) - porMinuto(a);
+
+    const porPartido = function (j) {
+      return (j.played || 0) ? (j[campo] || 0) / j.played : 0;
+    };
+    if (porPartido(a) !== porPartido(b)) return porPartido(b) - porPartido(a);
 
     if ((a.assists || 0) !== (b.assists || 0)) return (b.assists || 0) - (a.assists || 0);
     return String(a.name).localeCompare(String(b.name), 'es');
@@ -6331,8 +6371,27 @@
     const caja = $('rankings-temporada');
     if (!caja) return;
 
-    const todos = state.recuento;
-    if (!todos) { caja.innerHTML = ''; return; }
+    /* La píldora y su explicación, que sin ella los números despistan. */
+    const deLaLiga = state.rankingsAmbito === 'liga';
+    const boton = $('rankings-ambito');
+    if (boton) {
+      boton.textContent = deLaLiga ? 'Mi liga' : 'LaLiga';
+      boton.setAttribute('aria-pressed', deLaLiga ? 'true' : 'false');
+      boton.classList.toggle('ambito--on', deLaLiga);
+    }
+    const pista = $('rankings-pista');
+    if (pista) {
+      pista.textContent = deLaLiga
+        ? 'Solo lo que hizo cada uno estando alineado en la liga.'
+        : 'Todo lo de LaLiga, lo alineara alguien o no.';
+    }
+
+    const todos = recuentoActivo();
+    if (!todos) {
+      caja.innerHTML = deLaLiga && state.recuentoLigaCargando
+        ? '<p class="muted">Repasando jornada a jornada quién alineó a quién…</p>' : '';
+      return;
+    }
     if (todos.length === 0) {
       caja.innerHTML = '<p class="muted">Todav\u00eda no hay jornadas jugadas.</p>';
       return;
@@ -6358,13 +6417,24 @@
           return desempata(ranking.campo, a, b);
         }
         return String(a.name).localeCompare(String(b.name), 'es');
-      }).slice(0, 10);
+      });
 
       if (lista.length === 0) return '';
 
-      return '<div class="ranking">' +
-        '<h3 class="ranking__title">' + ranking.titulo + '</h3>' +
-        '<ol class="ranking__list">' + lista.map(function (jugador) {
+      /* Diez de primeras; la cabecera despliega hasta cincuenta. */
+      const desplegado = state.rankingAbierto === ranking.campo;
+      const vistos = lista.slice(0, desplegado ? 50 : 10);
+      const hayMas = lista.length > 10;
+
+      return '<div class="ranking' + (desplegado ? ' ranking--desplegado' : '') + '">' +
+        '<button type="button" class="ranking__title ranking__title--mando"' +
+          ' data-mas="' + escapeHtml(ranking.campo) + '"' +
+          ' aria-expanded="' + (desplegado ? 'true' : 'false') + '"' +
+          (hayMas ? '' : ' disabled') + '>' +
+          ranking.titulo +
+          (hayMas ? '<span class="ranking__caret" aria-hidden="true">▸</span>' : '') +
+        '</button>' +
+        '<ol class="ranking__list">' + vistos.map(function (jugador) {
           const valor = ranking.decimal
             ? (jugador[ranking.campo] || 0).toFixed(2).replace('.', ',')
             : (jugador[ranking.campo] || 0);
@@ -7176,9 +7246,29 @@
     /* En las clasificaciones de futbolistas, cada uno abre su gráfico. */
     /* Los rankings de la temporada abren la ficha del futbolista con sus
        estadísticas, sin el gráfico de valor de mercado. */
+    const pildora = $('rankings-ambito');
+    if (pildora) {
+      pildora.addEventListener('click', function () {
+        state.rankingsAmbito = state.rankingsAmbito === 'liga' ? 'laliga' : 'liga';
+        /* Al cambiar de ámbito los números son otros: se cierra lo desplegado
+           y la ficha abierta, que ya no dicen lo mismo. */
+        state.rankingAbierto = null;
+        state.datosDetalle = null;
+        ensureRecuento();
+        renderRankingsTemporada();
+      });
+    }
+
     const tandas = $('rankings-temporada');
     if (tandas) {
       tandas.addEventListener('click', function (event) {
+        const mas = event.target.closest('[data-mas]');
+        if (mas) {
+          const cual = mas.getAttribute('data-mas');
+          state.rankingAbierto = state.rankingAbierto === cual ? null : cual;
+          renderRankingsTemporada();
+          return;
+        }
         const boton = event.target.closest('[data-ficha]');
         if (!boton) return;
         const clave = boton.getAttribute('data-ficha');
