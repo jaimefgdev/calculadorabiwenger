@@ -1846,16 +1846,16 @@
        otro sitio: lo dice el propio rótulo del reloj. */
     const porEmpezar = jornadaPorEmpezar(round);
     const cual = (siguiente && siguiente.number) || round.number || null;
-    const cabecera = porEmpezar && cual ? 'Jornada ' + cual + ' · ' : '';
+    const cabecera = porEmpezar && cual ? ' · Jornada ' + cual : '';
 
     const deOtra = !porEmpezar && siguiente && siguiente.otraJornada && siguiente.number
       ? ' (jornada ' + siguiente.number + ')' : '';
     const rotulo = siguiente
-      ? cabecera + 'próximo partido' + deOtra + ' · <span class="round__rival">' +
+      ? 'próximo partido' + cabecera + deOtra + ' · <span class="round__rival">' +
         escudoDeEquipo(siguiente.homeId, siguiente.home) +
         '<span class="round__vs">–</span>' +
         escudoDeEquipo(siguiente.awayId, siguiente.away) + '</span>'
-      : cabecera + 'próximo partido';
+      : 'próximo partido' + cabecera;
 
     clock.innerHTML = '<span class="round__next"><small>' + rotulo + '</small>' +
       unidades + '</span>';
