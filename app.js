@@ -3786,8 +3786,12 @@
     } catch (error) { /* sin sitio: se sigue en memoria */ }
   }
 
-  /** Une lo que llega con lo guardado, quedándose siempre con lo más completo. */
-  function mergeJornada(payload) {
+  /**
+   * Une lo que llega con lo guardado, quedándose siempre con lo más completo.
+   * En silencio (`callado`) no toca cuál es la jornada en curso: se usa al
+   * refrescar por detrás una jornada que no se está mirando.
+   */
+  function mergeJornada(payload, callado) {
     const id = payload.round && payload.round.id;
     if (id == null) return null;
 
@@ -3823,7 +3827,7 @@
       savedAt: new Date().toISOString()
     };
     if (payload.rounds && payload.rounds.length) state.jornadas.list = payload.rounds;
-    state.jornadas.actual = id;
+    if (!callado) state.jornadas.actual = id;
     persistJornadas();
     return id;
   }
@@ -3874,6 +3878,40 @@
       .catch(function () {
         state.jornadaEstado = 'error';
         renderJornadas();
+      });
+  }
+
+  /**
+   * Refresca por detrás las jornadas guardadas que todavía no están cerradas.
+   *
+   * Sus puntos entran en la general aunque no se estén mirando, y hasta ahora
+   * solo se actualizaban al abrirlas: en el PC la jornada 1 se quedó con los
+   * números viejos de hacía dos días —y con ellos la general— mientras que en
+   * el móvil, que sí la había abierto después, salían bien.
+   */
+  function refrescarJornadasAbiertas() {
+    const config = loadSyncConfig();
+    if (!config.url || !config.key) return;
+
+    jornadasGuardadas()
+      .filter(function (jornada) { return !jornadaCerrada(jornada); })
+      .forEach(function (jornada) {
+        const id = jornada.round.id;
+        /* La que se está mirando ya la pide ensureJornada, con su aviso de
+           «cargando»; aquí solo van las de detrás, y sin tocar la vista. */
+        if (String(id) === String(jornadaVistaId())) return;
+
+        fetch(config.url.replace(/\/+$/, '') + '/?key=' + encodeURIComponent(config.key) +
+          '&jornada=' + encodeURIComponent(id), { headers: { 'accept': 'application/json' } })
+          .then(function (response) { return response.json(); })
+          .then(function (payload) {
+            if (payload.error || !payload.round) return;
+            mergeJornada(payload, true);
+            renderJornadas();
+            renderManagers();
+            renderRankings();
+          })
+          .catch(function () { /* si falla, se queda lo guardado */ });
       });
   }
 
@@ -7057,6 +7095,9 @@
     /* Mientras la jornada está viva es el único momento en que Biwenger da el
        banquillo: se captura en cada sincronización, se mire o no la pestaña. */
     ensureJornada('actual', true);
+    /* Y las que siguen abiertas por detrás (la 1 con sus aplazados, sin ir más
+       lejos): sus puntos cuentan para la general aunque no se estén mirando. */
+    refrescarJornadasAbiertas();
     /* Y se mira si has tocado la alineación desde el otro aparato. */
     traerXiCompartida();
     /* Lo que se pidió hace rato se vuelve a pedir: si no, con la pestaña
