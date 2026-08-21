@@ -3800,7 +3800,12 @@
     const config = loadSyncConfig();
     if (!config.url || !config.key) return;
 
-    const guardada = cual !== 'actual' && state.jornadas.datos[cual];
+    /* Una jornada por jugar puede tener guardado un cero viejo (o algo peor,
+       de antes de arreglar esto), y no cambia sola: solo se confía en la
+       caché si ya está cerrada o en juego, para que una por jugar se vuelva
+       a pedir cada vez hasta que de verdad tenga algo que enseñar. */
+    const previa = cual !== 'actual' ? state.jornadas.datos[cual] : null;
+    const guardada = previa && previa.round && previa.round.status !== 'pending' ? previa : null;
     if (guardada && !forzar) { state.jornadaVista = cual; return; }
     /* Solo se frena si ya se está pidiendo esa misma: antes, con una jornada
        a medio traer, elegir otra no hacía nada. */
