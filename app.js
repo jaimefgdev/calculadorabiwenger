@@ -3482,6 +3482,16 @@
   /** ¿Esta jornada ha terminado y ya tiene los puntos repartidos? */
   function jornadaCerrada(jornada) {
     if (!jornada || !jornada.round) return false;
+
+    /* Biwenger da por «finished» una jornada a la que todavía le quedan
+       partidos aplazados por jugar: la 1 lo estuvo con cuatro pendientes para
+       la semana siguiente. Si a algún alineado le falta su partido, la jornada
+       no está cerrada por mucho que él diga lo contrario. */
+    const faltaAlguno = (jornada.standings || []).some(function (fila) {
+      return (fila.xi || []).some(function (jugador) { return jugador.pending; });
+    });
+    if (faltaAlguno) return false;
+
     if (jornada.round.status) return jornada.round.status === 'finished';
     /* Sin estado, se mira si es la que está en juego ahora mismo. */
     return !(state.round && String(state.round.id) === String(jornada.round.id));
@@ -3832,11 +3842,7 @@
        se quedan clavadas con lo que hubiera la primera vez (un cero de antes
        de empezar, o un marcador ya viejo). */
     const previa = cual !== 'actual' ? state.jornadas.datos[cual] : null;
-    const sinPendientes = previa && (previa.standings || []).every(function (fila) {
-      return !(fila.xi || []).some(function (p) { return p.pending; });
-    });
-    const guardada = previa && previa.round && previa.round.status === 'finished' && sinPendientes
-      ? previa : null;
+    const guardada = previa && jornadaCerrada(previa) ? previa : null;
     if (guardada && !forzar) { state.jornadaVista = cual; return; }
     /* Solo se frena si ya se está pidiendo esa misma: antes, con una jornada
        a medio traer, elegir otra no hacía nada. */
