@@ -326,6 +326,13 @@ code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft)
   margin: 1.6rem 0 .7rem;
 }
 
+/* Título a la izquierda y la píldora que cambia de ámbito a la derecha. */
+.seccion__cabecera {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: .6rem; flex-wrap: wrap;
+}
+.seccion__cabecera .rankings__mando { margin-bottom: 0; }
+
 /* ---------- Quién puntúa en la liga ---------- */
 /* Las cuatro siempre en una fila, también en móvil: ahí la página se ve con
    1024 px de ancho y caben. Los nombres largos se recortan con puntos. */

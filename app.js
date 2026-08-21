@@ -372,7 +372,7 @@
     Object.keys(state.jornadas.datos).forEach(function (id) {
       const jornada = state.jornadas.datos[id];
       const round = jornada && jornada.round;
-      if (!round || (round.part || 1) !== 1) return;
+      if (!esJornadaPropia(round)) return;
       if (round.status === 'pending') return;
       if (hasta != null && (round.number || 0) > hasta) return;
       /* Por identificador y no por nombre: en la jornada Biwenger devuelve el
@@ -603,6 +603,7 @@
     faltas: {},             // goles de falta por dia (AAAAMMDD), según ESPN
     recuentoLiga: null,     // el mismo recuento, pero solo de lo hecho alineado
     rankingsAmbito: 'laliga',
+    puntosAmbito: 'laliga',  // el mismo cambio, en la tabla de Puntos
     rankingsAbiertos: {},   // que rankings se han desplegado, uno por campo
     teams: {},
     warnings: [],
@@ -3466,11 +3467,31 @@
 
   /* ---------- Cómo va la liga ---------- */
 
-  /** Las jornadas guardadas, de la más antigua a la más nueva. */
+  /**
+   * ¿Es una jornada de verdad, y no la mitad aplazada de otra?
+   *
+   * Biwenger añade una entrada más («Jornada 1 (aplazada)») con los MISMOS
+   * partidos y los mismos futbolistas que la original. Contarla es contar dos
+   * veces a todo el mundo, que es lo que inflaba los partidos de cada uno.
+   *
+   * El `part` viene en la respuesta, pero las jornadas guardadas de antes no lo
+   * tienen: para esas se busca en el calendario, que sí lo trae.
+   */
+  function esJornadaPropia(round) {
+    if (!round) return false;
+    if (round.part != null) return round.part === 1;
+    const ficha = (state.jornadas.list || []).filter(function (r) {
+      return String(r.id) === String(round.id);
+    })[0];
+    return ((ficha && ficha.part) || 1) === 1;
+  }
+
+  /** Las jornadas guardadas propias, de la más antigua a la más nueva. */
   function jornadasGuardadas() {
     return Object.keys(state.jornadas.datos)
       .map(function (id) { return state.jornadas.datos[id]; })
       .filter(function (j) { return j && j.round && (j.standings || []).length; })
+      .filter(function (j) { return esJornadaPropia(j.round); })
       .sort(function (a, b) { return (a.round.number || 0) - (b.round.number || 0); });
   }
 
@@ -3510,7 +3531,11 @@
        cambiar con cada partido, así que no se cuenta hasta que Biwenger la
        da por acabada y reparte los puntos. */
     conPuntos.filter(jornadaCerrada).forEach(function (jornada) {
-      const filas = (jornada.standings || []).filter(function (f) { return f.points != null; });
+      /* El que empezó la jornada en negativo no puntúa esa jornada, así que
+         tampoco puede ganarla por mucho que sumara su once. */
+      const filas = (jornada.standings || []).filter(function (f) {
+        return f.points != null && f.counts !== false;
+      });
       if (!filas.length) return;
 
       /* El ganador se decide con los criterios oficiales, no solo por puntos. */
@@ -3522,10 +3547,19 @@
     });
 
     /* Racha: los puntos de las tres últimas jornadas, incluida la que está en
-       juego con lo que lleve. Al empezar la cuarta, la primera deja de contar. */
+       juego con lo que lleve. Al empezar la cuarta, la primera deja de contar.
+
+       Al mánager que empezó la jornada con saldo negativo esa jornada no le
+       cuenta (`counts: false`, lo dice Biwenger): ni suma ni resta, aporta
+       cero. Lo que puntúen sus futbolistas da igual aquí. */
     conPuntos.slice(-3).forEach(function (jornada) {
       (jornada.standings || []).forEach(function (fila) {
         if (fila.points == null) return;
+        if (fila.counts === false) {
+          /* Que aparezca en la lista aunque esa jornada no le sume nada. */
+          ultimas[fila.name] = ultimas[fila.name] || 0;
+          return;
+        }
         ultimas[fila.name] = (ultimas[fila.name] || 0) + fila.points;
       });
     });
@@ -3807,6 +3841,7 @@
         points: fila.points != null ? fila.points : antes.points,
         played: fila.played != null ? fila.played : antes.played,
         counts: fila.counts !== undefined ? fila.counts : antes.counts,
+        gaps: fila.gaps !== undefined ? fila.gaps : antes.gaps,
         type: fila.type || antes.type,
         // Lo importante: una respuesta vacía nunca borra la alineación guardada.
         xi: fila.xi && fila.xi.length ? fila.xi : (antes.xi || []),
@@ -4958,7 +4993,13 @@
           (fila.counts === false
             ? ' class="no-cuenta" title="Empezó la jornada con saldo negativo: no puntúa"'
             : '') + '>' +
-          (fila.points == null ? '—' : fila.points) + '</strong></td>' +
+          (fila.points == null ? '—' : fila.points) + '</strong>' +
+          /* Cuatro puntos menos por hueco sin cubrir: si no se dice, el total
+             parece que está mal restado. */
+          (fila.gaps ? '<span class="ranking__sub" title="' + fila.gaps +
+            (fila.gaps === 1 ? ' hueco' : ' huecos') + ' en la alineación, a 4 puntos cada uno">−' +
+            (fila.gaps * 4) + '</span>' : '') +
+        '</td>' +
         '<td class="num" data-label="General">' + (function () {
           const total = puntosGenerales(fila.name);
           return total == null ? '<span class="sub">—</span>' : total;
@@ -6109,6 +6150,9 @@
 
     Object.keys(state.jornadas.datos).forEach(function (id) {
       const jornada = state.jornadas.datos[id];
+      /* La mitad aplazada de una jornada trae los mismos partidos y los mismos
+         futbolistas que la original: contarla es contar a todos dos veces. */
+      if (!esJornadaPropia(jornada.round)) return;
       const numero = (jornada.round && jornada.round.number) || null;
 
       (jornada.standings || []).forEach(function (fila) {
@@ -6138,6 +6182,7 @@
             sinNota: jugador.points == null,
             home: jugador.home
           });
+          /* Un futbolista suma o resta lo que puntúe, tal cual. */
           ficha.points += jugador.points || 0;
           if (jugador.home === true) {
             ficha.pointsHome += jugador.points || 0;
@@ -6601,21 +6646,37 @@
     }).join('');
   }
 
+  /**
+   * Los que más y menos rinden. Una sola tabla con su píldora, igual que en
+   * Rankings: antes eran dos tablas seguidas, la nuestra y la de LaLiga.
+   */
   function renderRankings() {
-    const caja = $('rankings-jugadores');
+    const caja = $('rankings-puntos');
     if (!caja) return;
 
-    const todos = futbolistasAlineados(null);
+    const deLaLiga = state.puntosAmbito === 'liga';
+    const boton = $('puntos-ambito');
+    if (boton) {
+      boton.textContent = deLaLiga ? 'Mi liga' : 'LaLiga';
+      boton.setAttribute('aria-pressed', deLaLiga ? 'true' : 'false');
+      boton.classList.toggle('ambito--on', deLaLiga);
+    }
+
     /* Con las dos filas dentro, el contenedor no reparte columnas. */
     caja.classList.add('rankings--filas');
-    caja.innerHTML = todos.length === 0
-      ? '<p class="muted">Todavía no hay jornadas guardadas con alineaciones.</p>'
-      : cuatroListas(todos, 'nuestra', state.ambito.nuestra, state.puesto.nuestra);
 
-    const mando = $('ambitos-nuestra');
-    if (mando) mando.innerHTML = selectorAmbito('nuestra', state.ambito.nuestra, state.puesto.nuestra);
+    if (deLaLiga) {
+      const todos = futbolistasAlineados(null);
+      caja.innerHTML = todos.length === 0
+        ? '<p class="muted">Todavía no hay jornadas guardadas con alineaciones.</p>'
+        : cuatroListas(todos, 'nuestra', state.ambito.nuestra, state.puesto.nuestra);
 
-    renderLaLiga();
+      const mando = $('ambitos-puntos');
+      if (mando) mando.innerHTML = selectorAmbito('nuestra', state.ambito.nuestra, state.puesto.nuestra);
+    } else {
+      renderLaLiga();
+    }
+
     ajustarNombres();
   }
 
@@ -6632,7 +6693,7 @@
 
   /** Lo mismo, pero con todos los futbolistas de la competición. */
   function renderLaLiga() {
-    const caja = $('rankings-laliga');
+    const caja = $('rankings-puntos');
     if (!caja) return;
 
     const datos = state.laliga;
@@ -6674,7 +6735,7 @@
       ? '<p class="muted">Todavía no ha jugado nadie.</p>'
       : cuatroListas(lista, 'laliga', state.ambito.laliga, state.puesto.laliga);
 
-    const mando = $('ambitos-laliga');
+    const mando = $('ambitos-puntos');
     if (mando) mando.innerHTML = selectorAmbito('laliga', state.ambito.laliga, state.puesto.laliga);
     ajustarNombres();
   }
@@ -6696,11 +6757,13 @@
         state.laligaAt = Date.now();
         recordarPosiciones(state.laliga);
         state.laligaCargando = false;
-        renderLaLiga();
+        /* Solo si es lo que se está mirando: si no, pisaría la tabla nuestra. */
+        if (state.puntosAmbito !== 'liga') renderLaLiga();
       })
       .catch(function () {
         state.laligaCargando = false;
-        const caja = $('rankings-laliga');
+        if (state.puntosAmbito === 'liga') return;
+        const caja = $('rankings-puntos');
         if (caja) caja.innerHTML = '<p class="muted">No se han podido traer los datos de la competición.</p>';
       });
   }
@@ -7400,6 +7463,17 @@
       });
     }
 
+    const pildoraPuntos = $('puntos-ambito');
+    if (pildoraPuntos) {
+      pildoraPuntos.addEventListener('click', function () {
+        state.puntosAmbito = state.puntosAmbito === 'liga' ? 'laliga' : 'liga';
+        /* Los números son otros: la ficha abierta ya no dice lo mismo. */
+        state.puntosDetalle = null;
+        if (state.puntosAmbito !== 'liga') ensureLaLiga();
+        renderRankings();
+      });
+    }
+
     const tandas = $('rankings-temporada');
     if (tandas) {
       tandas.addEventListener('click', function (event) {
@@ -7421,7 +7495,7 @@
       });
     }
 
-    ['rankings-jugadores', 'rankings-laliga', 'ambitos-nuestra', 'ambitos-laliga'].forEach(function (id) {
+    ['rankings-puntos', 'ambitos-puntos'].forEach(function (id) {
       $(id).addEventListener('click', function (event) {
         const mando = event.target.closest('[data-ambito], [data-puesto]');
         if (mando) {
