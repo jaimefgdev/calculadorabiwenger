@@ -351,27 +351,33 @@
   /* ---------- Cálculo ---------- */
 
   /**
-   * Los puntos de la jornada en juego, que Biwenger no suma a la clasificación
-   * general hasta que la cierra: mientras tanto manda ceros y en su propia app
-   * los enseña igualmente. Aquí se suman para que la tabla vaya subiendo según
-   * acaban los partidos, y se dejan de sumar en cuanto la jornada acaba, que es
-   * cuando Biwenger ya los tiene en el total.
+   * Los puntos de las jornadas que Biwenger todavía no ha sumado a la
+   * clasificación general: mientras la jornada 1 tenga un partido aplazado
+   * sin jugar, su tabla de puntos se queda a cero indefinidamente, y con ella
+   * cualquier jornada posterior (aquí llega ese cero como «base»). Así que la
+   * general no se fía de ese campo: se suma a mano lo que llevamos calculado
+   * de cada jornada propia (part 1) que tengamos, jugada del todo o a medias,
+   * y ese total manda siempre que haya alguna jornada con datos.
    */
   function conJornadaEnJuego(equipo, base) {
-    const round = state.round;
-    if (!equipo || !equipo.id || !round || !round.live || round.id == null) return base;
+    if (!equipo || !equipo.id) return base;
 
-    const jornada = state.jornadas.datos[round.id];
-    if (!jornada) return base;
+    let total = 0;
+    let alguna = false;
+    Object.keys(state.jornadas.datos).forEach(function (id) {
+      const jornada = state.jornadas.datos[id];
+      if (!jornada || !jornada.round || (jornada.round.part || 1) !== 1) return;
+      /* Por identificador y no por nombre: en la jornada Biwenger devuelve el
+         nombre con emojis y aquí llega sin ellos. */
+      const fila = (jornada.standings || []).filter(function (f) {
+        return String(f.id) === String(equipo.id);
+      })[0];
+      if (!fila) return;
+      total += fila.points || 0;
+      alguna = true;
+    });
 
-    /* Por identificador y no por nombre: en la jornada Biwenger devuelve el
-       nombre con emojis y aquí llega sin ellos. */
-    const fila = (jornada.standings || []).filter(function (f) {
-      return String(f.id) === String(equipo.id);
-    })[0];
-    const suma = fila && fila.points ? fila.points : 0;
-    if (!suma) return base;
-    return (base || 0) + suma;
+    return alguna ? total : base;
   }
 
   function computeBudgets(movements, teams) {
@@ -3800,12 +3806,20 @@
     const config = loadSyncConfig();
     if (!config.url || !config.key) return;
 
-    /* Una jornada por jugar puede tener guardado un cero viejo (o algo peor,
-       de antes de arreglar esto), y no cambia sola: solo se confía en la
-       caché si ya está cerrada o en juego, para que una por jugar se vuelva
-       a pedir cada vez hasta que de verdad tenga algo que enseñar. */
+    /* Una jornada por jugar o en juego cambia sola: la primera en cuanto
+       empieza, la segunda partido a partido. Y aunque Biwenger la marque
+       «finished», si le queda algún jugador pendiente es que todavía tiene
+       un partido aplazado sin jugar (pasa en la jornada 1): tampoco esa es
+       de fiar. Solo una cerrada y sin nadie pendiente se queda en caché para
+       siempre; las demás se vuelven a pedir cada vez que se abren, que si no
+       se quedan clavadas con lo que hubiera la primera vez (un cero de antes
+       de empezar, o un marcador ya viejo). */
     const previa = cual !== 'actual' ? state.jornadas.datos[cual] : null;
-    const guardada = previa && previa.round && previa.round.status !== 'pending' ? previa : null;
+    const sinPendientes = previa && (previa.standings || []).every(function (fila) {
+      return !(fila.xi || []).some(function (p) { return p.pending; });
+    });
+    const guardada = previa && previa.round && previa.round.status === 'finished' && sinPendientes
+      ? previa : null;
     if (guardada && !forzar) { state.jornadaVista = cual; return; }
     /* Solo se frena si ya se está pidiendo esa misma: antes, con una jornada
        a medio traer, elegir otra no hacía nada. */
