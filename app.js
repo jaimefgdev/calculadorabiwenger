@@ -351,22 +351,30 @@
   /* ---------- Cálculo ---------- */
 
   /**
-   * Los puntos de las jornadas que Biwenger todavía no ha sumado a la
-   * clasificación general: mientras la jornada 1 tenga un partido aplazado
-   * sin jugar, su tabla de puntos se queda a cero indefinidamente, y con ella
-   * cualquier jornada posterior (aquí llega ese cero como «base»). Así que la
-   * general no se fía de ese campo: se suma a mano lo que llevamos calculado
-   * de cada jornada propia (part 1) que tengamos, jugada del todo o a medias,
-   * y ese total manda siempre que haya alguna jornada con datos.
+   * Lo que lleva un mánager sumando jornada a jornada lo calculado aquí.
+   * Biwenger no publica el total de la temporada mientras la jornada 1 tenga
+   * partidos aplazados sin jugar: deja su campo de puntos a cero, así que la
+   * general se suma a mano.
+   *
+   * Con `hasta` se corta en esa jornada inclusive, que es lo que hace falta en
+   * la pestaña de Jornadas: mirando la 1 la general es la de la 1, mirando la
+   * 2 la de la 1 más la 2, y así. Sin `hasta`, la temporada entera.
+   *
+   * Solo cuentan las jornadas propias (part 1, nunca la mitad aplazada de otra,
+   * que repite sus mismos partidos) y las que ya han empezado: una por jugar no
+   * suma nada aunque haya quedado algo guardado de ella.
    */
-  function conJornadaEnJuego(equipo, base) {
-    if (!equipo || !equipo.id) return base;
+  function puntosSumados(equipo, hasta) {
+    if (!equipo || !equipo.id) return null;
 
     let total = 0;
     let alguna = false;
     Object.keys(state.jornadas.datos).forEach(function (id) {
       const jornada = state.jornadas.datos[id];
-      if (!jornada || !jornada.round || (jornada.round.part || 1) !== 1) return;
+      const round = jornada && jornada.round;
+      if (!round || (round.part || 1) !== 1) return;
+      if (round.status === 'pending') return;
+      if (hasta != null && (round.number || 0) > hasta) return;
       /* Por identificador y no por nombre: en la jornada Biwenger devuelve el
          nombre con emojis y aquí llega sin ellos. */
       const fila = (jornada.standings || []).filter(function (f) {
@@ -377,7 +385,12 @@
       alguna = true;
     });
 
-    return alguna ? total : base;
+    return alguna ? total : null;
+  }
+
+  function conJornadaEnJuego(equipo, base) {
+    const total = puntosSumados(equipo, null);
+    return total != null ? total : base;
   }
 
   function computeBudgets(movements, teams) {
@@ -3866,16 +3879,18 @@
   }
 
   /**
-   * Puntos de toda la temporada. Biwenger no suma la jornada en curso al total
-   * hasta que la cierra, así que se le añade lo que lleve ahora mismo: es lo
-   * que enseña su app y lo que se espera ver aquí.
+   * Puntos en la general hasta la jornada que se está mirando, inclusive: en la
+   * 1 son los de la 1; en la 2, los de la 1 más los de la 2, y así. Es una
+   * columna de la tabla de jornadas, y ahí una general que no avanza con la
+   * jornada elegida no dice nada.
    */
   function puntosGenerales(nombre) {
     const equipo = state.teams[nombre];
     if (!equipo) return null;
-    const base = equipo.points != null ? equipo.points : null;
-    const total = conJornadaEnJuego(equipo, base);
-    return total != null ? total : base;
+    const vista = jornadaActiva();
+    const hasta = vista && vista.round && vista.round.number != null ? vista.round.number : null;
+    const total = puntosSumados(equipo, hasta);
+    return total != null ? total : (equipo.points != null ? equipo.points : null);
   }
 
   const ROUND_VALUES = {
