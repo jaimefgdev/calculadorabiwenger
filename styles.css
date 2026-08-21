@@ -2305,6 +2305,10 @@ main.wrap { padding-top: 1.15rem; padding-bottom: 3.5rem; }
 .nota--roja { background: var(--neg); color: #fff; }
 .nota--sin { background: transparent; color: var(--text-faint); font-weight: 400; }
 
+/* Jornada que no le cuenta al mánager por empezarla con saldo negativo: los
+   puntos se ven, pero tachados y en rojo, para que se note que no suman. */
+.no-cuenta { color: var(--neg); text-decoration: line-through; }
+
 /* Los bloques de Puntos, en dos filas de tres. */
 /* Dos filas de tres. El contenedor de Puntos era una rejilla de cuatro
    columnas y metía las dos filas dentro como celdas: salían las seis listas

@@ -381,7 +381,10 @@
         return String(f.id) === String(equipo.id);
       })[0];
       if (!fila) return;
-      total += fila.points || 0;
+      /* El mánager que empezó la jornada con saldo negativo no puntúa esa
+         jornada: ni suma ni resta. La jornada cuenta igual (por eso `alguna`),
+         pero él aporta cero. */
+      if (fila.counts !== false) total += fila.points || 0;
       alguna = true;
     });
 
@@ -3789,6 +3792,7 @@
         position: fila.position != null ? fila.position : antes.position,
         points: fila.points != null ? fila.points : antes.points,
         played: fila.played != null ? fila.played : antes.played,
+        counts: fila.counts !== undefined ? fila.counts : antes.counts,
         type: fila.type || antes.type,
         // Lo importante: una respuesta vacía nunca borra la alineación guardada.
         xi: fila.xi && fila.xi.length ? fila.xi : (antes.xi || []),
@@ -4904,7 +4908,12 @@
             '<span class="manager">' + avatar(fila.name) +
               '<span class="manager__name">' + escapeHtml(fila.name) + '</span></span>' +
           '</button></td>' +
-        '<td class="num" data-label="Jornada"><strong>' +
+        /* Con saldo negativo al empezar la jornada, esos puntos no le cuentan:
+           se enseñan igual (como hace Biwenger) pero en rojo y avisando. */
+        '<td class="num" data-label="Jornada"><strong' +
+          (fila.counts === false
+            ? ' class="no-cuenta" title="Empezó la jornada con saldo negativo: no puntúa"'
+            : '') + '>' +
           (fila.points == null ? '—' : fila.points) + '</strong></td>' +
         '<td class="num" data-label="General">' + (function () {
           const total = puntosGenerales(fila.name);
