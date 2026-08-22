@@ -645,6 +645,8 @@
     market: null,          // el mercado de hoy, con sus pujas
     marketFiltro: 'todos',  // todos · libres · vendidos (de mánagers)
     marketState: '',       // 'cargando' | 'error' | ''
+    marketError: '',       // el motivo, tal como lo dice Biwenger
+    marketReintento: null, // el temporizador del reintento tras su tregua
     startPrices: {},       // lo que valía cada jugador el día que lo recibió
     priceSeries: {},       // evolución de precio de cada futbolista
     priceModal: null,      // futbolista con la evolución ampliada
@@ -2589,12 +2591,27 @@
           return { id: v.playerId, position: v.position, altPositions: v.altPositions };
         }));
         state.marketState = '';
+        state.marketError = '';
         renderMarket();
         ensurePriceSeries(state.market.map(function (v) { return v.playerId; }), renderMarket);
       })
-      .catch(function () {
+      .catch(function (error) {
         state.marketState = 'error';
+        /* Se guarda el motivo: casi siempre es que Biwenger nos ha limitado un
+           rato, y decirlo (con lo que queda) evita pensar que está roto. */
+        state.marketError = String((error && error.message) || '');
         renderMarket();
+
+        /* Si es solo la tregua de Biwenger, se reintenta solo: son segundos, y
+           tener que darle tú a recargar para eso no tiene sentido. */
+        const espera = state.marketError.match(/(\d+)\s*s/);
+        if (/limitado/i.test(state.marketError) && !state.marketReintento) {
+          const segundos = espera ? Math.min(180, Number(espera[1]) + 3) : 95;
+          state.marketReintento = setTimeout(function () {
+            state.marketReintento = null;
+            ensureMarket(true);
+          }, segundos * 1000);
+        }
       });
   }
 
@@ -2671,7 +2688,11 @@
 
     if (!state.market) {
       cuerpo.innerHTML = '<tr><td colspan="8" class="muted">' +
-        (state.marketState === 'error' ? 'No se ha podido traer el mercado.' : 'Cargando el mercado\u2026') +
+        (state.marketState === 'error'
+          /* Con el motivo de Biwenger, que suele ser su tregua de un rato. */
+          ? escapeHtml(state.marketError || 'No se ha podido traer el mercado.') +
+            (/limitado/i.test(state.marketError || '') ? ' Se vuelve a intentar solo.' : '')
+          : 'Cargando el mercado\u2026') +
         '</td></tr>';
       return;
     }
@@ -2689,6 +2710,7 @@
         '</td></tr>';
       /* Aun sin filas, el resto de la cabecera se pinta igual. */
       pintarBotonOfertas();
+      pintarCierreMercado();
       return;
     }
 
@@ -2750,20 +2772,26 @@
         : (state.sort.market.dir === 1 ? 'ascending' : 'descending'));
     });
 
-    /* El mercado se renueva cuando vencen los jugadores libres: el más
-       próximo de esos plazos es la hora de cierre. */
-    const cierre = state.market
+    /* Los nombres largos de los duenos se encogen hasta caber enteros. */
+    ajustarNombres();
+    pintarCierreMercado();
+  }
+
+  /**
+   * La cuenta atrás del cierre. El mercado se renueva cuando vencen los
+   * jugadores libres, así que el más próximo de esos plazos es la hora.
+   *
+   * Se saca del mercado entero, nunca de lo que se esté viendo: filtrando por
+   * «no libres» no queda ningún plazo y la cuenta atrás se habría borrado.
+   */
+  function pintarCierreMercado() {
+    const nota = $('market-note');
+    if (!nota) return;
+    const cierre = (state.market || [])
       .filter(function (v) { return v.free && v.until; })
       .map(function (v) { return v.until; })
       .sort()[0] || null;
-
-    /* Los nombres largos de los duenos se encogen hasta caber enteros. */
-    ajustarNombres();
-
-    /* Cuantos hay no dice gran cosa: lo que importa es lo que queda. */
-    $('market-note').innerHTML = cierre
-      ? 'Se renueva en ' + deadlineCell(cierre, true)
-      : '';
+    nota.innerHTML = cierre ? 'Se renueva en ' + deadlineCell(cierre, true) : '';
   }
 
   /* ---------- Operaciones de verdad en Biwenger ----------
