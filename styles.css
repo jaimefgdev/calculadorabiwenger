@@ -348,6 +348,15 @@ code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft)
 /* La píldora que cambia de ámbito, arrimada a la derecha dentro del cuadro. */
 .rankings__mando--derecha { justify-content: flex-end; }
 
+/* Cabecera dentro del cuadro: el rótulo a la izquierda y la píldora a la
+   derecha, en la misma línea. */
+.panel__cab {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: .6rem; flex-wrap: wrap; margin-bottom: 1rem;
+}
+/* Dentro del cuadro no hace falta el aire de arriba que lleva suelto. */
+.seccion__titulo--dentro { margin: 0; }
+
 /* ---------- Quién puntúa en la liga ---------- */
 /* Las cuatro siempre en una fila, también en móvil: ahí la página se ve con
    1024 px de ancho y caben. Los nombres largos se recortan con puntos. */

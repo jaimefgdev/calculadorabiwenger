@@ -647,6 +647,7 @@
     puntosAmbito: 'laliga',  // el mismo cambio, en la tabla de Puntos
     pujasDe: {},             // cuántas pujas lleva cada futbolista, ya preguntadas
     rankingsAbiertos: {},   // que rankings se han desplegado, uno por campo
+    puntosAbiertos: {},     // lo mismo, en las listas de Puntos
     teams: {},
     warnings: [],
     filters: { text: '', manager: '', type: '' },
@@ -7250,6 +7251,9 @@
 
     /* En casa y fuera solo entra quien ha jugado alguno allí. */
     const conDatos = lista.filter(function (j) {
+        /* Los entrenadores (puesto 5) no son futbolistas: puntúan con otras
+           reglas y no se comparan con nadie. Fuera de estas tablas. */
+        if (Number(j.position) === 5) return false;
         if (puesto && puesto !== '0' && String(j.position) !== String(puesto)) return false;
         return (j[ambito.partidos] || 0) > 0;
       })
@@ -7292,11 +7296,28 @@
 
     const tope = topeRanking(conDatos.length);
     const bloque = function (titulo, prefijo, orden, valor) {
-      return '<div class="ranking">' +
-        '<h3 class="ranking__title">' + titulo + '</h3>' +
-        rankingRows(orden.slice(0, tope), function (j) {
+      /* Cada lista se despliega desde su cabecera hasta setenta y cinco, igual
+         que las de Rankings, y se pliega con la cabecera o con «Ver menos». */
+      const clave = marca + ':' + ambito.clave + ':' + (puesto || '0') + ':' + prefijo;
+      const desplegado = !!state.puntosAbiertos[clave];
+      const cuantos = desplegado ? RANKING_LARGO : tope;
+      const hayMas = orden.length > tope;
+
+      return '<div class="ranking' + (desplegado ? ' ranking--desplegado' : '') + '">' +
+        '<button type="button" class="ranking__title ranking__title--mando"' +
+          ' data-puntos-mas="' + escapeHtml(clave) + '"' +
+          ' aria-expanded="' + (desplegado ? 'true' : 'false') + '"' +
+          (hayMas ? '' : ' disabled') + '>' +
+          titulo +
+          (hayMas ? '<span class="ranking__caret" aria-hidden="true">▸</span>' : '') +
+        '</button>' +
+        rankingRows(orden.slice(0, cuantos), function (j) {
           return valor(j) + veces(j);
-        }, marca + ':' + ambito.clave + ':' + (puesto || '0') + ':' + prefijo) +
+        }, clave) +
+        (desplegado && hayMas
+          ? '<button type="button" class="btn btn--ghost btn--sm ranking__mas"' +
+            ' data-puntos-mas="' + escapeHtml(clave) + '">Ver menos</button>'
+          : '') +
       '</div>';
     };
 
@@ -8471,6 +8492,23 @@
           state[cual][partes[0]] = partes[1];
           state.puntosDetalle = null;
           renderRankings();
+          return;
+        }
+
+        /* La cabecera despliega hasta setenta y cinco; el mismo botón y el
+           «Ver menos» de abajo lo vuelven a plegar (los dos llevan el mismo
+           data-puntos-mas, así que basta con invertir). */
+        const mas = event.target.closest('[data-puntos-mas]');
+        if (mas) {
+          const cual = mas.getAttribute('data-puntos-mas');
+          const plegando = !!state.puntosAbiertos[cual];
+          state.puntosAbiertos[cual] = !state.puntosAbiertos[cual];
+          renderRankings();
+          /* Al plegar, subir a su principio si se quedó por encima. */
+          if (plegando) {
+            const nuevo = document.querySelector('[data-puntos-mas="' + cual + '"]');
+            subirA(nuevo && nuevo.closest('.ranking'));
+          }
           return;
         }
 
