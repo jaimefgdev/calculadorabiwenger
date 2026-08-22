@@ -121,18 +121,18 @@ code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft)
 .topbar__inner > * { min-width: 0; }
 .brand { display: flex; align-items: center; gap: .55rem; flex: 0 0 auto; }
 .brand__logo {
-  width: 36px; height: 36px; flex: none;
+  width: 46px; height: 46px; flex: none;
   display: grid; place-items: center;
   font-size: 1.35rem;
   background: var(--accent-soft);
   border: 0;
-  border-radius: 12px;
+  border-radius: 14px;
   cursor: pointer;
   transition: transform .12s, background .15s;
 }
 /* El escudo de Biwenger, en vez del balón. Se deja respirar dentro del
    cuadrado y manda su propia proporción (es más alto que ancho). */
-.brand__escudo { height: 30px; width: auto; display: block; }
+.brand__escudo { height: 38px; width: auto; display: block; }
 .brand__logo:hover { transform: scale(1.08); background: color-mix(in srgb, var(--accent) 18%, transparent); }
 .brand__logo:active { transform: scale(.96); }
 .brand__logo:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
