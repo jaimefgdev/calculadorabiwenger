@@ -640,6 +640,8 @@
     /* Partidos de cada futbolista, para la píldora de su ficha. */
     partidosJugador: {},
     faltas: {},             // goles de falta por dia (AAAAMMDD), según ESPN
+    envivo: [],             // partidos rodando ahora mismo, con marcador de ESPN
+    envivoPidiendo: false,
     recuentoLiga: null,     // el mismo recuento, pero solo de lo hecho alineado
     rankingsAmbito: 'laliga',
     puntosAmbito: 'laliga',  // el mismo cambio, en la tabla de Puntos
@@ -8206,7 +8208,26 @@
       if (document.visibilityState !== 'visible') return;
       if (state.nextSyncAt && Date.now() < state.nextSyncAt) return;
       if (!state.lastSync || Date.now() - state.lastSync > intervaloSync()) syncNow(true);
+      ensureEnVivo();
     });
+
+    /* El marcador en directo va por su cuenta y mucho más a menudo que la
+       sincronización: es una consulta a ESPN, no a Biwenger, así que no gasta
+       de su cupo ni se arriesga a que nos corte. Solo mientras miras. */
+    ensureEnVivo();
+    setInterval(function () {
+      if (document.visibilityState !== 'visible') return;
+      /* Solo cuando puede haber algo rodando: la jornada en juego, o algún
+         partido a menos de tres horas (por si acaba de empezar). */
+      const round = state.round || {};
+      const cerca = (round.matches || []).some(function (p) {
+        const empieza = Date.parse(p.start);
+        return !isNaN(empieza) && Date.now() - empieza > -15 * 60e3 &&
+          Date.now() - empieza < 3 * 3600e3;
+      });
+      if (!round.live && !cerca && !(state.envivo || []).length) return;
+      ensureEnVivo();
+    }, 45 * 1000);
   }
 
   function resetAll() {
