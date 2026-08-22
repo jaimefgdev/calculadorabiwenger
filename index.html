@@ -16,7 +16,7 @@
 <title>Calculadora Biwenger — Presupuestos de la liga</title>
 <!-- El ?v= se sube en cada publicación: obliga al navegador a bajar el archivo
      nuevo en vez de reutilizar el que tenga en caché. -->
-<link rel="stylesheet" href="styles.css?v=208">
+<link rel="stylesheet" href="styles.css?v=209">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>💰</text></svg>">
 </head>
 <body>
@@ -380,9 +380,12 @@
        ============================================================ -->
   <div id="panel-mercado" data-panel="mercado" hidden>
     <section class="panel">
-      <div class="panel__head">
-        <h2>Mercado de hoy</h2>
-        <p class="muted" id="market-note">Quien está en venta, de quién es y cuántas pujas lleva.</p>
+      <!-- El titulo a la izquierda y la pildora de ofertas a la derecha. -->
+      <div class="panel__head panel__head--row">
+        <div>
+          <h2>Mercado de hoy</h2>
+          <p class="muted" id="market-note">Quien está en venta, de quién es y cuántas pujas lleva.</p>
+        </div>
         <!-- Las ofertas que te han hecho, para aceptarlas o rechazarlas aquí mismo. -->
         <button type="button" id="btn-ofertas" class="ambito ambito--ofertas" hidden
           aria-haspopup="dialog">Ofertas</button>
@@ -582,6 +585,6 @@
 
 </main>
 
-<script src="app.js?v=215"></script>
+<script src="app.js?v=216"></script>
 </body>
 </html>

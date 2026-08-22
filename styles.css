@@ -329,22 +329,15 @@ code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft)
 /* La píldora que cambia de ámbito, arrimada a la derecha dentro del cuadro. */
 .rankings__mando--derecha { justify-content: flex-end; }
 
-/* Las pujas dentro del diálogo de puja, tras darle a la píldora. */
-.op-pujas { margin: .2rem 0 .6rem; }
-/* La píldora, en rojo y arrimada a la derecha. */
-.op-pujas__mando { display: flex; justify-content: flex-end; }
-.ambito--rojo {
+/* Las pujas: una celda más del diálogo, a la altura de «Tu puja de ahora».
+   La píldora se arrima a la derecha de su celda y va en rojo siempre. */
+.op-pujas { align-items: flex-end; }
+.op-pujas dd { display: flex; justify-content: flex-end; }
+.ambito--rojo,
+.ambito--rojo[aria-pressed="true"] {
   background: var(--neg); border-color: var(--neg); color: #fff;
 }
 .ambito--rojo:hover { filter: brightness(1.1); }
-.op-pujas__lista { list-style: none; margin: .5rem 0 0; padding: 0; }
-.op-pujas__lista li {
-  display: flex; align-items: center; justify-content: space-between;
-  gap: .8rem; padding: .3rem 0;
-  border-bottom: 1px solid var(--border);
-}
-.op-pujas__lista li:last-child { border-bottom: 0; }
-.op-pujas__vacio { color: var(--text-faint); margin: .5rem 0 0; font-size: .92em; }
 
 /* ---------- Quién puntúa en la liga ---------- */
 /* Las cuatro siempre en una fila, también en móvil: ahí la página se ve con

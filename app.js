@@ -604,7 +604,6 @@
     recuentoLiga: null,     // el mismo recuento, pero solo de lo hecho alineado
     rankingsAmbito: 'laliga',
     puntosAmbito: 'laliga',  // el mismo cambio, en la tabla de Puntos
-    opVerPujas: false,       // si el diálogo de puja enseña las pujas
     pujasDe: {},             // cuántas pujas lleva cada futbolista, ya preguntadas
     rankingsAbiertos: {},   // que rankings se han desplegado, uno por campo
     teams: {},
@@ -2771,7 +2770,6 @@
     opPendiente = null;
     /* La próxima puja empieza con las pujas plegadas otra vez. */
     opPujaAbierta = null;
-    state.opVerPujas = false;
   }
 
   function abrirOpModal(html) {
@@ -2836,55 +2834,34 @@
    * se dice eso en vez de inventar un número. La tuya sí se sabe siempre.
    */
   function pujasPorEsteJugador(venta) {
-    const abierto = state.opVerPujas;
+    /* De lo tuyo las pujas ya se saben enteras (son las ofertas recibidas); de
+       lo de los demás hay que preguntárselo a Biwenger. */
     const recibidas = venta.mine
       ? ofertasRecibidas().filter(function (o) {
           return String(o.playerId) === String(venta.playerId);
         })
       : [];
-    const mia = miPujaPor(venta.playerId);
-
-    /* De lo tuyo las pujas ya se saben enteras (son las ofertas recibidas); de
-       lo de los demás hay que preguntárselo a Biwenger. */
     const contadas = state.pujasDe[String(venta.playerId)];
+
     const cuantas = venta.mine ? recibidas.length
       : (contadas && contadas.bids != null ? contadas.bids : null);
-    const rotulo = cuantas == null ? 'Ver pujas'
-      : (cuantas === 1 ? '1 puja' : cuantas + ' pujas');
 
-    let detalle = '';
-    if (abierto) {
-      if (venta.mine) {
-        detalle = recibidas.length
-          ? '<ul class="op-pujas__lista">' + recibidas.map(function (o) {
-              return '<li><span>' + escapeHtml(o.other) + '</span><strong>' +
-                money(o.amount) + '</strong></li>';
-            }).join('') + '</ul>'
-          : '<p class="op-pujas__vacio">Todavía no ha pujado nadie por él.</p>';
-      } else if (contadas && contadas.cargando) {
-        detalle = '<p class="op-pujas__vacio">Preguntando a Biwenger…</p>';
-      } else if (contadas && contadas.error) {
-        detalle = '<p class="op-pujas__vacio">' + escapeHtml(contadas.error) + '</p>';
-      } else if (contadas && contadas.bids != null) {
-        /* Si además manda de cuánto es cada puja, se enseñan. */
-        detalle = (contadas.lista && contadas.lista.length
-          ? '<ul class="op-pujas__lista">' + contadas.lista.map(function (p) {
-              return '<li><span>' + escapeHtml(p.user || p.name || 'Un mánager') +
-                '</span><strong>' + (p.amount != null ? money(p.amount) : '—') + '</strong></li>';
-            }).join('') + '</ul>'
-          : '') +
-          (mia ? '<p class="op-pujas__vacio">La tuya: ' + money(mia.amount) + '</p>' : '');
-      }
-    }
+    /* Todo cabe en el propio botón: sin contar, invita; contando, avisa; y ya
+       contado, el número pelado. Nada de listas ni de repetir tu puja, que ya
+       está justo encima. */
+    let rotulo = 'Ver pujas';
+    if (contadas && contadas.cargando) rotulo = '…';
+    else if (contadas && contadas.error) rotulo = 'No se ha podido';
+    else if (cuantas != null) rotulo = cuantas === 1 ? '1 puja' : cuantas + ' pujas';
 
     return '<div class="op-pujas">' +
-      '<div class="op-pujas__mando">' +
-        '<button type="button" class="ambito ambito--rojo' + (abierto ? ' ambito--on' : '') + '"' +
+      '<dt>Pujas</dt>' +
+      '<dd>' +
+        '<button type="button" class="ambito ambito--rojo"' +
           ' data-op-pujas="' + escapeHtml(String(venta.playerId)) + '"' +
-          ' aria-expanded="' + (abierto ? 'true' : 'false') + '">' +
-          (abierto ? rotulo : 'Ver pujas') + '</button>' +
-      '</div>' +
-      detalle +
+          (contadas && contadas.error ? ' title="' + escapeHtml(contadas.error) + '"' : '') + '>' +
+          rotulo + '</button>' +
+      '</dd>' +
     '</div>';
   }
 
@@ -2968,8 +2945,8 @@
           : '') +
         (mia ? '<div><dt>Tu puja de ahora</dt><dd><strong class="money-neg">' +
           money(mia.amount) + '</strong></dd></div>' : '') +
+        pujasPorEsteJugador(venta) +
       '</dl>' +
-      pujasPorEsteJugador(venta) +
       '<label class="op-importe"><span>' + (mia ? 'Nueva puja' : 'Cuánto ofreces') + '</span>' +
         '<input type="number" id="op-importe" inputmode="numeric" step="100000" min="0"' +
           ' value="' + partida + '"></label>' +
@@ -3528,10 +3505,9 @@
          perder lo que ya hubieras escrito en el importe. */
       const verPujas = event.target.closest('[data-op-pujas]');
       if (verPujas) {
-        state.opVerPujas = !state.opVerPujas;
-        /* Solo se le pregunta a Biwenger al abrir, y una vez por futbolista:
-           esa consulta puede costar un crédito de la cuenta. */
-        if (state.opVerPujas) contarPujas(verPujas.getAttribute('data-op-pujas'));
+        /* Se le pregunta a Biwenger una sola vez por futbolista: la consulta
+           puede costar un crédito de la cuenta. */
+        contarPujas(verPujas.getAttribute('data-op-pujas'));
         repintarPuja();
         return;
       }
