@@ -16,7 +16,7 @@
 <title>Calculadora Biwenger — Presupuestos de la liga</title>
 <!-- El ?v= se sube en cada publicación: obliga al navegador a bajar el archivo
      nuevo en vez de reutilizar el que tenga en caché. -->
-<link rel="stylesheet" href="styles.css?v=206">
+<link rel="stylesheet" href="styles.css?v=207">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>💰</text></svg>">
 </head>
 <body>
@@ -486,31 +486,26 @@
   <div id="panel-datos" data-panel="datos" hidden>
     
 
-    <!-- El titulo a la izquierda y la pildora que cambia de ambito a la
-         derecha; igual en los dos bloques. -->
-    <div class="seccion__cabecera">
-      <h2 class="seccion__titulo">Rankings</h2>
-      <!-- Cambia entre lo de toda LaLiga y lo que cada uno hizo alineado aqui. -->
-      <div class="rankings__mando">
+    <h2 class="seccion__titulo">Rankings</h2>
+    <section class="panel">
+      <!-- La pildora va dentro del cuadro, arrimada a la derecha.
+           Cambia entre lo de toda LaLiga y lo que cada uno hizo alineado aqui. -->
+      <div class="rankings__mando rankings__mando--derecha">
         <button type="button" class="ambito" id="rankings-ambito"
           aria-pressed="false">Mi liga</button>
       </div>
-    </div>
-    <section class="panel">
       <div id="rankings-temporada" class="rankings rankings--muchos"></div>
     </section>
 
-    <div class="seccion__cabecera">
-      <h2 class="seccion__titulo">Puntos</h2>
-      <div class="rankings__mando">
-        <button type="button" class="ambito" id="puntos-ambito"
-          aria-pressed="false">Mi liga</button>
-      </div>
-    </div>
+    <h2 class="seccion__titulo">Puntos</h2>
 
     <!-- Los que más y menos rinden. Una sola tabla: la pildora cambia entre
          los nuestros y los de toda LaLiga, como en Rankings. -->
     <section class="panel">
+      <div class="rankings__mando rankings__mando--derecha">
+        <button type="button" class="ambito" id="puntos-ambito"
+          aria-pressed="false">Mi liga</button>
+      </div>
       <div id="ambitos-puntos"></div>
       <div id="rankings-puntos" class="rankings"></div>
     </section>
@@ -587,6 +582,6 @@
 
 </main>
 
-<script src="app.js?v=213"></script>
+<script src="app.js?v=214"></script>
 </body>
 </html>

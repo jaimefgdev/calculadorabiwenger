@@ -604,6 +604,7 @@
     recuentoLiga: null,     // el mismo recuento, pero solo de lo hecho alineado
     rankingsAmbito: 'laliga',
     puntosAmbito: 'laliga',  // el mismo cambio, en la tabla de Puntos
+    opVerPujas: false,       // si el diálogo de puja enseña las pujas
     rankingsAbiertos: {},   // que rankings se han desplegado, uno por campo
     teams: {},
     warnings: [],
@@ -2759,11 +2760,17 @@
     boton.classList.toggle('ambito--avisa', recibidas > 0);
   }
 
+  /* Qué venta tiene abierto el diálogo de puja, para poder repintarlo. */
+  let opPujaAbierta = null;
+
   function cerrarOpModal() {
     const caja = $('op-modal');
     caja.hidden = true;
     caja.innerHTML = '';
     opPendiente = null;
+    /* La próxima puja empieza con las pujas plegadas otra vez. */
+    opPujaAbierta = null;
+    state.opVerPujas = false;
   }
 
   function abrirOpModal(html) {
@@ -2820,10 +2827,57 @@
     return { tope: maximo - comprometido, comprometido: comprometido, saldo: saldo, maximo: maximo };
   }
 
+  /**
+   * La píldora «Ver pujas» del diálogo de puja, con lo que se sepa de verdad.
+   *
+   * Biwenger solo publica las pujas de lo que vendes tú: por lo que venden los
+   * demás (o el propio mercado) no dice cuántas hay ni de cuánto, así que aquí
+   * se dice eso en vez de inventar un número. La tuya sí se sabe siempre.
+   */
+  function pujasPorEsteJugador(venta) {
+    const abierto = state.opVerPujas;
+    const recibidas = venta.mine
+      ? ofertasRecibidas().filter(function (o) {
+          return String(o.playerId) === String(venta.playerId);
+        })
+      : [];
+    const mia = miPujaPor(venta.playerId);
+
+    const cuantas = venta.mine ? recibidas.length : (mia ? 1 : 0);
+    const rotulo = cuantas === 1 ? '1 puja' : cuantas + ' pujas';
+
+    let detalle = '';
+    if (abierto) {
+      if (venta.mine) {
+        detalle = recibidas.length
+          ? '<ul class="op-pujas__lista">' + recibidas.map(function (o) {
+              return '<li><span>' + escapeHtml(o.other) + '</span><strong>' +
+                money(o.amount) + '</strong></li>';
+            }).join('') + '</ul>'
+          : '<p class="op-pujas__vacio">Todavía no ha pujado nadie por él.</p>';
+      } else if (mia) {
+        detalle = '<ul class="op-pujas__lista">' +
+          '<li><span>La tuya</span><strong>' + money(mia.amount) + '</strong></li></ul>' +
+          '<p class="op-pujas__vacio">Biwenger no dice cuántos más han pujado.</p>';
+      } else {
+        detalle = '<p class="op-pujas__vacio">No has pujado por él todavía. ' +
+          'Biwenger no dice si lo ha hecho alguien más.</p>';
+      }
+    }
+
+    return '<div class="op-pujas">' +
+      '<button type="button" class="ambito' + (abierto ? ' ambito--on' : '') + '"' +
+        ' data-op-pujas aria-expanded="' + (abierto ? 'true' : 'false') + '">' +
+        (abierto ? rotulo : 'Ver pujas') + '</button>' +
+      detalle +
+    '</div>';
+  }
+
   /** Diálogo de puja: dice lo que vale, lo que piden y hasta dónde puedes. */
   function abrirPuja(playerId) {
     const venta = ventaDe(playerId);
     if (!venta) return;
+    opPujaAbierta = playerId;
     const mia = miPujaPor(playerId);
     const limite = topeDePuja(playerId);
     /* Si ya pujaste, se parte de tu puja; si no, del precio que piden. */
@@ -2855,6 +2909,7 @@
         (mia ? '<div><dt>Tu puja de ahora</dt><dd><strong class="money-neg">' +
           money(mia.amount) + '</strong></dd></div>' : '') +
       '</dl>' +
+      pujasPorEsteJugador(venta) +
       '<label class="op-importe"><span>' + (mia ? 'Nueva puja' : 'Cuánto ofreces') + '</span>' +
         '<input type="number" id="op-importe" inputmode="numeric" step="100000" min="0"' +
           ' value="' + partida + '"></label>' +
@@ -3408,6 +3463,19 @@
       }
       if (event.target.closest('[data-op-va]')) { ejecutarPendiente(); return; }
       if (event.target.closest('[data-op-alinear]')) { mandarOnce(); return; }
+
+      /* La píldora de las pujas: se vuelve a pintar el diálogo, pero sin
+         perder lo que ya hubieras escrito en el importe. */
+      if (event.target.closest('[data-op-pujas]')) {
+        state.opVerPujas = !state.opVerPujas;
+        const escrito = $('op-importe') ? $('op-importe').value : null;
+        if (opPujaAbierta != null) {
+          abrirPuja(opPujaAbierta);
+          const campo = $('op-importe');
+          if (campo && escrito !== null) campo.value = escrito;
+        }
+        return;
+      }
 
       const puja = event.target.closest('[data-op-pujar]');
       if (puja) { confirmarPuja(puja.getAttribute('data-op-pujar')); return; }
@@ -5105,14 +5173,22 @@
   /* #, Jugador, Puntos, Valor equipo, Jug., Saldo, Puja máxima y Última conexión. */
   const MANAGER_COLUMNS = 8;
 
-  /** Clasificación: por puntos y, a igualdad, por valor de equipo. */
+  /**
+   * Clasificación: por puntos y, a igualdad, por Valor de Equipo + Saldo, que
+   * es el desempate oficial de Biwenger para el campeón de la temporada.
+   * Antes se miraba solo el valor de equipo y dejaba fuera el saldo.
+   */
   function managerRows() {
     const sort = state.sort.managers;
     const rows = computeBudgets(state.movements, state.teams);
     if (sort.key) return sortRows(rows, 'managers', sort);
+    const patrimonio = function (fila) {
+      return (fila.teamValue || 0) +
+        (fila.officialBalance != null ? fila.officialBalance : (fila.balance || 0));
+    };
     return rows.slice().sort(function (a, b) {
       const points = (b.points || 0) - (a.points || 0);
-      return points || (b.teamValue || 0) - (a.teamValue || 0);
+      return points || (patrimonio(b) - patrimonio(a));
     });
   }
 
