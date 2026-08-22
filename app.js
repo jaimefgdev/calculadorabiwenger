@@ -6636,7 +6636,9 @@
   /** Los partidos del futbolista, con su rival, resultado y lo que hizo. */
   function listaDePartidos(id) {
     const datos = state.partidosJugador[String(id)];
-    if (datos === undefined) return '<p class="muted">Cargando partidos\u2026</p>';
+    if (datos === undefined || datos === 'pidiendo') {
+      return '<p class="muted">Cargando partidos\u2026</p>';
+    }
     if (!datos || !datos.matches || !datos.matches.length) {
       return '<p class="muted">Todavía no hay partidos suyos esta temporada.</p>';
     }
@@ -6675,7 +6677,8 @@
   function partidosComparados(unoId, otroId) {
     const deUno = state.partidosJugador[String(unoId)];
     const deOtro = state.partidosJugador[String(otroId)];
-    if (deUno === undefined || deOtro === undefined) {
+    const pendiente = function (d) { return d === undefined || d === 'pidiendo'; };
+    if (pendiente(deUno) || pendiente(deOtro)) {
       return '<p class="muted">Cargando partidos…</p>';
     }
 
@@ -6750,13 +6753,28 @@
     const clave = String(id);
     if (state.partidosJugador[clave] !== undefined) return;
 
-    state.partidosJugador[clave] = undefined;
+    /* Lo de la última vez se enseña al instante y no se pide nada: los
+       partidos ya jugados no cambian. Solo se vuelve a preguntar si no hay
+       nada guardado. */
+    const guardado = cacheLeer('partidos:' + clave);
+    if (guardado) {
+      state.partidosJugador[clave] = guardado;
+      renderPriceModal();
+      return;
+    }
+
+    /* «Pidiendo» tiene que ser un valor distinto de «sin pedir»: antes se
+       marcaba con `undefined`, que es justo lo que vale una clave que no
+       existe, así que el guardia de arriba no frenaba nada y el mismo
+       futbolista se podía pedir varias veces a la vez. */
+    state.partidosJugador[clave] = 'pidiendo';
     fetch(config.url.replace(/\/+$/, '') + '/?key=' + encodeURIComponent(config.key) +
       '&partidosDe=' + encodeURIComponent(clave), { headers: { 'accept': 'application/json' } })
       .then(function (response) { return response.json(); })
       .then(function (payload) {
         const datos = payload && payload.error ? null : payload;
         state.partidosJugador[clave] = datos;
+        if (datos) cacheGuardar('partidos:' + clave, datos);
         renderPriceModal();
         /* Igual que en la jornada: los goles de falta los pone ESPN despues. */
         if (datos) {
