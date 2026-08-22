@@ -5,9 +5,16 @@
 @import url('https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;700&display=swap');
 
 /* Fuentes locales (los .ttf viven junto a este archivo). */
+/* Las dos fuentes iban en .ttf y pesaban cuatro megas entre las dos: era, de
+   lejos, lo que más tardaba en cargar, sobre todo en el móvil. En .woff2 y
+   dejando solo los caracteres que hacen falta (latín completo, para los
+   nombres extranjeros, más los símbolos que usa la web) se quedan en 77 KB:
+   un 98 % menos. El .ttf se deja de respaldo por si un navegador viejo no
+   entiende woff2, pero ese solo lo bajará él. */
 @font-face {
   font-family: 'GoogleSans';
-  src: url('GoogleSans-Regular.ttf') format('truetype');
+  src: url('GoogleSans-Regular.woff2') format('woff2'),
+       url('GoogleSans-Regular.ttf') format('truetype');
   font-weight: normal;
   font-style: normal;
   font-display: swap;
@@ -15,7 +22,8 @@
 
 @font-face {
   font-family: 'GoogleSans';
-  src: url('GoogleSans-Bold.ttf') format('truetype');
+  src: url('GoogleSans-Bold.woff2') format('woff2'),
+       url('GoogleSans-Bold.ttf') format('truetype');
   font-weight: bold;
   font-style: normal;
   font-display: swap;

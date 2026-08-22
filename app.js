@@ -647,6 +647,8 @@
     marketState: '',       // 'cargando' | 'error' | ''
     marketError: '',       // el motivo, tal como lo dice Biwenger
     marketReintento: null, // el temporizador del reintento tras su tregua
+    marketIntentos: 0,     // cuántos reintentos seguidos llevamos (tope: 3)
+    marketViejo: false,    // si lo que se ve es el respaldo, no lo de ahora
     startPrices: {},       // lo que valía cada jugador el día que lo recibió
     priceSeries: {},       // evolución de precio de cada futbolista
     priceModal: null,      // futbolista con la evolución ampliada
@@ -2595,15 +2597,10 @@
            igual, pero diciendo que no es de ahora mismo. */
         state.marketError = payload.stale ? (payload.warning || 'Datos de hace un rato.') : '';
         state.marketViejo = !!payload.stale;
+        if (!payload.stale) state.marketIntentos = 0;
         renderMarket();
         /* Si es viejo, se vuelve a pedir en cuanto pase la tregua. */
-        if (payload.stale && !state.marketReintento) {
-          const espera = String(payload.warning || '').match(/(\d+)\s*s/);
-          state.marketReintento = setTimeout(function () {
-            state.marketReintento = null;
-            ensureMarket(true);
-          }, (espera ? Math.min(180, Number(espera[1]) + 3) : 95) * 1000);
-        }
+        if (payload.stale) reintentarMercado(payload.warning);
         ensurePriceSeries(state.market.map(function (v) { return v.playerId; }), renderMarket);
       })
       .catch(function (error) {
@@ -2613,18 +2610,31 @@
            rato, y decirlo (con lo que queda) evita pensar que está roto. */
         state.marketError = String((error && error.message) || '');
         renderMarket();
-
-        /* Si es solo la tregua de Biwenger, se reintenta solo: son segundos, y
-           tener que darle tú a recargar para eso no tiene sentido. */
-        const espera = state.marketError.match(/(\d+)\s*s/);
-        if (/limitado/i.test(state.marketError) && !state.marketReintento) {
-          const segundos = espera ? Math.min(180, Number(espera[1]) + 3) : 95;
-          state.marketReintento = setTimeout(function () {
-            state.marketReintento = null;
-            ensureMarket(true);
-          }, segundos * 1000);
-        }
+        if (/limitado/i.test(state.marketError)) reintentarMercado(state.marketError);
       });
+  }
+
+  /**
+   * Vuelve a pedir el mercado cuando Biwenger nos tiene de tregua.
+   *
+   * Con cuentagotas a propósito: insistir es lo que alarga el bloqueo. Se
+   * espera lo que él diga y un poco más, se va doblando la espera en cada
+   * intento y a los tres se deja de insistir; a partir de ahí, la próxima
+   * sincronización lo intentará por su cuenta.
+   */
+  function reintentarMercado(motivo) {
+    if (state.marketReintento) return;              // ya hay uno esperando
+    if (state.marketIntentos >= 3) return;          // se deja de insistir
+
+    const dicho = String(motivo || '').match(/(\d+)\s*s/);
+    const base = dicho ? Number(dicho[1]) + 5 : 95;
+    const segundos = Math.min(600, base * Math.pow(2, state.marketIntentos));
+    state.marketIntentos += 1;
+
+    state.marketReintento = setTimeout(function () {
+      state.marketReintento = null;
+      ensureMarket(true);
+    }, segundos * 1000);
   }
 
   const MARKET_VALUES = {
