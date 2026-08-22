@@ -362,6 +362,17 @@ code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft)
 }
 .ambito--rojo:hover { filter: brightness(1.1); }
 
+/* El filtro del mercado: gris muy claro con la letra negra, y siempre igual.
+   Los colores van fijos y no en variables porque no debe cambiar ni con el
+   tema oscuro ni al pulsarlo. Va después de `.ambito` para que gane. */
+.ambito--gris,
+.ambito--gris:hover,
+.ambito--gris:focus,
+.ambito--gris[aria-pressed="true"] {
+  background: #ececec; border-color: #d4d4d4; color: #111;
+}
+.ambito--gris:hover { border-color: #bdbdbd; }
+
 /* La cuenta atrás del mercado y su filtro, en la misma línea. */
 .market-sub { display: flex; align-items: center; gap: .5rem; flex-wrap: wrap; }
 .market-sub p { margin: 0; }

@@ -2659,9 +2659,8 @@
     const actual = FILTROS_MERCADO.filter(function (f) {
       return f.clave === state.marketFiltro;
     })[0] || FILTROS_MERCADO[0];
+    /* Solo cambia el r\u00f3tulo: el color se queda siempre igual. */
     boton.textContent = actual.rotulo;
-    /* Encendida cuando filtra, apagada cuando est\u00e1n todos. */
-    boton.classList.toggle('ambito--on', state.marketFiltro !== 'todos');
   }
 
   function renderMarket() {
