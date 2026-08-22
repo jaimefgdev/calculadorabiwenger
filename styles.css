@@ -1833,8 +1833,13 @@ main.wrap { padding-top: 1.15rem; padding-bottom: 3.5rem; }
 /* El de la derecha, en espejo: los dos marcadores miran al centro. */
 .versus-part__fila > .versus-part__lado:last-child { flex-direction: row-reverse; }
 .versus-part__marcador { font-variant-numeric: tabular-nums; font-weight: 600; }
+/* Goles, asistencias y tarjetas de ese partido. */
+.versus-part__lances { display: inline-flex; align-items: center; gap: .12rem; }
 .versus-part__min { font-size: .66rem; color: var(--text-faint); }
 .versus-part__vacio { color: var(--text-faint); text-align: center; }
+
+/* Las cifras del precio comparado, bajo el gráfico de las dos líneas. */
+.versus__filas--precio { display: grid; gap: .25rem; margin-top: .6rem; }
 
 /* «Vender» en rojo: es la acción que saca al futbolista de tu plantilla. El
    de cambiar precio se queda como estaba, que no vende nada. */

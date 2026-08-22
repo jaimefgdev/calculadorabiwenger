@@ -6090,6 +6090,91 @@
     '</div>';
   }
 
+  /**
+   * La evolución del precio de los dos comparados, en el mismo gráfico y cada
+   * uno de su color, con sus cifras debajo también enfrentadas.
+   *
+   * Enseñar solo la línea de uno mientras se comparan dos engañaba, así que o
+   * salen los dos o no sale ninguno.
+   */
+  function graficoDePreciosComparados(unoId, otroId) {
+    const serieUno = state.priceSeries[String(unoId)];
+    const serieOtro = state.priceSeries[String(otroId)];
+    if (serieUno === undefined || serieOtro === undefined) {
+      return '<p class="muted">Cargando la evolución…</p>';
+    }
+    if (!(serieUno || []).length || !(serieOtro || []).length) {
+      return '<p class="viz__empty">Biwenger no publica la evolución de alguno de los dos.</p>';
+    }
+
+    const uno = playerInfo(unoId);
+    const otro = playerInfo(otroId);
+    const COLOR_UNO = '#2a78d6';
+    const COLOR_OTRO = '#e08b14';
+
+    /* Los dos precios en el mismo punto de cada día, que es lo que espera el
+       gráfico para pintar dos líneas. */
+    const porDia = {};
+    (serieUno || []).forEach(function (par) {
+      const dia = stampToDay(par[0]);
+      (porDia[dia] = porDia[dia] || { day: dia }).unoPrice = par[1];
+    });
+    (serieOtro || []).forEach(function (par) {
+      const dia = stampToDay(par[0]);
+      (porDia[dia] = porDia[dia] || { day: dia }).otroPrice = par[1];
+    });
+    const puntos = Object.keys(porDia).sort().map(function (d) { return porDia[d]; });
+    if (puntos.length < 2) return '<p class="viz__empty">Todavía no hay evolución que comparar.</p>';
+
+    const series = [
+      { field: 'unoPrice', color: COLOR_UNO, label: uno.name || 'Uno' },
+      { field: 'otroPrice', color: COLOR_OTRO, label: otro.name || 'Otro' }
+    ];
+
+    /* Lo que ha cambiado cada uno en cada periodo, enfrentado. */
+    const cambios = function (serie) {
+      return PERIODOS.map(function (p) { return variacion(serie, p.dias); });
+    };
+    const deUno = cambios(serieUno);
+    const deOtro = cambios(serieOtro);
+
+    const celda = function (cambio) {
+      if (cambio == null) return '<span class="sub">—</span>';
+      if (cambio === 0) return '<span class="delta delta--igual">– ' + compactMoney(0) + '</span>';
+      return '<span class="delta ' + (cambio > 0 ? 'delta--up' : 'delta--down') + '">' +
+        (cambio > 0 ? '+' : '−') + compactMoney(Math.abs(cambio)) + '</span>';
+    };
+
+    const ultimo = function (serie) { return serie[serie.length - 1][1]; };
+
+    return '<h3 class="bench__title">Evolución del precio</h3>' +
+      '<div class="viz__legend">' + series.map(function (s) {
+        return '<span class="viz__key"><span class="chip__dot" style="background:' + s.color + '"></span>' +
+          escapeHtml(s.label) + '</span>';
+      }).join('') + '</div>' +
+      '<div class="viz-hover">' +
+        lineChart(puntos, 'unoPrice', COLOR_UNO, 'Valor de mercado',
+          { height: 220, ticks: 6, fullTicks: true, padX: 96, hover: true, series: series }) +
+        '<div class="viz-tip" hidden></div>' +
+      '</div>' +
+      /* Valor de hoy y lo que se ha movido en cada plazo, uno frente a otro. */
+      '<div class="versus__filas versus__filas--precio">' +
+        '<div class="versus__fila">' +
+          '<span class="versus__dato">' + money(ultimo(serieUno)) + '</span>' +
+          '<span class="versus__label">Hoy</span>' +
+          '<span class="versus__dato">' + money(ultimo(serieOtro)) + '</span>' +
+        '</div>' +
+        PERIODOS.map(function (p, i) {
+          if (deUno[i] == null && deOtro[i] == null) return '';
+          return '<div class="versus__fila">' +
+            '<span class="versus__dato">' + celda(deUno[i]) + '</span>' +
+            '<span class="versus__label">' + p.label + '</span>' +
+            '<span class="versus__dato">' + celda(deOtro[i]) + '</span>' +
+          '</div>';
+        }).join('') +
+      '</div>';
+  }
+
   /** Las estadísticas de los dos, en dos columnas. */
   function comparativaDeFichas(unoId, otroId) {
     const uno = playerInfo(unoId);
@@ -6115,8 +6200,10 @@
       { rotulo: 'Goles por partido', valor: function (d) {
           return d ? (num(d.goalsPerGame)).toFixed(2).replace('.', ',') : '0,00'; } },
       { rotulo: 'Partidos ganados', valor: function (d) { return d ? num(d.wins) : 0; } },
-      { rotulo: 'Porterías a cero', valor: function (d) { return d ? num(d.cleanSheets) : 0; } },
-      { rotulo: 'Goles encajados', valor: function (d) { return d ? num(d.conceded) : 0; }, menor: true },
+      /* Dejar la portería a cero solo puntúa a porteros y defensas: en un
+         medio o un delantero es un dato que no dice nada. */
+      { rotulo: 'Porterías a cero', valor: function (d) { return d ? num(d.cleanSheets) : 0; }, atras: true },
+      { rotulo: 'Goles encajados', valor: function (d) { return d ? num(d.conceded) : 0; }, menor: true, atras: true },
       { rotulo: 'Amarillas', valor: function (d) { return d ? num(d.yellow) : 0; }, menor: true },
       { rotulo: 'Rojas', valor: function (d) { return d ? num(d.red) : 0; }, menor: true },
       { rotulo: 'Veces sustituido', valor: function (d) { return d ? num(d.subsOut) : 0; }, menor: true },
@@ -6128,12 +6215,18 @@
       { rotulo: 'Puntos fuera', valor: function (d) { return d && d.away ? num(d.away.points) : 0; } },
       { rotulo: 'Media fuera', valor: function (d) {
           return d && d.away && d.away.played ? num(d.away.average).toFixed(1).replace('.', ',') : '0,0'; } },
-      { rotulo: 'Valor', valor: function (d, f) { return money(f.marketValue || 0); }, texto: true },
-      { rotulo: 'Puntos por millón', valor: function (d, f) {
-          const pts = d ? num(d.points) : 0;
-          const precio = f.marketValue || 0;
-          return precio ? (pts / (precio / 1000000)).toFixed(2).replace('.', ',') : '0,00'; } }
+      { rotulo: 'Valor', valor: function (d, f) { return money(f.marketValue || 0); }, texto: true }
     ];
+
+    /* Las de portería solo si alguno de los dos juega atrás (portero o
+       defensa); si los dos son medios o delanteros, no pintan nada. */
+    const puestoDe = function (ficha, id) {
+      return ficha && ficha.position != null ? ficha.position : posicionConocida[String(id)];
+    };
+    const hayAtras = [puestoDe(uno, unoId), puestoDe(otro, otroId)].some(function (p) {
+      return p === 1 || p === 2;
+    });
+    const visibles = filas.filter(function (f) { return !f.atras || hayAtras; });
 
     const cabecera = function (ficha, id) {
       return '<div class="versus__quien">' + faceOf(id, 'ficha__face') +
@@ -6143,7 +6236,7 @@
 
     return '<div class="versus">' +
       '<div class="versus__cab">' + cabecera(uno, unoId) + cabecera(otro, otroId) + '</div>' +
-      '<div class="versus__filas">' + filas.map(function (fila) {
+      '<div class="versus__filas">' + visibles.map(function (fila) {
         const a = fila.valor(datosUno, uno);
         const b = fila.valor(datosOtro, otro);
         const bruto = fila.texto ? 0
@@ -6241,6 +6334,8 @@
         escudoDeEquipo(rivalId, rival) +
         '<span class="versus-part__marcador">' +
           (jugado ? suyos + '–' + otros : '–') + '</span>' +
+        /* Goles, asistencias y tarjetas, igual que en la lista de uno solo. */
+        '<span class="versus-part__lances">' + (juego.alineado ? lancesDe(juego) : '') + '</span>' +
         '<span class="versus-part__min">' + (juego.minutes ? juego.minutes + "'" : '') + '</span>' +
         (juego.alineado ? notaDePartido(juego.points) : '<span class="nota nota--sin"></span>') +
       '</span>';
@@ -6355,8 +6450,12 @@
             ' title="Cerrar" aria-label="Cerrar">✕</button>' +
         '</div>' +
         '<p class="muted ficha__datos">' + datos + '</p>' +
-        /* Elegido el rival, sus estadísticas van al lado de las de este. */
-        (abierto.comparar && !abierto.partidos ? comparativaDeFichas(abierto.id, abierto.comparar) : '') +
+        /* Elegido el rival, sus estadísticas van al lado de las de este, y
+           debajo la evolución del precio de los dos en el mismo gráfico. */
+        (abierto.comparar && !abierto.partidos
+          ? comparativaDeFichas(abierto.id, abierto.comparar) +
+            (abierto.soloDatos ? '' : graficoDePreciosComparados(abierto.id, abierto.comparar))
+          : '') +
         /* Con rival elegido, los partidos también se comparan. */
         (abierto.partidos
           ? (abierto.comparar
@@ -6364,12 +6463,15 @@
               : listaDePartidos(abierto.id))
           : '') +
         (abierto.eligiendo ? selectorDeComparacion(abierto.id) : '') +
-        /* Los partidos van solos: ni estadísticas ni gráficos. */
-        (abierto.partidos || abierto.soloPrecio
+        /* Los partidos van solos: ni estadísticas ni gráficos. Y comparando
+           tampoco: esos cuadros son de uno solo y repiten, peor contadas, las
+           mismas cifras que ya están enfrentadas arriba. */
+        (abierto.partidos || abierto.soloPrecio || abierto.comparar
           ? '' : estadisticasDeTemporada(abierto.id) + rachaDeTemporada(abierto.id)) +
         /* Desde los rankings solo interesan las estadísticas: ni el valor de
-           mercado ni su evolución pintan nada ahí. */
-        (abierto.soloDatos || abierto.partidos ? '' :
+           mercado ni su evolución pintan nada ahí. Comparando, el gráfico de
+           precio sería el de uno de los dos y engañaría: se deja fuera. */
+        (abierto.soloDatos || abierto.partidos || abierto.comparar ? '' :
         (puntos.length < 2
           /* Biwenger no publica el histórico de todos —los que están sin club,
              por ejemplo—, pero el valor de hoy sí se sabe: se enseña eso. */
@@ -8049,6 +8151,8 @@
         state.priceModal.busca = '';
         ensureEstadisticas(state.priceModal.id);
         ensureEstadisticas(state.priceModal.comparar);
+        /* Y su serie de precios, para el gráfico de los dos. */
+        ensurePriceSeries([state.priceModal.id, state.priceModal.comparar], renderPriceModal);
         /* Si estabas viendo los partidos, se piden ya los del rival para que
            al volver estén los dos y no haya que esperar. */
         if (state.priceModal.partidos) ensurePartidosDe(state.priceModal.comparar);
