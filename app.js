@@ -1811,9 +1811,14 @@
     const enJuego = !!round.live;
     /* Si hay un partido rodando, el rótulo lo dice; el reloj de al lado lleva el
        marcador. Si no, cuántos van jugados o cuándo empieza. */
+    /* En juego según Biwenger o según ESPN: él lo marca antes, así que un
+       partido recién empezado ya sale aquí aunque Biwenger siga sin marcador. */
     const rodando = (round.matches || []).filter(function (partido) {
-      return partido.homeScore != null && partido.awayScore != null && partido.status !== 'finished';
+      if (partido.status === 'finished') return false;
+      if (partido.homeScore != null && partido.awayScore != null) return true;
+      return !!marcadorEnVivo(partido.home, partido.away);
     })[0];
+    const vivoAhora = rodando ? marcadorEnVivo(rodando.home, rodando.away) : null;
 
     /* Con la jornada empezada el rótulo sobra: ya se ve el partido en curso o
        los que van jugados. Solo se dice algo cuando aún no ha arrancado. */
@@ -1823,9 +1828,14 @@
     if (rodando) {
       /* Escudos, igual que en el resto de la tarjeta: el nombre en texto
          desentonaba con el próximo partido de al lado, que va con escudos. */
-      $('round-when').innerHTML = '<span class="round__live">En juego</span>' +
+      /* El marcador de ESPN manda mientras rueda: va por delante del suyo. */
+      const marca = vivoAhora
+        ? vivoAhora.homeScore + '–' + vivoAhora.awayScore
+        : rodando.homeScore + '–' + rodando.awayScore;
+      $('round-when').innerHTML = '<span class="round__live">En juego' +
+          (vivoAhora && vivoAhora.reloj ? ' · ' + escapeHtml(vivoAhora.reloj) : '') + '</span>' +
         '<span class="round__ahora">' + escudoDeEquipo(rodando.homeId, rodando.home) +
-          '<strong class="round__score">' + rodando.homeScore + '–' + rodando.awayScore + '</strong>' +
+          '<strong class="round__score">' + marca + '</strong>' +
           escudoDeEquipo(rodando.awayId, rodando.away) + '</span>';
     } else {
       /* Antes de arrancar, ni fecha ni hora: la cuenta atras de al lado ya dice
@@ -1870,14 +1880,20 @@
         '<p class="round__day">' + escapeHtml(key) + '</p>';
       day = key;
 
-      const hayMarcador = match.homeScore != null && match.awayScore != null;
       const acabado = match.status === 'finished';
+      /* Mientras rueda manda ESPN, que va por delante de Biwenger. */
+      const vivo = acabado ? null : marcadorEnVivo(match.home, match.away);
+      const hayMarcador = vivo ? true : (match.homeScore != null && match.awayScore != null);
       const rodando = hayMarcador && !acabado;
+      const marca = vivo
+        ? vivo.homeScore + '–' + vivo.awayScore
+        : match.homeScore + '–' + match.awayScore;
 
       /* Una vez jugado el partido, el canal ya no le importa a nadie: ese
          hueco lo ocupa cómo va. */
       const estado = acabado ? '<span class="round__final">Final</span>'
-        : (rodando ? '<span class="round__playing">En juego</span>'
+        : (rodando ? '<span class="round__playing">En juego' +
+            (vivo && vivo.reloj ? ' ' + escapeHtml(vivo.reloj) : '') + '</span>'
           : (match.tv ? escapeHtml(match.tv) : '—'));
 
       return header +
@@ -1886,7 +1902,7 @@
           '<span class="round__hour">' + timeFormat.format(when) + '</span>' +
           '<span class="round__teams">' + escudoDeEquipo(match.homeId, match.home) +
             (hayMarcador
-              ? '<span class="round__vs round__score">' + match.homeScore + '–' + match.awayScore + '</span>'
+              ? '<span class="round__vs round__score">' + marca + '</span>'
               : '<span class="round__vs">–</span>') +
             escudoDeEquipo(match.awayId, match.away) + '</span>' +
           '<span class="round__tv">' + estado + '</span>' +
@@ -2314,6 +2330,48 @@
   /* Amarillas de cada futbolista, para avisar de quién está a una de sanción.
      Biwenger no lo manda como estado: sale del recuento de la temporada. */
   const amarillasDe = {};
+
+  /**
+   * El parte de Biwenger de un lesionado o sancionado, para la ficha.
+   *
+   * Él lo manda en `statusInfo` («Lesión en el bíceps femoral. Retorno
+   * estimado: mediados de enero», «Roja directa»...), que es lo que de verdad
+   * dice si contar con él o no. Puede venir de la plantilla, de la lista de
+   * futbolistas o de sus estadísticas: se coge de donde esté.
+   */
+  function parteMedico(id) {
+    const clave = String(id);
+    const busca = function (lista) {
+      return (lista || []).filter(function (j) { return j && String(j.id) === clave; })[0];
+    };
+
+    const fuentes = [
+      state.estadisticas && state.estadisticas[clave],
+      busca(state.jugadores),
+      busca(mySquad())
+    ];
+    (squadList() || []).forEach(function (plantilla) {
+      fuentes.push(busca(plantilla.players));
+    });
+
+    let estado = null;
+    let parte = null;
+    fuentes.forEach(function (fuente) {
+      if (!fuente) return;
+      if (!estado && fuente.status && fuente.status !== 'ok') estado = fuente.status;
+      if (!parte && fuente.statusInfo) parte = fuente.statusInfo;
+    });
+
+    if (!estado && !parte) return '';
+    const marca = STATUS_MARKS[estado] || null;
+    const titulo = marca ? marca.label : 'No disponible';
+
+    return '<p class="ficha__parte">' +
+      (marca ? '<span class="ficha__parte-icono" aria-hidden="true">' + marca.icon + '</span>' : '') +
+      '<strong>' + escapeHtml(titulo) + '</strong>' +
+      (parte ? ' · ' + escapeHtml(parte) : '') +
+    '</p>';
+  }
 
   function aUnaDeSancion(player) {
     if (!player || player.id == null) return false;
@@ -4968,6 +5026,97 @@
       });
   }
 
+  /* ---------- Marcador en directo ----------
+   *
+   * Biwenger tarda un rato en mover el marcador. ESPN lo lleva al momento y ya
+   * se le pregunta desde aquí para los goles de falta, así que sale gratis.
+   *
+   * Solo se toca el marcador de los partidos EN JUEGO: el de los acabados lo
+   * manda Biwenger, que es quien reparte los puntos. Y solo se emparejan
+   * equipos —veinte, por nombre—, nunca futbolistas: ahí es donde se lía.
+   */
+  const NOMBRE_RUIDO = { fc: 1, cf: 1, cd: 1, ud: 1, sd: 1, club: 1, de: 1, la: 1 };
+
+  function palabrasDeEquipo(nombre) {
+    return llano(nombre).split(' ').filter(function (palabra) {
+      return palabra && !NOMBRE_RUIDO[palabra];
+    });
+  }
+
+  /**
+   * ¿Son el mismo club? Las dos fuentes lo escriben distinto («Athletic» y
+   * «Athletic Club», «Celta» y «Celta Vigo»), así que vale con que las
+   * palabras de uno estén todas en el otro. «Real Madrid» y «Real Sociedad»
+   * no se confunden: ninguno está contenido en el otro.
+   */
+  function mismoEquipo(uno, otro) {
+    const a = palabrasDeEquipo(uno);
+    const b = palabrasDeEquipo(otro);
+    if (!a.length || !b.length) return false;
+    const dentro = function (chico, grande) {
+      return chico.every(function (palabra) { return grande.indexOf(palabra) !== -1; });
+    };
+    return dentro(a, b) || dentro(b, a);
+  }
+
+  /** Pide a ESPN los partidos de hoy y de ayer, con su marcador y su minuto. */
+  function ensureEnVivo() {
+    if (state.envivoPidiendo) return;
+    state.envivoPidiendo = true;
+
+    const dia = function (cuando) {
+      const d = new Date(cuando);
+      return d.getFullYear() + String(d.getMonth() + 1).padStart(2, '0') +
+        String(d.getDate()).padStart(2, '0');
+    };
+    /* Ayer también: un partido de noche cruza la medianoche en UTC. */
+    const dias = [dia(Date.now() - 86400e3), dia(Date.now())];
+
+    Promise.all(dias.map(function (d) {
+      return fetch(ESPN + '/scoreboard?dates=' + d)
+        .then(function (r) { return r.ok ? r.json() : { events: [] }; })
+        .catch(function () { return { events: [] }; });
+    })).then(function (tandas) {
+      const vivos = [];
+      tandas.forEach(function (cuerpo) {
+        (cuerpo.events || []).forEach(function (evento) {
+          const juego = (evento.competitions || [])[0] || {};
+          const estado = (evento.status && evento.status.type) || {};
+          /* Solo lo que está rodando: ni lo que no ha empezado ni lo acabado. */
+          if (estado.state !== 'in') return;
+          const equipos = juego.competitors || [];
+          const local = equipos.filter(function (e) { return e.homeAway === 'home'; })[0];
+          const fuera = equipos.filter(function (e) { return e.homeAway === 'away'; })[0];
+          if (!local || !fuera) return;
+          vivos.push({
+            home: (local.team && local.team.displayName) || '',
+            away: (fuera.team && fuera.team.displayName) || '',
+            homeScore: Number(local.score),
+            awayScore: Number(fuera.score),
+            reloj: (evento.status && evento.status.displayClock) || ''
+          });
+        });
+      });
+      state.envivo = vivos;
+      state.envivoPidiendo = false;
+      /* Solo se repinta si hay algo rodando: si no, no cambia nada. */
+      if (vivos.length) {
+        render();
+        if (state.tab === 'jornadas') renderPartidos();
+      }
+    }).catch(function () { state.envivoPidiendo = false; });
+  }
+
+  /** El marcador de ese partido según ESPN, si lo está jugando ahora mismo. */
+  function marcadorEnVivo(home, away) {
+    const vivos = state.envivo || [];
+    for (let i = 0; i < vivos.length; i++) {
+      const v = vivos[i];
+      if (mismoEquipo(v.home, home) && mismoEquipo(v.away, away)) return v;
+    }
+    return null;
+  }
+
   /** Junta los goles de falta de varios días. */
   function faltasDeLosDias(dias) {
     return Promise.all(dias.map(faltasDelDia)).then(function (tandas) {
@@ -5271,13 +5420,15 @@
                         (juego.confirmadas ? 'Alineación confirmada.' : 'Alineaciones probables.') +
                         '</p>') +
                     (function () {
-                      /* Solo se ofrece la otra vista. La píldora se queda
-                         siempre a la derecha: antes saltaba de lado según la
-                         vista y había que buscarla con la mirada. */
-                      const otra = state.vistaPartido === 'tabla' ? 'campo' : 'tabla';
+                      /* La píldora dice en qué vista estás, no a cuál irías
+                         —igual que las de Mi liga y LaLiga—, y al pulsarla
+                         cambian el rótulo y lo de debajo. Siempre a la
+                         derecha: antes saltaba de lado según la vista. */
+                      const ahora = state.vistaPartido === 'campo' ? 'campo' : 'tabla';
+                      const otra = ahora === 'campo' ? 'tabla' : 'campo';
                       return '<div class="vistas">' +
                         '<button type="button" class="ambito ambito--marco" data-vista="' + otra + '">' +
-                          (otra === 'campo' ? 'Campo' : 'Tabla') + '</button>' +
+                          (ahora === 'campo' ? 'Campo' : 'Tabla') + '</button>' +
                       '</div>';
                     })() +
                     '<div class="alineaciones">' +
@@ -6667,6 +6818,10 @@
             ' title="Cerrar" aria-label="Cerrar">✕</button>' +
         '</div>' +
         '<p class="muted ficha__datos">' + datos + '</p>' +
+        /* Lesionado o sancionado: el parte de Biwenger («Retorno estimado:
+           mediados de enero», «Roja directa»...) debajo del nombre y en rojo,
+           que es el dato que de verdad decide si lo alineas. */
+        parteMedico(abierto.id) +
         /* Elegido el rival, sus estadísticas van al lado de las de este, y
            debajo la evolución del precio de los dos en el mismo gráfico. */
         (abierto.comparar && !abierto.partidos

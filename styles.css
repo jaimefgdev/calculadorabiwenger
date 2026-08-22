@@ -1531,6 +1531,15 @@ code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft)
    nunca el sitio del botón. */
 .vistas { display: flex; justify-content: flex-end; margin-bottom: .4rem; }
 
+/* El parte de la lesión o la sanción, bajo el nombre de la ficha. En rojo,
+   que es el aviso de «con este no cuentes». */
+.ficha__parte {
+  display: flex; align-items: baseline; gap: .35rem;
+  margin: -.2rem 0 .7rem;
+  color: var(--neg); font-size: .82rem; line-height: 1.35;
+}
+.ficha__parte-icono { font-weight: 700; }
+
 /* En la vista de campo los lances van debajo del nombre, en su propia línea:
    flotando se comían el nombre del futbolista. */
 .pitch__lances, .bench__lances {
