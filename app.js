@@ -4811,8 +4811,12 @@
     return '<span class="face-box">' + faceOf(jugador.id, claseCara) +
       chapaDePuesto(jugador.position, 'puesto--esquina', otrosPuestosDe(jugador)) +
       /* Con el dueño puesto, él ocupa la esquina de arriba a la derecha y el
-         estado se calla: en el once ideal de una jornada ya jugada no aporta. */
-      (conDueno ? chapaDeManager(jugador, 'dueno--alto') : statusMark(jugador, 'mark--esquina')) +
+         estado se calla: en el once ideal de una jornada ya jugada no aporta.
+         Al que no es de nadie no se le deja la esquina vacía: ahí vuelve el
+         estado, que si no los libres perdían su marca. */
+      (conDueno
+        ? (chapaDeManager(jugador, 'dueno--alto') || statusMark(jugador, 'mark--esquina'))
+        : statusMark(jugador, 'mark--esquina')) +
       '<span class="pts pts--esquina' + (sinNota ? ' pts--sinnota' : '') + (negativa ? ' pts--neg' : '') + '">' +
         marcaDePuntos(jugador) + '</span>' +
     '</span>';
@@ -5407,8 +5411,10 @@
 
     caja.hidden = false;
     caja.innerHTML = '<div class="onces">' +
-      campo('Once ideal', once) +
-      /* En el nuestro, la foto de quién lo tiene en su plantilla. */
+      /* También en el de toda LaLiga: si el futbolista es de alguno de los
+         ocho, se ve su foto. Los que no son de nadie no llevan chapa, que
+         `chapaDeManager` devuelve vacío cuando no tiene dueño. */
+      campo('Once ideal', once, true) +
       campo('Once ideal de mi liga', nuestro, true) +
     '</div>';
   }
@@ -7286,7 +7292,8 @@
       return;
     }
 
-    caja.innerHTML = RANKINGS.map(function (ranking) {
+    const tarjetas = {};
+    RANKINGS.forEach(function (ranking) {
       /* Solo los porteros en lo que solo les toca a ellos, y solo quien ha
          jugado: un cero de quien no se ha estrenado no dice nada. */
       const lista = todos.filter(function (j) {
@@ -7311,7 +7318,7 @@
         return String(a.name).localeCompare(String(b.name), 'es');
       });
 
-      if (lista.length === 0) return '';
+      if (lista.length === 0) { tarjetas[ranking.campo] = ''; return; }
 
       /* Diez de primeras; la cabecera despliega hasta setenta y cinco. Mismo
          patrón que «los que más suben y bajan»: se abre pulsando el título y
@@ -7322,7 +7329,7 @@
       const vistos = lista.slice(0, tope);
       const hayMas = lista.length > 10;
 
-      return '<div class="ranking' + (desplegado ? ' ranking--desplegado' : '') + '">' +
+      tarjetas[ranking.campo] = '<div class="ranking' + (desplegado ? ' ranking--desplegado' : '') + '">' +
         '<button type="button" class="ranking__title ranking__title--mando"' +
           ' data-mas="' + escapeHtml(ranking.campo) + '"' +
           ' aria-expanded="' + (desplegado ? 'true' : 'false') + '"' +
@@ -7364,6 +7371,22 @@
             escapeHtml(ranking.campo) + '">Ver menos</button>'
           : '') +
       '</div>';
+    });
+
+    /* Por temas y no en una parrilla suelta: goles, disciplina, participación
+       y portería. Cada fila lleva las que pediste (3-2-3-2). */
+    const FILAS = [
+      ['goals', 'minutesPerGoal', 'assists'],
+      ['yellow', 'red'],
+      ['minutes', 'subsOut', 'subsIn'],
+      ['cleanSheets', 'conceded']
+    ];
+
+    caja.innerHTML = FILAS.map(function (fila) {
+      const dentro = fila.map(function (campo) { return tarjetas[campo] || ''; }).join('');
+      if (!dentro) return '';
+      /* La fila dice cuántas lleva, para repartirlas a lo ancho. */
+      return '<div class="rankings-fila rankings-fila--' + fila.length + '">' + dentro + '</div>';
     }).join('');
   }
 

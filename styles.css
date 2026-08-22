@@ -322,9 +322,14 @@ code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft)
 /* El once ideal va solo en su bloque, así que se centra. */
 .panel__head--center { text-align: center; }
 
-/* Los rankings de la temporada son diez: cinco por fila en pantalla ancha. */
-.rankings--muchos { grid-template-columns: repeat(5, minmax(0, 1fr)); row-gap: 1.4rem; }
-@media (max-width: 1100px) { .rankings--muchos { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+/* Los rankings de la temporada, por temas y no en una parrilla suelta: goles,
+   disciplina, participación y portería, cada uno en su fila. */
+.rankings-temporada { display: grid; gap: 1.4rem; }
+.rankings-fila { display: grid; gap: .8rem; align-items: start; }
+/* Tres y dos SIEMPRE, en móvil igual que en el ordenador: sin consulta de
+   medios que los reordene por ancho de pantalla. */
+.rankings-fila--3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.rankings-fila--2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 /* Estas filas no se pulsan: no llevan el gráfico por jornada. */
 .ranking__boton--fijo { cursor: default; }
 
@@ -369,6 +374,18 @@ code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft)
   background: var(--neg); border-color: var(--neg); color: #fff;
 }
 .ambito--rojo:hover { filter: brightness(1.1); }
+
+/* Las píldoras de ámbito de Datos (Rankings y Puntos): rojas de borde y letra,
+   con el fondo del sitio. Van después de `.ambito` y de `.ambito--on` para que
+   ni el estado encendido les cambie el color. */
+.ambito--marco,
+.ambito--marco:hover,
+.ambito--marco:focus,
+.ambito--marco.ambito--on,
+.ambito--marco[aria-pressed="true"] {
+  background: transparent; border-color: var(--neg); color: var(--neg);
+}
+.ambito--marco:hover { background: var(--neg-soft); }
 
 /* El filtro del mercado: gris muy claro con la letra negra, y siempre igual.
    Los colores van fijos y no en variables porque no debe cambiar ni con el

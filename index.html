@@ -20,7 +20,7 @@
 <link rel="dns-prefetch" href="https://cdn.biwenger.com">
 <!-- El ?v= se sube en cada publicación: obliga al navegador a bajar el archivo
      nuevo en vez de reutilizar el que tenga en caché. -->
-<link rel="stylesheet" href="styles.css?v=220">
+<link rel="stylesheet" href="styles.css?v=222">
 <!-- La tipografia se pide ya, sin esperar a que el CSS termine de leerse. -->
 <link rel="preload" href="GoogleSans-Regular.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>💰</text></svg>">
@@ -506,10 +506,10 @@
       <!-- La pildora va dentro del cuadro, arrimada a la derecha.
            Cambia entre lo de toda LaLiga y lo que cada uno hizo alineado aqui. -->
       <div class="rankings__mando rankings__mando--derecha">
-        <button type="button" class="ambito" id="rankings-ambito"
+        <button type="button" class="ambito ambito--marco" id="rankings-ambito"
           aria-pressed="false">Mi liga</button>
       </div>
-      <div id="rankings-temporada" class="rankings rankings--muchos"></div>
+      <div id="rankings-temporada" class="rankings-temporada"></div>
     </section>
 
     <h2 class="seccion__titulo">Puntos</h2>
@@ -518,7 +518,7 @@
          los nuestros y los de toda LaLiga, como en Rankings. -->
     <section class="panel">
       <div class="rankings__mando rankings__mando--derecha">
-        <button type="button" class="ambito" id="puntos-ambito"
+        <button type="button" class="ambito ambito--marco" id="puntos-ambito"
           aria-pressed="false">Mi liga</button>
       </div>
       <div id="ambitos-puntos"></div>
@@ -597,6 +597,6 @@
 
 </main>
 
-<script src="app.js?v=229"></script>
+<script src="app.js?v=230"></script>
 </body>
 </html>
