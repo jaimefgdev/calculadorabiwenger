@@ -362,6 +362,10 @@ code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft)
 }
 .ambito--rojo:hover { filter: brightness(1.1); }
 
+/* La cuenta atrás del mercado y su filtro, en la misma línea. */
+.market-sub { display: flex; align-items: center; gap: .5rem; flex-wrap: wrap; }
+.market-sub p { margin: 0; }
+
 /* Las pujas: una celda más del diálogo, a la altura de «Tu puja de ahora»,
    con la píldora arrimada a la derecha y sin rótulo encima. */
 .op-pujas { align-items: flex-end; justify-content: flex-end; }
@@ -2045,13 +2049,16 @@ main.wrap { padding-top: 1.15rem; padding-bottom: 3.5rem; }
   margin-top: .5rem; padding-top: .5rem;
   border-top: 1px solid var(--border);
 }
-.periodo { display: inline-flex; align-items: baseline; gap: .2rem; font-size: .72rem; white-space: nowrap; }
-.periodo__label { color: var(--text-faint); font-size: .66rem; text-transform: uppercase; letter-spacing: .02em; }
-.periodo .delta { font-size: .72rem; }
+/* Siete periodos (6m … 1d) en una sola línea: la letra se aprieta un poco y
+   los huecos se reparten solos para que quepan sin partirse. */
+.periodo { display: inline-flex; align-items: baseline; gap: .15rem; font-size: .66rem; white-space: nowrap; }
+.periodo__label { color: var(--text-faint); font-size: .61rem; text-transform: uppercase; letter-spacing: .01em; }
+.periodo .delta { font-size: .66rem; }
 .periodo--dias { color: var(--text-soft); }
 @media (max-width: 560px) {
-  .periodo, .periodo .delta { font-size: .64rem; }
-  .periodo__label { font-size: .6rem; }
+  .periodo, .periodo .delta { font-size: .58rem; }
+  .periodo__label { font-size: .55rem; }
+  .viz-periodos { gap: .2rem; }
 }
 /* Ver más / ver menos en las listas de subidas y bajadas. */
 .movers__mas { margin-top: .5rem; width: 100%; }

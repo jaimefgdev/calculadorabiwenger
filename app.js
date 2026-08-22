@@ -32,6 +32,9 @@
   /* El once del simulador se guarda aparte: es tuyo, no el que tenga puesto
      Biwenger, y no debe perderse al recargar. */
   const XI_KEY = 'biwenger-calc-xi';
+  /* El filtro del mercado (todos / libres / de mánagers), que se recuerda de
+     una visita a otra: casi siempre se mira lo mismo. */
+  const MARKET_FILTER_KEY = 'biwenger-calc-filtro-mercado';
   /* El estado del futbolista cuando se hizo cada fichaje. Se guarda la primera
      vez que se ve el movimiento y ya no se toca: Biwenger solo da el de hoy. */
   const MOVE_STATUS_KEY = 'biwenger-calc-estado-fichajes-v2';
@@ -640,6 +643,7 @@
     movers: null,          // los que más suben y bajan hoy
     moversAbiertos: {},    // listas desplegadas a la lista larga
     market: null,          // el mercado de hoy, con sus pujas
+    marketFiltro: 'todos',  // todos · libres · vendidos (de mánagers)
     marketState: '',       // 'cargando' | 'error' | ''
     startPrices: {},       // lo que valía cada jugador el día que lo recibió
     priceSeries: {},       // evolución de precio de cada futbolista
@@ -2632,9 +2636,39 @@
     });
   }
 
+  /* Las tres vueltas de la p\u00edldora del mercado, en orden. */
+  const FILTROS_MERCADO = [
+    { clave: 'todos',    rotulo: 'Todos' },
+    { clave: 'libres',   rotulo: 'Libres' },
+    { clave: 'vendidos', rotulo: 'No libres' }
+  ];
+
+  function filtrarMercado(lista) {
+    if (state.marketFiltro === 'libres') {
+      return lista.filter(function (venta) { return venta.free; });
+    }
+    if (state.marketFiltro === 'vendidos') {
+      return lista.filter(function (venta) { return !venta.free; });
+    }
+    return lista;
+  }
+
+  function pintarFiltroMercado() {
+    const boton = $('market-filtro');
+    if (!boton) return;
+    const actual = FILTROS_MERCADO.filter(function (f) {
+      return f.clave === state.marketFiltro;
+    })[0] || FILTROS_MERCADO[0];
+    boton.textContent = actual.rotulo;
+    /* Encendida cuando filtra, apagada cuando est\u00e1n todos. */
+    boton.classList.toggle('ambito--on', state.marketFiltro !== 'todos');
+  }
+
   function renderMarket() {
     const cuerpo = $('market-body');
     if (!cuerpo) return;
+
+    pintarFiltroMercado();
 
     if (!state.market) {
       cuerpo.innerHTML = '<tr><td colspan="8" class="muted">' +
@@ -2647,7 +2681,19 @@
       return;
     }
 
-    cuerpo.innerHTML = sortMarket(state.market).map(function (venta) {
+    const visibles = filtrarMercado(state.market);
+    if (visibles.length === 0) {
+      cuerpo.innerHTML = '<tr><td colspan="8" class="muted">' +
+        (state.marketFiltro === 'libres'
+          ? 'Ahora mismo no hay ning\u00fan futbolista libre.'
+          : 'Ahora mismo no hay ninguno vendido por un m\u00e1nager.') +
+        '</td></tr>';
+      /* Aun sin filas, el resto de la cabecera se pinta igual. */
+      pintarBotonOfertas();
+      return;
+    }
+
+    cuerpo.innerHTML = sortMarket(visibles).map(function (venta) {
       const sube = venta.increment > 0;
       /* De lo que vendes tú la API no da el contador, pero las ofertas
          recibidas sí están: se cuentan de ahí. */
@@ -3460,6 +3506,18 @@
 
     const pastilla = $('btn-ofertas');
     if (pastilla) pastilla.addEventListener('click', function () { abrirOfertas(); });
+
+    /* El filtro del mercado va rotando: todos → libres → no libres → todos. */
+    const filtro = $('market-filtro');
+    if (filtro) {
+      filtro.addEventListener('click', function () {
+        const donde = FILTROS_MERCADO.map(function (f) { return f.clave; })
+          .indexOf(state.marketFiltro);
+        state.marketFiltro = FILTROS_MERCADO[(donde + 1) % FILTROS_MERCADO.length].clave;
+        try { localStorage.setItem(MARKET_FILTER_KEY, state.marketFiltro); } catch (e) { /* sin memoria */ }
+        renderMarket();
+      });
+    }
 
     const ambito = $('moves-ambito');
     if (ambito) {
@@ -5424,7 +5482,10 @@
     { label: '3m', dias: 90 },
     { label: '1m', dias: 30 },
     { label: '15d', dias: 15 },
-    { label: '7d', dias: 7 }
+    { label: '7d', dias: 7 },
+    { label: '3d', dias: 3 },
+    /* De ayer a hoy: lo primero que se mira cuando abre el mercado. */
+    { label: '1d', dias: 1 }
   ];
 
   /** Importe corto, para las filas donde no cabe la cifra entera. */
@@ -6123,9 +6184,10 @@
                 return '<span class="periodo"><span class="periodo__label">' + periodo.label + '</span>' +
                   marca + '</span>';
               }).join('');
-              return '<div class="viz-periodos">' +
-                '<span class="periodo periodo--dias"><strong>' + puntos.length + ' días</strong></span>' +
-                celdas + '</div>';
+              /* Sin el «N días» de la izquierda: ese dato ya sale en el propio
+                 gráfico y ocupaba el sitio que necesitan 3d y 1d para caber
+                 todos en una línea. */
+              return '<div class="viz-periodos">' + celdas + '</div>';
             })() +
             /* Lo más alto y lo más bajo que ha llegado a valer, con su fecha. */
             topesDePrecio(puntos))) +
@@ -8011,6 +8073,13 @@
     loadJornadas();
     loadMoveStatus();
     loadXi();
+    /* El filtro del mercado, tal como se dejó la última vez. */
+    try {
+      const guardado = localStorage.getItem(MARKET_FILTER_KEY);
+      if (FILTROS_MERCADO.some(function (f) { return f.clave === guardado; })) {
+        state.marketFiltro = guardado;
+      }
+    } catch (error) { /* se queda en «todos» */ }
     /* Al abrir, lo primero es ver si el otro aparato dejó otra alineación. */
     traerXiCompartida();
     render();
