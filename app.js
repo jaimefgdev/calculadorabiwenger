@@ -3285,6 +3285,93 @@
     '</div>';
   }
 
+  /* ---------- Tema morado ----------
+     Se enciende dejando pulsado el escudo de Inicio diez segundos, y se apaga
+     igual. Va escondido a propósito: es un capricho, no una opción del menú.
+     Toda la web tira de las mismas variables de color, así que basta con poner
+     la marca en el <html> para que cambie entera. */
+  const TEMA_KEY = 'biwenger-calc-tema';
+  const TEMA_SEGUNDOS = 10;
+  let temaCambiado = false;      // para descartar el clic de después
+
+  /** Un aviso corto abajo del todo, que se va solo. */
+  function toast(texto) {
+    let caja = document.getElementById('toast');
+    if (!caja) {
+      caja = document.createElement('div');
+      caja.id = 'toast';
+      caja.className = 'toast';
+      document.body.appendChild(caja);
+    }
+    caja.textContent = texto;
+    caja.classList.add('toast--visible');
+    clearTimeout(toast._reloj);
+    toast._reloj = setTimeout(function () {
+      caja.classList.remove('toast--visible');
+    }, 1800);
+  }
+
+  function aplicarTema(tema) {
+    if (tema === 'morado') document.documentElement.setAttribute('data-tema', 'morado');
+    else document.documentElement.removeAttribute('data-tema');
+  }
+
+  function cargarTema() {
+    let guardado = null;
+    try { guardado = localStorage.getItem(TEMA_KEY); } catch (error) { /* sin memoria */ }
+    aplicarTema(guardado);
+  }
+
+  function cambiarTema() {
+    const ahora = document.documentElement.getAttribute('data-tema') === 'morado';
+    const nuevo = ahora ? null : 'morado';
+    aplicarTema(nuevo);
+    try {
+      if (nuevo) localStorage.setItem(TEMA_KEY, nuevo);
+      else localStorage.removeItem(TEMA_KEY);
+    } catch (error) { /* sin memoria: dura lo que dure la sesión */ }
+    toast(nuevo ? 'Modo morado' : 'Colores de siempre');
+  }
+
+  function engancharTemaLargo() {
+    const boton = $('brand-home');
+    if (!boton) return;
+
+    let reloj = null;
+    let desde = 0;
+
+    const parar = function () {
+      if (reloj) { clearInterval(reloj); reloj = null; }
+      boton.style.removeProperty('--tema-avance');
+      boton.classList.remove('brand__logo--cargando');
+    };
+
+    const empezar = function (evento) {
+      if (evento.button != null && evento.button !== 0) return;
+      parar();
+      desde = Date.now();
+      boton.classList.add('brand__logo--cargando');
+      /* Se va pintando cuánto llevas: diez segundos a ciegas parecen una
+         eternidad y darías por hecho que no funciona. */
+      reloj = setInterval(function () {
+        const parte = Math.min(1, (Date.now() - desde) / (TEMA_SEGUNDOS * 1000));
+        boton.style.setProperty('--tema-avance', (parte * 100).toFixed(1) + '%');
+        if (parte >= 1) {
+          parar();
+          temaCambiado = true;
+          cambiarTema();
+        }
+      }, 100);
+    };
+
+    boton.addEventListener('pointerdown', empezar);
+    ['pointerup', 'pointerleave', 'pointercancel'].forEach(function (cual) {
+      boton.addEventListener(cual, parar);
+    });
+    /* Con el dedo, mantener pulsado abre el menú del navegador: se corta. */
+    boton.addEventListener('contextmenu', function (evento) { evento.preventDefault(); });
+  }
+
   /** Repinta el diálogo de puja sin perder lo escrito en el importe. */
   function repintarPuja() {
     if (opPujaAbierta == null) return;
@@ -8383,9 +8470,14 @@
     });
 
     $('brand-home').addEventListener('click', function () {
+      /* Tras la pulsación larga el navegador manda igualmente un clic: ese se
+         descarta, que si no te lleva a Inicio al soltar. */
+      if (temaCambiado) { temaCambiado = false; return; }
       showTab('inicio');
       window.scrollTo({ top: 0, behavior: 'smooth' });
     });
+
+    engancharTemaLargo();
 
     $('round-toggle').addEventListener('click', function () {
       state.roundOpen = !state.roundOpen;
@@ -8949,6 +9041,8 @@
     renderLastSync(state.lastSync);
 
     const hadData = loadStored();
+    /* Antes que nada: si dejaste puesto el morado, que no parpadee en rojo. */
+    cargarTema();
     loadJornadas();
     loadMoveStatus();
     loadXi();

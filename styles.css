@@ -86,6 +86,40 @@
   }
 }
 
+/* ---------- Tema morado ----------
+   El mismo morado del escudo del Madrid (#691b7b) que lleva el icono de la
+   pestaña. Se enciende dejando pulsado el escudo de Inicio diez segundos y se
+   apaga igual. Como toda la web tira de estas variables, con redefinirlas aquí
+   cambia entera: no hay que tocar ni una regla más.
+
+   Va al final de las paletas y con `:root[data-tema]` (dos señas) para que gane
+   tanto al tema oscuro como al claro del sistema. */
+:root[data-tema="morado"] {
+  --bg:            #0b060d;
+  --bg-elev:       #150a19;
+  --bg-surface:    #1b0d20;
+  --border:        #2e1636;
+  --border-strong: #3f1e4a;
+  --border-hover:  #582a66;
+  --text:          #f6f0f8;
+  --text-soft:     #d3c2db;
+  --text-faint:    #a58fb0;
+
+  --accent:        #a034bd;
+  --accent-rgb:    160, 52, 189;
+  --accent-soft:   rgba(160, 52, 189, .16);
+
+  /* El verde chillón desentona con el morado: se apaga hacia turquesa. */
+  --pos:           #2fd3a7;
+  --pos-soft:      rgba(47, 211, 167, .14);
+  /* Lo malo sigue leyéndose como rojo, pero rebajado para no chillar. */
+  --neg:           #ff4d6d;
+  --neg-soft:      rgba(255, 77, 109, .12);
+
+  --marca:         #d9a7e8;
+  --shadow:        0 1px 2px rgba(0, 0, 0, .6), 0 8px 24px rgba(40, 0, 50, .6);
+}
+
 * { box-sizing: border-box; }
 
 body {
@@ -133,6 +167,28 @@ code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft)
 /* El escudo de Biwenger, en vez del balón. Se deja respirar dentro del
    cuadrado y manda su propia proporción (es más alto que ancho). */
 .brand__escudo { height: 47px; width: auto; display: block; }
+/* En morado, el escudo de la cabecera pasa a ser el mismo de la pestaña. */
+.brand__escudo--morado { display: none; }
+:root[data-tema="morado"] .brand__escudo { display: none; }
+:root[data-tema="morado"] .brand__escudo--morado { display: block; }
+
+/* Mientras dejas pulsado el escudo, se va rellenando por debajo: diez
+   segundos sin ninguna señal parecerían que no hace nada. */
+.brand__logo--cargando {
+  background:
+    linear-gradient(to top, var(--accent-soft) var(--tema-avance, 0%), transparent var(--tema-avance, 0%));
+}
+
+/* Aviso corto abajo del todo, para decir a qué modo se ha cambiado. */
+.toast {
+  position: fixed; left: 50%; bottom: 1.2rem; transform: translateX(-50%) translateY(1rem);
+  z-index: 95; pointer-events: none;
+  padding: .5rem .9rem; border-radius: 100px;
+  background: var(--bg-elev); border: 1px solid var(--border-strong);
+  color: var(--text); font-size: .82rem; box-shadow: var(--shadow);
+  opacity: 0; transition: opacity .18s, transform .18s;
+}
+.toast--visible { opacity: 1; transform: translateX(-50%) translateY(0); }
 .brand__logo:hover { transform: scale(1.08); background: color-mix(in srgb, var(--accent) 18%, transparent); }
 .brand__logo:active { transform: scale(.96); }
 .brand__logo:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
@@ -141,7 +197,8 @@ code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft)
 /* Tu firma, como en tu portfolio: nombre en blanco y «fgdev» en rojo.
    En modo claro el blanco se volvería invisible, así que usa la tinta normal. */
 .brand__sub--me { color: var(--text); font-weight: 650; letter-spacing: .01em; font-family: var(--mono); }
-.brand__sub--me span { color: #ff0033; }
+/* Sigue el color de la marca para que en morado no quede un rojo suelto. */
+.brand__sub--me span { color: var(--accent); }
 
 /* ---------- Pestañas ---------- */
 .tabs { display: flex; gap: .1rem; flex: 1 1 auto; justify-content: center; }
