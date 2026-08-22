@@ -2854,8 +2854,8 @@
     else if (contadas && contadas.error) rotulo = 'No se ha podido';
     else if (cuantas != null) rotulo = cuantas === 1 ? '1 puja' : cuantas + ' pujas';
 
+    /* Sin rótulo encima: el propio botón ya dice lo que es. */
     return '<div class="op-pujas">' +
-      '<dt>Pujas</dt>' +
       '<dd>' +
         '<button type="button" class="ambito ambito--rojo"' +
           ' data-op-pujas="' + escapeHtml(String(venta.playerId)) + '"' +
@@ -2954,7 +2954,7 @@
       /* Para cerrar está el aspa de arriba: aquí solo va la acción. */
       '<div class="op-botones">' +
         '<button type="button" class="btn btn--primary" data-op-pujar="' +
-          escapeHtml(String(venta.playerId)) + '">' + (mia ? 'Cambiarla' : 'Pujar') + '</button>' +
+          escapeHtml(String(venta.playerId)) + '">' + (mia ? 'Cambiar' : 'Pujar') + '</button>' +
       '</div>');
 
     const campo = $('op-importe');

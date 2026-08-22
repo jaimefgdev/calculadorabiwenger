@@ -329,16 +329,6 @@ code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft)
 /* La píldora que cambia de ámbito, arrimada a la derecha dentro del cuadro. */
 .rankings__mando--derecha { justify-content: flex-end; }
 
-/* Las pujas: una celda más del diálogo, a la altura de «Tu puja de ahora».
-   La píldora se arrima a la derecha de su celda y va en rojo siempre. */
-.op-pujas { align-items: flex-end; }
-.op-pujas dd { display: flex; justify-content: flex-end; }
-.ambito--rojo,
-.ambito--rojo[aria-pressed="true"] {
-  background: var(--neg); border-color: var(--neg); color: #fff;
-}
-.ambito--rojo:hover { filter: brightness(1.1); }
-
 /* ---------- Quién puntúa en la liga ---------- */
 /* Las cuatro siempre en una fila, también en móvil: ahí la página se ve con
    1024 px de ancho y caben. Los nombres largos se recortan con puntos. */
@@ -361,6 +351,21 @@ code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft)
   color: var(--accent); border-color: var(--accent); background: var(--accent-soft);
 }
 .ambito:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* La píldora de ver pujas: roja siempre, pase lo que pase. Va después de
+   `.ambito` a propósito: con la misma especificidad manda la última, y puesta
+   antes se quedaba gris. */
+.ambito--rojo,
+.ambito--rojo:hover,
+.ambito--rojo[aria-pressed="true"] {
+  background: var(--neg); border-color: var(--neg); color: #fff;
+}
+.ambito--rojo:hover { filter: brightness(1.1); }
+
+/* Las pujas: una celda más del diálogo, a la altura de «Tu puja de ahora»,
+   con la píldora arrimada a la derecha y sin rótulo encima. */
+.op-pujas { align-items: flex-end; justify-content: flex-end; }
+.op-pujas dd { display: flex; justify-content: flex-end; }
 
 .ranking { min-width: 0; }
 .ranking__title { font-size: .9rem; font-weight: 650; }
