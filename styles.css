@@ -373,6 +373,9 @@ code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft)
 }
 .ambito--gris:hover { border-color: #bdbdbd; }
 
+/* Aviso de que lo que se ve es el respaldo, no lo de ahora mismo. */
+.stale { color: var(--warn, #e08b14); }
+
 /* La cuenta atrás del mercado y su filtro, en la misma línea. */
 .market-sub { display: flex; align-items: center; gap: .5rem; flex-wrap: wrap; }
 .market-sub p { margin: 0; }

@@ -2591,12 +2591,24 @@
           return { id: v.playerId, position: v.position, altPositions: v.altPositions };
         }));
         state.marketState = '';
-        state.marketError = '';
+        /* Puede venir del respaldo, si Biwenger estaba de tregua: se enseña
+           igual, pero diciendo que no es de ahora mismo. */
+        state.marketError = payload.stale ? (payload.warning || 'Datos de hace un rato.') : '';
+        state.marketViejo = !!payload.stale;
         renderMarket();
+        /* Si es viejo, se vuelve a pedir en cuanto pase la tregua. */
+        if (payload.stale && !state.marketReintento) {
+          const espera = String(payload.warning || '').match(/(\d+)\s*s/);
+          state.marketReintento = setTimeout(function () {
+            state.marketReintento = null;
+            ensureMarket(true);
+          }, (espera ? Math.min(180, Number(espera[1]) + 3) : 95) * 1000);
+        }
         ensurePriceSeries(state.market.map(function (v) { return v.playerId; }), renderMarket);
       })
       .catch(function (error) {
         state.marketState = 'error';
+        state.marketViejo = false;
         /* Se guarda el motivo: casi siempre es que Biwenger nos ha limitado un
            rato, y decirlo (con lo que queda) evita pensar que está roto. */
         state.marketError = String((error && error.message) || '');
@@ -2791,7 +2803,11 @@
       .filter(function (v) { return v.free && v.until; })
       .map(function (v) { return v.until; })
       .sort()[0] || null;
-    nota.innerHTML = cierre ? 'Se renueva en ' + deadlineCell(cierre, true) : '';
+    nota.innerHTML = (cierre ? 'Se renueva en ' + deadlineCell(cierre, true) : '') +
+      /* Cuando lo servido es el respaldo, se dice: si no, parecería de ahora. */
+      (state.marketViejo
+        ? (cierre ? ' · ' : '') + '<span class="stale">Biwenger no responde; esto es de hace un rato</span>'
+        : '');
   }
 
   /* ---------- Operaciones de verdad en Biwenger ----------
