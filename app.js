@@ -7788,8 +7788,31 @@
 
   const TAB_KEY = 'biwenger-calc-tab';
 
+  /**
+   * Sube la página hasta un bloque, dejándolo debajo de la barra de arriba,
+   * que es fija y si no lo taparía.
+   *
+   * Solo se mueve si el bloque se ha quedado por encima de lo que se ve: al
+   * plegar un ranking largo la lista encoge y el principio se va hacia arriba,
+   * pero si ya lo tienes delante no hay que tocar nada.
+   */
+  function subirA(elemento) {
+    if (!elemento) return;
+    const barra = document.querySelector('.topbar');
+    const alto = barra ? barra.getBoundingClientRect().height : 0;
+    const arriba = elemento.getBoundingClientRect().top;
+    if (arriba >= alto) return;             // ya se ve: no se toca
+    window.scrollTo({
+      top: window.scrollY + arriba - alto - 8,
+      behavior: 'smooth'
+    });
+  }
+
   function showTab(name) {
     state.tab = name;
+    /* Cada pestaña empieza por su principio: al cambiar, la página se quedaba
+       a la altura a la que estuvieras en la anterior. */
+    window.scrollTo({ top: 0, behavior: 'auto' });
     // Se recuerda para que al recargar (o al tirar hacia abajo en el móvil)
     // sigas en la pestaña donde estabas.
     try { localStorage.setItem(TAB_KEY, name); } catch (error) { /* sin persistencia */ }
@@ -8418,8 +8441,16 @@
           /* Mismo botón para abrir y para «Ver menos»: los dos llevan el mismo
              data-mas, así que basta con invertir si estaba abierto. */
           const cual = mas.getAttribute('data-mas');
+          const plegando = !!state.rankingsAbiertos[cual];
           state.rankingsAbiertos[cual] = !state.rankingsAbiertos[cual];
           renderRankingsTemporada();
+          /* Al plegar, la lista encoge y su principio puede quedarse por
+             encima de la pantalla: se sube a él. Se busca después de pintar,
+             que el botón de antes ya no existe. */
+          if (plegando) {
+            const nuevo = tandas.querySelector('[data-mas="' + cual + '"]');
+            subirA(nuevo && nuevo.closest('.ranking'));
+          }
           return;
         }
         const boton = event.target.closest('[data-ficha]');
@@ -8481,8 +8512,15 @@
       const boton = event.target.closest('[data-movers]');
       if (!boton) return;
       const clave = boton.getAttribute('data-movers');
+      const plegando = !!state.moversAbiertos[clave];
       state.moversAbiertos[clave] = !state.moversAbiertos[clave];
       renderMovers();
+      /* Igual que en los rankings: al plegar, subir a su principio si se ha
+         quedado por encima de lo que se ve. */
+      if (plegando) {
+        const titulo = document.querySelector('[data-movers="' + clave + '"].movers__titulo');
+        subirA(titulo || $(clave));
+      }
     });
 
     document.addEventListener('click', function (event) {
