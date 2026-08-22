@@ -35,6 +35,42 @@
   /* El filtro del mercado (todos / libres / de mánagers), que se recuerda de
      una visita a otra: casi siempre se mira lo mismo. */
   const MARKET_FILTER_KEY = 'biwenger-calc-filtro-mercado';
+
+  /* ---------- Copia en disco de lo que trae el Worker ----------
+     Cada pestaña pedía lo suyo al abrirla y, al recargar la página, todo otra
+     vez desde cero: entre uno y dos segundos mirando un «cargando». Aquí se
+     guarda la última respuesta buena de cada cosa y se enseña al momento
+     mientras por detrás se pide la de ahora. */
+  const CACHE_KEY = 'biwenger-calc-cache';
+
+  /* Cuánto se da por bueno lo guardado sin ni siquiera repintarlo luego. Es
+     solo para no enseñar algo de anteayer: aunque esté fresco, siempre se
+     vuelve a pedir por detrás. */
+  const CACHE_HORAS = 12;
+
+  function cacheTodo() {
+    try { return JSON.parse(localStorage.getItem(CACHE_KEY) || '{}') || {}; }
+    catch (error) { return {}; }
+  }
+
+  function cacheLeer(nombre) {
+    const caja = cacheTodo()[nombre];
+    if (!caja || !caja.at) return null;
+    if (Date.now() - caja.at > CACHE_HORAS * 3600e3) return null;
+    return caja.data;
+  }
+
+  function cacheGuardar(nombre, data) {
+    try {
+      const todo = cacheTodo();
+      todo[nombre] = { at: Date.now(), data: data };
+      localStorage.setItem(CACHE_KEY, JSON.stringify(todo));
+    } catch (error) {
+      /* Sin sitio: se tira lo guardado y se sigue, que esto es un apaño de
+         velocidad, no un dato que haya que conservar. */
+      try { localStorage.removeItem(CACHE_KEY); } catch (e) { /* nada */ }
+    }
+  }
   /* El estado del futbolista cuando se hizo cada fichaje. Se guarda la primera
      vez que se ve el movimiento y ya no se toca: Biwenger solo da el de hoy. */
   const MOVE_STATUS_KEY = 'biwenger-calc-estado-fichajes-v2';
@@ -2005,7 +2041,14 @@
     const config = loadSyncConfig();
     if (!config.url || !config.key) return;
 
-    state.squads = { status: 'loading', list: [] };
+    /* Lo de la última vez se enseña ya, sin esperar a la red: la plantilla no
+       cambia de un minuto para otro y así la pestaña abre llena. Lo que llegue
+       después manda. */
+    const guardado = cacheLeer('squads');
+    state.squads = guardado
+      ? { status: 'ok', list: guardado.squads || [] }
+      : { status: 'loading', list: [] };
+    if (guardado) (guardado.squads || []).forEach(function (s) { recordarPosiciones(s.players); });
     fetch(config.url.replace(/\/+$/, '') + '/?key=' + encodeURIComponent(config.key) + '&squads=1',
       { headers: { 'accept': 'application/json' } })
       .then(function (response) { return response.json(); })
@@ -2013,11 +2056,15 @@
         if (payload.error) throw new Error(payload.error);
         state.squads = { status: 'ok', list: payload.squads || [] };
         (payload.squads || []).forEach(function (s) { recordarPosiciones(s.players); });
+        cacheGuardar('squads', payload);
         render();
         if (state.tab === 'jornadas') renderPartidos();
       })
       .catch(function () {
-        state.squads = { status: 'error', list: [] };
+        /* Con algo guardado se deja lo que ya se veía, que es mejor que nada. */
+        if (!state.squads || state.squads.status !== 'ok') {
+          state.squads = { status: 'error', list: [] };
+        }
         render();
       });
   }
@@ -2580,6 +2627,14 @@
     if (state.marketState === 'cargando') return;
     if (state.market && !forzar) return;
 
+    /* Lo de la última vez, mientras llega lo de ahora. */
+    if (!state.market) {
+      const guardado = cacheLeer('mercado');
+      if (guardado && guardado.sales) {
+        state.market = guardado.sales;
+        state.marketViejo = false;
+      }
+    }
     state.marketState = 'cargando';
     renderMarket();
 
@@ -2597,7 +2652,10 @@
            igual, pero diciendo que no es de ahora mismo. */
         state.marketError = payload.stale ? (payload.warning || 'Datos de hace un rato.') : '';
         state.marketViejo = !!payload.stale;
-        if (!payload.stale) state.marketIntentos = 0;
+        if (!payload.stale) {
+          state.marketIntentos = 0;
+          cacheGuardar('mercado', payload);
+        }
         renderMarket();
         /* Si es viejo, se vuelve a pedir en cuanto pase la tregua. */
         if (payload.stale) reintentarMercado(payload.warning);
@@ -3464,13 +3522,19 @@
         /* Lo que diga Biwenger manda: se vuelve a preguntar todo. */
         setTimeout(function () {
           syncNow(true);
-          if (volver) {
-            /* La lista se repinta con lo que acabe de llegar. */
-            volver();
-            setTimeout(volver, 2500);
-          } else {
-            cerrarOpModal();
-          }
+          if (!volver) { cerrarOpModal(); return; }
+
+          /* La lista se repinta con lo que acabe de llegar. */
+          volver();
+
+          /* Y otra vez al llegar la sincronía, PERO solo si sigues mirándola:
+             antes se reabría siempre, así que si cerrabas el diálogo después
+             de responder una oferta, a los dos segundos y medio te saltaba
+             otra vez él solo —y encima vacío, porque la oferta ya no estaba. */
+          setTimeout(function () {
+            const caja = $('op-modal');
+            if (caja && !caja.hidden) volver();
+          }, 2500);
         }, 900);
       })
       .catch(function (error) {
@@ -4411,6 +4475,12 @@
     if (!config.url || !config.key) return;
     if (state.jugadores || state.jugadoresCargando) return;
 
+    /* Lo guardado se enseña ya; lo de ahora llega por detrás. */
+    const previo = cacheLeer('jugadores');
+    if (previo && previo.players) {
+      state.jugadores = previo.players;
+      recordarPosiciones(state.jugadores);
+    }
     state.jugadoresCargando = true;
     fetch(config.url.replace(/\/+$/, '') + '/?key=' + encodeURIComponent(config.key) + '&jugadores=1',
       { headers: { 'accept': 'application/json' } })
@@ -4421,6 +4491,7 @@
         state.jugadoresAt = Date.now();
         recordarPosiciones(state.jugadores);
         state.jugadoresCargando = false;
+        cacheGuardar('jugadores', payload);
         renderJugadores();
       })
       .catch(function () {
@@ -6030,14 +6101,38 @@
       return '<p class="muted">Cargando estad\u00edsticas\u2026</p>';
     }
 
+    /* Todo lo que da la ficha, no solo cuatro cosas. `menor` marca las que se
+       ganan por lo bajo (encajar menos, costar menos); `texto` las que no son
+       una carrera y no se pintan en verde. */
+    const num = function (v) { return v == null ? 0 : v; };
     const filas = [
-      { rotulo: 'Puntos', valor: function (d, f) { return d ? d.points : (f.points || 0); } },
+      { rotulo: 'Puntos', valor: function (d, f) { return d ? num(d.points) : (f.points || 0); } },
       { rotulo: 'Media', valor: function (d) { return d && d.played ? (d.points / d.played).toFixed(1).replace('.', ',') : '0,0'; } },
-      { rotulo: 'Partidos', valor: function (d) { return d ? d.played : 0; } },
-      { rotulo: 'Minutos', valor: function (d) { return d ? d.minutes : 0; } },
-      { rotulo: 'Goles', valor: function (d) { return d ? d.goals : 0; } },
-      { rotulo: 'Asistencias', valor: function (d) { return d ? d.assists : 0; } },
-      { rotulo: 'Valor', valor: function (d, f) { return money(f.marketValue || 0); }, texto: true }
+      { rotulo: 'Partidos', valor: function (d) { return d ? num(d.played) : 0; } },
+      { rotulo: 'Minutos', valor: function (d) { return d ? num(d.minutes) : 0; } },
+      { rotulo: 'Goles', valor: function (d) { return d ? num(d.goals) : 0; } },
+      { rotulo: 'Asistencias', valor: function (d) { return d ? num(d.assists) : 0; } },
+      { rotulo: 'Goles por partido', valor: function (d) {
+          return d ? (num(d.goalsPerGame)).toFixed(2).replace('.', ',') : '0,00'; } },
+      { rotulo: 'Partidos ganados', valor: function (d) { return d ? num(d.wins) : 0; } },
+      { rotulo: 'Porterías a cero', valor: function (d) { return d ? num(d.cleanSheets) : 0; } },
+      { rotulo: 'Goles encajados', valor: function (d) { return d ? num(d.conceded) : 0; }, menor: true },
+      { rotulo: 'Amarillas', valor: function (d) { return d ? num(d.yellow) : 0; }, menor: true },
+      { rotulo: 'Rojas', valor: function (d) { return d ? num(d.red) : 0; }, menor: true },
+      { rotulo: 'Veces sustituido', valor: function (d) { return d ? num(d.subsOut) : 0; }, menor: true },
+      { rotulo: 'Sale del banquillo', valor: function (d) { return d ? num(d.subsIn) : 0; } },
+      /* En casa y fuera, para ver de quién te puedes fiar dónde. */
+      { rotulo: 'Puntos en casa', valor: function (d) { return d && d.home ? num(d.home.points) : 0; } },
+      { rotulo: 'Media en casa', valor: function (d) {
+          return d && d.home && d.home.played ? num(d.home.average).toFixed(1).replace('.', ',') : '0,0'; } },
+      { rotulo: 'Puntos fuera', valor: function (d) { return d && d.away ? num(d.away.points) : 0; } },
+      { rotulo: 'Media fuera', valor: function (d) {
+          return d && d.away && d.away.played ? num(d.away.average).toFixed(1).replace('.', ',') : '0,0'; } },
+      { rotulo: 'Valor', valor: function (d, f) { return money(f.marketValue || 0); }, texto: true },
+      { rotulo: 'Puntos por millón', valor: function (d, f) {
+          const pts = d ? num(d.points) : 0;
+          const precio = f.marketValue || 0;
+          return precio ? (pts / (precio / 1000000)).toFixed(2).replace('.', ',') : '0,00'; } }
     ];
 
     const cabecera = function (ficha, id) {
@@ -6051,7 +6146,10 @@
       '<div class="versus__filas">' + filas.map(function (fila) {
         const a = fila.valor(datosUno, uno);
         const b = fila.valor(datosOtro, otro);
-        const gana = fila.texto ? 0 : (Number(String(a).replace(',', '.')) - Number(String(b).replace(',', '.')));
+        const bruto = fila.texto ? 0
+          : (Number(String(a).replace(',', '.')) - Number(String(b).replace(',', '.')));
+        /* Donde gana el que menos tiene (tarjetas, encajados), al revés. */
+        const gana = fila.menor ? -bruto : bruto;
         return '<div class="versus__fila">' +
           '<span class="versus__dato' + (gana > 0 ? ' versus__dato--mejor' : '') + '">' + a + '</span>' +
           '<span class="versus__label">' + fila.rotulo + '</span>' +
@@ -6094,6 +6192,75 @@
     }).join('');
 
     return '<div class="partidos-jug">' + filas + '</div>';
+  }
+
+  /**
+   * Los partidos de los dos comparados, jornada a jornada y uno al lado del
+   * otro, con la nota de cada uno para poder verlos de un vistazo.
+   */
+  function partidosComparados(unoId, otroId) {
+    const deUno = state.partidosJugador[String(unoId)];
+    const deOtro = state.partidosJugador[String(otroId)];
+    if (deUno === undefined || deOtro === undefined) {
+      return '<p class="muted">Cargando partidos…</p>';
+    }
+
+    const uno = playerInfo(unoId);
+    const otro = playerInfo(otroId);
+    const porJornada = function (datos) {
+      const mapa = {};
+      ((datos && datos.matches) || []).forEach(function (j) {
+        if (j.number != null) mapa[j.number] = j;
+      });
+      return mapa;
+    };
+    const a = porJornada(deUno);
+    const b = porJornada(deOtro);
+
+    const jornadas = Object.keys(a).concat(Object.keys(b))
+      .map(Number)
+      .filter(function (n, i, lista) { return lista.indexOf(n) === i; })
+      .sort(function (x, y) { return x - y; });
+
+    if (!jornadas.length) {
+      return '<p class="muted">Todavía no hay partidos suyos esta temporada.</p>';
+    }
+
+    /* El lado de uno: su rival de esa jornada y lo que hizo. */
+    const lado = function (juego) {
+      if (!juego) return '<span class="versus-part__vacio">—</span>';
+      const rivalId = juego.enCasa ? juego.awayId : juego.homeId;
+      const rival = juego.enCasa ? juego.away : juego.home;
+      const jugado = juego.homeScore != null && juego.awayScore != null;
+      const suyos = juego.enCasa ? juego.homeScore : juego.awayScore;
+      const otros = juego.enCasa ? juego.awayScore : juego.homeScore;
+      const resultado = !jugado ? '' : (suyos > otros ? ' partido-jug--gano'
+        : (suyos < otros ? ' partido-jug--pierdo' : ' partido-jug--empato'));
+
+      return '<span class="versus-part__lado' + resultado + '">' +
+        escudoDeEquipo(rivalId, rival) +
+        '<span class="versus-part__marcador">' +
+          (jugado ? suyos + '–' + otros : '–') + '</span>' +
+        '<span class="versus-part__min">' + (juego.minutes ? juego.minutes + "'" : '') + '</span>' +
+        (juego.alineado ? notaDePartido(juego.points) : '<span class="nota nota--sin"></span>') +
+      '</span>';
+    };
+
+    const cabecera = function (ficha, id) {
+      return '<div class="versus__quien">' + faceOf(id, 'ficha__face') +
+        '<strong>' + escapeHtml(ficha.name || '') + '</strong></div>';
+    };
+
+    return '<div class="versus">' +
+      '<div class="versus__cab">' + cabecera(uno, unoId) + cabecera(otro, otroId) + '</div>' +
+      '<div class="versus-part">' + jornadas.map(function (n) {
+        return '<div class="versus-part__fila">' +
+          lado(a[n]) +
+          '<span class="versus-part__jornada">J' + n + '</span>' +
+          lado(b[n]) +
+        '</div>';
+      }).join('') + '</div>' +
+    '</div>';
   }
 
   /** Pide al Worker los partidos de ese futbolista; se guardan por sesión. */
@@ -6178,6 +6345,9 @@
           (abierto.partidos ? '' :
             '<button type="button" class="ambito ficha__comparar" data-comparar>' +
               (abierto.comparar ? 'Quitar comparación' : 'Comparar') + '</button>') +
+            /* Mientras estás eligiendo rival no hay dos a quien comparar, así
+               que el botón de partidos se esconde hasta que elijas; en cuanto
+               hay rival vuelve, y entonces enseña los de los dos. */
             '<button type="button" class="ambito' + (abierto.partidos ? ' ficha__comparar' : '') +
               '" data-partidos-de>' +
               (abierto.partidos ? 'Ocultar partidos' : 'Partidos') + '</button>') +
@@ -6187,7 +6357,12 @@
         '<p class="muted ficha__datos">' + datos + '</p>' +
         /* Elegido el rival, sus estadísticas van al lado de las de este. */
         (abierto.comparar && !abierto.partidos ? comparativaDeFichas(abierto.id, abierto.comparar) : '') +
-        (abierto.partidos ? listaDePartidos(abierto.id) : '') +
+        /* Con rival elegido, los partidos también se comparan. */
+        (abierto.partidos
+          ? (abierto.comparar
+              ? partidosComparados(abierto.id, abierto.comparar)
+              : listaDePartidos(abierto.id))
+          : '') +
         (abierto.eligiendo ? selectorDeComparacion(abierto.id) : '') +
         /* Los partidos van solos: ni estadísticas ni gráficos. */
         (abierto.partidos || abierto.soloPrecio
@@ -6691,6 +6866,13 @@
     if (state.rankingsAmbito === 'liga') { ensureRecuentoDeLiga(); return; }
     if (state.recuento || state.recuentoCargando) return;
 
+    /* Lo guardado se enseña ya; lo de ahora llega por detrás. */
+    const previo = cacheLeer('recuento');
+    if (previo && previo.players) {
+      state.recuento = previo.players;
+      recordarPosiciones(state.recuento);
+      state.recuento.forEach(function (j) { amarillasDe[String(j.id)] = j.yellow || 0; });
+    }
     state.recuentoCargando = true;
     fetch(config.url.replace(/\/+$/, '') + '/?key=' + encodeURIComponent(config.key) + '&recuento=1',
       { headers: { 'accept': 'application/json' } })
@@ -6702,6 +6884,7 @@
         recordarPosiciones(state.recuento);
         state.recuento.forEach(function (j) { amarillasDe[String(j.id)] = j.yellow || 0; });
         state.recuentoCargando = false;
+        cacheGuardar('recuento', payload);
         renderRankingsTemporada();
         /* Las amarillas llegan después de pintar: si alguien está a una de
            sanción, hay que repasar las vistas para que salga su tarjeta. */
@@ -6973,6 +7156,14 @@
     if (state.laliga && !forzar) return;
     if (state.laligaCargando) return;
 
+    /* Lo guardado se enseña ya; lo de ahora llega por detrás. */
+    if (!state.laliga) {
+      const guardado = cacheLeer('laliga');
+      if (guardado && guardado.players) {
+        state.laliga = guardado.players;
+        recordarPosiciones(state.laliga);
+      }
+    }
     state.laligaCargando = true;
     fetch(config.url.replace(/\/+$/, '') + '/?key=' + encodeURIComponent(config.key) + '&ranking=1',
       { headers: { 'accept': 'application/json' } })
@@ -6983,6 +7174,7 @@
         state.laligaAt = Date.now();
         recordarPosiciones(state.laliga);
         state.laligaCargando = false;
+        cacheGuardar('laliga', payload);
         /* Solo si es lo que se está mirando: si no, pisaría la tabla nuestra. */
         if (state.puntosAmbito !== 'liga') renderLaLiga();
       })
@@ -7821,7 +8013,11 @@
 
       if (event.target.closest('[data-partidos-de]')) {
         state.priceModal.partidos = !state.priceModal.partidos;
-        if (state.priceModal.partidos) ensurePartidosDe(state.priceModal.id);
+        if (state.priceModal.partidos) {
+          ensurePartidosDe(state.priceModal.id);
+          /* Comparando, hacen falta los del rival para poder ponerlos al lado. */
+          if (state.priceModal.comparar) ensurePartidosDe(state.priceModal.comparar);
+        }
         renderPriceModal();
         return;
       }
@@ -7853,6 +8049,9 @@
         state.priceModal.busca = '';
         ensureEstadisticas(state.priceModal.id);
         ensureEstadisticas(state.priceModal.comparar);
+        /* Si estabas viendo los partidos, se piden ya los del rival para que
+           al volver estén los dos y no haya que esperar. */
+        if (state.priceModal.partidos) ensurePartidosDe(state.priceModal.comparar);
         renderPriceModal();
         return;
       }
