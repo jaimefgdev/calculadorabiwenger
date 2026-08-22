@@ -5395,8 +5395,13 @@
         ? '<p class="muted">Esta jornada todav\u00eda no tiene calendario.</p>'
         : '<div class="partidos">' + partidos.map(function (juego) {
             const abierto = state.partidoAbierto === juego.id;
-            const jugado = juego.home.score != null && juego.away.score != null;
             const acabado = juego.status === 'finished';
+            /* Mientras rueda manda ESPN: mueve el marcador antes que Biwenger. */
+            const vivo = acabado ? null : marcadorEnVivo(juego.home.name, juego.away.name);
+            const jugado = vivo ? true : (juego.home.score != null && juego.away.score != null);
+            const marca = vivo
+              ? vivo.homeScore + '–' + vivo.awayScore
+              : juego.home.score + '–' + juego.away.score;
             const hayAlineacion = juego.home.xi.length > 0;
 
             return '<div class="partido' + (abierto ? ' partido--abierto' : '') + '">' +
@@ -5406,8 +5411,9 @@
                 '<span class="partido__equipo partido__equipo--local">' +
                   escapeHtml(juego.home.name) + crestOf({ team: juego.home.id, teamName: juego.home.name }, 'crest--badge') +
                 '</span>' +
-                '<span class="partido__marcador' + (acabado ? '' : ' partido__marcador--vivo') + '">' +
-                  (jugado ? juego.home.score + '\u2013' + juego.away.score : '\u2013') + '</span>' +
+                '<span class="partido__marcador' + (acabado ? '' : ' partido__marcador--vivo') + '"' +
+                  (vivo && vivo.reloj ? ' title="En juego \u00b7 ' + escapeHtml(vivo.reloj) + '"' : '') + '>' +
+                  (jugado ? marca : '\u2013') + '</span>' +
                 '<span class="partido__equipo">' +
                   crestOf({ team: juego.away.id, teamName: juego.away.name }, 'crest--badge') +
                   escapeHtml(juego.away.name) +
