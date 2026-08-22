@@ -104,7 +104,7 @@ const CDN = 'https://cf.biwenger.com/api/v2';
    navegador normal y las cabeceras que este mandaría. */
 /* Marca de versión: se sube en cada cambio y se consulta con ?version=1.
    Sirve para saber desde fuera si el despliegue ha entrado o no. */
-const VERSION = '2026-08-22 · deno 1';
+const VERSION = '2026-08-22 · deno 2';
 
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ' +
   '(KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36';
@@ -1700,7 +1700,10 @@ async function playerStats(id, names, score) {
   if (!slug) return null;
 
   const sistema = String(score || 1);
-  const campos = 'fields=*,reports(*,match(*),events(*))';
+  /* Biwenger dejó de incluir 'points' y 'round' en el comodín: hay que
+     pedirlos por su nombre o los informes llegan sin puntos y sin jornada,
+     y entonces no se puede saber ni qué partido era ni qué hizo. */
+  const campos = 'fields=*,reports(*,points,match(*,round(*)),events(*))';
   const response = await fetch(CDN + '/players/la-liga/' + encodeURIComponent(slug) +
     '?lang=es&' + campos + '&score=' + encodeURIComponent(sistema), { headers: NAVEGADOR });
   if (!response.ok) return null;
@@ -2067,7 +2070,10 @@ async function partidosDeJugador(env, id) {
   /* Su ficha trae, partido a partido, el rival, el resultado, los lances y
      —esto solo está aquí— los minutos jugados. El detalle de jornada no los
      publica, así que esta es la única fuente buena. */
-  const campos = 'fields=*,reports(*,match(*),events(*))';
+  /* Biwenger dejó de incluir 'points' y 'round' en el comodín: hay que
+     pedirlos por su nombre o los informes llegan sin puntos y sin jornada,
+     y entonces no se puede saber ni qué partido era ni qué hizo. */
+  const campos = 'fields=*,reports(*,points,match(*,round(*)),events(*))';
   const response = await fetch(CDN + '/players/la-liga/' + encodeURIComponent(slug) +
     '?lang=es&' + campos + '&score=' + encodeURIComponent(score), { headers: NAVEGADOR });
   if (!response.ok) return { player: clave, matches: [] };
