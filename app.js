@@ -605,6 +605,7 @@
     rankingsAmbito: 'laliga',
     puntosAmbito: 'laliga',  // el mismo cambio, en la tabla de Puntos
     opVerPujas: false,       // si el diálogo de puja enseña las pujas
+    pujasDe: {},             // cuántas pujas lleva cada futbolista, ya preguntadas
     rankingsAbiertos: {},   // que rankings se han desplegado, uno por campo
     teams: {},
     warnings: [],
@@ -2843,8 +2844,13 @@
       : [];
     const mia = miPujaPor(venta.playerId);
 
-    const cuantas = venta.mine ? recibidas.length : (mia ? 1 : 0);
-    const rotulo = cuantas === 1 ? '1 puja' : cuantas + ' pujas';
+    /* De lo tuyo las pujas ya se saben enteras (son las ofertas recibidas); de
+       lo de los demás hay que preguntárselo a Biwenger. */
+    const contadas = state.pujasDe[String(venta.playerId)];
+    const cuantas = venta.mine ? recibidas.length
+      : (contadas && contadas.bids != null ? contadas.bids : null);
+    const rotulo = cuantas == null ? 'Ver pujas'
+      : (cuantas === 1 ? '1 puja' : cuantas + ' pujas');
 
     let detalle = '';
     if (abierto) {
@@ -2855,22 +2861,76 @@
                 money(o.amount) + '</strong></li>';
             }).join('') + '</ul>'
           : '<p class="op-pujas__vacio">Todavía no ha pujado nadie por él.</p>';
-      } else if (mia) {
-        detalle = '<ul class="op-pujas__lista">' +
-          '<li><span>La tuya</span><strong>' + money(mia.amount) + '</strong></li></ul>' +
-          '<p class="op-pujas__vacio">Biwenger no dice cuántos más han pujado.</p>';
-      } else {
-        detalle = '<p class="op-pujas__vacio">No has pujado por él todavía. ' +
-          'Biwenger no dice si lo ha hecho alguien más.</p>';
+      } else if (contadas && contadas.cargando) {
+        detalle = '<p class="op-pujas__vacio">Preguntando a Biwenger…</p>';
+      } else if (contadas && contadas.error) {
+        detalle = '<p class="op-pujas__vacio">' + escapeHtml(contadas.error) + '</p>';
+      } else if (contadas && contadas.bids != null) {
+        /* Si además manda de cuánto es cada puja, se enseñan. */
+        detalle = (contadas.lista && contadas.lista.length
+          ? '<ul class="op-pujas__lista">' + contadas.lista.map(function (p) {
+              return '<li><span>' + escapeHtml(p.user || p.name || 'Un mánager') +
+                '</span><strong>' + (p.amount != null ? money(p.amount) : '—') + '</strong></li>';
+            }).join('') + '</ul>'
+          : '') +
+          (mia ? '<p class="op-pujas__vacio">La tuya: ' + money(mia.amount) + '</p>' : '');
       }
     }
 
     return '<div class="op-pujas">' +
-      '<button type="button" class="ambito' + (abierto ? ' ambito--on' : '') + '"' +
-        ' data-op-pujas aria-expanded="' + (abierto ? 'true' : 'false') + '">' +
-        (abierto ? rotulo : 'Ver pujas') + '</button>' +
+      '<div class="op-pujas__mando">' +
+        '<button type="button" class="ambito ambito--rojo' + (abierto ? ' ambito--on' : '') + '"' +
+          ' data-op-pujas="' + escapeHtml(String(venta.playerId)) + '"' +
+          ' aria-expanded="' + (abierto ? 'true' : 'false') + '">' +
+          (abierto ? rotulo : 'Ver pujas') + '</button>' +
+      '</div>' +
       detalle +
     '</div>';
+  }
+
+  /** Repinta el diálogo de puja sin perder lo escrito en el importe. */
+  function repintarPuja() {
+    if (opPujaAbierta == null) return;
+    const escrito = $('op-importe') ? $('op-importe').value : null;
+    abrirPuja(opPujaAbierta);
+    const campo = $('op-importe');
+    if (campo && escrito !== null) campo.value = escrito;
+  }
+
+  /**
+   * Le pregunta a Biwenger cuántas pujas lleva un futbolista del mercado.
+   *
+   * Es la misma consulta que hace su web con el botón de ver pujas, y puede
+   * gastar un crédito de la cuenta, así que se hace solo cuando lo pides y una
+   * única vez por futbolista mientras dure la sesión.
+   */
+  function contarPujas(playerId) {
+    const clave = String(playerId);
+    const venta = ventaDe(playerId);
+    /* De lo tuyo no hace falta: las pujas recibidas ya las tienes enteras. */
+    if (!venta || venta.mine) return;
+    if (state.pujasDe[clave]) return;      // ya preguntado (o preguntándose)
+
+    const config = loadSyncConfig();
+    if (!config.url || !config.key) return;
+
+    state.pujasDe[clave] = { cargando: true };
+
+    fetch(config.url.replace(/\/+$/, '') + '/?key=' + encodeURIComponent(config.key) +
+      '&pujas=' + encodeURIComponent(clave) +
+      (venta.sellerId ? '&de=' + encodeURIComponent(venta.sellerId) : ''),
+      { headers: { 'accept': 'application/json' } })
+      .then(function (response) { return response.json(); })
+      .then(function (payload) {
+        state.pujasDe[clave] = payload.error
+          ? { error: payload.error }
+          : { bids: payload.bids, lista: payload.lista || null };
+        repintarPuja();
+      })
+      .catch(function () {
+        state.pujasDe[clave] = { error: 'No se ha podido preguntar.' };
+        repintarPuja();
+      });
   }
 
   /** Diálogo de puja: dice lo que vale, lo que piden y hasta dónde puedes. */
@@ -3466,14 +3526,13 @@
 
       /* La píldora de las pujas: se vuelve a pintar el diálogo, pero sin
          perder lo que ya hubieras escrito en el importe. */
-      if (event.target.closest('[data-op-pujas]')) {
+      const verPujas = event.target.closest('[data-op-pujas]');
+      if (verPujas) {
         state.opVerPujas = !state.opVerPujas;
-        const escrito = $('op-importe') ? $('op-importe').value : null;
-        if (opPujaAbierta != null) {
-          abrirPuja(opPujaAbierta);
-          const campo = $('op-importe');
-          if (campo && escrito !== null) campo.value = escrito;
-        }
+        /* Solo se le pregunta a Biwenger al abrir, y una vez por futbolista:
+           esa consulta puede costar un crédito de la cuenta. */
+        if (state.opVerPujas) contarPujas(verPujas.getAttribute('data-op-pujas'));
+        repintarPuja();
         return;
       }
 

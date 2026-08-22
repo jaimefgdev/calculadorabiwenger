@@ -331,6 +331,12 @@ code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft)
 
 /* Las pujas dentro del diálogo de puja, tras darle a la píldora. */
 .op-pujas { margin: .2rem 0 .6rem; }
+/* La píldora, en rojo y arrimada a la derecha. */
+.op-pujas__mando { display: flex; justify-content: flex-end; }
+.ambito--rojo {
+  background: var(--neg); border-color: var(--neg); color: #fff;
+}
+.ambito--rojo:hover { filter: brightness(1.1); }
 .op-pujas__lista { list-style: none; margin: .5rem 0 0; padding: 0; }
 .op-pujas__lista li {
   display: flex; align-items: center; justify-content: space-between;
