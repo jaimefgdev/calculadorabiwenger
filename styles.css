@@ -298,9 +298,14 @@ code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft)
   font-family: var(--font); font-size: .86rem;
 }
 .round__ahora .round__score {
-  font-family: var(--mono); color: var(--marca);
+  font-family: var(--mono); color: var(--marca); font-weight: 700;
   padding: .05rem .35rem; background: var(--bg-surface); border-radius: var(--radius-sm);
 }
+/* El minuto, pegado al marcador y con su mismo peso. */
+.round__minuto { font-family: var(--mono); font-weight: 700; color: var(--marca); }
+/* En la lista de partidos el distintivo va como el de la cabecera, pero sin
+   mayúsculas forzadas: ahí conviven con los nombres de los canales. */
+.round__live--fila { text-transform: none; letter-spacing: 0; gap: .3rem; }
 
 /* El reloj pasa a contar al siguiente partido, y lo dice. En móvil el aviso de
    «en juego» y la cuenta no caben de una: se deja que caiga a otra línea. */

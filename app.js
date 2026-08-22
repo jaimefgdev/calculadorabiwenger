@@ -1835,11 +1835,15 @@
       const marca = vivoAhora
         ? vivoAhora.homeScore + '–' + vivoAhora.awayScore
         : rodando.homeScore + '–' + rodando.awayScore;
-      $('round-when').innerHTML = '<span class="round__live">En juego' +
-          (vivoAhora && vivoAhora.reloj ? ' · ' + escapeHtml(vivoAhora.reloj) : '') + '</span>' +
+      /* El minuto va detrás del marcador, no en el rótulo: así se lee de
+         corrido «0–0 84'» en vez de tener el dato partido en dos sitios. */
+      $('round-when').innerHTML = '<span class="round__live">En juego</span>' +
         '<span class="round__ahora">' + escudoDeEquipo(rodando.homeId, rodando.home) +
           '<strong class="round__score">' + marca + '</strong>' +
-          escudoDeEquipo(rodando.awayId, rodando.away) + '</span>';
+          escudoDeEquipo(rodando.awayId, rodando.away) +
+          (vivoAhora && vivoAhora.reloj
+            ? '<strong class="round__minuto">' + escapeHtml(vivoAhora.reloj) + '</strong>' : '') +
+        '</span>';
     } else {
       /* Antes de arrancar, ni fecha ni hora: la cuenta atras de al lado ya dice
          cuanto queda, que es lo que se mira, y la fecha solo hacia ruido. */
@@ -1894,9 +1898,13 @@
 
       /* Una vez jugado el partido, el canal ya no le importa a nadie: ese
          hueco lo ocupa cómo va. */
+      /* El mismo distintivo que arriba —punto que late incluido— para que la
+         lista y la cabecera se lean igual. */
       const estado = acabado ? '<span class="round__final">Final</span>'
-        : (rodando ? '<span class="round__playing">En juego' +
-            (vivo && vivo.reloj ? ' ' + escapeHtml(vivo.reloj) : '') + '</span>'
+        : (rodando ? '<span class="round__live round__live--fila">En juego' +
+            (vivo && vivo.reloj
+              ? ' <strong class="round__minuto">' + escapeHtml(vivo.reloj) + '</strong>' : '') +
+            '</span>'
           : (match.tv ? escapeHtml(match.tv) : '—'));
 
       return header +
