@@ -1144,10 +1144,15 @@
         const d = points2.map(function (c, i) {
           return (i ? 'L' : 'M') + c.x.toFixed(1) + ' ' + c.y.toFixed(1);
         }).join(' ');
+        /* Con un dato por día son cientos de puntos: a radio 4 se solapan y
+           tapan la línea entera, que era justo lo que hacía que no se
+           vieran los colores. Cuando hay muchos se dejan casi como una mota,
+           lo justo para que sigan teniendo su etiqueta al pasar por encima. */
+        const radio = points2.length > 60 ? 1.4 : 4;
         return '<path class="viz__line" d="' + d + '" stroke="' + serie.color + '"></path>' +
           points2.map(function (c) {
             return '<circle class="viz__dot" cx="' + c.x.toFixed(1) + '" cy="' + c.y.toFixed(1) +
-              '" r="4" fill="' + serie.color + '"><title>' + etiqueta(c.point) + ' · ' +
+              '" r="' + radio + '" fill="' + serie.color + '"><title>' + etiqueta(c.point) + ' · ' +
               serie.label + ': ' + (isCount ? String(c.point[serie.field]) : money(c.point[serie.field])) +
               '</title></circle>';
           }).join('');
@@ -1157,8 +1162,12 @@
         escapeHtml(label) + ' por día">' + grid + body + firstLabel + lastLabel + '</svg>';
     }
 
+    /* Lo mismo que arriba: con muchos días, puntos de mota para que se vea la
+       línea y no una oruga de bolitas. */
+    const radioUno = coords.length > 60 ? 1.4 : 4;
     const dots = coords.map(function (c) {
-      return '<circle class="viz__dot" cx="' + c.x.toFixed(1) + '" cy="' + c.y.toFixed(1) + '" r="4" fill="' + color +
+      return '<circle class="viz__dot" cx="' + c.x.toFixed(1) + '" cy="' + c.y.toFixed(1) +
+        '" r="' + radioUno + '" fill="' + color +
         '"><title>' + shortDay(c.point.day) + ' · ' + fmtFull(c.point[key]) + '</title></circle>';
     }).join('');
 
@@ -6518,26 +6527,18 @@
       const resultado = !jugado ? '' : (suyos > otros ? ' partido-jug--gano'
         : (suyos < otros ? ' partido-jug--pierdo' : ' partido-jug--empato'));
 
-      /* En dos alturas: arriba el rival, el marcador y la nota; abajo los
-         minutos y los lances. Todo en una línea no cabía en media ventana y
-         los iconos salían apelotonados, sin poder distinguir una asistencia
-         de un gol. */
+      /* Todo en una línea, arrimado a la jornada del centro: es el hueco que
+         sobraba y así los iconos caben sin apelotonarse. */
       const lances = juego.alineado ? lancesDe(juego) : '';
       const minutos = juego.minutes ? juego.minutes + "'" : '';
 
       return '<span class="versus-part__lado' + resultado + '">' +
-        '<span class="versus-part__linea">' +
-          escudoDeEquipo(rivalId, rival) +
-          '<span class="versus-part__marcador">' +
-            (jugado ? suyos + '–' + otros : '–') + '</span>' +
-          (juego.alineado ? notaDePartido(juego.points) : '<span class="nota nota--sin"></span>') +
-        '</span>' +
-        (lances || minutos
-          ? '<span class="versus-part__linea versus-part__linea--abajo">' +
-              (minutos ? '<span class="versus-part__min">' + minutos + '</span>' : '') +
-              '<span class="versus-part__lances">' + lances + '</span>' +
-            '</span>'
-          : '') +
+        escudoDeEquipo(rivalId, rival) +
+        '<span class="versus-part__marcador">' +
+          (jugado ? suyos + '–' + otros : '–') + '</span>' +
+        '<span class="versus-part__lances">' + lances + '</span>' +
+        (minutos ? '<span class="versus-part__min">' + minutos + '</span>' : '') +
+        (juego.alineado ? notaDePartido(juego.points) : '<span class="nota nota--sin"></span>') +
       '</span>';
     };
 
