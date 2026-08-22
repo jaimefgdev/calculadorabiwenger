@@ -327,9 +327,15 @@ code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft)
 .rankings-temporada { display: grid; gap: 1.4rem; }
 .rankings-fila { display: grid; gap: .8rem; align-items: start; }
 /* Tres y dos SIEMPRE, en móvil igual que en el ordenador: sin consulta de
-   medios que los reordene por ancho de pantalla. */
-.rankings-fila--3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-.rankings-fila--2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+   medios que los reordene por ancho de pantalla.
+
+   Las dos filas usan la misma rejilla de seis columnas y cada tarjeta ocupa
+   dos: así una tarjeta mide igual esté en una fila de tres o de dos. La de
+   dos empieza en la segunda columna, y le sobra una a cada lado, con lo que
+   queda centrada en vez de estirada a media pantalla. */
+.rankings-fila { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+.rankings-fila > .ranking { grid-column: span 2; }
+.rankings-fila--2 > .ranking:first-child { grid-column: 2 / span 2; }
 /* Estas filas no se pulsan: no llevan el gráfico por jornada. */
 .ranking__boton--fijo { cursor: default; }
 
@@ -1521,9 +1527,9 @@ code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft)
 .alin__pts { text-align: right; font-weight: 700; font-variant-numeric: tabular-nums; }
 
 /* El botón de cambio de vista: solo el de la vista en la que no estás. */
-.vistas { display: flex; margin-bottom: .4rem; }
-.vistas--campo { justify-content: flex-end; }
-.vistas--tabla { justify-content: flex-start; }
+/* Siempre a la derecha: lo que cambia es el rótulo y lo que se ve debajo,
+   nunca el sitio del botón. */
+.vistas { display: flex; justify-content: flex-end; margin-bottom: .4rem; }
 
 /* En la vista de campo los lances van debajo del nombre, en su propia línea:
    flotando se comían el nombre del futbolista. */

@@ -5271,11 +5271,12 @@
                         (juego.confirmadas ? 'Alineación confirmada.' : 'Alineaciones probables.') +
                         '</p>') +
                     (function () {
-                      /* Solo se ofrece la otra vista: campo a la derecha, tabla
-                         a la izquierda. */
+                      /* Solo se ofrece la otra vista. La píldora se queda
+                         siempre a la derecha: antes saltaba de lado según la
+                         vista y había que buscarla con la mirada. */
                       const otra = state.vistaPartido === 'tabla' ? 'campo' : 'tabla';
-                      return '<div class="vistas vistas--' + otra + '">' +
-                        '<button type="button" class="ambito" data-vista="' + otra + '">' +
+                      return '<div class="vistas">' +
+                        '<button type="button" class="ambito ambito--marco" data-vista="' + otra + '">' +
                           (otra === 'campo' ? 'Campo' : 'Tabla') + '</button>' +
                       '</div>';
                     })() +
