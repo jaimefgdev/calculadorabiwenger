@@ -578,6 +578,34 @@ code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft)
   position: relative; display: flex; flex-direction: column; align-items: center;
   gap: .2rem; width: 18%; min-width: 0;
 }
+
+/* ---------- Arrastrar y soltar en el campo ---------- */
+/* Con el dedo, arrastrar no debe mover la página: sin esto el campo hace
+   scroll en vez de coger al futbolista. */
+.pitch__slot[data-lleva], .bench__player[data-lleva] {
+  touch-action: none; cursor: grab;
+}
+.pitch__slot[data-lleva]:active, .bench__player[data-lleva]:active { cursor: grabbing; }
+
+/* La copia que sigue al dedo. */
+.arrastrando {
+  position: fixed; z-index: 90; pointer-events: none;
+  opacity: .9; transform: scale(1.06);
+  filter: drop-shadow(0 6px 14px rgba(0, 0, 0, .45));
+}
+/* De dónde salió: se queda apagado mientras lo llevas. */
+.pitch__slot--origen { opacity: .35; }
+/* Dónde puede caer, y dónde caería si sueltas ahora. */
+.pitch__slot--vale::before {
+  content: ''; position: absolute; inset: -4px 2px;
+  border: 1px dashed var(--pos); border-radius: 10px;
+  pointer-events: none;
+}
+.pitch__slot--encima::before {
+  border-style: solid; border-width: 2px;
+  background: color-mix(in srgb, var(--pos) 18%, transparent);
+}
+.bench--encima { outline: 2px solid var(--pos); outline-offset: 3px; border-radius: 10px; }
 /* Doble clase a propósito: `.pic-player` fija 24 px más abajo y, a igualdad
    de peso, ganaría por ir después. */
 /* La medida la lleva la caja; la foto la rellena. Si el ancho fuera un
@@ -1827,14 +1855,25 @@ main.wrap { padding-top: 1.15rem; padding-bottom: 3.5rem; }
   text-transform: uppercase; letter-spacing: .04em;
 }
 .versus-part__lado {
-  display: inline-flex; align-items: center; gap: .35rem;
-  padding: .15rem .3rem; border-radius: var(--radius-sm);
+  display: flex; flex-direction: column; gap: .15rem;
+  padding: .2rem .3rem; border-radius: var(--radius-sm);
 }
+.versus-part__linea { display: flex; align-items: center; gap: .35rem; }
+/* Los lances, con sitio de sobra para distinguirlos. */
+.versus-part__linea--abajo { gap: .3rem; flex-wrap: wrap; }
 /* El de la derecha, en espejo: los dos marcadores miran al centro. */
-.versus-part__fila > .versus-part__lado:last-child { flex-direction: row-reverse; }
+.versus-part__fila > .versus-part__lado:last-child { align-items: flex-end; }
+.versus-part__fila > .versus-part__lado:last-child .versus-part__linea { flex-direction: row-reverse; }
 .versus-part__marcador { font-variant-numeric: tabular-nums; font-weight: 600; }
-/* Goles, asistencias y tarjetas de ese partido. */
-.versus-part__lances { display: inline-flex; align-items: center; gap: .12rem; }
+/* Goles, asistencias y tarjetas de ese partido, algo más grandes que en la
+   lista de uno solo: aquí hay que distinguirlos de un vistazo. */
+.versus-part__lances { display: inline-flex; align-items: center; gap: .25rem; flex-wrap: wrap; }
+.versus-part__lances .lance {
+  width: 19px; height: 19px; font-size: .7rem;
+}
+/* Con contador crece a lo ancho, pero conservando la altura nueva. */
+.versus-part__lances .lance:has(.lance__veces) { width: auto; min-width: 19px; }
+.versus-part__lances .lance__veces { font-size: .7rem; }
 .versus-part__min { font-size: .66rem; color: var(--text-faint); }
 .versus-part__vacio { color: var(--text-faint); text-align: center; }
 
@@ -2331,8 +2370,11 @@ main.wrap { padding-top: 1.15rem; padding-bottom: 3.5rem; }
 .lance { position: relative; }
 .lance__veces {
   position: static; margin-left: .12rem;
-  /* Siempre negro: va sobre el fondo claro del icono, y en blanco no se veía. */
-  font-size: .68rem; font-weight: 700; color: #111;
+  font-size: .68rem; font-weight: 700;
+  /* Hereda el color del icono: en los de fondo claro sale negro, y en los
+     de fondo de color (la asistencia es azul, la entrada verde) sale blanco.
+     Antes iba siempre en negro y sobre el azul no se leía. */
+  color: inherit;
   font-variant-numeric: tabular-nums;
 }
 /* El icono deja de ser un círculo fijo cuando lleva contador: crece a su lado. */

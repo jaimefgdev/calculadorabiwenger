@@ -2402,7 +2402,9 @@
       ? faceOf(player.id, 'pitch__face')
       : '<span class="pic-player pitch__face pitch__face--empty"></span>';
 
-    return '<div class="pitch__slot">' + crestOf(player, 'crest--ghost') +
+    return '<div class="pitch__slot" data-hueco="' + key + '" data-puesto="' + position + '"' +
+      (id ? ' data-lleva="' + escapeHtml(String(id)) + '"' : '') + '>' +
+      crestOf(player, 'crest--ghost') +
       '<span class="face-box">' + face +
         chapaDePuesto(player && player.position, 'puesto--esquina', otrosPuestosDe(player)) +
         statusMark(player, 'mark--esquina') + pointsBadge(player, 'pts--esquina') +
@@ -2509,6 +2511,180 @@
     renderPicker();
   }
 
+  /* ---------- Arrastrar y soltar en el campo ----------
+     Con eventos de puntero, no con el arrastre de HTML5: ese no existe en el
+     móvil, y aquí hace falta que funcione igual con el dedo y con el ratón.
+
+     Se puede llevar un futbolista de un hueco a otro (se cambian entre ellos),
+     del banquillo al campo (entra y sale el que estuviera) y del campo al
+     banquillo (deja el hueco libre). Un toque sin mover sigue abriendo el
+     panel de siempre, que para elegir de una lista va mejor. */
+  let arrastre = null;
+  /* El navegador manda un clic al soltar; con esto se descarta ese. */
+  let huboArrastre = false;
+
+  /** ¿Puede este futbolista jugar en ese hueco? La misma regla del panel. */
+  function cabeEn(id, puesto) {
+    return id != null && playsAs(id, Number(puesto));
+  }
+
+  function limpiarArrastre() {
+    if (arrastre && arrastre.fantasma) arrastre.fantasma.remove();
+    Array.prototype.forEach.call(
+      document.querySelectorAll('.pitch__slot--vale, .pitch__slot--encima, .bench--encima, .pitch__slot--origen'),
+      function (el) {
+        el.classList.remove('pitch__slot--vale', 'pitch__slot--encima',
+          'bench--encima', 'pitch__slot--origen');
+      });
+    arrastre = null;
+  }
+
+  /** Marca los huecos donde ese futbolista puede caer. */
+  function marcarDestinos(id) {
+    Array.prototype.forEach.call(document.querySelectorAll('#pitch [data-hueco]'), function (hueco) {
+      if (cabeEn(id, hueco.getAttribute('data-puesto'))) hueco.classList.add('pitch__slot--vale');
+    });
+  }
+
+  function empezarArrastre(evento, origen) {
+    const id = origen.getAttribute('data-lleva');
+    if (!id) return;
+
+    const rect = origen.getBoundingClientRect();
+    const fantasma = origen.cloneNode(true);
+    fantasma.className = 'arrastrando';
+    fantasma.style.width = rect.width + 'px';
+    document.body.appendChild(fantasma);
+
+    arrastre = {
+      id: id,
+      desdeHueco: origen.getAttribute('data-hueco'),   // null si viene del banquillo
+      fantasma: fantasma,
+      dx: evento.clientX - rect.left,
+      dy: evento.clientY - rect.top
+    };
+    origen.classList.add('pitch__slot--origen');
+    huboArrastre = true;
+    marcarDestinos(id);
+    moverFantasma(evento);
+  }
+
+  function moverFantasma(evento) {
+    if (!arrastre) return;
+    arrastre.fantasma.style.left = (evento.clientX - arrastre.dx) + 'px';
+    arrastre.fantasma.style.top = (evento.clientY - arrastre.dy) + 'px';
+  }
+
+  /** Qué hay debajo del dedo: un hueco del campo o el banquillo. */
+  function destinoBajo(evento) {
+    arrastre.fantasma.style.visibility = 'hidden';
+    const debajo = document.elementFromPoint(evento.clientX, evento.clientY);
+    arrastre.fantasma.style.visibility = '';
+    if (!debajo) return null;
+    const hueco = debajo.closest('#pitch [data-hueco]');
+    if (hueco) return { tipo: 'campo', el: hueco };
+    if (debajo.closest('#bench')) return { tipo: 'banquillo', el: debajo.closest('#bench') };
+    return null;
+  }
+
+  function soltar(evento) {
+    if (!arrastre) return;
+    const destino = destinoBajo(evento);
+    const id = arrastre.id;
+    const desde = arrastre.desdeHueco;
+
+    if (!destino) { limpiarArrastre(); return; }
+
+    if (destino.tipo === 'banquillo') {
+      /* Al banquillo: solo tiene sentido si venía del campo. */
+      if (desde) { delete state.xi.slots[desde]; guardarXiMia(); renderLineup(); }
+      limpiarArrastre();
+      return;
+    }
+
+    const hueco = destino.el.getAttribute('data-hueco');
+    const puesto = destino.el.getAttribute('data-puesto');
+    if (!cabeEn(id, puesto)) { limpiarArrastre(); return; }   // ahí no juega
+
+    const habia = state.xi.slots[hueco] || null;
+
+    if (desde) {
+      /* De un hueco a otro: se cambian, pero solo si el otro también puede
+         jugar donde estaba este; si no, se quedaría en un sitio que no es. */
+      const puestoDeOrigen = desde.split('-')[0];
+      if (habia && !cabeEn(habia, puestoDeOrigen)) { limpiarArrastre(); return; }
+      if (habia) state.xi.slots[desde] = habia;
+      else delete state.xi.slots[desde];
+    } else if (habia) {
+      /* Del banquillo: el que estaba se va al banquillo. */
+      delete state.xi.slots[hueco];
+    }
+
+    state.xi.slots[hueco] = id;
+    guardarXiMia();
+    renderLineup();
+    limpiarArrastre();
+  }
+
+  function engancharArrastre() {
+    const campo = $('pitch');
+    const banquillo = $('bench');
+    if (!campo || !banquillo) return;
+
+    [campo, banquillo].forEach(function (zona) {
+      zona.addEventListener('pointerdown', function (evento) {
+        if (evento.button != null && evento.button !== 0) return;   // solo el botón principal
+        const origen = evento.target.closest('[data-lleva]');
+        if (!origen || !state.xi) return;
+        /* Todavía no se arrastra: se apunta por dónde empezó y se decide en
+           cuanto se mueva. Así un toque limpio sigue abriendo el panel. */
+        arrastre = null;
+        zona.__pendiente = {
+          origen: origen, x: evento.clientX, y: evento.clientY,
+          pointerId: evento.pointerId
+        };
+      });
+    });
+
+    /* En todo el documento: si se sale de la zona mientras arrastra, se sigue. */
+    document.addEventListener('pointermove', function (evento) {
+      if (arrastre) {
+        evento.preventDefault();
+        moverFantasma(evento);
+        const destino = destinoBajo(evento);
+        Array.prototype.forEach.call(
+          document.querySelectorAll('.pitch__slot--encima, .bench--encima'),
+          function (el) { el.classList.remove('pitch__slot--encima', 'bench--encima'); });
+        if (destino && destino.tipo === 'campo' &&
+            cabeEn(arrastre.id, destino.el.getAttribute('data-puesto'))) {
+          destino.el.classList.add('pitch__slot--encima');
+        } else if (destino && destino.tipo === 'banquillo' && arrastre.desdeHueco) {
+          destino.el.classList.add('bench--encima');
+        }
+        return;
+      }
+
+      [$('pitch'), $('bench')].forEach(function (zona) {
+        const pend = zona && zona.__pendiente;
+        if (!pend || pend.pointerId !== evento.pointerId) return;
+        /* Ocho píxeles: por debajo de eso es un toque, no un arrastre. */
+        if (Math.abs(evento.clientX - pend.x) + Math.abs(evento.clientY - pend.y) < 8) return;
+        zona.__pendiente = null;
+        empezarArrastre(evento, pend.origen);
+      });
+    }, { passive: false });
+
+    const acabar = function (evento) {
+      [$('pitch'), $('bench')].forEach(function (zona) { if (zona) zona.__pendiente = null; });
+      if (arrastre) soltar(evento);
+    };
+    document.addEventListener('pointerup', acabar);
+    document.addEventListener('pointercancel', function () {
+      [$('pitch'), $('bench')].forEach(function (zona) { if (zona) zona.__pendiente = null; });
+      limpiarArrastre();
+    });
+  }
+
   function renderLineup() {
     const section = $('lineup-panel');
     if (!state.me || !state.lineup) { section.hidden = true; return; }
@@ -2546,7 +2722,7 @@
       ? '<p class="muted">' + (state.squads && state.squads.status === 'loading'
           ? 'Cargando la plantilla…' : 'Sin suplentes.') + '</p>'
       : bench.map(function (player) {
-          return '<div class="bench__player">' +
+          return '<div class="bench__player" data-lleva="' + escapeHtml(String(player.id)) + '">' +
             crestOf(player, 'crest--ghost') +
             caraConChapas(player, 'bench__face') +
             '<span class="bench__name">' + escapeHtml(player.name) + '</span>' +
@@ -6126,6 +6302,18 @@
     const puntos = Object.keys(porDia).sort().map(function (d) { return porDia[d]; });
     if (puntos.length < 2) return '<p class="viz__empty">Todavía no hay evolución que comparar.</p>';
 
+    /* Cada uno tiene precio en días distintos, así que al juntarlos quedaban
+       huecos: la línea se partía y salía una nube de puntos sueltos en vez de
+       dos líneas. Se arrastra el último precio conocido hasta el siguiente
+       dato. Antes del primero se deja vacío, que ahí todavía no cotizaba. */
+    ['unoPrice', 'otroPrice'].forEach(function (campo) {
+      let ultimo = null;
+      puntos.forEach(function (p) {
+        if (p[campo] != null) ultimo = p[campo];
+        else if (ultimo != null) p[campo] = ultimo;
+      });
+    });
+
     const series = [
       { field: 'unoPrice', color: COLOR_UNO, label: uno.name || 'Uno' },
       { field: 'otroPrice', color: COLOR_OTRO, label: otro.name || 'Otro' }
@@ -6330,14 +6518,26 @@
       const resultado = !jugado ? '' : (suyos > otros ? ' partido-jug--gano'
         : (suyos < otros ? ' partido-jug--pierdo' : ' partido-jug--empato'));
 
+      /* En dos alturas: arriba el rival, el marcador y la nota; abajo los
+         minutos y los lances. Todo en una línea no cabía en media ventana y
+         los iconos salían apelotonados, sin poder distinguir una asistencia
+         de un gol. */
+      const lances = juego.alineado ? lancesDe(juego) : '';
+      const minutos = juego.minutes ? juego.minutes + "'" : '';
+
       return '<span class="versus-part__lado' + resultado + '">' +
-        escudoDeEquipo(rivalId, rival) +
-        '<span class="versus-part__marcador">' +
-          (jugado ? suyos + '–' + otros : '–') + '</span>' +
-        /* Goles, asistencias y tarjetas, igual que en la lista de uno solo. */
-        '<span class="versus-part__lances">' + (juego.alineado ? lancesDe(juego) : '') + '</span>' +
-        '<span class="versus-part__min">' + (juego.minutes ? juego.minutes + "'" : '') + '</span>' +
-        (juego.alineado ? notaDePartido(juego.points) : '<span class="nota nota--sin"></span>') +
+        '<span class="versus-part__linea">' +
+          escudoDeEquipo(rivalId, rival) +
+          '<span class="versus-part__marcador">' +
+            (jugado ? suyos + '–' + otros : '–') + '</span>' +
+          (juego.alineado ? notaDePartido(juego.points) : '<span class="nota nota--sin"></span>') +
+        '</span>' +
+        (lances || minutos
+          ? '<span class="versus-part__linea versus-part__linea--abajo">' +
+              (minutos ? '<span class="versus-part__min">' + minutos + '</span>' : '') +
+              '<span class="versus-part__lances">' + lances + '</span>' +
+            '</span>'
+          : '') +
       '</span>';
     };
 
@@ -8044,7 +8244,12 @@
       renderPicker();
     });
 
+    engancharArrastre();
+
     $('pitch').addEventListener('click', function (event) {
+      /* Tras arrastrar, el navegador manda igualmente un clic: si no se
+         ignora, al soltar se abriría el panel encima. */
+      if (huboArrastre) { huboArrastre = false; return; }
       const pick = event.target.closest('[data-slot]');
       if (!pick) return;
       state.picker = {
