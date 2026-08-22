@@ -1144,15 +1144,22 @@
         const d = points2.map(function (c, i) {
           return (i ? 'L' : 'M') + c.x.toFixed(1) + ' ' + c.y.toFixed(1);
         }).join(' ');
-        /* Con un dato por día son cientos de puntos: a radio 4 se solapan y
-           tapan la línea entera, que era justo lo que hacía que no se
-           vieran los colores. Cuando hay muchos se dejan casi como una mota,
-           lo justo para que sigan teniendo su etiqueta al pasar por encima. */
-        const radio = points2.length > 60 ? 1.4 : 4;
+        /* Con un dato por día son cientos de puntos, y cada uno lleva un borde
+           de 2 px del color del fondo (.viz__dot): amontonados, esos bordes
+           oscuros pintan por encima y BORRAN la línea. Por eso no se veían los
+           colores. Cuando hay muchos, los puntos se quedan en una mota y sin
+           borde, para que la línea quede a la vista; siguen llevando su
+           etiqueta al pasar por encima. */
+        const denso = points2.length > 60;
+        const radio = denso ? 1.4 : 4;
+        /* Por clase y no por atributo: el `stroke` de `.viz__dot` viene del
+           CSS, y una regla de CSS siempre le gana a un atributo del SVG. */
+        const clase = 'viz__dot' + (denso ? ' viz__dot--mota' : '');
         return '<path class="viz__line" d="' + d + '" stroke="' + serie.color + '"></path>' +
           points2.map(function (c) {
-            return '<circle class="viz__dot" cx="' + c.x.toFixed(1) + '" cy="' + c.y.toFixed(1) +
-              '" r="' + radio + '" fill="' + serie.color + '"><title>' + etiqueta(c.point) + ' · ' +
+            return '<circle class="' + clase + '" cx="' + c.x.toFixed(1) + '" cy="' + c.y.toFixed(1) +
+              '" r="' + radio + '" fill="' + serie.color + '"><title>' +
+              etiqueta(c.point) + ' · ' +
               serie.label + ': ' + (isCount ? String(c.point[serie.field]) : money(c.point[serie.field])) +
               '</title></circle>';
           }).join('');
@@ -1162,11 +1169,13 @@
         escapeHtml(label) + ' por día">' + grid + body + firstLabel + lastLabel + '</svg>';
     }
 
-    /* Lo mismo que arriba: con muchos días, puntos de mota para que se vea la
-       línea y no una oruga de bolitas. */
-    const radioUno = coords.length > 60 ? 1.4 : 4;
+    /* Lo mismo que arriba: con muchos días, puntos de mota y sin borde, que
+       si no tapan la línea. */
+    const densoUno = coords.length > 60;
+    const radioUno = densoUno ? 1.4 : 4;
+    const claseUno = 'viz__dot' + (densoUno ? ' viz__dot--mota' : '');
     const dots = coords.map(function (c) {
-      return '<circle class="viz__dot" cx="' + c.x.toFixed(1) + '" cy="' + c.y.toFixed(1) +
+      return '<circle class="' + claseUno + '" cx="' + c.x.toFixed(1) + '" cy="' + c.y.toFixed(1) +
         '" r="' + radioUno + '" fill="' + color +
         '"><title>' + shortDay(c.point.day) + ' · ' + fmtFull(c.point[key]) + '</title></circle>';
     }).join('');

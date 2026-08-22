@@ -1096,6 +1096,10 @@ code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft)
 .viz__grid { stroke: var(--border); stroke-width: 1; vector-effect: non-scaling-stroke; }
 .viz__tick { fill: var(--text-faint); font-size: 11px; font-family: var(--mono); }
 .viz__dot { stroke: var(--bg-elev); stroke-width: 2; vector-effect: non-scaling-stroke; }
+/* Con cientos de días hay un punto por día, y ese borde de 2 px del color del
+   fondo los convierte en una franja opaca que tapa la línea entera. Cuando son
+   muchos se quedan sin borde y del tamaño de una mota. */
+.viz__dot--mota { stroke: none; }
 .viz__bar { stroke: var(--bg-elev); stroke-width: 2; vector-effect: non-scaling-stroke; }
 .viz__empty { color: var(--text-faint); font-size: .78rem; margin-bottom: .5rem; }
 /* Con dos series el color no basta: siempre leyenda. */
@@ -1854,27 +1858,28 @@ main.wrap { padding-top: 1.15rem; padding-bottom: 3.5rem; }
   font-size: .66rem; color: var(--text-faint);
   text-transform: uppercase; letter-spacing: .04em;
 }
-/* Los dos lados apretados contra la jornada del centro, que es donde sobraba
-   el sitio: así todo cabe en una línea sin amontonar los iconos. */
+/* Cada lado ocupa TODO su ancho: empieza en el borde de fuera y llega hasta
+   la jornada del centro, repartiendo el hueco entre sus piezas. Así los
+   iconos caben más grandes y se distinguen de un vistazo. */
 .versus-part__lado {
   display: flex; align-items: center; gap: .3rem;
-  padding: .2rem .3rem; border-radius: var(--radius-sm);
-  justify-content: flex-end;
+  padding: .2rem .1rem; border-radius: var(--radius-sm);
+  justify-content: space-between;
 }
-/* El de la derecha, en espejo: los dos marcadores miran al centro. */
-.versus-part__fila > .versus-part__lado:last-child {
-  flex-direction: row-reverse; justify-content: flex-end;
-}
+/* El de la derecha, en espejo: los dos empiezan en su borde de fuera. */
+.versus-part__fila > .versus-part__lado:last-child { flex-direction: row-reverse; }
+/* Los lances se quedan con el hueco que sobra, en el centro del lado. */
+.versus-part__lado .versus-part__lances { margin-inline: auto; }
 .versus-part__marcador { font-variant-numeric: tabular-nums; font-weight: 600; }
 /* Goles, asistencias y tarjetas de ese partido, algo más grandes que en la
    lista de uno solo: aquí hay que distinguirlos de un vistazo. */
-.versus-part__lances { display: inline-flex; align-items: center; gap: .2rem; }
+.versus-part__lances { display: inline-flex; align-items: center; gap: .28rem; }
 .versus-part__lances .lance {
-  width: 17px; height: 17px; font-size: .64rem;
+  width: 22px; height: 22px; font-size: .82rem;
 }
 /* Con contador crece a lo ancho, pero conservando la altura nueva. */
-.versus-part__lances .lance:has(.lance__veces) { width: auto; min-width: 17px; }
-.versus-part__lances .lance__veces { font-size: .64rem; }
+.versus-part__lances .lance:has(.lance__veces) { width: auto; min-width: 22px; padding-right: .25rem; }
+.versus-part__lances .lance__veces { font-size: .72rem; }
 .versus-part__min { font-size: .66rem; color: var(--text-faint); }
 .versus-part__vacio { color: var(--text-faint); text-align: center; }
 
