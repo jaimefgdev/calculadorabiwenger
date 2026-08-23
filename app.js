@@ -2363,8 +2363,9 @@
       return (lista || []).filter(function (j) { return j && String(j.id) === clave; })[0];
     };
 
+    const suyas = state.estadisticas && state.estadisticas[clave];
     const fuentes = [
-      state.estadisticas && state.estadisticas[clave],
+      suyas === 'pidiendo' ? null : suyas,
       busca(state.jugadores),
       busca(mySquad())
     ];
@@ -6373,8 +6374,9 @@
   function estadisticasDeTemporada(id) {
     const datos = state.estadisticas[String(id)];
     /* Mientras no estén (o si no llegan) no se dice nada: aparecen solas al
-       llegar, y anunciarlo solo ensucia la ficha. */
-    if (!datos) return '';
+       llegar, y anunciarlo solo ensucia la ficha. Ojo con «pidiendo», que es
+       texto y pasaría por bueno pintando la ficha entera a cero. */
+    if (!datos || datos === 'pidiendo') return '';
 
     /* Sin partidos se ense\u00f1an los mismos huecos a cero: la ficha se lee igual
        antes y despu\u00e9s de que el futbolista juegue. */
@@ -6417,10 +6419,15 @@
           /* Al portero le interesan los goles que le meten, no los que mete. */
           (portero ? celda('Goles encajados', numero(datos.conceded))
                    : celda('Goles', numero(datos.goals))) +
-          (atras ? celda('Porterías a cero', numero(datos.cleanSheets))
+          (atras ? celda('Porterías a cero', numero(datos.cleanSheets)) +
+                   /* Al defensa también le cuentan los que encaja; al portero
+                      ya se los hemos puesto arriba. */
+                   (portero ? '' : celda('Goles encajados', numero(datos.conceded)))
                  : celda('Gol cada', golCada(datos)) +
                    celda('Media goles p/p', decimal(datos.goalsPerGame))) +
           celda('Asistencias', numero(datos.assists)) +
+          /* Cuántos ganó jugando él: lo mandaba el servidor y no se enseñaba. */
+          celda('Ganados', numero(datos.wins)) +
           celda('Amarillas', numero(datos.yellow)) +
           celda('Rojas', numero(datos.red)) +
       '</div>' +
@@ -6474,8 +6481,11 @@
     const clave = String(id);
     if (state.estadisticas[clave] !== undefined) return;
 
-    /* Se marca como pedida para no repetir la llamada en cada repintado. */
-    state.estadisticas[clave] = undefined;
+    /* Se marca como pedida para no repetir la llamada en cada repintado.
+       Con `undefined` no valía: es lo mismo que devuelve una clave que no
+       existe, así que el guardia de arriba no frenaba nada y la misma ficha
+       se pedía una vez por repintado. */
+    state.estadisticas[clave] = 'pidiendo';
     fetch(config.url.replace(/\/+$/, '') + '/?key=' + encodeURIComponent(config.key) +
       '&estadisticas=' + encodeURIComponent(clave), { headers: { 'accept': 'application/json' } })
       .then(function (response) { return response.json(); })
@@ -6715,8 +6725,9 @@
     const datosUno = state.estadisticas[String(unoId)];
     const datosOtro = state.estadisticas[String(otroId)];
 
-    if (datosUno === undefined || datosOtro === undefined) {
-      return '<p class="muted">Cargando estad\u00edsticas\u2026</p>';
+    const sinLlegar = function (d) { return d === undefined || d === 'pidiendo'; };
+    if (sinLlegar(datosUno) || sinLlegar(datosOtro)) {
+      return '<p class="muted">Cargando\u2026</p>';
     }
 
     /* Todo lo que da la ficha, no solo cuatro cosas. `menor` marca las que se
@@ -8161,12 +8172,34 @@
   const dayFormat = new Intl.DateTimeFormat('es-ES', { weekday: 'long', day: 'numeric', month: 'long' });
   const timeFormat = new Intl.DateTimeFormat('es-ES', { hour: '2-digit', minute: '2-digit' });
 
+  /* El proxy se mudó de Cloudflare a Deno porque las operadoras españolas
+     bloquean rangos de Cloudflare durante los partidos de LaLiga. La dirección
+     se guarda en cada navegador por separado, así que el móvil (o cualquier
+     otro aparato) se quedaba apuntando a la vieja y sin poder actualizar. Se
+     cambia sola la primera vez, y se guarda para no repetirlo.
+
+     Si algún día quieres volver a Cloudflare a mano, se respeta: la mudanza
+     solo se hace una vez, y queda anotada. */
+  const PROXY_VIEJO = 'biwenger-calc.jaime-5e2.workers.dev';
+  const PROXY_NUEVO = 'https://calculadorabiwenger.jaimefgdev.deno.net';
+
   function loadSyncConfig() {
     try {
       const raw = localStorage.getItem(SYNC_KEY);
       const data = raw ? JSON.parse(raw) : null;
+      let url = (data && data.url) || '';
+
+      if (url && data && !data.mudado && url.indexOf(PROXY_VIEJO) !== -1) {
+        url = PROXY_NUEVO;
+        try {
+          localStorage.setItem(SYNC_KEY, JSON.stringify({
+            url: url, key: data.key || '', lastSync: data.lastSync || null, mudado: true
+          }));
+        } catch (e) { /* sin memoria: al menos vale para esta sesión */ }
+      }
+
       return {
-        url: (data && data.url) || '',
+        url: url,
         key: (data && data.key) || '',
         lastSync: (data && data.lastSync) || null
       };
@@ -8176,7 +8209,10 @@
   }
 
   function saveSyncConfig(config) {
-    try { localStorage.setItem(SYNC_KEY, JSON.stringify(config)); } catch (error) { /* sin persistencia */ }
+    /* Si lo guardas tú a mano, esa es la buena: se marca como resuelta para
+       que la mudanza automática de arriba no te la vuelva a cambiar. */
+    const conMarca = Object.assign({}, config, { mudado: true });
+    try { localStorage.setItem(SYNC_KEY, JSON.stringify(conMarca)); } catch (error) { /* sin persistencia */ }
   }
 
   /** Sello de «actualizado a las…» en la barra superior. */
