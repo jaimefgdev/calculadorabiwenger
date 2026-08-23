@@ -1668,7 +1668,9 @@
     const titulo = $('moves-titulo');
     const filtros = document.querySelector('#panel-fichajes .filters');
 
-    if (boton) boton.textContent = enLaLiga ? 'Mi liga' : 'LaLiga';
+    /* La píldora dice dónde ESTÁS, no a dónde irías: igual que las de Datos.
+       Al revés confundía, porque ponía «LaLiga» estando en la tuya. */
+    if (boton) boton.textContent = enLaLiga ? 'LaLiga' : 'Mi liga';
     if (titulo) titulo.textContent = enLaLiga ? 'Altas y bajas en LaLiga' : 'Todos los fichajes y ventas';
     /* Los filtros son de la liga: con los movimientos de LaLiga no pintan nada.
        Se ocultan uno a uno, no el bloque entero: la pastilla vive dentro y con
@@ -7582,6 +7584,8 @@
     const caja = $('rankings-temporada');
     if (!caja) return;
 
+    /* Ojo con el nombre: 'liga' es MI liga, no LaLiga. La píldora dice
+       dónde estás, no a dónde irías. */
     const deLaLiga = state.rankingsAmbito === 'liga';
     const boton = $('rankings-ambito');
     if (boton) {
@@ -7706,6 +7710,7 @@
     const caja = $('rankings-puntos');
     if (!caja) return;
 
+    /* Igual que en Rankings: 'liga' es MI liga. */
     const deLaLiga = state.puntosAmbito === 'liga';
     const boton = $('puntos-ambito');
     if (boton) {
