@@ -6707,7 +6707,14 @@
           '<span class="versus__label">Hoy</span>' +
           '<span class="versus__dato">' + money(ultimo(serieOtro)) + '</span>' +
         '</div>' +
-        PERIODOS.map(function (p, i) {
+        /* De lo más reciente a lo más lejano: debajo de «Hoy» va 1d, luego 3d,
+           7d… Así se baja en el tiempo en vez de empezar por hace medio año.
+           `slice()` antes de dar la vuelta, que `reverse()` cambia el original
+           y PERIODOS lo usan también otras partes. */
+        PERIODOS.slice().reverse().map(function (p, i, lista) {
+          /* El índice ahora va al revés, pero deUno/deOtro siguen en el orden
+             de PERIODOS: se traduce para no cruzar los datos. */
+          i = lista.length - 1 - i;
           if (deUno[i] == null && deOtro[i] == null) return '';
           return '<div class="versus__fila">' +
             '<span class="versus__dato">' + celda(deUno[i]) + '</span>' +
@@ -7073,7 +7080,10 @@
               ' · <span class="delta ' + (sube ? 'delta--up' : 'delta--down') + '">' +
               (sube ? '▲ +' : '▼ −') + money(Math.abs(salto)) + '</span></p>' +
             (function () {
-              const celdas = PERIODOS.map(function (periodo) {
+              /* De lo más reciente a lo más lejano (1d, 3d, 7d…), igual que en
+                 la comparación. Con `slice()` antes de invertir: `reverse()`
+                 cambia el original, y PERIODOS se usa en los dos sitios. */
+              const celdas = PERIODOS.slice().reverse().map(function (periodo) {
                 const cambio = variacion(serie, periodo.dias);
                 if (cambio == null) return '';
                 const arriba = cambio > 0;
