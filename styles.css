@@ -117,6 +117,23 @@
   --shadow:        0 1px 2px rgba(0, 0, 0, .06), 0 8px 24px rgba(0, 0, 0, .08);
 }
 
+/* En claro, el verde fuerte de las píldoras con importe (aceptar oferta) y de
+   la de «Ofertas» quedaba casi negro sobre fondo blanco: se medía en 4,0:1 de
+   contraste, por debajo de lo legible. Se aclara solo ahí; en oscuro se queda
+   como estaba, que sobre negro se lee bien.
+
+   Los selectores llevan dos señas a propósito, para ganarle a `.btn--ok`. */
+@media (prefers-color-scheme: light) {
+  :root:not([data-tema="oscuro"]) .btn--ok,
+  :root:not([data-tema="oscuro"]) .ambito--avisa {
+    background: #d8f3e4; border-color: #a9e0c6; color: #0a5c3a;
+  }
+}
+:root[data-tema="claro"] .btn--ok,
+:root[data-tema="claro"] .ambito--avisa {
+  background: #d8f3e4; border-color: #a9e0c6; color: #0a5c3a;
+}
+
 /* Y al revés: si el sistema está en claro, se puede forzar el oscuro. */
 :root[data-tema="oscuro"] {
   --bg:            #050505;

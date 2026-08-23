@@ -79,7 +79,10 @@
      puntos: con puntuación mixta hay que esperar a las notas del AS, así que
      durante el partido no hay nada que mirar. */
   const AUTO_SYNC_MS = 30 * 60 * 1000;
-  const AUTO_SYNC_PUNTOS_MS = 10 * 60 * 1000;
+  /* Con partido en marcha ya no hace falta esperar tanto: lo que de verdad
+     actualiza es el aviso de ESPN en cuanto pasa algo (pedirSyncPorCambio).
+     Esto es solo la red de seguridad por si ESPN fallara. */
+  const AUTO_SYNC_PUNTOS_MS = 5 * 60 * 1000;
 
   /* ---------- Utilidades ---------- */
 
@@ -642,6 +645,8 @@
     faltas: {},             // goles de falta por dia (AAAAMMDD), según ESPN
     envivo: [],             // partidos rodando ahora mismo, con marcador de ESPN
     envivoPidiendo: false,
+    envivoFirma: undefined,  // cómo iban los partidos en la última mirada
+    syncPorCambioAt: 0,      // cuándo se sincronizó por un cambio en el campo
     recuentoLiga: null,     // el mismo recuento, pero solo de lo hecho alineado
     rankingsAmbito: 'laliga',
     puntosAmbito: 'laliga',  // el mismo cambio, en la tabla de Puntos
@@ -5207,14 +5212,62 @@
           });
         });
       });
+      /* Antes de guardar, se mira si ha cambiado algo de verdad: un gol, o un
+         partido que se ha acabado. Eso es lo que dispara la sincronización,
+         en vez de estar preguntándole a Biwenger cada pocos minutos por si
+         acaso. ESPN es gratis; Biwenger nos corta si insistimos. */
+      const firma = vivos.map(function (v) {
+        return v.home + '|' + v.away + '|' + v.homeScore + '-' + v.awayScore;
+      }).sort().join(' ~ ');
+      const antes = state.envivoFirma;
+      /* Los que estaban rodando y ya no están: han terminado, y con el pitido
+         final llegan los puntos. */
+      const acabados = (state.envivo || []).filter(function (v) {
+        return !vivos.some(function (n) { return n.home === v.home && n.away === v.away; });
+      }).length;
+
       state.envivo = vivos;
+      state.envivoFirma = firma;
       state.envivoPidiendo = false;
+
       /* Solo se repinta si hay algo rodando: si no, no cambia nada. */
       if (vivos.length) {
         render();
         if (state.tab === 'jornadas') renderPartidos();
       }
+
+      /* La primera vuelta solo toma la foto: no hay con qué comparar. */
+      if (antes === undefined) return;
+      if (firma !== antes || acabados) pedirSyncPorCambio(acabados);
     }).catch(function () { state.envivoPidiendo = false; });
+  }
+
+  /**
+   * Ha cambiado algo en el campo: se le pide a Biwenger lo nuevo.
+   *
+   * Con freno a propósito. Biwenger nos cortó un día por preguntarle de más, y
+   * un gol no cambia los puntos al instante: sus notas tardan un rato. Así que
+   * como mucho una consulta cada minuto y medio.
+   *
+   * Al acabar un partido se repite un par de veces más pasados unos minutos:
+   * es cuando llegan las notas del AS, y no llegan todas a la vez.
+   */
+  function pedirSyncPorCambio(acabados) {
+    const AHORA_NO_MAS_DE = 90 * 1000;
+    if (state.syncPorCambioAt && Date.now() - state.syncPorCambioAt < AHORA_NO_MAS_DE) return;
+    state.syncPorCambioAt = Date.now();
+
+    syncNow(true);
+
+    if (!acabados) return;
+    /* Las notas de un partido recién acabado tardan en publicarse: se vuelve
+       a mirar a los tres y a los ocho minutos, y ahí se deja. */
+    [3, 8].forEach(function (minutos) {
+      setTimeout(function () {
+        if (document.visibilityState !== 'visible') return;
+        syncNow(true);
+      }, minutos * 60 * 1000);
+    });
   }
 
   /** El marcador de ese partido según ESPN, si lo está jugando ahora mismo. */
@@ -7595,8 +7648,10 @@
     }
     const todos = recuentoActivo();
     if (!todos) {
+      /* Un «cargando» y ya: lo de «repasando jornada a jornada» contaba las
+         tripas del asunto y encima parecía que se había atascado. */
       caja.innerHTML = deLaLiga && state.recuentoLigaCargando
-        ? '<p class="muted">Repasando jornada a jornada quién alineó a quién…</p>' : '';
+        ? '<p class="muted">Cargando…</p>' : '';
       return;
     }
     if (todos.length === 0) {
@@ -7724,8 +7779,14 @@
 
     if (deLaLiga) {
       const todos = futbolistasAlineados(null);
+      /* Si aún se están trayendo las jornadas, es que está cargando; solo
+         cuando ya han llegado y no hay nada se dice que no hay nada. */
+      const cargando = state.jornadaEstado === 'cargando' ||
+        (!todos.length && !jornadasGuardadas().length);
       caja.innerHTML = todos.length === 0
-        ? '<p class="muted">Todavía no hay jornadas guardadas con alineaciones.</p>'
+        ? '<p class="muted">' + (cargando
+            ? 'Cargando…'
+            : 'Todavía no hay jornadas guardadas con alineaciones.') + '</p>'
         : cuatroListas(todos, 'nuestra', state.ambito.nuestra, state.puesto.nuestra);
 
       const mando = $('ambitos-puntos');
@@ -7755,7 +7816,7 @@
 
     const datos = state.laliga;
     if (!datos) {
-      caja.innerHTML = '<p class="muted">Cargando los datos de la competición…</p>';
+      caja.innerHTML = '<p class="muted">Cargando…</p>';
       return;
     }
 
