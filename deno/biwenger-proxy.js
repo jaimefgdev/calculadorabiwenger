@@ -104,7 +104,7 @@ const CDN = 'https://cf.biwenger.com/api/v2';
    navegador normal y las cabeceras que este mandaría. */
 /* Marca de versión: se sube en cada cambio y se consulta con ?version=1.
    Sirve para saber desde fuera si el despliegue ha entrado o no. */
-const VERSION = '2026-08-22 · deno 3';
+const VERSION = '2026-08-23 · deno 4';
 
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ' +
   '(KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36';
@@ -2123,8 +2123,22 @@ async function partidosDeJugador(env, id) {
 
   /* Y el calendario entero, para que estén las 38 jornadas aunque no jugara. */
   const calendario = await seasonRounds().catch(function () { return []; });
-  const salida = [];
 
+  /* Las jornadas en las que no jugó hay que mirarlas una a una para sacar el
+     partido de su equipo. Se piden TODAS A LA VEZ: en fila iban treinta y ocho
+     esperas encadenadas y la primera consulta de cada arranque tardaba veinte
+     segundos. En paralelo tarda lo que la más lenta. */
+  const propias = calendario.filter(function (jornada) {
+    return (jornada.part || 1) === 1 && !suyos[jornada.number];
+  });
+  const detalles = {};
+  await Promise.all(propias.map(function (jornada) {
+    return roundDetail(jornada.id, score)
+      .then(function (d) { detalles[jornada.id] = d; })
+      .catch(function () { detalles[jornada.id] = null; });
+  }));
+
+  const salida = [];
   for (let i = 0; i < calendario.length; i++) {
     const jornada = calendario[i];
     if ((jornada.part || 1) !== 1) continue;
@@ -2133,7 +2147,7 @@ async function partidosDeJugador(env, id) {
     if (suyos[numero]) { salida.push(suyos[numero]); continue; }
 
     /* Sin jugar: se busca el partido de su equipo para enseñarlo en blanco. */
-    const detalle = await roundDetail(jornada.id, score).catch(function () { return null; });
+    const detalle = detalles[jornada.id];
     const juego = ((detalle && detalle.matches) || []).filter(function (partido) {
       return String(partido.homeId) === String(suEquipo) || String(partido.awayId) === String(suEquipo);
     })[0];
