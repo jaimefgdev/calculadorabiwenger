@@ -3285,9 +3285,9 @@
     '</div>';
   }
 
-  /* ---------- Tema morado ----------
-     Se enciende dejando pulsado el escudo de Inicio diez segundos, y se apaga
-     igual. Va escondido a propósito: es un capricho, no una opción del menú.
+  /* ---------- Claro y oscuro ----------
+     Se cambia dejando pulsado el escudo de Inicio diez segundos, y se vuelve
+     igual. Va escondido a propósito: es un atajo, no una opción del menú.
      Toda la web tira de las mismas variables de color, así que basta con poner
      la marca en el <html> para que cambie entera. */
   const TEMA_KEY = 'biwenger-calc-tema';
@@ -3312,8 +3312,19 @@
   }
 
   function aplicarTema(tema) {
-    if (tema === 'morado') document.documentElement.setAttribute('data-tema', 'morado');
-    else document.documentElement.removeAttribute('data-tema');
+    if (tema === 'claro' || tema === 'oscuro') {
+      document.documentElement.setAttribute('data-tema', tema);
+    } else {
+      document.documentElement.removeAttribute('data-tema');
+    }
+  }
+
+  /** Lo que se ve ahora: lo elegido a mano o, si no hay nada, lo del sistema. */
+  function temaActual() {
+    const puesto = document.documentElement.getAttribute('data-tema');
+    if (puesto === 'claro' || puesto === 'oscuro') return puesto;
+    return window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches
+      ? 'claro' : 'oscuro';
   }
 
   function cargarTema() {
@@ -3323,14 +3334,13 @@
   }
 
   function cambiarTema() {
-    const ahora = document.documentElement.getAttribute('data-tema') === 'morado';
-    const nuevo = ahora ? null : 'morado';
+    /* Se cambia al contrario de lo que estés viendo, mires con el sistema en
+       claro o en oscuro. */
+    const nuevo = temaActual() === 'claro' ? 'oscuro' : 'claro';
     aplicarTema(nuevo);
-    try {
-      if (nuevo) localStorage.setItem(TEMA_KEY, nuevo);
-      else localStorage.removeItem(TEMA_KEY);
-    } catch (error) { /* sin memoria: dura lo que dure la sesión */ }
-    toast(nuevo ? 'Modo morado' : 'Colores de siempre');
+    try { localStorage.setItem(TEMA_KEY, nuevo); }
+    catch (error) { /* sin memoria: dura lo que dure la sesión */ }
+    toast(nuevo === 'claro' ? 'Modo claro' : 'Modo oscuro');
   }
 
   function engancharTemaLargo() {
@@ -9041,7 +9051,7 @@
     renderLastSync(state.lastSync);
 
     const hadData = loadStored();
-    /* Antes que nada: si dejaste puesto el morado, que no parpadee en rojo. */
+    /* Antes que nada, para que no parpadee con los colores del sistema. */
     cargarTema();
     loadJornadas();
     loadMoveStatus();

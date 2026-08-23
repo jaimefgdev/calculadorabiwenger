@@ -86,38 +86,60 @@
   }
 }
 
-/* ---------- Tema morado ----------
-   El mismo morado del escudo del Madrid (#691b7b) que lleva el icono de la
-   pestaña. Se enciende dejando pulsado el escudo de Inicio diez segundos y se
-   apaga igual. Como toda la web tira de estas variables, con redefinirlas aquí
-   cambia entera: no hay que tocar ni una regla más.
+/* ---------- Modo claro ----------
+   Se enciende dejando pulsado el escudo de Inicio diez segundos, y se apaga
+   igual. Es el mismo claro que ya traía la web para quien tiene el sistema en
+   claro; aquí se puede pedir a mano, sin depender del sistema.
 
-   Va al final de las paletas y con `:root[data-tema]` (dos señas) para que gane
-   tanto al tema oscuro como al claro del sistema. */
-:root[data-tema="morado"] {
-  --bg:            #0b060d;
-  --bg-elev:       #150a19;
-  --bg-surface:    #1b0d20;
-  --border:        #2e1636;
-  --border-strong: #3f1e4a;
-  --border-hover:  #582a66;
-  --text:          #f6f0f8;
-  --text-soft:     #d3c2db;
-  --text-faint:    #a58fb0;
+   Va con `:root[data-tema]` (dos señas) para que gane tanto al oscuro de
+   partida como al claro automático del sistema. */
+:root[data-tema="claro"] {
+  --bg:            #f0f0f0;
+  --bg-elev:       #ffffff;
+  --bg-surface:    #e8e8e8;
+  --border:        #d0d0d0;
+  --border-strong: #cccccc;
+  --border-hover:  #aaaaaa;
+  --text:          #111111;
+  --text-soft:     #444444;
+  --text-faint:    #555555;
 
-  --accent:        #a034bd;
-  --accent-rgb:    160, 52, 189;
-  --accent-soft:   rgba(160, 52, 189, .16);
+  --accent:        #ff0033;
+  --accent-rgb:    255, 0, 51;
+  --accent-soft:   rgba(255, 0, 51, .08);
 
-  /* El verde chillón desentona con el morado: se apaga hacia turquesa. */
-  --pos:           #2fd3a7;
-  --pos-soft:      rgba(47, 211, 167, .14);
-  /* Lo malo sigue leyéndose como rojo, pero rebajado para no chillar. */
-  --neg:           #ff4d6d;
-  --neg-soft:      rgba(255, 77, 109, .12);
+  --pos:           #0a8f56;
+  --pos-soft:      rgba(10, 143, 86, .1);
+  --neg:           #d80030;
+  --neg-soft:      rgba(216, 0, 48, .09);
 
-  --marca:         #d9a7e8;
-  --shadow:        0 1px 2px rgba(0, 0, 0, .6), 0 8px 24px rgba(40, 0, 50, .6);
+  --marca:         #b8860b;
+  --shadow:        0 1px 2px rgba(0, 0, 0, .06), 0 8px 24px rgba(0, 0, 0, .08);
+}
+
+/* Y al revés: si el sistema está en claro, se puede forzar el oscuro. */
+:root[data-tema="oscuro"] {
+  --bg:            #050505;
+  --bg-elev:       #0f0f0f;
+  --bg-surface:    #111111;
+  --border:        #222222;
+  --border-strong: #333333;
+  --border-hover:  #444444;
+  --text:          #f0f0f0;
+  --text-soft:     #cccccc;
+  --text-faint:    #999999;
+
+  --accent:        #ff0033;
+  --accent-rgb:    255, 0, 51;
+  --accent-soft:   rgba(255, 0, 51, .1);
+
+  --pos:           #00d68f;
+  --pos-soft:      rgba(0, 214, 143, .12);
+  --neg:           #ff0033;
+  --neg-soft:      rgba(255, 0, 51, .1);
+
+  --marca:         #ffc233;
+  --shadow:        0 1px 2px rgba(0, 0, 0, .5), 0 8px 24px rgba(0, 0, 0, .55);
 }
 
 * { box-sizing: border-box; }
@@ -167,10 +189,8 @@ code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft)
 /* El escudo de Biwenger, en vez del balón. Se deja respirar dentro del
    cuadrado y manda su propia proporción (es más alto que ancho). */
 .brand__escudo { height: 47px; width: auto; display: block; }
-/* En morado, el escudo de la cabecera pasa a ser el mismo de la pestaña. */
+/* El de la pestaña solo se usa ahí; en la cabecera manda el original. */
 .brand__escudo--morado { display: none; }
-:root[data-tema="morado"] .brand__escudo { display: none; }
-:root[data-tema="morado"] .brand__escudo--morado { display: block; }
 
 /* Mientras dejas pulsado el escudo, se va rellenando por debajo: diez
    segundos sin ninguna señal parecerían que no hace nada. */
@@ -197,7 +217,7 @@ code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft)
 /* Tu firma, como en tu portfolio: nombre en blanco y «fgdev» en rojo.
    En modo claro el blanco se volvería invisible, así que usa la tinta normal. */
 .brand__sub--me { color: var(--text); font-weight: 650; letter-spacing: .01em; font-family: var(--mono); }
-/* Sigue el color de la marca para que en morado no quede un rojo suelto. */
+/* Sigue el color de la marca, para que acompañe al tema que toque. */
 .brand__sub--me span { color: var(--accent); }
 
 /* ---------- Pestañas ---------- */
