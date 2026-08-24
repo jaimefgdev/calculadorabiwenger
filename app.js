@@ -4485,6 +4485,7 @@
         icon: fila.icon || antes.icon,
         position: fila.position != null ? fila.position : antes.position,
         points: fila.points != null ? fila.points : antes.points,
+        pointsOfficial: fila.pointsOfficial != null ? fila.pointsOfficial : antes.pointsOfficial,
         played: fila.played != null ? fila.played : antes.played,
         counts: fila.counts !== undefined ? fila.counts : antes.counts,
         gaps: fila.gaps !== undefined ? fila.gaps : antes.gaps,
@@ -4492,7 +4493,8 @@
         // Lo importante: una respuesta vacía nunca borra la alineación guardada.
         xi: fila.xi && fila.xi.length ? fila.xi : (antes.xi || []),
         bench: fila.bench && fila.bench.length ? fila.bench : (antes.bench || []),
-        xiValue: fila.xiValue || antes.xiValue || 0
+        xiValue: fila.xiValue || antes.xiValue || 0,
+        abono: fila.abono || antes.abono || null
       };
     });
 
@@ -4630,7 +4632,8 @@
       return total == null ? -Infinity : total;
     },
     played: function (row) { return row.played == null ? -Infinity : row.played; },
-    xiValue: function (row) { return row.xiValue || 0; }
+    xiValue: function (row) { return row.xiValue || 0; },
+    abono: function (row) { return row.abono ? row.abono.total : -Infinity; }
   };
 
   /**
@@ -5782,7 +5785,7 @@
     cuerpo.innerHTML = filas.map(function (fila, indice) {
       const abierta = state.jornadaAbierta === fila.id;
       const detalle = !abierta ? '' :
-        '<tr class="detail-row"><td class="detail-cell" colspan="6"><div class="detail">' +
+        '<tr class="detail-row"><td class="detail-cell" colspan="7"><div class="detail">' +
           jornadaDetalle(fila) + '</div></td></tr>';
 
       return '<tr class="' + (abierta ? 'row-open' : '') + '">' +
@@ -5815,11 +5818,41 @@
           (fila.played == null ? '<span class="sub">—</span>' : fila.played) + '</td>' +
         '<td class="num" data-label="Valor del once">' +
           (fila.xiValue ? money(fila.xiValue) : '<span class="sub">—</span>') + '</td>' +
+        '<td class="num" data-label="Abono">' + celdaAbono(fila) + '</td>' +
       '</tr>' + detalle;
     }).join('');
 
     updateRoundHeaders();
     renderJornadaChart();
+  }
+
+  /**
+   * Lo que la liga le paga a un mánager por la jornada.
+   *
+   * Mientras la jornada sigue abierta esto es una previsión: Biwenger no abona
+   * hasta el día siguiente de cerrarla. Se avisa en el título para que nadie
+   * cuente con ese dinero antes de tiempo.
+   */
+  function celdaAbono(fila) {
+    const abono = fila.abono;
+    if (!abono) return '<span class="sub">—</span>';
+
+    if (abono.motivo === 'negativo') {
+      return '<span class="sub" title="Empezó la jornada con saldo negativo: ' +
+        'no puntúa, y sin puntos no cobra nada de la jornada">' + money(0) + '</span>';
+    }
+
+    const partes = [];
+    if (abono.puntos) partes.push(money(abono.puntos) + ' por puntos');
+    if (abono.ideal) partes.push(money(abono.ideal) + ' del once ideal');
+    if (abono.mvp) partes.push(money(abono.mvp) + ' por MVP');
+    const cerrada = fila.pointsOfficial != null;
+
+    return '<span class="' + (abono.total < 0 ? 'money-neg' : 'money-pos') +
+      '" title="' + escapeHtml((partes.join(' + ') || 'Sin abono') + '. ' +
+        (cerrada ? 'Jornada cerrada: es lo que ha pagado.'
+                 : 'Previsión: la jornada aún no ha cerrado.')) + '">' +
+      (abono.total > 0 ? '+' : '') + money(abono.total) + '</span>';
   }
 
   function updateRoundHeaders() {
