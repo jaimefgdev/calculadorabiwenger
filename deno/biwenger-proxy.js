@@ -104,7 +104,7 @@ const CDN = 'https://cf.biwenger.com/api/v2';
    navegador normal y las cabeceras que este mandaría. */
 /* Marca de versión: se sube en cada cambio y se consulta con ?version=1.
    Sirve para saber desde fuera si el despliegue ha entrado o no. */
-const VERSION = '2026-08-23 · deno 4';
+const VERSION = '2026-08-25 · deno 5';
 
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ' +
   '(KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36';
@@ -139,7 +139,8 @@ const NAVEGADOR = {
    Cloudflare recicla el proceso, se vuelve a hacer login solo. */
 let cache = { token: null, account: null, players: null, playersAt: 0, prices: {},
   round: null, roundAt: 0, tv: null, tvAt: 0, calendar: null, calendarAt: 0,
-  board: null, boardAt: 0, limitedUntil: 0, lastGood: null, forzar: false };
+  board: null, boardAt: 0, limitedUntil: 0, lastGood: null, forzar: false,
+  primas: null };
 
 const app = {
   async fetch(request, env) {
@@ -1280,6 +1281,49 @@ function colocarEnSistema(jugadores, sistema) {
 }
 
 /**
+ * Las primas que paga la liga, tal y como las tiene puestas el administrador.
+ *
+ * No se fijan a fuego a propósito: si algún día se cambian los importes en los
+ * ajustes, la web tiene que seguir cuadrando sola. Cambian una vez al año como
+ * mucho, así que se guardan en el KV y no se vuelven a pedir.
+ */
+async function primasDeLaLiga(env) {
+  if (cache.primas) return cache.primas;
+
+  if (env.JORNADAS) {
+    try {
+      const guardado = await env.JORNADAS.get('primas');
+      if (guardado) {
+        cache.primas = JSON.parse(guardado);
+        return cache.primas;
+      }
+    } catch (error) { /* se pregunta abajo */ }
+  }
+
+  try {
+    const who = await account(env);
+    const liga = await api(env, '/league?fields=settings',
+      { 'x-league': who.leagueId, 'x-user': who.userId, 'x-version': '628' });
+    const s = (liga && liga.settings) || {};
+    const num = function (v) { return typeof v === 'number' ? v : 0; };
+    cache.primas = {
+      porPunto: num(s.bonusPoint),
+      fija: num(s.bonusFixed),
+      onceIdeal: num(s.bonusIdealLineup),
+      mvpPartido: num(s.bonusGameMVP),
+      mvpJornada: num(s.bonusRoundMVP),
+      /* Con esto en true, al que hace puntuación negativa le quitan dinero;
+         sin él, el abono se queda en cero pero no resta. */
+      restaSiNegativo: s.bonusAllowNegative !== false
+    };
+    if (env.JORNADAS) {
+      try { await env.JORNADAS.put('primas', JSON.stringify(cache.primas)); } catch (e) { /* da igual */ }
+    }
+  } catch (error) { /* sin primas se sigue: la web simplemente no las enseña */ }
+  return cache.primas || null;
+}
+
+/**
  * El sistema de puntuación de la liga. Los puntos cambian con él, y si el
  * Worker acaba de arrancar todavía no lo sabe: se pregunta una vez y se guarda.
  */
@@ -1932,13 +1976,19 @@ function mezclarJornada(guardado, fresco) {
       icon: fila.icon || antes.icon,
       position: fila.position != null ? fila.position : antes.position,
       points: conOnce ? fila.points : (antes.points != null ? antes.points : fila.points),
+      pointsOfficial: fila.pointsOfficial != null ? fila.pointsOfficial : antes.pointsOfficial,
       played: fila.played != null ? fila.played : antes.played,
       counts: fila.counts !== undefined ? fila.counts : antes.counts,
       gaps: fila.gaps !== undefined ? fila.gaps : antes.gaps,
       type: fila.type || antes.type,
       xi: fila.xi && fila.xi.length ? fila.xi : (antes.xi || []),
       bench: fila.bench && fila.bench.length ? fila.bench : (antes.bench || []),
-      xiValue: fila.xiValue || antes.xiValue || 0
+      xiValue: fila.xiValue || antes.xiValue || 0,
+      /* Sin esto el día de los precios se perdía en cada mezcla y el valor del
+         once se recalculaba entero cada vez, que son casi cien consultas al
+         CDN que ya estaban hechas. */
+      xiValueDay: fila.xiValueDay || antes.xiValueDay || null,
+      abono: fila.abono || antes.abono || null
     };
   });
   return fresco;
@@ -1969,6 +2019,10 @@ async function roundDetail(roundId, score) {
   const fichas = {};      // futbolista -> nombre, puesto y equipo con el que jugó
   const lances = [];      // cada gol, tarjeta o cambio de la jornada
   const partidos = [];
+  /* Biwenger marca al mejor de cada partido con `mvp`. Esta liga paga por
+     alinearlo, así que se recoge aquí: viene en el mismo informe que ya se
+     recorre, sin una sola petición de más. */
+  const mvps = {};
 
   (data.games || []).forEach(function (game) {
     const local = game.home || {};
@@ -1985,6 +2039,7 @@ async function roundDetail(roundId, score) {
            contrastarlo. Las notas buenas salen del índice de futbolistas, en
            puntosDeLaJornada(). */
         if (informe.points != null) puntos[id] = informe.points;
+        if (informe.mvp) mvps[id] = true;
         (informe.events || []).forEach(function (evento) {
           lances.push({ id: id, type: evento.type, minute: evento.metadata != null ? evento.metadata : null });
         });
@@ -2034,6 +2089,7 @@ async function roundDetail(roundId, score) {
     ideal: data.idealLineup || null,
     puntos: puntos,
     fichas: fichas,
+    mvps: mvps,
     lances: lances,
     matches: partidos,
     played: jugados,
@@ -2358,11 +2414,23 @@ async function roundBoard(env, headers, jornada, listaNombres) {
       name: row.name || '',
       icon: iconUrl(row.icon),
       position: row.position != null ? row.position : null,
-      /* Manda siempre lo calculado aquí, teniendo el once: cuadra al punto con
-         la tabla de Biwenger en las dos jornadas comprobadas, y su campo
-         oficial se queda a cero mientras la jornada 1 tenga aplazados. Solo
-         sin once (no llegó la alineación) se tira de lo que él diga. */
-      points: !empezada ? 0 : (once.length ? sumado : (oficiales || 0)),
+      /* Mientras la jornada sigue viva Biwenger deja su marcador a cero, así
+         que el bueno es el que se suma aquí con el once delante. En cuanto la
+         cierra publica el suyo, y ese manda: trae los extras que su pantalla
+         aplica y el índice de futbolistas no (la Súper Pica del AS, que esta
+         liga tiene activada), y por eso alguna chapa se quedaba un punto corta
+         —Oso 14 en vez de 15— sin que ningún campo de la API lo explicara. */
+      /* Al que no le cuenta la jornada, Biwenger publica un cero oficial pero
+         en pantalla le sigue enseñando sus puntos tachados. Aquí se hace igual:
+         se queda lo sumado para poder pintarlo en rojo, y `counts` ya se
+         encarga de que no entre en la general. */
+      points: !empezada ? 0
+        : ((oficiales && !(lineup && lineup.count === false))
+          ? oficiales
+          : (once.length ? sumado : 0)),
+      /* Para poder decir en la web si el número es el definitivo de Biwenger o
+         todavía el que vamos sumando nosotros mientras ruedan los partidos. */
+      pointsOfficial: oficiales || null,
       played: !empezada ? 0
         : (once.length ? jugados : (lineup && lineup.played != null ? lineup.played : null)),
       /* Al mánager que empieza la jornada con saldo negativo Biwenger no le
@@ -2429,6 +2497,63 @@ async function roundBoard(env, headers, jornada, listaNombres) {
     ? await bestXi(round.id, names, score).catch(function () { return null; })
     : null;
 
+  /* ---------- Lo que cobra cada mánager por esta jornada ----------
+     La liga paga por punto, por meter gente en el once ideal y por alinear al
+     mejor de un partido o de la jornada. Biwenger no lo abona hasta el día
+     siguiente de cerrarla, así que hasta entonces esto es una previsión: sale
+     de los mismos puntos que ya se enseñan, no de un número inventado. */
+  const primas = await primasDeLaLiga(env).catch(function () { return null; });
+
+  if (primas) {
+    const enIdeal = {};
+    ((once && once.players) || []).forEach(function (jugador) {
+      if (jugador && jugador.id != null) enIdeal[String(jugador.id)] = true;
+    });
+    const mvps = (detalle && detalle.mvps) || {};
+
+    /* El MVP de la jornada es el que más puntúa de todos los que sí fueron el
+       mejor de su partido. Sin jornada cerrada todavía puede moverse. */
+    let mejor = null;
+    Object.keys(mvps).forEach(function (id) {
+      const nota = marcador[id];
+      if (typeof nota !== 'number') return;
+      if (!mejor || nota > mejor.nota) mejor = { id: id, nota: nota };
+    });
+
+    standings.forEach(function (fila) {
+      let ideales = 0, mejores = 0, deJornada = 0;
+      (fila.xi || []).forEach(function (jugador) {
+        const id = String(jugador.id);
+        if (enIdeal[id]) { jugador.ideal = true; ideales++; }
+        if (mvps[id]) { jugador.mvp = true; mejores++; }
+        if (mejor && id === mejor.id) deJornada++;
+      });
+
+      /* Al que arranca la jornada en números rojos Biwenger no le cuenta la
+         jornada, y con ella se va todo el abono: ni puntos, ni once ideal, ni
+         MVP. Confirmado en la jornada 2, con Eneko a 25 puntos y cero euros. */
+      if (!fila.counts) {
+        fila.abono = { total: 0, puntos: 0, ideal: 0, mvp: 0, motivo: 'negativo' };
+        return;
+      }
+
+      /* Si la liga no resta por puntuación negativa, el abono por puntos se
+         queda en cero pero nunca baja de ahí. */
+      const cuentan = primas.restaSiNegativo ? fila.points : Math.max(0, fila.points);
+      const porPuntos = cuentan * primas.porPunto;
+      const porIdeal = ideales * primas.onceIdeal;
+      const porMvp = mejores * primas.mvpPartido + deJornada * primas.mvpJornada;
+
+      fila.abono = {
+        total: primas.fija + porPuntos + porIdeal + porMvp,
+        puntos: porPuntos,
+        ideal: porIdeal,
+        mvp: porMvp,
+        motivo: null
+      };
+    });
+  }
+
   let payload = {
     round: {
       id: round.id != null ? round.id : null,
@@ -2443,6 +2568,9 @@ async function roundBoard(env, headers, jornada, listaNombres) {
     rounds: calendar,
     standings: standings,
     bestXi: once,
+    /* Los importes que paga la liga, para poder explicarlos en la web sin
+       repetirlos allí: si se cambian en Biwenger, cambian aquí solos. */
+    primas: primas,
     updatedAt: new Date().toISOString()
   };
 
