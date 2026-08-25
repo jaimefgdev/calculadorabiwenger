@@ -697,6 +697,7 @@
     jugadores: null,        // lista completa de la competición, para el buscador
     jugadoresCargando: false,
     estadisticas: {},       // resumen de temporada de cada futbolista
+    bios: {},               // estatura, peso y nacimiento, de la web de LaLiga
     partidos: {},           // partidos de cada jornada, con sus alineaciones
     partidosEstado: '',
     partidoAbierto: null,   // el partido cuyo detalle se está viendo
@@ -6517,26 +6518,42 @@
    * es mejor no enseñar el hueco que enseñarlo vacío.
    */
   function tiraPersonal(id) {
-    const datos = state.estadisticas[String(id)];
-    if (!datos || datos === 'pidiendo' || !datos.bio) return '';
-    const bio = datos.bio;
+    const bio = state.bios[String(id)];
+    if (!bio || bio === 'pidiendo') return '';
 
+    /* El orden lo marca el ancho de cada dato: primero los cortos y fijos, y al
+       final el dorsal, que cierra. */
     const partes = [];
+    if (bio.height) partes.push({ que: 'Estatura', valor: bio.height + ' cm' });
+    if (bio.weight) partes.push({ que: 'Peso', valor: bio.weight + ' kg' });
+
     if (bio.birthDate) {
       const f = new Date(bio.birthDate + 'T00:00:00');
       if (!isNaN(f.getTime())) {
-        /* La edad se calcula aquí y no se guarda: si no, envejecería mal. */
+        /* La edad se calcula al vuelo y no se guarda: si no, envejecería mal. */
         const hoy = new Date();
         let anos = hoy.getFullYear() - f.getFullYear();
         const mes = hoy.getMonth() - f.getMonth();
         if (mes < 0 || (mes === 0 && hoy.getDate() < f.getDate())) anos--;
-        partes.push({ que: 'Edad', valor: anos + ' años',
-          detalle: dateFormat.format(f) });
+        partes.push({ que: 'Edad', valor: anos + ' años' });
+        partes.push({ que: 'Nacimiento', valor: dateFormat.format(f) });
       }
     }
-    if (bio.birthPlace) partes.push({ que: 'Nacido en', valor: bio.birthPlace });
-    if (bio.height) partes.push({ que: 'Estatura', valor: bio.height + ' cm' });
-    if (bio.weight) partes.push({ que: 'Peso', valor: bio.weight + ' kg' });
+
+    if (bio.birthPlace) {
+      /* Con la provincia detrás, si se ha podido averiguar: «Torrevieja
+         (Alicante)». Salvo que la localidad ya sea la propia provincia. */
+      const prov = bio.birthProvince;
+      const mismo = prov && prov.toLowerCase() === bio.birthPlace.toLowerCase();
+      partes.push({ que: 'Nacido en',
+        valor: bio.birthPlace + (prov && !mismo ? ' (' + prov + ')' : '') });
+    }
+    if (bio.country) {
+      const bandera = banderaDe(bio.country);
+      partes.push({ que: 'País',
+        valor: (bandera ? bandera + ' ' : '') + nombreDePais(bio.country) });
+    }
+    if (bio.number) partes.push({ que: 'Dorsal', valor: String(bio.number) });
     if (!partes.length) return '';
 
     return '<div class="personal"' +
@@ -6642,6 +6659,7 @@
     };
     ensurePriceSeries([state.priceModal.id], renderPriceModal);
     ensureEstadisticas(state.priceModal.id);
+    ensureBio(state.priceModal.id);
     renderPriceModal();
     return true;
   }
@@ -6652,6 +6670,51 @@
     if (!datos || !(datos.rounds || []).length) return '';
     return '<h4 class="stats__titulo">Puntos por jornada</h4>' +
       graficoDePuntos({ rounds: datos.rounds, points: datos.points });
+  }
+
+  /* El código ISO a nombre en español, con lo que ya trae el navegador. Si no
+     lo supiera traducir, se queda el código, que tampoco engaña a nadie. */
+  let paises = null;
+  function nombreDePais(codigo) {
+    try {
+      if (!paises) paises = new Intl.DisplayNames(['es'], { type: 'region' });
+      return paises.of(codigo) || codigo;
+    } catch (error) { return codigo; }
+  }
+
+  /**
+   * La bandera de un país a partir de su código.
+   *
+   * Se arma con los dos «indicadores regionales» que le tocan a cada letra
+   * (ES → 🇪🇸). Es texto, no una imagen: no hay nada que descargar y se ve en
+   * cualquier sitio donde se vea el resto de la ficha.
+   */
+  function banderaDe(codigo) {
+    const dos = String(codigo || '').toUpperCase();
+    if (!/^[A-Z]{2}$/.test(dos)) return '';
+    return String.fromCodePoint(0x1F1E6 + dos.charCodeAt(0) - 65) +
+      String.fromCodePoint(0x1F1E6 + dos.charCodeAt(1) - 65);
+  }
+
+  /** Los datos personales del futbolista, en su propia llamada. */
+  function ensureBio(id) {
+    const config = loadSyncConfig();
+    if (!config.url || !config.key || id == null) return;
+    const clave = String(id);
+    if (state.bios[clave] !== undefined) return;
+
+    state.bios[clave] = 'pidiendo';
+    fetch(config.url.replace(/\/+$/, '') + '/?key=' + encodeURIComponent(config.key) +
+      '&bio=' + encodeURIComponent(clave), { headers: { 'accept': 'application/json' } })
+      .then(function (response) { return response.json(); })
+      .then(function (payload) {
+        /* Sin ficha en LaLiga llega un objeto vacío: se guarda como nulo para
+           no volver a preguntar y que la tira sencillamente no salga. */
+        state.bios[clave] = (payload && payload.height) ? payload : null;
+        renderPriceModal();
+        if (state.datosDetalle) renderRankingsTemporada();
+      })
+      .catch(function () { state.bios[clave] = null; });
   }
 
   function ensureEstadisticas(id) {
