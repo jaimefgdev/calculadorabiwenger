@@ -5119,16 +5119,25 @@
     const jornada = jornadaActiva();
     if (alineadosDe === jornada && alineadosMemo) return alineadosMemo;
 
-    const quienes = {};
+    /* No basta con saber QUIÉN estaba alineado: hace falta DE QUIÉN era en esa
+       jornada. La plantilla de hoy no sirve para mirar atrás —quien vendió a un
+       futbolista en septiembre lo tenía alineado en la jornada 1, y su icono
+       tiene que salir igual—, y la alineación guardada de aquel día es la única
+       que lo dice. */
+    const once = {};
+    const banco = {};
     ((jornada && jornada.standings) || []).forEach(function (fila) {
       (fila.xi || []).forEach(function (jugador) {
-        if (jugador && jugador.id != null) quienes[String(jugador.id)] = true;
+        if (jugador && jugador.id != null) once[String(jugador.id)] = fila.name;
+      });
+      (fila.bench || []).forEach(function (jugador) {
+        if (jugador && jugador.id != null) banco[String(jugador.id)] = fila.name;
       });
     });
 
     alineadosDe = jornada;
-    alineadosMemo = quienes;
-    return quienes;
+    alineadosMemo = { once: once, banco: banco };
+    return alineadosMemo;
   }
 
   /**
@@ -5137,7 +5146,12 @@
    * puntuando y quién se ha quedado en el banquillo de su mánager.
    */
   function chapaDeManager(jugador, extra) {
-    const dueno = jugador && duenoDe(jugador.id);
+    if (!jugador) return '';
+    const clave = String(jugador.id);
+    const deLaJornada = alineadosEnLaJornada();
+    /* Manda quien lo tuviera en esa jornada; solo si nadie lo alineó ni lo
+       sentó se recurre a la plantilla de hoy. */
+    const dueno = deLaJornada.once[clave] || deLaJornada.banco[clave] || duenoDe(jugador.id);
     if (!dueno) return '';
 
     /* Antes de que se cierren las alineaciones de esa jornada, «no alineado»
@@ -5146,7 +5160,7 @@
     const jornada = jornadaActiva();
     const empezada = !!(jornada && jornada.round && jornada.round.status &&
       jornada.round.status !== 'pending');
-    const juega = !empezada || alineadosEnLaJornada()[String(jugador.id)];
+    const juega = !empezada || !!deLaJornada.once[clave];
     return '<span class="dueno ' + (extra || '') + (juega ? '' : ' dueno--fuera') + '"' +
       ' title="' + escapeHtml(dueno) + (juega ? '' : ' (no lo ha alineado)') + '">' +
       avatar(dueno) +
