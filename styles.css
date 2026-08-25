@@ -1464,9 +1464,10 @@ code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft)
    cara, estado y puntos en sus círculos, y el nombre debajo. */
 #jugadores-buscar { min-width: 240px; }
 .jugadores-rejilla {
-  /* Cinco por fila, en el ordenador y en el móvil. */
+  /* Cuatro por fila, en el ordenador y en el móvil: sin consultas de medios,
+     que en móvil se ve la misma cuadrícula escalada. */
   display: grid; gap: 1.1rem .7rem;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
 }
 .jugador-card {
   position: relative; overflow: hidden;
