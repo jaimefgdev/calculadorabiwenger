@@ -104,7 +104,7 @@ const CDN = 'https://cf.biwenger.com/api/v2';
    navegador normal y las cabeceras que este mandaría. */
 /* Marca de versión: se sube en cada cambio y se consulta con ?version=1.
    Sirve para saber desde fuera si el despliegue ha entrado o no. */
-const VERSION = '2026-08-25 · deno 29';
+const VERSION = '2026-08-25 · deno 30';
 
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ' +
   '(KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36';
@@ -1730,25 +1730,11 @@ async function matchDay(roundId, score, names, primas) {
   const salto = await saltoPorEquipo(detalle.number, score).catch(function () { return {}; });
   const delIndice = conSuperPica(puntosDeLaJornada(names, salto), detalle, primas);
 
-  const equipo = function (lado, estadoPartido, confirmadas) {
+  const equipo = function (lado, estadoPartido) {
     const once = [];
     const banquillo = [];
 
-    /* Con el partido ya rodando y sin que Biwenger haya confirmado el once, lo
-       que manda son alineaciones PROBABLES: nombres que puso antes del pitido y
-       que ya no valen. Enseñarlas junto a un marcador en vivo es peor que no
-       enseñar nada, porque parecen las de verdad. Antes de empezar sí se ven,
-       avisando de que son probables, que para eso están. */
-    const empezado = estadoPartido && estadoPartido !== 'pending' && estadoPartido !== 'preview';
-    if (empezado && !confirmadas) {
-      return {
-        id: lado.id != null ? lado.id : null,
-        name: lado.name || '',
-        score: lado.score != null ? lado.score : null,
-        xi: [],
-        bench: []
-      };
-    }
+
     /* Hasta que el partido no termina del todo, cualquier puntuación que
        llegue es la de la jornada anterior: Biwenger no la publica de verdad
        ni la pone a cero hasta el pitido final, ni mediado el partido. */
@@ -1784,6 +1770,29 @@ async function matchDay(roundId, score, names, primas) {
     };
   };
 
+  /**
+   * El once de verdad de un partido que se está jugando.
+   *
+   * El feed de la jornada se queda atrás mientras rueda el partido: en
+   * Valencia-Betis daba un Betis con Fran García, Natan, Bartra y Bellerín
+   * cuando los que estaban en el campo eran Firpo, Diego Llorente, Valentín
+   * Gómez y Ángel Ortiz. La ficha del partido suelto sí va al día —es la que
+   * usa su propia web—, así que para los que están en curso se pregunta por
+   * ella. Son 7 KB y solo se hace con los que ruedan, que nunca son más de dos
+   * o tres a la vez.
+   */
+  const onceEnVivo = async function (id) {
+    const respuesta = await fetch(fresco(CDN + '/matches/la-liga/' + encodeURIComponent(id) + '?lang=es'),
+      { headers: NAVEGADOR, cf: SIN_CACHE }).catch(function () { return null; });
+    if (!respuesta || !respuesta.ok) return null;
+    const suyo = ((await respuesta.json().catch(function () { return {}; })).data) || {};
+    if (!suyo.home || !suyo.away) return null;
+    return {
+      home: equipo(suyo.home, suyo.status || null),
+      away: equipo(suyo.away, suyo.status || null)
+    };
+  };
+
   const partidos = (data.games || []).map(function (game) {
     return {
       id: game.id,
@@ -1793,10 +1802,23 @@ async function matchDay(roundId, score, names, primas) {
       /* Biwenger marca con «initialLineups» los partidos cuyos onces ya son
          los oficiales; sin esa marca, lo que hay son alineaciones probables. */
       confirmadas: !!game.initialLineups,
-      home: equipo(game.home || {}, game.status || null, !!game.initialLineups),
-      away: equipo(game.away || {}, game.status || null, !!game.initialLineups)
+      home: equipo(game.home || {}, game.status || null),
+      away: equipo(game.away || {}, game.status || null)
     };
   }).sort(function (a, b) { return String(a.start).localeCompare(String(b.start)); });
+
+  /* A los que están rodando se les cambia el once por el bueno. Si la ficha del
+     partido no contesta, se deja el que hubiera: mejor uno viejo que ninguno. */
+  const rodando = partidos.filter(function (p) {
+    return p.status && p.status !== 'pending' && p.status !== 'preview' && p.status !== 'finished';
+  });
+  await Promise.all(rodando.map(function (p) {
+    return onceEnVivo(p.id).then(function (bueno) {
+      if (!bueno) return;
+      if ((bueno.home.xi || []).length) p.home = Object.assign({}, p.home, { xi: bueno.home.xi, bench: bueno.home.bench });
+      if ((bueno.away.xi || []).length) p.away = Object.assign({}, p.away, { xi: bueno.away.xi, bench: bueno.away.bench });
+    }).catch(function () { /* se deja lo que había */ });
+  }));
 
   return {
     round: {
