@@ -104,7 +104,7 @@ const CDN = 'https://cf.biwenger.com/api/v2';
    navegador normal y las cabeceras que este mandaría. */
 /* Marca de versión: se sube en cada cambio y se consulta con ?version=1.
    Sirve para saber desde fuera si el despliegue ha entrado o no. */
-const VERSION = '2026-08-25 · deno 18';
+const VERSION = '2026-08-25 · deno 19';
 
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ' +
   '(KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36';
@@ -3014,37 +3014,56 @@ function movimientosDeLaLiga(board, names) {
   return salida;
 }
 
-/* El pago de las primas al cerrar la jornada. Biwenger lo publica en el tablón
-   como un aviso aparte, sin futbolista: es dinero que entra por puntuar, por
-   meter gente en el once ideal o por alinear al MVP. */
-const BONUS_TYPES = ['bonus', 'roundBonus', 'bonusRound'];
+/* Cómo se llama cada concepto del reparto, para poder desglosarlo. */
+const CONCEPTOS_DE_PRIMA = {
+  bonusPoint: 'por puntos',
+  bonusFixed: 'fijo',
+  bonusIdealLineup: 'once ideal',
+  bonusGameMVP: 'MVP de partido',
+  bonusRoundMVP: 'MVP de la jornada'
+};
 
 /**
  * Los abonos de una jornada, sacados del tablón.
  *
- * Cuando se escribió esto la liga aún no había cerrado ninguna jornada, así que
- * no había ni un pago que mirar: de ahí que se acepten varias formas del apunte
- * (el importe puede venir como `amount`, `bonus` o `value`; el mánager como
- * `user`, `to` o `manager`) y que lo que no se reconozca se ignore sin ruido.
- * Es preferible que falte una línea a que aparezca una inventada.
+ * Biwenger publica el reparto al cerrar la jornada, en un aviso de tipo
+ * `roundFinished` que trae la lista entera de mánagers con sus puntos y lo que
+ * cobra cada uno:
+ *
+ *   {"type":"roundFinished","content":{"round":{"name":"Jornada 2"},
+ *     "results":[{"user":{...},"points":65,"bonus":3550000,
+ *       "reason":{"bonusPoint":3250000,"bonusIdealLineup":[100000,2],
+ *                 "bonusGameMVP":[200000,2]}}, …]}}
+ *
+ * En `reason` cada concepto viene como importe suelto o como [importe, cuántas
+ * veces]; quien solo cobra por puntos no trae `reason`. Al que no cobra nada
+ * —el que empieza la jornada en negativo— le falta el campo `bonus` entero, y
+ * entonces no se le hace línea: en una lista de ingresos, una fila de 0 € no
+ * cuenta nada. Sus puntos tachados ya salen en la tabla de la jornada.
  */
 function abonosDelTablon(board) {
   const salida = [];
 
   (board || []).forEach(function (post) {
-    if (BONUS_TYPES.indexOf(post.type) === -1) return;
+    if (post.type !== 'roundFinished') return;
     const date = post.date ? new Date(post.date * 1000).toISOString() : null;
-    const apuntes = Array.isArray(post.content) ? post.content
-      : (post.content ? [post.content] : []);
+    const contenido = post.content || {};
+    const jornada = (contenido.round || {}).name || null;
 
-    apuntes.filter(Boolean).forEach(function (item) {
-      const quien = (item.user && item.user.name) ||
-        (item.to && item.to.name) ||
-        (typeof item.manager === 'string' ? item.manager : null);
-      const importe = item.amount != null ? item.amount
-        : (item.bonus != null ? item.bonus
-          : (item.value != null ? item.value : null));
+    (contenido.results || []).filter(Boolean).forEach(function (fila) {
+      const quien = (fila.user && fila.user.name) || null;
+      const importe = fila.bonus;
       if (!quien || importe == null || isNaN(Number(importe))) return;
+
+      /* El desglose, para poder contarlo al pasar por encima. */
+      const razones = fila.reason || {};
+      const detalle = Object.keys(razones).map(function (concepto) {
+        const valor = razones[concepto];
+        const nombre = CONCEPTOS_DE_PRIMA[concepto] || concepto;
+        return Array.isArray(valor)
+          ? valor[0] + ' € ' + nombre + ' ×' + valor[1]
+          : valor + ' € ' + nombre;
+      });
 
       salida.push({
         playerId: null,
@@ -3053,10 +3072,13 @@ function abonosDelTablon(board) {
         player: 'Abono de puntos',
         type: 'bonus',
         manager: quien,
-        otro: null,
+        /* La jornada, que es contra quién se cobra. */
+        otro: jornada,
         amount: Math.round(Number(importe)),
         date: date,
         source: post.type,
+        roundPoints: fila.points != null ? fila.points : null,
+        detail: detalle.length ? detalle.join(' · ') : null,
         team: null,
         teamName: null,
         status: null,
