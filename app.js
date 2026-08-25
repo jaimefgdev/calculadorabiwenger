@@ -7485,7 +7485,14 @@
                hay rival vuelve, y entonces enseña los de los dos. */
             '<button type="button" class="ambito' + (abierto.partidos ? ' ficha__comparar' : '') +
               '" data-partidos-de>' +
-              (abierto.partidos ? 'Ocultar partidos' : 'Partidos') + '</button>') +
+              (abierto.partidos ? 'Ocultar partidos' : 'Partidos') + '</button>' +
+            /* Datos personales y trayectoria. Van tras su propia pastilla y en
+               esta misma ventana, no en otra: todo lo del futbolista se mira
+               aquí y se va cambiando con los botones. */
+            (abierto.partidos ? '' :
+              '<button type="button" class="ambito' + (abierto.ficha ? ' ficha__comparar' : '') +
+                '" data-ficha-de>' +
+                (abierto.ficha ? 'Ocultar ficha' : 'Ficha') + '</button>')) +
           '<button type="button" class="btn btn--ghost btn--close" data-price-close' +
             ' title="Cerrar" aria-label="Cerrar">✕</button>' +
         '</div>' +
@@ -7507,16 +7514,20 @@
               : listaDePartidos(abierto.id))
           : '') +
         (abierto.eligiendo ? selectorDeComparacion(abierto.id) : '') +
+        /* La ficha va sola, como los partidos: quien la abre quiere sus datos y
+           su trayectoria, no repasar otra vez las cifras de la temporada. */
+        (abierto.ficha && !abierto.partidos
+          ? tiraPersonal(abierto.id) + trayectoria(abierto.id)
+          : '') +
         /* Los partidos van solos: ni estadísticas ni gráficos. Y comparando
            tampoco: esos cuadros son de uno solo y repiten, peor contadas, las
            mismas cifras que ya están enfrentadas arriba. */
-        (abierto.partidos || abierto.soloPrecio || abierto.comparar
-          ? '' : tiraPersonal(abierto.id) + estadisticasDeTemporada(abierto.id) +
-            rachaDeTemporada(abierto.id) + trayectoria(abierto.id)) +
+        (abierto.ficha || abierto.partidos || abierto.soloPrecio || abierto.comparar
+          ? '' : estadisticasDeTemporada(abierto.id) + rachaDeTemporada(abierto.id)) +
         /* Desde los rankings solo interesan las estadísticas: ni el valor de
            mercado ni su evolución pintan nada ahí. Comparando, el gráfico de
            precio sería el de uno de los dos y engañaría: se deja fuera. */
-        (abierto.soloDatos || abierto.partidos || abierto.comparar ? '' :
+        (abierto.soloDatos || abierto.ficha || abierto.partidos || abierto.comparar ? '' :
         (puntos.length < 2
           /* Biwenger no publica el histórico de todos —los que están sin club,
              por ejemplo—, pero el valor de hoy sí se sabe: se enseña eso. */
@@ -9345,6 +9356,12 @@
 
     $('price-modal').addEventListener('click', function (event) {
       if (!state.priceModal) return;
+
+      if (event.target.closest('[data-ficha-de]')) {
+        state.priceModal.ficha = !state.priceModal.ficha;
+        renderPriceModal();
+        return;
+      }
 
       if (event.target.closest('[data-partidos-de]')) {
         state.priceModal.partidos = !state.priceModal.partidos;
