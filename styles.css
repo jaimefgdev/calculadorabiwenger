@@ -938,8 +938,13 @@ code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft)
   width: 1.15em; height: auto; flex: none;
   border-radius: 2px; box-shadow: 0 0 0 1px var(--border);
 }
-/* La bandera va sola en su hueco, algo mayor para que se distinga. */
-.personal__dato .bandera { width: 1.5em; }
+/* La bandera va sola en su hueco, así que se le da tamaño y proporción de
+   bandera: 3:2, que es la de casi todas. `cover` recorta lo justo en las que
+   vienen más cuadradas, en vez de estirarlas —una bandera deformada se nota
+   mucho más que un milímetro recortado—. */
+.personal__dato .bandera {
+  width: 2.1em; height: 1.4em; object-fit: cover;
+}
 .personal__label {
   font-size: clamp(.55rem, .72vw, .68rem);
   text-transform: uppercase; letter-spacing: .03em; color: var(--text-faint);
