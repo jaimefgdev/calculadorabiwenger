@@ -104,7 +104,7 @@ const CDN = 'https://cf.biwenger.com/api/v2';
    navegador normal y las cabeceras que este mandaría. */
 /* Marca de versión: se sube en cada cambio y se consulta con ?version=1.
    Sirve para saber desde fuera si el despliegue ha entrado o no. */
-const VERSION = '2026-08-25 · deno 6 (súper pica)';
+const VERSION = '2026-08-25 · deno 7';
 
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ' +
   '(KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36';
@@ -1180,14 +1180,27 @@ async function proximaJornada() {
       };
     });
 
+  /* «La próxima» no significa «sin empezar». La mitad aplazada de la jornada 1
+     es la próxima que se juega y llega con seis partidos ya en el bote, así que
+     dar por hecho que va a cero hacía que la tarjeta de inicio la anunciara
+     como «Inicio de la Jornada 1» diez días después de haber arrancado. Se
+     cuenta lo que hay. */
+  const jugados = matches.filter(function (p) { return p.status === 'finished'; }).length;
+  const empezados = matches.filter(function (p) {
+    return p.status && p.status !== 'pending' && p.status !== 'preview';
+  }).length;
+  /* El primero que queda por jugar: es el que la tarjeta cuenta atrás. */
+  const ahora = Date.now();
+  const pendiente = matches.filter(function (p) { return Date.parse(p.start) > ahora; })[0];
+
   return {
     id: data.id != null ? data.id : null,
     number: Number(String(data.short || '').replace(/\D/g, '')) || null,
     name: data.name || null,
-    start: matches.length ? matches[0].start : null,
+    start: pendiente ? pendiente.start : (matches.length ? matches[0].start : null),
     games: matches.length,
-    played: 0,
-    live: false,
+    played: jugados,
+    live: empezados > 0 && jugados < matches.length,
     matches: matches
   };
 }
@@ -1926,6 +1939,14 @@ function roundPlayer(entry, names, puntos, partidoDe, enCasa) {
   const marcador = puntos || {};
   const equipo = names[id + ':team'] != null ? names[id + ':team'] : null;
 
+  /* El que se ha ido de LaLiga sigue en la alineación de quien lo tenía, pero
+     ya no tiene equipo en el índice. No es que su partido esté por jugarse: es
+     que no hay partido y no lo habrá, así que se da por resuelto y sin nota.
+     Antes caía en «sin terminar» y la web le pintaba una interrogación para
+     siempre, como si aún fuera a puntuar. Biwenger tampoco lo penaliza: a
+     gijonudo le da los mismos 26 puntos que salen de sus otros diez. */
+  const fuera = equipo == null;
+
   /* Sin puntuación hay dos casos distintos: su partido ya acabó y no jugó (un
      guion), o todavía no se sabe la nota (una interrogación). */
   const estadoPartido = (partidoDe || {})[equipo] || null;
@@ -1933,11 +1954,13 @@ function roundPlayer(entry, names, puntos, partidoDe, enCasa) {
      llegue (de la alineación, de la ficha o del índice) es la de la jornada
      pasada: Biwenger no la pone a cero ni la publica de verdad hasta el
      pitido final, ni con el partido ya mediado. Se ignora sin más. */
-  const sinTerminar = estadoPartido !== 'finished';
+  const sinTerminar = !fuera && estadoPartido !== 'finished';
 
   /* Cuando solo llega el número, los puntos salen del índice de futbolistas:
-     así van subiendo según acaba cada partido. */
-  const puntuacion = sinTerminar ? null
+     así van subiendo según acaba cada partido. Al que ya no está se le fuerza
+     el vacío: si no, se le colaría por el índice la nota de la última jornada
+     que llegó a jugar. */
+  const puntuacion = (sinTerminar || fuera) ? null
     : (!suelto && entry && entry.points != null ? entry.points
       : (player.points != null ? player.points
         : (marcador[id] != null ? marcador[id] : null)));
@@ -1953,6 +1976,9 @@ function roundPlayer(entry, names, puntos, partidoDe, enCasa) {
       : (names[id + ':pos'] != null ? names[id + ':pos'] : null),
     points: puntuacion,
     pending: pendiente,
+    /* Para poder decir en la web por qué no tiene nota, y para dejarlo fuera
+       de la cuenta de jugadores: Biwenger enseña diez, no once. */
+    fuera: fuera,
     home: casa == null ? null : casa,
     marketValue: names[id + ':price'] != null ? Math.round(names[id + ':price']) : null,
     team: equipo,
@@ -2443,8 +2469,10 @@ async function roundBoard(env, headers, jornada, listaNombres) {
 
     const oficiales = lineup && lineup.points != null ? lineup.points
       : (row.points != null ? row.points : null);
-    /* Como Biwenger: cuenta el que ya ha jugado su partido, puntúe o no. */
-    const jugados = once.filter(function (p) { return !p.pending; }).length;
+    /* Como Biwenger: cuenta el que ya ha jugado su partido, puntúe o no. El
+       que se fue de LaLiga no cuenta —su hueco no llega a ser jugador—, que es
+       justo por lo que a gijonudo le salen diez y a los demás once. */
+    const jugados = once.filter(function (p) { return !p.pending && !p.fuera; }).length;
 
     return {
       id: row.id != null ? String(row.id) : null,
