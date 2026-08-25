@@ -104,7 +104,7 @@ const CDN = 'https://cf.biwenger.com/api/v2';
    navegador normal y las cabeceras que este mandaría. */
 /* Marca de versión: se sube en cada cambio y se consulta con ?version=1.
    Sirve para saber desde fuera si el despliegue ha entrado o no. */
-const VERSION = '2026-08-25 · deno 19';
+const VERSION = '2026-08-25 · deno 20';
 
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ' +
   '(KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36';
@@ -3609,24 +3609,43 @@ async function boardItems(env, headers, leagueId) {
  * Quién luce la foto de destacado ahora mismo.
  *
  * Biwenger tiene esa segunda foto hecha para 91 futbolistas, pero no se la pone
- * a los 91: se la quita al que está fuera de combate. Comprobado con casos de
- * los dos lados —Raphinha, Espí y Fermín (`status: ok`) la llevan; Le Normand
- * (sancionado) y Ruibal (lesionado) la tienen hecha y su web les enseña la
- * normal—. De los 91 quedan 72; los 19 que caen son 15 lesionados, 3
- * sancionados y 1 en duda.
+ * a los 91: solo a los que destacaron en la última jornada, o sea a los del
+ * ONCE IDEAL. Y además tienen que estar disponibles: al lesionado o sancionado
+ * le devuelve la normal.
  *
- * Antes esto miraba el once ideal de la última jornada y solo dejaba cinco: la
- * coincidencia engañaba, porque los del once ideal están sanos por definición.
+ * Los dos filtros hacen falta, y cada uno se ganó con un caso: Raphinha (19
+ * puntos), Fermín (19) y Espí (13) la llevan y están en el once; Sancet la
+ * tiene hecha, está sano y hace 3 puntos —no está en el once y no la lleva—;
+ * Le Normand y Ruibal la tienen hecha y su web les enseña la normal, uno
+ * sancionado y el otro lesionado.
+ *
+ * Se probó a soltarla a los 91 sanos (72) y salía en gente como Sancet.
  */
-function heroesDisponibles(names) {
-  return Object.keys(names)
-    .filter(function (clave) { return clave.slice(-5) === ':hero' && names[clave]; })
-    .map(function (clave) { return clave.slice(0, -5); })
-    .filter(function (id) {
-      /* Sin estado se considera disponible: es lo normal en el que está bien. */
-      const estado = names[id + ':status'];
-      return !estado || estado === 'ok';
-    });
+async function heroesDisponibles(env, names, score) {
+  const calendario = await seasonRounds().catch(function () { return []; });
+  /* De la más reciente hacia atrás, saltando las mitades aplazadas. */
+  const candidatas = calendario
+    .filter(function (r) {
+      return (r.part || 1) === 1 && (r.status === 'finished' || r.status === 'active');
+    })
+    .sort(function (a, b) { return (b.number || 0) - (a.number || 0); })
+    .slice(0, 2);   // dos intentos como mucho, que cada uno es una consulta
+
+  for (let i = 0; i < candidatas.length; i++) {
+    const detalle = await roundDetail(candidatas[i].id, score).catch(function () { return null; });
+    const once = ((detalle && detalle.ideal) || {}).players || [];
+    if (!once.length) continue;
+    return once
+      .map(function (jugador) { return String(jugador.id); })
+      .filter(function (id) {
+        if (!names[id + ':hero']) return false;
+        /* Y que no esté lesionado ni sancionado: ahí Biwenger le devuelve la
+           foto normal aunque viniera del once ideal. */
+        const estado = names[id + ':status'];
+        return !estado || estado === 'ok';
+      });
+  }
+  return [];
 }
 
 async function build(env, debug) {
@@ -3676,8 +3695,8 @@ async function build(env, debug) {
     }
   };
 
-  let destacados = [];
-  try { destacados = heroesDisponibles(names); } catch (error) { /* sin fotos y ya */ }
+  const destacados = await heroesDisponibles(env, names, cache.score)
+    .catch(function () { return []; });
 
   const payload = {
     updatedAt: new Date().toISOString(),
