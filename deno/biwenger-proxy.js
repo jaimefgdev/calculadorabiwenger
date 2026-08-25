@@ -104,7 +104,7 @@ const CDN = 'https://cf.biwenger.com/api/v2';
    navegador normal y las cabeceras que este mandaría. */
 /* Marca de versión: se sube en cada cambio y se consulta con ?version=1.
    Sirve para saber desde fuera si el despliegue ha entrado o no. */
-const VERSION = '2026-08-25 · deno 12';
+const VERSION = '2026-08-25 · deno 14';
 
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ' +
   '(KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36';
@@ -1831,7 +1831,21 @@ async function playerStats(id, names, score) {
 
     const ronda = (informe.match && informe.match.round) || {};
     const numero = Number(String(ronda.short || '').replace(/\D/g, '')) || null;
-    if (numero) jornadas.push({ number: numero, points: puntos, home: !!informe.home });
+    /* Sin minutos no jugó, aunque Biwenger emita el informe (un suplente que se
+       queda en el banquillo lo tiene igual, a cero). En el gráfico de barras eso
+       tiene que salir como un guion, no como «0 pts»: un cero se lee como que
+       jugó y no puntuó, que es otra cosa. Si no viene el dato de minutos no se
+       supone nada y se cuenta como jugado. */
+    const minutos = bruto.minutesPlayed;
+    const jugado = minutos == null ? true : minutos > 0;
+    if (numero) {
+      jornadas.push({
+        number: numero,
+        points: jugado ? puntos : 0,
+        sinNota: !jugado,
+        home: !!informe.home
+      });
+    }
   });
 
   jornadas.sort(function (a, b) { return a.number - b.number; });
@@ -3339,6 +3353,37 @@ async function boardItems(env, headers, leagueId) {
   throw last || new Error('No se ha podido leer el tablón.');
 }
 
+/**
+ * Quién luce la foto de destacado ahora mismo.
+ *
+ * Biwenger tiene esa segunda foto hecha para 91 futbolistas, pero no se la pone
+ * a los 91: la saca solo para los del ONCE IDEAL de la última jornada, y se la
+ * quita cuando dejan de estarlo. Se comprobó con la jornada 2: de su once
+ * ideal, los que tienen foto son Fermín, Bellingham, Raphinha, Isaac Romero y
+ * Espí, que son los que la llevan; Le Normand y Ruibal la tienen hecha, no
+ * están en ese once, y su web les enseña la normal.
+ */
+async function heroesDeLaJornada(names, score) {
+  const calendario = await seasonRounds().catch(function () { return []; });
+  /* De la más reciente hacia atrás, saltando las mitades aplazadas. */
+  const candidatas = calendario
+    .filter(function (r) {
+      return (r.part || 1) === 1 && (r.status === 'finished' || r.status === 'active');
+    })
+    .sort(function (a, b) { return (b.number || 0) - (a.number || 0); })
+    .slice(0, 2);   // dos intentos como mucho: no vale gastar llamadas en esto
+
+  for (let i = 0; i < candidatas.length; i++) {
+    const detalle = await roundDetail(candidatas[i].id, score).catch(function () { return null; });
+    const once = ((detalle && detalle.ideal) || {}).players || [];
+    if (!once.length) continue;
+    return once
+      .map(function (jugador) { return String(jugador.id); })
+      .filter(function (id) { return !!names[id + ':hero']; });
+  }
+  return [];
+}
+
 async function build(env, debug) {
   const who = await account(env);
   const headers = { 'x-league': who.leagueId, 'x-user': who.userId, 'x-version': '628' };
@@ -3386,6 +3431,9 @@ async function build(env, debug) {
     }
   };
 
+  const destacados = await heroesDeLaJornada(names, cache.score)
+    .catch(function () { return []; });
+
   const payload = {
     updatedAt: new Date().toISOString(),
     league: {
@@ -3406,13 +3454,9 @@ async function build(env, debug) {
     laligaMoves: safe('movimientos de LaLiga', function () {
       return movimientosDeLaLiga(boardResult.data, names);
     }, []),
-    /* Quiénes tienen la foto de destacado. Van solo los ids —la ruta la compone
-       la web— para no repetir la misma cadena noventa veces. */
-    heroes: safe('fotos destacadas', function () {
-      return Object.keys(names)
-        .filter(function (clave) { return clave.slice(-5) === ':hero' && names[clave]; })
-        .map(function (clave) { return clave.slice(0, -5); });
-    }, []),
+    /* Los destacados de la última jornada. Van solo los ids: la ruta la compone
+       la web. */
+    heroes: destacados,
     me: {
       id: who.userId,
       balance: status.balance != null ? status.balance : null,
