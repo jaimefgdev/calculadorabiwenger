@@ -578,7 +578,9 @@
     },
     moves: {
       player:  function (m) { return m.player; },
-      type:    function (m) { return m.type === 'buy' ? 'Fichado' : 'Vendido'; },
+      type:    function (m) {
+        return m.type === 'bonus' ? 'Abono' : (m.type === 'buy' ? 'Fichado' : 'Vendido');
+      },
       manager: function (m) { return m.manager; },
       amount:  function (m) { return m.amount; },
       date:    function (m) { return m.timestamp; }
@@ -691,6 +693,7 @@
     picker: null,          // hueco del campo que se está cambiando
     moveStatus: {},        // estado congelado de cada fichaje
     movers: null,          // los que más suben y bajan hoy
+    heroes: {},            // los que tienen la foto de destacado de Biwenger
     moversAbiertos: {},    // listas desplegadas a la lista larga
     market: null,          // el mercado de hoy, con sus pujas
     marketFiltro: 'todos',  // todos · libres · vendidos (de mánagers)
@@ -838,8 +841,8 @@
   function playerName(movement, sinChapa) {
     const id = movement.playerId;
     const pic = id
-      ? '<span class="pic-player" style="background-image:url(\'https://cdn.biwenger.com/i/p/' +
-        encodeURIComponent(id) + '.png\')" aria-hidden="true"></span>'
+      ? '<span class="pic-player" style="background-image:url(\'' + fotoDe(id) +
+        '\')" aria-hidden="true"></span>'
       : '';
     /* La demarcación va delante, con su color, igual que en las fichas. */
     const puesto = movement.position != null ? movement.position
@@ -870,7 +873,11 @@
     const earned = rows.reduce(function (sum, row) { return sum + row.earned; }, 0);
     const balance = rows.reduce(function (sum, row) { return sum + row.balance; }, 0);
     const buys = state.movements.filter(function (m) { return m.type === 'buy'; }).length;
-    const sells = state.movements.length - buys;
+    /* Los abonos de jornada no son ventas: entran en el dinero ingresado, pero
+       contarlos aquí inflaría el recuento y la media por venta. */
+    const sells = state.movements.filter(function (m) {
+      return m.type !== 'buy' && m.type !== 'bonus';
+    }).length;
     const negatives = rows.filter(function (row) { return row.balance < 0; }).length;
 
     return {
@@ -1517,9 +1524,12 @@
             status: state.moveStatus[moveKey(movement)] || movement.status }) + '</td>' +
         '<td data-label="Acción">' + etiquetaDeOperacion(movement) + '</td>' +
         '<td data-label="Futbolista">' + managerCell + '</td>' +
+        /* El abono puede ser negativo, si la liga resta por puntuación
+           negativa: entonces se pinta como lo que es, dinero que se va. */
         '<td class="num" data-label="Importe">' +
-          (buy ? '<span class="money-neg">−' + money(movement.amount) + '</span>'
-               : '<span class="money-pos">+' + money(movement.amount) + '</span>') + '</td>' +
+          (buy || movement.amount < 0
+            ? '<span class="money-neg">−' + money(Math.abs(movement.amount)) + '</span>'
+            : '<span class="money-pos">+' + money(movement.amount) + '</span>') + '</td>' +
         '<td data-label="Fecha">' + escapeHtml(movement.date || '—') + '</td>' +
       '</tr>';
     }).join('');
@@ -1576,6 +1586,12 @@
    * quién se hizo. Sin contraparte fue con el mercado.
    */
   function etiquetaDeOperacion(movimiento) {
+    /* El abono de la jornada no es ni compra ni venta: no hay futbolista ni
+       nadie al otro lado, es la liga pagando por lo que se ha puntuado. */
+    if (movimiento.type === 'bonus') {
+      return '<span class="tag tag--sell">Abono' +
+        ' <span class="tag__otro">(jornada)</span></span>';
+    }
     const compra = movimiento.type !== 'sell';
     const otro = movimiento.otro || 'Mercado';
     return '<span class="tag ' + (compra ? 'tag--buy' : 'tag--sell') + '">' +
@@ -2341,10 +2357,25 @@
     return alt.indexOf(position) !== -1;
   }
 
+  /**
+   * La foto de un futbolista.
+   *
+   * Biwenger publica una segunda foto, más trabajada, para un puñado de
+   * destacados (unos noventa de los quinientos y pico): la manda en `iconHero`
+   * y es la que enseña en su once ideal. Si ese futbolista tiene la suya, se
+   * usa; el resto se quedan con la de siempre.
+   */
+  function fotoDe(id) {
+    const clave = String(id);
+    return 'https://cdn.biwenger.com/i/p/' +
+      (state.heroes && state.heroes[clave] ? 'hero/' : '') +
+      encodeURIComponent(clave) + '.png';
+  }
+
   /** Foto de un futbolista como fondo; `extra` son clases del sitio donde va. */
   function faceOf(id, extra) {
     return '<span class="pic-player ' + extra + '" style="background-image:url(\'' +
-      'https://cdn.biwenger.com/i/p/' + encodeURIComponent(id) + '.png\')"></span>';
+      fotoDe(id) + '\')"></span>';
   }
 
   /* Lesionado, sancionado o en duda: un circulito blanco pegado al borde
@@ -8414,6 +8445,14 @@
     state.lineup = payload.lineup || null;
     state.round = payload.round || state.round;
     state.movers = payload.movers || state.movers;
+    /* Los que tienen foto de destacado. Se guardan como diccionario para poder
+       preguntar por uno sin recorrer los noventa cada vez que se pinta una
+       cara, que son cientos por pantalla. */
+    if (Array.isArray(payload.heroes)) {
+      const heroes = {};
+      payload.heroes.forEach(function (id) { heroes[String(id)] = true; });
+      state.heroes = heroes;
+    }
     /* Altas y bajas de LaLiga: van en su propia vista dentro de Fichajes. */
     state.laligaMoves = payload.laligaMoves || state.laligaMoves || [];
     /* De aquí salen demarcaciones que no están en ninguna plantilla. */
