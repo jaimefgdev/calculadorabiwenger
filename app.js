@@ -697,7 +697,7 @@
     jugadores: null,        // lista completa de la competición, para el buscador
     jugadoresCargando: false,
     estadisticas: {},       // resumen de temporada de cada futbolista
-    bios: {},               // estatura, peso y nacimiento, de la web de LaLiga
+    sofa: {},               // trayectoria, pie y contrato, de SofaScore
     partidos: {},           // partidos de cada jornada, con sus alineaciones
     partidosEstado: '',
     partidoAbierto: null,   // el partido cuyo detalle se está viendo
@@ -6530,15 +6530,26 @@
    * los campos que vengan: de algún futbolista faltará la cuna o la estatura, y
    * es mejor no enseñar el hueco que enseñarlo vacío.
    */
+  /**
+   * La tira de datos personales, delante de las estadísticas.
+   *
+   * Solo de SofaScore. Se probó a completarla con la web de LaLiga, que además
+   * trae peso y lugar de nacimiento, y se quitó: LaLiga solo cubre a la mitad
+   * de la plantilla, así que esos dos campos aparecían y desaparecían según el
+   * futbolista. Un dato que unas veces está y otras no confunde más de lo que
+   * aporta. Mejor los mismos campos para todos, aunque sean menos.
+   *
+   * De paso se fue la espera: la ficha de LaLiga son 300 KB y cuatro segundos.
+   */
   function tiraPersonal(id) {
-    const bio = state.bios[String(id)];
+    const bio = state.sofa[String(id)];
     if (!bio || bio === 'pidiendo') return '';
+    if (!bio.height && !bio.birthDate && !bio.number) return '';
 
     /* El orden lo marca el ancho de cada dato: primero los cortos y fijos, y al
        final el dorsal, que cierra. */
     const partes = [];
     if (bio.height) partes.push({ que: 'Estatura', valor: bio.height + ' cm' });
-    if (bio.weight) partes.push({ que: 'Peso', valor: bio.weight + ' kg' });
 
     if (bio.birthDate) {
       const f = new Date(bio.birthDate + 'T00:00:00');
@@ -6555,14 +6566,6 @@
       }
     }
 
-    if (bio.birthPlace) {
-      /* Con la provincia detrás, si se ha podido averiguar: «Torrevieja
-         (Alicante)». Salvo que la localidad ya sea la propia provincia. */
-      const prov = bio.birthProvince;
-      const mismo = prov && prov.toLowerCase() === bio.birthPlace.toLowerCase();
-      partes.push({ que: 'Nacido en',
-        valor: bio.birthPlace + (prov && !mismo ? ' (' + prov + ')' : '') });
-    }
     if (bio.country) {
       /* Nacionalidad, no país de nacimiento: son cosas distintas y este dato es
          la primera. Mariano nació en Barcelona y es dominicano, y la bandera
@@ -6571,11 +6574,20 @@
       partes.push({ que: 'Nacionalidad',
         crudo: banderaDe(bio.country, nombreDePais(bio.country)) });
     }
+    if (bio.foot) {
+      partes.push({ que: 'Pie', valor: PIES[bio.foot] || bio.foot });
+    }
+    if (bio.contractUntil) {
+      const c = new Date(bio.contractUntil + 'T00:00:00');
+      if (!isNaN(c.getTime())) {
+        partes.push({ que: 'Contrato', valor: 'hasta ' + c.getFullYear(),
+          detalle: 'Termina el ' + soloFecha.format(c) });
+      }
+    }
     if (bio.number) partes.push({ que: 'Dorsal', valor: String(bio.number) });
     if (!partes.length) return '';
 
-    return '<div class="personal"' +
-      (bio.fullName ? ' title="' + escapeHtml(bio.fullName) + '"' : '') + '>' +
+    return '<div class="personal">' +
       partes.map(function (p) {
         return '<div class="personal__dato"' +
           (p.detalle ? ' title="' + escapeHtml(p.detalle) + '"' : '') + '>' +
@@ -6585,6 +6597,34 @@
           '<strong>' + (p.crudo ? p.crudo : escapeHtml(p.valor)) + '</strong></div>';
       }).join('') +
     '</div>';
+  }
+
+  /**
+   * Por dónde ha pasado, del club actual hacia atrás.
+   *
+   * SofaScore lo da como una lista de traspasos («de X a Y»), así que la
+   * trayectoria son los destinos: el primero es donde está ahora. El origen del
+   * traspaso más antiguo es su club de cantera, que se añade al final para no
+   * perderlo.
+   */
+  function trayectoria(id) {
+    const sofa = state.sofa[String(id)];
+    if (!sofa || sofa === 'pidiendo' || !(sofa.career || []).length) return '';
+
+    const pasos = sofa.career.map(function (t) {
+      return { club: t.to, desde: t.date };
+    });
+    const primero = sofa.career[sofa.career.length - 1];
+    if (primero && primero.from) pasos.push({ club: primero.from, desde: null });
+
+    return '<h4 class="stats__titulo">Trayectoria</h4>' +
+      '<ol class="trayecto">' + pasos.map(function (paso, i) {
+        const ano = paso.desde ? paso.desde.slice(0, 4) : '';
+        return '<li class="trayecto__paso' + (i === 0 ? ' trayecto__paso--ahora' : '') + '">' +
+          '<span class="trayecto__ano">' + escapeHtml(ano || '—') + '</span>' +
+          '<span class="trayecto__club">' + escapeHtml(paso.club) + '</span>' +
+        '</li>';
+      }).join('') + '</ol>';
   }
 
   function estadisticasDeTemporada(id) {
@@ -6679,7 +6719,6 @@
     };
     ensurePriceSeries([state.priceModal.id], renderPriceModal);
     ensureEstadisticas(state.priceModal.id);
-    ensureBio(state.priceModal.id);
     renderPriceModal();
     return true;
   }
@@ -6714,31 +6753,112 @@
     const dos = String(codigo || '').toLowerCase();
     if (!/^[a-z]{2}$/.test(dos)) return '';
     const nombre = titulo || String(codigo).toUpperCase();
+    /* No se usan las de LaLiga: las publica con proporciones distintas —España
+       cuadrada 16×16, Brasil 1.43, Argentina 1.60—, así que o se deformaban o
+       había que recortarlas, y a España el recorte le comía las franjas rojas.
+       Estas vienen cada una con su proporción oficial. */
     return '<img class="bandera" loading="lazy" alt="' + escapeHtml(nombre) +
       '" title="' + escapeHtml(nombre) + '" src="' +
-      'https://assets.laliga.com/assets/public/flags/' + dos + '.svg">';
+      'https://flagcdn.com/w80/' + dos + '.png">';
   }
 
-  /** Los datos personales del futbolista, en su propia llamada. */
-  function ensureBio(id) {
-    const config = loadSyncConfig();
-    if (!config.url || !config.key || id == null) return;
+  /* ---------- SofaScore ----------
+     Lo que no publica ni Biwenger ni LaLiga: trayectoria por clubes, pie
+     preferido, hasta cuándo tiene contrato y su valor estimado.
+
+     Se pide DESDE EL NAVEGADOR a propósito. Al proxy le responden 403 —tienen
+     protección antibot y no basta con imitar las cabeceras—, pero a una página
+     le contestan con normalidad y además permiten CORS. Por eso estos datos no
+     se comparten entre tus dispositivos: cada uno los pide y se los guarda.
+
+     El emparejamiento es por nombre y SE VALIDA CON EL CLUB. Sin eso se cuela
+     otro futbolista: buscando «Balde» salen tres y «Yuri» devuelve al brasileño
+     de Maceió en vez de a Berchiche, que es del Athletic. */
+  const SOFA = 'https://api.sofascore.com/api/v1';
+  /* Lo manda en inglés. */
+  const PIES = { Left: 'Zurdo', Right: 'Diestro', Both: 'Ambidiestro' };
+
+  function mismoClub(uno, otro) {
+    const limpiar = function (t) {
+      return String(t || '').toLowerCase()
+        .normalize('NFD').replace(/[̀-ͯ]/g, '')
+        .replace(/\b(fc|cf|ud|cd|rc|rcd|sd|sad|club|de|futbol|atletico|real)\b/g, '')
+        .replace(/[^a-z0-9]+/g, '');
+    };
+    const a = limpiar(uno), b = limpiar(otro);
+    if (!a || !b) return false;
+    return a === b || a.indexOf(b) !== -1 || b.indexOf(a) !== -1;
+  }
+
+  async function buscarEnSofa(nombre, club) {
+    const url = SOFA + '/search/all?q=' + encodeURIComponent(nombre);
+    const datos = await fetch(url).then(function (r) { return r.ok ? r.json() : null; });
+    const gente = ((datos || {}).results || []).filter(function (x) {
+      return x.type === 'player' && x.entity && x.entity.id;
+    });
+    /* Con club conocido manda el club. Sin él, solo vale si hay uno y nada más:
+       con dos candidatos y sin forma de distinguirlos, mejor no enseñar nada. */
+    const cuadra = gente.filter(function (x) {
+      return mismoClub(club, (x.entity.team || {}).name);
+    });
+    if (cuadra.length) return cuadra[0].entity.id;
+    return (!club && gente.length === 1) ? gente[0].entity.id : null;
+  }
+
+  function ensureSofa(id, nombre, club) {
     const clave = String(id);
-    if (state.bios[clave] !== undefined) return;
+    if (state.sofa[clave] !== undefined) return;
+    state.sofa[clave] = 'pidiendo';
 
-    state.bios[clave] = 'pidiendo';
-    fetch(config.url.replace(/\/+$/, '') + '/?key=' + encodeURIComponent(config.key) +
-      '&bio=' + encodeURIComponent(clave), { headers: { 'accept': 'application/json' } })
-      .then(function (response) { return response.json(); })
-      .then(function (payload) {
-        /* Sin ficha en LaLiga llega un objeto vacío: se guarda como nulo para
-           no volver a preguntar y que la tira sencillamente no salga. */
-        state.bios[clave] = (payload && payload.height) ? payload : null;
-        renderPriceModal();
-        if (state.datosDetalle) renderRankingsTemporada();
+    const guardado = cacheLeer('sofa:' + clave);
+    if (guardado !== null && guardado !== undefined) {
+      state.sofa[clave] = guardado;
+      renderPriceModal();
+      return;
+    }
+
+    buscarEnSofa(nombre, club)
+      .then(function (sofaId) {
+        if (!sofaId) return null;
+        return Promise.all([
+          fetch(SOFA + '/player/' + sofaId).then(function (r) { return r.ok ? r.json() : null; }),
+          /* La trayectoria puede no existir y no es motivo para tirar el resto. */
+          fetch(SOFA + '/player/' + sofaId + '/transfer-history')
+            .then(function (r) { return r.ok ? r.json() : null; })
+            .catch(function () { return null; })
+        ]);
       })
-      .catch(function () { state.bios[clave] = null; });
+      .then(function (dos) {
+        if (!dos) { state.sofa[clave] = null; renderPriceModal(); return; }
+        const p = (dos[0] || {}).player || {};
+        const dia = function (sello) {
+          return sello ? new Date(sello * 1000).toISOString().slice(0, 10) : null;
+        };
+        const ficha = {
+          height: p.height || null,
+          birthDate: dia(p.dateOfBirthTimestamp),
+          country: (p.country || {}).alpha2 || null,
+          countryName: (p.country || {}).name || null,
+          number: p.shirtNumber != null ? p.shirtNumber : null,
+          foot: p.preferredFoot || null,
+          contractUntil: dia(p.contractUntilTimestamp),
+          marketValue: (p.proposedMarketValue && p.proposedMarketValue.value) ||
+            (typeof p.proposedMarketValue === 'number' ? p.proposedMarketValue : null),
+          career: (((dos[1] || {}).transferHistory) || []).map(function (t) {
+            return {
+              date: dia(t.transferDateTimestamp),
+              from: (t.transferFrom || {}).name || null,
+              to: (t.transferTo || {}).name || null
+            };
+          }).filter(function (t) { return t.to; })
+        };
+        state.sofa[clave] = ficha;
+        cacheGuardar('sofa:' + clave, ficha);
+        renderPriceModal();
+      })
+      .catch(function () { state.sofa[clave] = null; });
   }
+
 
   function ensureEstadisticas(id) {
     const config = loadSyncConfig();
@@ -6757,6 +6877,9 @@
       .then(function (payload) {
         state.estadisticas[clave] = payload && payload.error ? null : payload;
         state.estadisticasAt = Date.now();
+        /* Con el club ya en la mano se puede buscar en SofaScore sin colarse
+           de futbolista. Por eso va aquí y no al abrir la ficha. */
+        if (payload && payload.name) ensureSofa(clave, payload.name, payload.teamName);
         renderPriceModal();
         /* Puede estar abierta dentro de un ranking en vez de en la ficha. */
         if (state.datosDetalle) renderRankingsTemporada();
@@ -7309,7 +7432,8 @@
            tampoco: esos cuadros son de uno solo y repiten, peor contadas, las
            mismas cifras que ya están enfrentadas arriba. */
         (abierto.partidos || abierto.soloPrecio || abierto.comparar
-          ? '' : tiraPersonal(abierto.id) + estadisticasDeTemporada(abierto.id) + rachaDeTemporada(abierto.id)) +
+          ? '' : tiraPersonal(abierto.id) + estadisticasDeTemporada(abierto.id) +
+            rachaDeTemporada(abierto.id) + trayectoria(abierto.id)) +
         /* Desde los rankings solo interesan las estadísticas: ni el valor de
            mercado ni su evolución pintan nada ahí. Comparando, el gráfico de
            precio sería el de uno de los dos y engañaría: se deja fuera. */
