@@ -3197,11 +3197,18 @@
   /* Qué venta tiene abierto el diálogo de puja, para poder repintarlo. */
   let opPujaAbierta = null;
 
+  /* Cada apertura y cada cierre del diálogo cuenta como una pantalla distinta.
+     Sirve para que una operación que tarda no reabra ni pise lo que estés
+     mirando cuando termine: si el número ya no es el mismo, es que cerraste o
+     abriste otra cosa entretanto, y entonces no se toca nada. */
+  let opSesion = 0;
+
   function cerrarOpModal() {
     const caja = $('op-modal');
     caja.hidden = true;
     caja.innerHTML = '';
     opPendiente = null;
+    opSesion++;
     /* La próxima puja empieza con las pujas plegadas otra vez. */
     opPujaAbierta = null;
   }
@@ -3210,6 +3217,7 @@
     const caja = $('op-modal');
     caja.innerHTML = '<div class="op-card">' + html + '</div>';
     caja.hidden = false;
+    opSesion++;
   }
 
   function opAviso(texto, mal) {
@@ -3882,6 +3890,9 @@
   let trasOperar = null;
 
   function lanzarOperacion(orden, mensaje) {
+    /* La pantalla desde la que se lanza. Si al terminar ya no es esta, es que
+       te has ido a otro sitio y no hay que devolverte a rastras. */
+    const sesion = opSesion;
     Array.prototype.forEach.call(document.querySelectorAll('#op-modal button'), function (b) {
       b.disabled = true;
     });
@@ -3896,24 +3907,34 @@
         /* Lo que diga Biwenger manda: se vuelve a preguntar todo. */
         setTimeout(function () {
           syncNow(true);
+          /* Si mientras se resolvía cerraste el diálogo (o abriste otra oferta
+             encima), aquí ya no se pinta nada: ni se reabre la lista —que a
+             estas alturas está vacía, porque la oferta acaba de resolverse— ni
+             se cierra lo que hayas abierto tú después. */
+          if (opSesion !== sesion) return;
           if (!volver) { cerrarOpModal(); return; }
 
           /* La lista se repinta con lo que acabe de llegar. */
           volver();
 
-          /* Y otra vez al llegar la sincronía, PERO solo si sigues mirándola:
-             antes se reabría siempre, así que si cerrabas el diálogo después
-             de responder una oferta, a los dos segundos y medio te saltaba
-             otra vez él solo —y encima vacío, porque la oferta ya no estaba. */
+          /* Y otra vez al llegar la sincronía, PERO solo si sigues en esa misma
+             lista: antes se reabría siempre, así que si cerrabas el diálogo
+             después de responder una oferta, a los dos segundos y medio te
+             saltaba otra vez él solo —y encima vacío. */
+          const listaAbierta = opSesion;
           setTimeout(function () {
-            const caja = $('op-modal');
-            if (caja && !caja.hidden) volver();
+            if (opSesion !== listaAbierta) return;
+            volver();
           }, 2500);
         }, 900);
       })
       .catch(function (error) {
         /* Si falla no se quita nada: la oferta sigue donde estaba. */
         trasOperarLimpia = null;
+        /* Y si ya no estás en esa pantalla, el error no se escribe encima de
+           lo que estés mirando: se pierde, que es lo correcto —la oferta sigue
+           sin resolver y la volverás a ver en la lista. */
+        if (opSesion !== sesion) return;
         Array.prototype.forEach.call(document.querySelectorAll('#op-modal button'), function (b) {
           b.disabled = false;
         });
