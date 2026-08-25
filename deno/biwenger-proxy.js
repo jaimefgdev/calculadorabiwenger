@@ -104,7 +104,7 @@ const CDN = 'https://cf.biwenger.com/api/v2';
    navegador normal y las cabeceras que este mandaría. */
 /* Marca de versión: se sube en cada cambio y se consulta con ?version=1.
    Sirve para saber desde fuera si el despliegue ha entrado o no. */
-const VERSION = '2026-08-25 · deno 9';
+const VERSION = '2026-08-25 · deno 10';
 
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ' +
   '(KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36';
@@ -877,10 +877,15 @@ async function players(score) {
      que son los de Biwenger a secas. */
   const sistema = score || cache.score || 1;
 
-  /* Diez minutos: aquí vienen los puntos, que suben durante los partidos. Es
-     una descarga de 220 KB cada diez minutos como mucho, no por consulta. */
+  /* Aquí vienen los puntos, que suben durante los partidos, así que con algo
+     rodando se mira cada diez minutos. Pero fuera de los partidos esos puntos
+     no se mueven en horas, y esta descarga son 220 KB: repetirla cada diez
+     minutos de madrugada, con la web preguntando cada minuto, es lo que llena
+     la cuota de tráfico sin que cambie un solo dato. */
+  const rodando = !!(cache.round && cache.round.live);
+  const vigencia = rodando ? 10 * 60 * 1000 : 60 * 60 * 1000;
   const fresh = cache.players && cache.playersScore === sistema &&
-    Date.now() - cache.playersAt < 10 * 60 * 1000;
+    Date.now() - cache.playersAt < vigencia;
   if (fresh) return cache.players;
 
   const response = await fetch(fresco(CDN + '/competitions/la-liga/data?lang=es&score=' +
@@ -2755,8 +2760,64 @@ function movimientosDeLaLiga(board, names) {
   return salida;
 }
 
+/* El pago de las primas al cerrar la jornada. Biwenger lo publica en el tablón
+   como un aviso aparte, sin futbolista: es dinero que entra por puntuar, por
+   meter gente en el once ideal o por alinear al MVP. */
+const BONUS_TYPES = ['bonus', 'roundBonus', 'bonusRound'];
+
+/**
+ * Los abonos de una jornada, sacados del tablón.
+ *
+ * Cuando se escribió esto la liga aún no había cerrado ninguna jornada, así que
+ * no había ni un pago que mirar: de ahí que se acepten varias formas del apunte
+ * (el importe puede venir como `amount`, `bonus` o `value`; el mánager como
+ * `user`, `to` o `manager`) y que lo que no se reconozca se ignore sin ruido.
+ * Es preferible que falte una línea a que aparezca una inventada.
+ */
+function abonosDelTablon(board) {
+  const salida = [];
+
+  (board || []).forEach(function (post) {
+    if (BONUS_TYPES.indexOf(post.type) === -1) return;
+    const date = post.date ? new Date(post.date * 1000).toISOString() : null;
+    const apuntes = Array.isArray(post.content) ? post.content
+      : (post.content ? [post.content] : []);
+
+    apuntes.filter(Boolean).forEach(function (item) {
+      const quien = (item.user && item.user.name) ||
+        (item.to && item.to.name) ||
+        (typeof item.manager === 'string' ? item.manager : null);
+      const importe = item.amount != null ? item.amount
+        : (item.bonus != null ? item.bonus
+          : (item.value != null ? item.value : null));
+      if (!quien || importe == null || isNaN(Number(importe))) return;
+
+      salida.push({
+        playerId: null,
+        /* En la lista de fichajes va en el sitio del futbolista: no hay ninguno
+           que enseñar, y lo que interesa es de qué es el dinero. */
+        player: 'Abono de puntos',
+        type: 'bonus',
+        manager: quien,
+        otro: null,
+        amount: Math.round(Number(importe)),
+        date: date,
+        source: post.type,
+        team: null,
+        teamName: null,
+        status: null,
+        position: null,
+        points: null,
+        marketValue: null
+      });
+    });
+  });
+
+  return salida;
+}
+
 function normalizeBoard(board, names) {
-  const movements = [];
+  const movements = abonosDelTablon(board);
 
   (board || []).forEach(function (post) {
     if (MONEY_TYPES.indexOf(post.type) === -1) return;
