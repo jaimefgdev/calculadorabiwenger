@@ -104,7 +104,7 @@ const CDN = 'https://cf.biwenger.com/api/v2';
    navegador normal y las cabeceras que este mandaría. */
 /* Marca de versión: se sube en cada cambio y se consulta con ?version=1.
    Sirve para saber desde fuera si el despliegue ha entrado o no. */
-const VERSION = '2026-08-25 · deno 5';
+const VERSION = '2026-08-25 · deno 6 (súper pica)';
 
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ' +
   '(KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36';
@@ -1291,9 +1291,14 @@ function colocarEnSistema(jugadores, sistema) {
 async function primasDeLaLiga(env) {
   if (cache.primas) return cache.primas;
 
+  /* La clave lleva versión a propósito. Lo guardado es un objeto con forma
+     fija, y al añadirle un campo nuevo (`superPica`) lo que había en el KV se
+     seguía sirviendo sin él: el código nuevo desplegado y el ajuste sin
+     aplicarse, porque la caché no caduca nunca. Subir el número aquí obliga a
+     volver a preguntar. */
   if (env.JORNADAS) {
     try {
-      const guardado = await env.JORNADAS.get('primas');
+      const guardado = await env.JORNADAS.get('primas-v2');
       if (guardado) {
         cache.primas = JSON.parse(guardado);
         return cache.primas;
@@ -1322,7 +1327,7 @@ async function primasDeLaLiga(env) {
       superPica: s.superPicaExtraPoints === true
     };
     if (env.JORNADAS) {
-      try { await env.JORNADAS.put('primas', JSON.stringify(cache.primas)); } catch (e) { /* da igual */ }
+      try { await env.JORNADAS.put('primas-v2', JSON.stringify(cache.primas)); } catch (e) { /* da igual */ }
     }
   } catch (error) { /* sin primas se sigue: la web simplemente no las enseña */ }
   return cache.primas || null;
