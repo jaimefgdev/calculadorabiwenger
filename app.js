@@ -7475,17 +7475,18 @@
           /* Mientras se elige rival, la pastilla estorba: su sitio lo ocupa el
              aspa que hay junto al buscador. */
           (abierto.eligiendo ? '' :
-            /* Con los partidos abiertos, comparar estorba: se deja solo la
-             pastilla para volver. */
-          (abierto.partidos ? '' :
+            /* Con los partidos o la ficha abiertos, comparar estorba: se deja
+               solo la pastilla para volver. */
+          (abierto.partidos || abierto.ficha ? '' :
             '<button type="button" class="ambito ficha__comparar" data-comparar>' +
               (abierto.comparar ? 'Quitar comparación' : 'Comparar') + '</button>') +
             /* Mientras estás eligiendo rival no hay dos a quien comparar, así
                que el botón de partidos se esconde hasta que elijas; en cuanto
                hay rival vuelve, y entonces enseña los de los dos. */
-            '<button type="button" class="ambito' + (abierto.partidos ? ' ficha__comparar' : '') +
-              '" data-partidos-de>' +
-              (abierto.partidos ? 'Ocultar partidos' : 'Partidos') + '</button>' +
+            (abierto.ficha ? '' :
+              '<button type="button" class="ambito' + (abierto.partidos ? ' ficha__comparar' : '') +
+                '" data-partidos-de>' +
+                (abierto.partidos ? 'Ocultar partidos' : 'Partidos') + '</button>') +
             /* Datos personales y trayectoria. Van tras su propia pastilla y en
                esta misma ventana, no en otra: todo lo del futbolista se mira
                aquí y se va cambiando con los botones. */
@@ -7580,7 +7581,7 @@
             })() +
             /* Lo más alto y lo más bajo que ha llegado a valer, con su fecha. */
             topesDePrecio(puntos))) +
-        (!abierto.partidos && ficha.moves && ficha.moves.length
+        (!abierto.partidos && !abierto.ficha && ficha.moves && ficha.moves.length
           ? '<h3 class="bench__title">En la liga</h3>' + playerHistory(ficha)
           : '') +
       '</div>';
