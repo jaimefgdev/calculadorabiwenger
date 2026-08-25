@@ -104,7 +104,7 @@ const CDN = 'https://cf.biwenger.com/api/v2';
    navegador normal y las cabeceras que este mandaría. */
 /* Marca de versión: se sube en cada cambio y se consulta con ?version=1.
    Sirve para saber desde fuera si el despliegue ha entrado o no. */
-const VERSION = '2026-08-25 · deno 7';
+const VERSION = '2026-08-25 · deno 9';
 
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ' +
   '(KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36';
@@ -326,9 +326,8 @@ const app = {
           const headers = { 'x-league': who.leagueId, 'x-user': who.userId, 'x-version': '628' };
           data = await marketBoard(env, headers, who.userId, await players());
           cache.mercado = data;
-          if (env.JORNADAS) {
-            try { await env.JORNADAS.put('ultimo-mercado', JSON.stringify(data)); } catch (e) { /* sin KV */ }
-          }
+          await guardarSiCambia(env, 'ultimo-mercado', JSON.stringify(data),
+            JSON.stringify(Object.assign({}, data, { updatedAt: null })));
         } catch (error) {
           const guardado = cache.mercado || await (async function () {
             if (!env.JORNADAS) return null;
@@ -470,9 +469,11 @@ const app = {
         cache.forzar = url.searchParams.get('force') === '1';
         data = await build(env, url.searchParams.get('debug') === '1');
         cache.lastGood = data;
-        if (env.JORNADAS) {
-          try { await env.JORNADAS.put('ultima-sincronizacion', JSON.stringify(data)); } catch (e) { /* sin KV */ }
-        }
+        /* Solo si cambió algo. Esta copia es la red de seguridad para cuando
+           Biwenger corta, no un registro: reescribirla en cada visita con lo
+           mismo era el mayor gasto del almacén. */
+        await guardarSiCambia(env, 'ultima-sincronizacion', JSON.stringify(data),
+          JSON.stringify(Object.assign({}, data, { updatedAt: null, generatedAt: null })));
       } catch (error) {
         const guardada = cache.lastGood || await (async function () {
           if (!env.JORNADAS) return null;
@@ -1999,9 +2000,42 @@ async function kvLeer(env, id) {
   } catch (error) { return null; }
 }
 
+/* Huella de lo último que se escribió en cada clave, para no repetir la
+   escritura cuando el contenido es idéntico. Se reescribía en CADA petición:
+   la jornada entera pasa de 40 KB, así que el almacén la parte en trozos y era
+   media docena de escrituras por visita, dijeran lo mismo o no. Con la jornada
+   parada (de madrugada, o entre partidos) eso es puro gasto, y es lo que se
+   comió la cuota del plan gratuito. */
+const ultimoEscrito = {};
+
+function huellaDe(texto) {
+  let h = 5381;
+  for (let i = 0; i < texto.length; i++) h = ((h * 33) ^ texto.charCodeAt(i)) >>> 0;
+  return texto.length + ':' + h;
+}
+
+/**
+ * Escribe solo si cambió. Devuelve si llegó a escribir.
+ *
+ * `paraHuella` permite comparar por una versión distinta del texto: los
+ * payloads llevan un `updatedAt` que cambia en cada respuesta y, si entrara en
+ * la cuenta, no se ahorraría ni una escritura.
+ */
+async function guardarSiCambia(env, clave, texto, paraHuella) {
+  if (!env.JORNADAS) return false;
+  const huella = huellaDe(paraHuella != null ? paraHuella : texto);
+  if (ultimoEscrito[clave] === huella) return false;
+  try {
+    await env.JORNADAS.put(clave, texto);
+    ultimoEscrito[clave] = huella;
+    return true;
+  } catch (error) { return false; }
+}
+
 async function kvGuardar(env, id, data) {
   if (!env.JORNADAS) return;
-  try { await env.JORNADAS.put('jornada-' + id, JSON.stringify(data)); } catch (error) { /* sin KV */ }
+  await guardarSiCambia(env, 'jornada-' + id, JSON.stringify(data),
+    JSON.stringify(Object.assign({}, data, { updatedAt: null })));
 }
 
 /** Se queda con lo más completo de las dos versiones, nunca con lo más pobre. */
@@ -2469,10 +2503,13 @@ async function roundBoard(env, headers, jornada, listaNombres) {
 
     const oficiales = lineup && lineup.points != null ? lineup.points
       : (row.points != null ? row.points : null);
-    /* Como Biwenger: cuenta el que ya ha jugado su partido, puntúe o no. El
-       que se fue de LaLiga no cuenta —su hueco no llega a ser jugador—, que es
-       justo por lo que a gijonudo le salen diez y a los demás once. */
-    const jugados = once.filter(function (p) { return !p.pending && !p.fuera; }).length;
+    /* Cuenta el que ya tiene su jornada resuelta, puntúe o no: si en su chapa
+       hay un guion, cuenta. Da igual que el guion sea porque su partido acabó
+       y no jugó (Lemar) o porque se fue de LaLiga y ya no va a jugar (Manu
+       Fernández): los dos están cerrados, y contar uno sí y otro no era una
+       incoherencia nuestra. Solo se queda fuera el que aún tiene el partido
+       por delante, que es el de la interrogación. */
+    const jugados = once.filter(function (p) { return !p.pending; }).length;
 
     return {
       id: row.id != null ? String(row.id) : null,
