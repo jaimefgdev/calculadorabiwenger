@@ -104,7 +104,7 @@ const CDN = 'https://cf.biwenger.com/api/v2';
    navegador normal y las cabeceras que este mandaría. */
 /* Marca de versión: se sube en cada cambio y se consulta con ?version=1.
    Sirve para saber desde fuera si el despliegue ha entrado o no. */
-const VERSION = '2026-08-25 · deno 24';
+const VERSION = '2026-08-25 · deno 26';
 
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ' +
   '(KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36';
@@ -2467,24 +2467,29 @@ async function roundBoard(env, headers, jornada, listaNombres) {
   const calendar = await seasonRounds().catch(function () { return []; });
   let wanted = String(jornada) === 'actual' ? '' : String(jornada);
 
-  /* «Actual» para Biwenger es la última que cerró, no la que se está jugando.
-     Con los aplazados eso se nota: la jornada 1 se partió en dos y su segunda
-     mitad se juega diez días después, pero él seguía diciendo «Jornada 2» y la
-     pestaña se quedaba clavada ahí mientras rodaba la 1.
+  /* Cuál es «la jornada en la que estamos».
 
-     Así que manda la jornada del próximo partido, que es la que ya calcula la
-     tarjeta de inicio. Y se devuelve su mitad de calendario (part 1), no la
-     aplazada: la aplazada no es una jornada aparte —repite los mismos
-     partidos— y el selector ni siquiera la lista, así que no se podría marcar
-     cuál se está viendo. Solo se hace el cambio si esa jornada ya ha empezado;
-     si no, se deja lo que diga él. */
+     No vale preguntárselo a Biwenger: para él la actual es la última que cerró.
+     Tampoco vale su campo `status`, que miente con los aplazados —la jornada 1
+     dice «finished» llevando 6 partidos de 10—. Ni sirve mirar el próximo
+     partido: con uno de la 1 rodando ahora mismo, el siguiente ya es de la 3, y
+     la pestaña se iba a la 3.
+
+     Lo que no engaña es cuántos partidos lleva jugados. La jornada en la que
+     estamos es la más antigua que ha empezado y no ha terminado. Las que ni han
+     empezado se descartan sin preguntar por ellas, que cada consulta cuesta. */
   if (!wanted) {
-    const enCurso = await nextRound().catch(function () { return null; });
-    if (enCurso && (enCurso.played || 0) > 0 && enCurso.number != null) {
-      const propia = calendar.filter(function (r) {
-        return (r.part || 1) === 1 && r.number === enCurso.number;
-      })[0];
-      if (propia && propia.id != null) wanted = String(propia.id);
+    const empezadas = calendar
+      .filter(function (r) { return (r.part || 1) === 1 && r.status !== 'pending'; })
+      .sort(function (a, b) { return (a.number || 0) - (b.number || 0); })
+      .slice(0, 4);
+
+    for (let i = 0; i < empezadas.length && !wanted; i++) {
+      const suyo = await roundDetail(empezadas[i].id, null).catch(function () { return null; });
+      if (!suyo) continue;
+      const jugados = suyo.played || 0;
+      const total = suyo.games || 0;
+      if (jugados > 0 && jugados < total) wanted = String(empezadas[i].id);
     }
   }
   /* La jornada va en la ruta, no como parámetro: su propia web pide
@@ -3432,31 +3437,25 @@ async function boardItems(env, headers, leagueId) {
  *
  * Se probó a soltarla a los 91 sanos (72) y salía en gente como Sancet.
  */
-async function heroesDisponibles(env, names, score) {
-  const calendario = await seasonRounds().catch(function () { return []; });
-  /* De la más reciente hacia atrás, saltando las mitades aplazadas. */
-  const candidatas = calendario
-    .filter(function (r) {
-      return (r.part || 1) === 1 && (r.status === 'finished' || r.status === 'active');
-    })
-    .sort(function (a, b) { return (b.number || 0) - (a.number || 0); })
-    .slice(0, 2);   // dos intentos como mucho, que cada uno es una consulta
+/* A partir de cuántos puntos de temporada luce la foto. Sale de casos reales,
+   no de la documentación de nadie: la llevan Raphinha y Fermín (19), Pépé (16),
+   Espí e Isaac Romero (13) y Bellingham (12); no la lleva Sancet, que va con 3
+   y está sano. El corte exacto entre 4 y 11 no se puede saber sin más casos,
+   así que se pone donde separa lo comprobado. */
+const PUNTOS_DE_DESTACADO = 10;
 
-  for (let i = 0; i < candidatas.length; i++) {
-    const detalle = await roundDetail(candidatas[i].id, score).catch(function () { return null; });
-    const once = ((detalle && detalle.ideal) || {}).players || [];
-    if (!once.length) continue;
-    return once
-      .map(function (jugador) { return String(jugador.id); })
-      .filter(function (id) {
-        if (!names[id + ':hero']) return false;
-        /* Y que no esté lesionado ni sancionado: ahí Biwenger le devuelve la
-           foto normal aunque viniera del once ideal. */
-        const estado = names[id + ':status'];
-        return !estado || estado === 'ok';
-      });
-  }
-  return [];
+function heroesDisponibles(names) {
+  return Object.keys(names)
+    .filter(function (clave) { return clave.slice(-5) === ':hero' && names[clave]; })
+    .map(function (clave) { return clave.slice(0, -5); })
+    .filter(function (id) {
+      /* Lesionado o sancionado, foto normal: comprobado con Le Normand y
+         Ruibal, que tienen la suya hecha y su web no se la pone. */
+      const estado = names[id + ':status'];
+      if (estado && estado !== 'ok') return false;
+      const puntos = names[id + ':pts'];
+      return typeof puntos === 'number' && puntos >= PUNTOS_DE_DESTACADO;
+    });
 }
 
 async function build(env, debug) {
@@ -3506,8 +3505,8 @@ async function build(env, debug) {
     }
   };
 
-  const destacados = await heroesDisponibles(env, names, cache.score)
-    .catch(function () { return []; });
+  let destacados = [];
+  try { destacados = heroesDisponibles(names); } catch (error) { /* sin fotos y ya */ }
 
   const payload = {
     updatedAt: new Date().toISOString(),
