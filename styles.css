@@ -932,7 +932,11 @@ code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft)
   font-size: clamp(9px, 2.3cqw, 15px);
 }
 .personal__dato {
-  display: flex; flex-direction: column; gap: .1rem;
+  /* Rótulo y dato centrados, igual que en los cuadros de estadísticas: si van
+     pegados a la izquierda, cada columna empieza en un sitio y la tira se lee
+     torcida. */
+  display: flex; flex-direction: column; align-items: center; gap: .1rem;
+  text-align: center;
   /* Cada dato ocupa lo que necesita, ni más ni menos. Antes iba a partes
      iguales (`1 1 0`) y eso le daba el mismo hueco a «9» que a «Torrevieja
      (Alicante)», así que el largo se cortaba y perdía letras. Ahora no encoge
@@ -941,7 +945,7 @@ code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft)
   flex: 0 0 auto; min-width: 0;
 }
 /* La bandera, con el nombre del país al lado y en la misma línea. */
-.personal__dato strong { display: flex; align-items: center; gap: .3rem; min-width: 0; }
+.personal__dato strong { display: flex; align-items: center; justify-content: center; gap: .3rem; min-width: 0; }
 .bandera {
   width: 1.15em; height: auto; flex: none;
   border-radius: 2px; box-shadow: 0 0 0 1px var(--border);
