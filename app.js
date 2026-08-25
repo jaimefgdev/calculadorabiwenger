@@ -6564,8 +6564,12 @@
         valor: bio.birthPlace + (prov && !mismo ? ' (' + prov + ')' : '') });
     }
     if (bio.country) {
-      partes.push({ que: 'País', crudo: banderaDe(bio.country) +
-        '<span class="personal__pais">' + escapeHtml(nombreDePais(bio.country)) + '</span>' });
+      /* Nacionalidad, no país de nacimiento: son cosas distintas y este dato es
+         la primera. Mariano nació en Barcelona y es dominicano, y la bandera
+         que enseña Biwenger es la dominicana. Va sola, sin el nombre al lado:
+         la bandera ya lo dice, y el nombre se lee al pasar por encima. */
+      partes.push({ que: 'Nacionalidad',
+        crudo: banderaDe(bio.country, nombreDePais(bio.country)) });
     }
     if (bio.number) partes.push({ que: 'Dorsal', valor: String(bio.number) });
     if (!partes.length) return '';
@@ -6706,10 +6710,12 @@
    * —«Do República Dominicana»— en vez del dibujo. Se usa la imagen de la propia
    * web de LaLiga, que es de donde sale el resto de la ficha y las tiene todas.
    */
-  function banderaDe(codigo) {
+  function banderaDe(codigo, titulo) {
     const dos = String(codigo || '').toLowerCase();
     if (!/^[a-z]{2}$/.test(dos)) return '';
-    return '<img class="bandera" alt="" loading="lazy" src="' +
+    const nombre = titulo || String(codigo).toUpperCase();
+    return '<img class="bandera" loading="lazy" alt="' + escapeHtml(nombre) +
+      '" title="' + escapeHtml(nombre) + '" src="' +
       'https://assets.laliga.com/assets/public/flags/' + dos + '.svg">';
   }
 

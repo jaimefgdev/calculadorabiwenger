@@ -938,7 +938,8 @@ code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft)
   width: 1.15em; height: auto; flex: none;
   border-radius: 2px; box-shadow: 0 0 0 1px var(--border);
 }
-.personal__pais { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* La bandera va sola en su hueco, algo mayor para que se distinga. */
+.personal__dato .bandera { width: 1.5em; }
 .personal__label {
   font-size: clamp(.55rem, .72vw, .68rem);
   text-transform: uppercase; letter-spacing: .03em; color: var(--text-faint);
