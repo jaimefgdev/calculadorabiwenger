@@ -598,7 +598,9 @@
     moves: {
       player:  function (m) { return m.player; },
       type:    function (m) {
-        return m.type === 'bonus' ? 'Abono' : (m.type === 'buy' ? 'Fichado' : 'Vendido');
+        if (m.type === 'bonus') return 'Abono';
+        if (m.type === 'reparto') return 'Reparto';
+        return m.type === 'buy' ? 'Fichado' : 'Vendido';
       },
       manager: function (m) { return m.manager; },
       amount:  function (m) { return m.amount; },
@@ -1427,7 +1429,7 @@
   /** Ficha desplegable de un jugador con sus jugadores. */
   function managerDetail(name) {
     const moves = sortDetail(
-      state.movements.filter(function (movement) { return movement.manager === name; }),
+      movimientosConReparto().filter(function (movement) { return movement.manager === name; }),
       state.sort.detail
     );
 
@@ -1440,9 +1442,11 @@
             '<td><span class="with-crest">' + playerName(movement) +
               crestOf(movement, 'crest--badge') + '</span></td>' +
             '<td>' + etiquetaDeOperacion(movement) + '</td>' +
-            '<td class="num">' + (buy
-              ? '<span class="money-neg">−' + money(movement.amount) + '</span>'
-              : '<span class="money-pos">+' + money(movement.amount) + '</span>') + '</td>' +
+            '<td class="num">' + (movement.type === 'reparto'
+              ? '<span class="sub">—</span>'
+              : (buy
+                ? '<span class="money-neg">−' + money(movement.amount) + '</span>'
+                : '<span class="money-pos">+' + money(movement.amount) + '</span>')) + '</td>' +
             '<td class="detail-date">' + escapeHtml(movement.date || '—') + '</td>' +
           '</tr>';
         }).join('') + '</tbody></table>';
@@ -1520,9 +1524,56 @@
     $('standings-hint').hidden = Object.keys(state.teams).length > 0;
   }
 
+  /**
+   * Los que llegaron en el reparto inicial de la liga.
+   *
+   * El tablon no los detalla: del reparto solo publica un aviso suelto
+   * («leagueCopy, distribution»), sin decir quien se llevo a quien. Pero la
+   * plantilla si lo delata: el que esta en un equipo y nadie pago por el solo
+   * pudo llegar de ahi. Son 81 futbolistas, todos con la misma fecha, la de la
+   * creacion de la liga.
+   *
+   * Se pintan como los fichados, pero sin importe: no hubo dinero de por medio,
+   * y poner un cero pareceria un chollo en vez de un reparto.
+   */
+  function movimientosDeReparto() {
+    const salida = [];
+    squadList().forEach(function (equipo) {
+      const manager = findManager(equipo.name, null) || equipo.name;
+      (equipo.players || []).forEach(function (jugador) {
+        if (jugador.paid) return;
+        const cuando = jugador.since ? Date.parse(jugador.since) : NaN;
+        salida.push({
+          playerId: jugador.id != null ? String(jugador.id) : null,
+          player: jugador.name || 'Jugador desconocido',
+          type: 'reparto',
+          manager: manager,
+          otro: null,
+          amount: 0,
+          date: isNaN(cuando) ? '' : dateFormat.format(new Date(cuando)),
+          timestamp: isNaN(cuando) ? null : cuando,
+          source: 'distribution',
+          team: jugador.team != null ? jugador.team : null,
+          teamName: jugador.teamName || null,
+          status: jugador.status || null,
+          position: jugador.position != null ? jugador.position : null,
+          points: null,
+          marketValue: jugador.marketValue != null ? jugador.marketValue : null
+        });
+      });
+    });
+    return salida;
+  }
+
+  /* Los fichajes de verdad mas los del reparto. Solo para las listas: en el
+     dinero no entran, que no movieron un euro. */
+  function movimientosConReparto() {
+    return state.movements.concat(movimientosDeReparto());
+  }
+
   function filteredMovements() {
     const text = normalize(state.filters.text);
-    return state.movements.filter(function (movement) {
+    return movimientosConReparto().filter(function (movement) {
       if (state.filters.type && movement.type !== state.filters.type) return false;
       if (state.filters.manager && movement.manager !== state.filters.manager) return false;
       if (text) {
@@ -1554,9 +1605,11 @@
         /* El abono puede ser negativo, si la liga resta por puntuación
            negativa: entonces se pinta como lo que es, dinero que se va. */
         '<td class="num" data-label="Importe">' +
-          (buy || movement.amount < 0
-            ? '<span class="money-neg">−' + money(Math.abs(movement.amount)) + '</span>'
-            : '<span class="money-pos">+' + money(movement.amount) + '</span>') + '</td>' +
+          (movement.type === 'reparto'
+            ? '<span class="sub">—</span>'
+            : (buy || movement.amount < 0
+              ? '<span class="money-neg">−' + money(Math.abs(movement.amount)) + '</span>'
+              : '<span class="money-pos">+' + money(movement.amount) + '</span>')) + '</td>' +
         '<td data-label="Fecha">' + escapeHtml(movement.date || '—') + '</td>' +
       '</tr>';
     }).join('');
@@ -1624,6 +1677,10 @@
       return '<span class="tag tag--sell"' +
         (pistas.length ? ' title="' + escapeHtml(pistas.join(' · ')) + '"' : '') + '>Abono' +
         ' <span class="tag__otro">(' + escapeHtml(movimiento.otro || 'jornada') + ')</span></span>';
+    }
+    /* Del reparto inicial: ni compra ni venta, y sin nadie al otro lado. */
+    if (movimiento.type === 'reparto') {
+      return '<span class="tag tag--buy">Reparto</span>';
     }
     const compra = movimiento.type !== 'sell';
     const otro = movimiento.otro || 'Mercado';
@@ -8585,7 +8642,7 @@
     renderPlantilla();
     renderWarnings();
     if (state.tab === 'managers') { renderManagers(); renderSquads(); renderTandasDeLiga(); }
-    if (state.tab === 'fichajes') { renderDataKpis(); renderKpiCharts(); renderSpending(); pintarFichajes(); }
+    if (state.tab === 'fichajes') { ensureSquads(); renderDataKpis(); renderKpiCharts(); renderSpending(); pintarFichajes(); }
     if (state.tab === 'datos') { ensureSquads(); ensureLaLiga(); ensureRecuento(); renderRankings(); renderRankingsTemporada(); }
     if (state.tab === 'mercado') { renderMarket(); renderMovers(); }
     if (state.tab === 'jugadores') { ensureJugadores(); renderJugadores(); }
