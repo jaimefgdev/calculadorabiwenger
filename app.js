@@ -1338,6 +1338,9 @@
       while (index < moves.length && dayKey(moves[index].timestamp) <= day) {
         movesDay += 1;
         if (moves[index].type === 'buy') { buysDay += 1; spentDay += moves[index].amount; }
+        /* El abono entra en el dinero del día, pero no es una venta: sumarlo al
+           recuento inflaría las ventas de la jornada de cobro. */
+        else if (moves[index].type === 'bonus') { earnedDay += moves[index].amount; }
         else { sellsDay += 1; earnedDay += moves[index].amount; }
         index += 1;
       }
