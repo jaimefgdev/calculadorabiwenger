@@ -1609,8 +1609,14 @@
     /* El abono de la jornada no es ni compra ni venta: no hay futbolista ni
        nadie al otro lado, es la liga pagando por lo que se ha puntuado. */
     if (movimiento.type === 'bonus') {
-      return '<span class="tag tag--sell">Abono' +
-        ' <span class="tag__otro">(jornada)</span></span>';
+      /* El desglose que manda Biwenger (por puntos, once ideal, MVP…) va en el
+         título: la fila se lee de un vistazo y el detalle está si se busca. */
+      const pistas = [];
+      if (movimiento.roundPoints != null) pistas.push(movimiento.roundPoints + ' puntos');
+      if (movimiento.detail) pistas.push(movimiento.detail);
+      return '<span class="tag tag--sell"' +
+        (pistas.length ? ' title="' + escapeHtml(pistas.join(' · ')) + '"' : '') + '>Abono' +
+        ' <span class="tag__otro">(' + escapeHtml(movimiento.otro || 'jornada') + ')</span></span>';
     }
     const compra = movimiento.type !== 'sell';
     const otro = movimiento.otro || 'Mercado';
@@ -8165,8 +8171,17 @@
 
       const rows = MANAGERS.map(function (name) {
         const moves = state.movements.filter(function (movement) {
-          return movement.manager === name && movement.type === (buys ? 'buy' : 'sell');
-        }).sort(function (a, b) { return b.amount - a.amount; });
+          if (movement.manager !== name) return false;
+          /* Los abonos de jornada son ingresos, así que van con las ventas. */
+          return buys ? movement.type === 'buy' : movement.type !== 'buy';
+        }).sort(function (a, b) {
+          /* Por fecha, lo más reciente arriba. Antes iba por importe, y para
+             seguir lo que ha hecho alguien hay que leerlo en orden, no por lo
+             caro que fue. Sin fecha, al final. */
+          const ta = a.timestamp == null ? -Infinity : a.timestamp;
+          const tb = b.timestamp == null ? -Infinity : b.timestamp;
+          return tb - ta || b.amount - a.amount;
+        });
         return {
           name: name,
           moves: moves,
@@ -8531,8 +8546,13 @@
       return {
         playerId: item.playerId || null,
         player: item.player || 'Jugador desconocido',
-        type: item.type === 'sell' ? 'sell' : 'buy',
+        /* El abono de jornada es un tercer tipo: si se colara en este «o venta
+           o compra», se contaría como dinero gastado. */
+        type: item.type === 'bonus' ? 'bonus' : (item.type === 'sell' ? 'sell' : 'buy'),
         manager: manager,
+        /* Del abono: los puntos de esa jornada y el desglose del reparto. */
+        roundPoints: item.roundPoints != null ? item.roundPoints : null,
+        detail: item.detail || null,
         /* Con quién se hizo la operación: otro mánager, o el mercado. */
         otro: item.otro ? (findManager(item.otro, null) || item.otro) : null,
         amount: Math.round(item.amount || 0),
