@@ -104,7 +104,7 @@ const CDN = 'https://cf.biwenger.com/api/v2';
    navegador normal y las cabeceras que este mandaría. */
 /* Marca de versión: se sube en cada cambio y se consulta con ?version=1.
    Sirve para saber desde fuera si el despliegue ha entrado o no. */
-const VERSION = '2026-08-25 · deno 10';
+const VERSION = '2026-08-25 · deno 12';
 
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ' +
   '(KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36';
@@ -932,6 +932,11 @@ async function players(score) {
     names[id + ':jugFuera'] = source[id].playedAway || 0;
     names[id + ':ptsCasa'] = source[id].pointsHome || 0;
     names[id + ':ptsFuera'] = source[id].pointsAway || 0;
+    /* Biwenger tiene una segunda foto, más trabajada, para un puñado de
+       destacados: la anuncia con `iconHero` y es la que usa en su once ideal.
+       La ruta siempre es la misma («i/p/hero/<id>.png»), así que basta con
+       saber quién la tiene y la web ya la compone. */
+    names[id + ':hero'] = !!source[id].iconHero;
     /* Las últimas jornadas suyas, para dibujar su racha. Los huecos («injured»,
        null) se guardan como null: se pintan igual, pero sin nota. */
     names[id + ':fit'] = partidos.map(function (nota) {
@@ -2338,14 +2343,19 @@ async function partidosDeJugador(env, id) {
  * Si todavía no ha publicado ninguno, se arma uno probando las catorce
  * formaciones y quedándose con la que más suma.
  */
-async function bestXi(roundId, names, score, primas) {
+async function bestXi(roundId, names, score) {
   const detalle = await roundDetail(roundId, score);
   if (!detalle) return null;
 
   /* Los puntos del detalle bailan entre peticiones; los del índice de
      futbolistas son los que enseña la app, en juego y ya cerrada. */
+  /* Sin Súper Pica, a propósito. Este once es el de toda Primera División, no
+     el de la liga: Biwenger lo publica igual para todo el mundo, y la Súper
+     Pica es un ajuste de esta liga en concreto. Aplicándola, las chapas sumaban
+     159 mientras su propia cabecera decía 154. Los 11 elegidos salen de él, así
+     que aquí solo se pintan sus notas tal cual. */
   const salto = await saltoPorEquipo(detalle.number, score).catch(function () { return {}; });
-  const delIndice = conSuperPica(puntosDeLaJornada(names, salto), detalle, primas);
+  const delIndice = puntosDeLaJornada(names, salto);
 
   const ficha = function (id) {
     const clave = String(id);
@@ -2591,7 +2601,7 @@ async function roundBoard(env, headers, jornada, listaNombres) {
   }
 
   const once = round.id != null
-    ? await bestXi(round.id, names, score, primas).catch(function () { return null; })
+    ? await bestXi(round.id, names, score).catch(function () { return null; })
     : null;
 
   /* ---------- Lo que cobra cada mánager por esta jornada ----------
@@ -3395,6 +3405,13 @@ async function build(env, debug) {
     /* Altas y bajas de LaLiga, del mismo tablón que los fichajes. */
     laligaMoves: safe('movimientos de LaLiga', function () {
       return movimientosDeLaLiga(boardResult.data, names);
+    }, []),
+    /* Quiénes tienen la foto de destacado. Van solo los ids —la ruta la compone
+       la web— para no repetir la misma cadena noventa veces. */
+    heroes: safe('fotos destacadas', function () {
+      return Object.keys(names)
+        .filter(function (clave) { return clave.slice(-5) === ':hero' && names[clave]; })
+        .map(function (clave) { return clave.slice(0, -5); });
     }, []),
     me: {
       id: who.userId,
