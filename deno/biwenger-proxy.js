@@ -104,7 +104,7 @@ const CDN = 'https://cf.biwenger.com/api/v2';
    navegador normal y las cabeceras que este mandaría. */
 /* Marca de versión: se sube en cada cambio y se consulta con ?version=1.
    Sirve para saber desde fuera si el despliegue ha entrado o no. */
-const VERSION = '2026-08-25 · deno 14';
+const VERSION = '2026-08-25 · deno 15';
 
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ' +
   '(KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36';
@@ -3357,31 +3357,24 @@ async function boardItems(env, headers, leagueId) {
  * Quién luce la foto de destacado ahora mismo.
  *
  * Biwenger tiene esa segunda foto hecha para 91 futbolistas, pero no se la pone
- * a los 91: la saca solo para los del ONCE IDEAL de la última jornada, y se la
- * quita cuando dejan de estarlo. Se comprobó con la jornada 2: de su once
- * ideal, los que tienen foto son Fermín, Bellingham, Raphinha, Isaac Romero y
- * Espí, que son los que la llevan; Le Normand y Ruibal la tienen hecha, no
- * están en ese once, y su web les enseña la normal.
+ * a los 91: se la quita al que está fuera de combate. Comprobado con casos de
+ * los dos lados —Raphinha, Espí y Fermín (`status: ok`) la llevan; Le Normand
+ * (sancionado) y Ruibal (lesionado) la tienen hecha y su web les enseña la
+ * normal—. De los 91 quedan 72; los 19 que caen son 15 lesionados, 3
+ * sancionados y 1 en duda.
+ *
+ * Antes esto miraba el once ideal de la última jornada y solo dejaba cinco: la
+ * coincidencia engañaba, porque los del once ideal están sanos por definición.
  */
-async function heroesDeLaJornada(names, score) {
-  const calendario = await seasonRounds().catch(function () { return []; });
-  /* De la más reciente hacia atrás, saltando las mitades aplazadas. */
-  const candidatas = calendario
-    .filter(function (r) {
-      return (r.part || 1) === 1 && (r.status === 'finished' || r.status === 'active');
-    })
-    .sort(function (a, b) { return (b.number || 0) - (a.number || 0); })
-    .slice(0, 2);   // dos intentos como mucho: no vale gastar llamadas en esto
-
-  for (let i = 0; i < candidatas.length; i++) {
-    const detalle = await roundDetail(candidatas[i].id, score).catch(function () { return null; });
-    const once = ((detalle && detalle.ideal) || {}).players || [];
-    if (!once.length) continue;
-    return once
-      .map(function (jugador) { return String(jugador.id); })
-      .filter(function (id) { return !!names[id + ':hero']; });
-  }
-  return [];
+function heroesDisponibles(names) {
+  return Object.keys(names)
+    .filter(function (clave) { return clave.slice(-5) === ':hero' && names[clave]; })
+    .map(function (clave) { return clave.slice(0, -5); })
+    .filter(function (id) {
+      /* Sin estado se considera disponible: es lo normal en el que está bien. */
+      const estado = names[id + ':status'];
+      return !estado || estado === 'ok';
+    });
 }
 
 async function build(env, debug) {
@@ -3431,8 +3424,8 @@ async function build(env, debug) {
     }
   };
 
-  const destacados = await heroesDeLaJornada(names, cache.score)
-    .catch(function () { return []; });
+  let destacados = [];
+  try { destacados = heroesDisponibles(names); } catch (error) { /* sin fotos y ya */ }
 
   const payload = {
     updatedAt: new Date().toISOString(),
