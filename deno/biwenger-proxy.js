@@ -104,7 +104,7 @@ const CDN = 'https://cf.biwenger.com/api/v2';
    navegador normal y las cabeceras que este mandaría. */
 /* Marca de versión: se sube en cada cambio y se consulta con ?version=1.
    Sirve para saber desde fuera si el despliegue ha entrado o no. */
-const VERSION = '2026-08-25 · deno 31';
+const VERSION = '2026-08-25 · deno 32';
 
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ' +
   '(KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36';
@@ -1727,7 +1727,7 @@ async function matchDay(roundId, score, names, primas) {
      consulta, y no viene `rawStats` con el que comprobarlos. Los buenos, los
      que enseña la app, son los del índice de futbolistas con el sistema de la
      liga, esté la jornada en juego o cerrada. */
-  const salto = await saltoPorEquipo(detalle.number, score).catch(function () { return {}; });
+  const salto = await saltoPorEquipo(detalle.number, score, detalle.id).catch(function () { return {}; });
   const delIndice = conSuperPica(puntosDeLaJornada(names, salto), detalle, primas);
 
   const equipo = function (lado, estadoPartido) {
@@ -2037,22 +2037,51 @@ function puntosDeLaJornada(names, salto) {
  * pitido final. Y solo las jornadas propias (part 1): la mitad aplazada de una
  * jornada no es una jornada más, son los mismos partidos jugados otro día.
  */
-async function saltoPorEquipo(numero, score) {
+async function saltoPorEquipo(numero, score, ronda) {
   const saltos = {};
   if (numero == null) return saltos;
 
   const calendario = await seasonRounds().catch(function () { return []; });
-  const posteriores = calendario.filter(function (r) {
-    return (r.part || 1) === 1 && (r.number || 0) > numero &&
-      (r.status === 'finished' || r.status === 'active');
+
+  /* Cuándo jugó cada equipo SU partido de esta jornada. Es la referencia, y
+     tiene que ser la fecha, no el número de jornada: `fitness` va ordenado por
+     cuándo se jugó cada partido, y con los aplazados eso deja de coincidir. El
+     Valencia jugó su partido de la jornada 2 el día 22 y el de la 1 el día 25,
+     así que para él la nota de la jornada 1 es la MÁS RECIENTE, no la anterior.
+     Contando jornadas por número se leía una casilla corrida y salía su nota de
+     la 2 (Tárrega con 6 en vez de 4). */
+  const cuando = {};
+  const propia = ronda != null
+    ? await roundDetail(ronda, score).catch(function () { return null; })
+    : null;
+  ((propia && propia.matches) || []).forEach(function (partido) {
+    const dia = Date.parse(partido.start);
+    if (isNaN(dia)) return;
+    if (partido.homeId != null) cuando[partido.homeId] = dia;
+    if (partido.awayId != null) cuando[partido.awayId] = dia;
   });
 
-  for (let i = 0; i < posteriores.length; i++) {
-    const otra = await roundDetail(posteriores[i].id, score).catch(function () { return null; });
+  /* Se miran TODAS las jornadas ya jugadas, incluidas las mitades aplazadas
+     (son partidos de verdad y cuentan para el orden), y de cada equipo se
+     cuentan los partidos que jugó DESPUÉS del suyo de esta jornada. */
+  const jugadas = calendario.filter(function (r) {
+    return r.status === 'finished' || r.status === 'active';
+  });
+
+  for (let i = 0; i < jugadas.length; i++) {
+    if (String(jugadas[i].id) === String(ronda)) continue;
+    const otra = await roundDetail(jugadas[i].id, score).catch(function () { return null; });
     ((otra && otra.matches) || []).forEach(function (partido) {
       if (partido.status !== 'finished') return;
-      if (partido.homeId != null) saltos[partido.homeId] = (saltos[partido.homeId] || 0) + 1;
-      if (partido.awayId != null) saltos[partido.awayId] = (saltos[partido.awayId] || 0) + 1;
+      const dia = Date.parse(partido.start);
+      if (isNaN(dia)) return;
+      [partido.homeId, partido.awayId].forEach(function (equipo) {
+        if (equipo == null) return;
+        const suyo = cuando[equipo];
+        /* Sin fecha de referencia se cae a lo de antes: por número de jornada. */
+        const despues = suyo != null ? dia > suyo : (jugadas[i].number || 0) > numero;
+        if (despues) saltos[equipo] = (saltos[equipo] || 0) + 1;
+      });
     });
   }
   return saltos;
@@ -2472,7 +2501,7 @@ async function bestXi(roundId, names, score) {
      Pica es un ajuste de esta liga en concreto. Aplicándola, las chapas sumaban
      159 mientras su propia cabecera decía 154. Los 11 elegidos salen de él, así
      que aquí solo se pintan sus notas tal cual. */
-  const salto = await saltoPorEquipo(detalle.number, score).catch(function () { return {}; });
+  const salto = await saltoPorEquipo(detalle.number, score, detalle.id).catch(function () { return {}; });
   const delIndice = puntosDeLaJornada(names, salto);
 
   const ficha = function (id) {
@@ -2592,7 +2621,7 @@ async function roundBoard(env, headers, jornada, listaNombres) {
      cuadran al punto con lo que enseña Biwenger, jornada a jornada. */
   const numeroJornada = ficha.number != null ? ficha.number
     : ((detalle && detalle.number) != null ? detalle.number : null);
-  const salto = await saltoPorEquipo(numeroJornada, score).catch(function () { return {}; });
+  const salto = await saltoPorEquipo(numeroJornada, score, round.id).catch(function () { return {}; });
   const primas = await primasDeLaLiga(env).catch(function () { return null; });
   const marcador = conSuperPica(puntosDeLaJornada(names, salto), detalle, primas);
 
