@@ -6618,20 +6618,34 @@
     const sofa = state.sofa[String(id)];
     if (!sofa || sofa === 'pidiendo' || !(sofa.career || []).length) return '';
 
-    const pasos = sofa.career.map(function (t) {
-      return { club: t.to, desde: t.date };
-    });
-    const primero = sofa.career[sofa.career.length - 1];
-    if (primero && primero.from) pasos.push({ club: primero.from, desde: null });
+    /* Los años, en corto y como periodo: «2022–26», o «2022» si fue una sola
+       temporada. El club actual se marca con «act.» en vez de un año que
+       parecería que ya se fue. */
+    const periodo = function (fila, actual) {
+      if (!fila.desde) return '—';
+      const fin = actual ? 'act.' : String(fila.hasta).slice(-2);
+      return fila.desde === fila.hasta && !actual
+        ? String(fila.desde)
+        : String(fila.desde) + '–' + fin;
+    };
 
     return '<h4 class="stats__titulo">Trayectoria</h4>' +
-      '<ol class="trayecto">' + pasos.map(function (paso, i) {
-        const ano = paso.desde ? paso.desde.slice(0, 4) : '';
-        return '<li class="trayecto__paso' + (i === 0 ? ' trayecto__paso--ahora' : '') + '">' +
-          '<span class="trayecto__ano">' + escapeHtml(ano || '—') + '</span>' +
-          '<span class="trayecto__club">' + escapeHtml(paso.club) + '</span>' +
-        '</li>';
-      }).join('') + '</ol>';
+      '<table class="table detail-table trayecto">' +
+        '<thead><tr>' +
+          '<th>Club</th><th class="num">Años</th>' +
+          '<th class="num" title="Partidos jugados">PJ</th>' +
+          '<th class="num">Goles</th>' +
+          '<th class="num" title="Asistencias">Asist.</th>' +
+        '</tr></thead><tbody>' +
+        sofa.career.map(function (fila, i) {
+          return '<tr' + (i === 0 ? ' class="trayecto__ahora"' : '') + '>' +
+            '<td>' + escapeHtml(fila.club) + '</td>' +
+            '<td class="num">' + escapeHtml(periodo(fila, i === 0)) + '</td>' +
+            '<td class="num">' + (fila.pj || 0) + '</td>' +
+            '<td class="num">' + (fila.goles || 0) + '</td>' +
+            '<td class="num">' + (fila.asist || 0) + '</td>' +
+          '</tr>';
+        }).join('') + '</tbody></table>';
   }
 
   function estadisticasDeTemporada(id) {
@@ -6812,12 +6826,75 @@
     return (!club && gente.length === 1) ? gente[0].entity.id : null;
   }
 
+  /**
+   * Partidos, goles y asistencias por club, sumando todas las competiciones.
+   *
+   * SofaScore no tiene un resumen de carrera: hay que pedir una llamada por
+   * torneo y temporada (37 en el caso de Raphinha) y sumar. Se lanzan todas a
+   * la vez, se agrupan por club y el resultado se guarda, así que el coste es
+   * una sola vez por futbolista. Se pone un tope por si alguno tiene una
+   * carrera larguísima; con 60 llega de sobra para cualquiera.
+   */
+  async function carreraEnSofa(sofaId) {
+    const lista = await fetch(SOFA + '/player/' + sofaId + '/statistics/seasons')
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .catch(function () { return null; });
+
+    const pares = [];
+    (((lista || {}).uniqueTournamentSeasons) || []).forEach(function (t) {
+      const torneo = (t.uniqueTournament || {}).id;
+      if (torneo == null) return;
+      (t.seasons || []).forEach(function (s) {
+        if (s && s.id != null) pares.push({ torneo: torneo, temporada: s.id, ano: s.year || null });
+      });
+    });
+    if (!pares.length) return [];
+
+    const trozos = await Promise.all(pares.slice(0, 60).map(function (p) {
+      return fetch(SOFA + '/player/' + sofaId + '/unique-tournament/' + p.torneo +
+        '/season/' + p.temporada + '/statistics/overall')
+        .then(function (r) { return r.ok ? r.json() : null; })
+        .then(function (d) { return d ? { dato: d, ano: p.ano } : null; })
+        .catch(function () { return null; });
+    }));
+
+    const porClub = {};
+    trozos.filter(Boolean).forEach(function (t) {
+      const club = ((t.dato.team || {}).name) || null;
+      const st = t.dato.statistics || {};
+      if (!club) return;
+      if (!porClub[club]) porClub[club] = { club: club, pj: 0, goles: 0, asist: 0, anos: [] };
+      const fila = porClub[club];
+      fila.pj += st.appearances || 0;
+      fila.goles += st.goals || 0;
+      fila.asist += st.assists || 0;
+      if (t.ano) fila.anos.push(t.ano);
+    });
+
+    /* Del más reciente al más antiguo, por el año más alto de cada club. */
+    const orden = function (ano) {
+      /* Los años llegan como «26/27» o como «2026». */
+      const m = String(ano || '').match(/(\d{2,4})/);
+      if (!m) return 0;
+      const n = Number(m[1]);
+      return n < 100 ? 2000 + n : n;
+    };
+    return Object.keys(porClub).map(function (k) {
+      const f = porClub[k];
+      const desde = f.anos.map(orden).filter(Boolean);
+      f.desde = desde.length ? Math.min.apply(null, desde) : null;
+      f.hasta = desde.length ? Math.max.apply(null, desde) : null;
+      delete f.anos;
+      return f;
+    }).sort(function (a, b) { return (b.hasta || 0) - (a.hasta || 0); });
+  }
+
   function ensureSofa(id, nombre, club) {
     const clave = String(id);
     if (state.sofa[clave] !== undefined) return;
     state.sofa[clave] = 'pidiendo';
 
-    const guardado = cacheLeer('sofa2:' + clave);
+    const guardado = cacheLeer('sofa3:' + clave);
     if (guardado !== null && guardado !== undefined) {
       state.sofa[clave] = guardado;
       renderPriceModal();
@@ -6829,10 +6906,8 @@
         if (!sofaId) return null;
         return Promise.all([
           fetch(SOFA + '/player/' + sofaId).then(function (r) { return r.ok ? r.json() : null; }),
-          /* La trayectoria puede no existir y no es motivo para tirar el resto. */
-          fetch(SOFA + '/player/' + sofaId + '/transfer-history')
-            .then(function (r) { return r.ok ? r.json() : null; })
-            .catch(function () { return null; })
+          /* La carrera puede no existir y no es motivo para tirar el resto. */
+          carreraEnSofa(sofaId).catch(function () { return []; })
         ]);
       })
       .then(function (dos) {
@@ -6854,16 +6929,10 @@
           contractUntil: dia(p.contractUntilTimestamp),
           marketValue: (p.proposedMarketValue && p.proposedMarketValue.value) ||
             (typeof p.proposedMarketValue === 'number' ? p.proposedMarketValue : null),
-          career: (((dos[1] || {}).transferHistory) || []).map(function (t) {
-            return {
-              date: dia(t.transferDateTimestamp),
-              from: (t.transferFrom || {}).name || null,
-              to: (t.transferTo || {}).name || null
-            };
-          }).filter(function (t) { return t.to; })
+          career: dos[1] || []
         };
         state.sofa[clave] = ficha;
-        cacheGuardar('sofa2:' + clave, ficha);
+        cacheGuardar('sofa3:' + clave, ficha);
         renderPriceModal();
       })
       .catch(function () { state.sofa[clave] = null; });
