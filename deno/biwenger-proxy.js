@@ -104,7 +104,7 @@ const CDN = 'https://cf.biwenger.com/api/v2';
    navegador normal y las cabeceras que este mandaría. */
 /* Marca de versión: se sube en cada cambio y se consulta con ?version=1.
    Sirve para saber desde fuera si el despliegue ha entrado o no. */
-const VERSION = '2026-08-25 · deno 26';
+const VERSION = '2026-08-25 · deno 27';
 
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ' +
   '(KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36';
@@ -3438,11 +3438,21 @@ async function boardItems(env, headers, leagueId) {
  * Se probó a soltarla a los 91 sanos (72) y salía en gente como Sancet.
  */
 /* A partir de cuántos puntos de temporada luce la foto. Sale de casos reales,
-   no de la documentación de nadie: la llevan Raphinha y Fermín (19), Pépé (16),
-   Espí e Isaac Romero (13) y Bellingham (12); no la lleva Sancet, que va con 3
-   y está sano. El corte exacto entre 4 y 11 no se puede saber sin más casos,
-   así que se pone donde separa lo comprobado. */
-const PUNTOS_DE_DESTACADO = 10;
+   no de la documentación de nadie:
+
+     la llevan     Raphinha 19 · Fermín 19 · Pépé 16 · Espí 13 ·
+                   Isaac Romero 13 · Bellingham 12
+     no la llevan  Terrats 11 · Sancet 3   (los dos sanos)
+
+   Con Bellingham a 12 dentro y Terrats a 11 fuera, el corte queda cerrado.
+   No es el once ideal —Pépé no está en él y sí la lleva— ni la nota de la
+   última jornada —Isaac Romero hizo −1 y la lleva—: son los puntos de la
+   temporada.
+
+   Aviso para el futuro: si el criterio de Biwenger fuera relativo (los mejores
+   X) y no un número fijo, en enero habrá pasado de 12 media liga y se verá.
+   Entonces habrá que volver aquí con casos nuevos. */
+const PUNTOS_DE_DESTACADO = 12;
 
 function heroesDisponibles(names) {
   return Object.keys(names)
