@@ -6571,8 +6571,15 @@
          la primera. Mariano nació en Barcelona y es dominicano, y la bandera
          que enseña Biwenger es la dominicana. Va sola, sin el nombre al lado:
          la bandera ya lo dice, y el nombre se lee al pasar por encima. */
+      /* Bandera y el código de tres letras al lado, como lo enseña SofaScore.
+         El nombre entero se queda en el título, al pasar por encima. */
+      const pais = bio.countryName || nombreDePais(bio.country);
       partes.push({ que: 'Nacionalidad',
-        crudo: banderaDe(bio.country, nombreDePais(bio.country)) });
+        crudo: banderaDe(bio.country, pais) +
+          (bio.country3
+            ? '<span class="personal__iso" title="' + escapeHtml(pais) + '">' +
+              escapeHtml(bio.country3) + '</span>'
+            : '') });
     }
     if (bio.foot) {
       partes.push({ que: 'Pie', valor: PIES[bio.foot] || bio.foot });
@@ -6810,7 +6817,7 @@
     if (state.sofa[clave] !== undefined) return;
     state.sofa[clave] = 'pidiendo';
 
-    const guardado = cacheLeer('sofa:' + clave);
+    const guardado = cacheLeer('sofa2:' + clave);
     if (guardado !== null && guardado !== undefined) {
       state.sofa[clave] = guardado;
       renderPriceModal();
@@ -6838,6 +6845,9 @@
           height: p.height || null,
           birthDate: dia(p.dateOfBirthTimestamp),
           country: (p.country || {}).alpha2 || null,
+          /* El de tres letras, que es como lo escribe SofaScore junto a la
+             bandera: ESP, BRA. */
+          country3: (p.country || {}).alpha3 || null,
           countryName: (p.country || {}).name || null,
           number: p.shirtNumber != null ? p.shirtNumber : null,
           foot: p.preferredFoot || null,
@@ -6853,7 +6863,7 @@
           }).filter(function (t) { return t.to; })
         };
         state.sofa[clave] = ficha;
-        cacheGuardar('sofa:' + clave, ficha);
+        cacheGuardar('sofa2:' + clave, ficha);
         renderPriceModal();
       })
       .catch(function () { state.sofa[clave] = null; });

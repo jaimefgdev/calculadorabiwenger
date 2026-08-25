@@ -954,7 +954,9 @@ code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft)
    la misma en todas (España 3:2, Brasil 10:7, Argentina 8:5). Forzarlas a una
    sola medida obligaba a recortar, y a España le dejaba las franjas rojas
    afiladas. */
-.personal__dato .bandera { width: 2.1em; height: auto; }
+.personal__dato .bandera { width: 1.7em; height: auto; }
+/* El código de tres letras junto a la bandera. */
+.personal__iso { font-variant-numeric: normal; letter-spacing: .02em; }
 /* Los dos en `em`: crecen y encogen con la letra de la tira, que es la que se
    ajusta al ancho. Sin recortes ni puntos suspensivos: si algo no cabe, lo que
    cede es el tamaño, no el texto. */
