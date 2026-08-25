@@ -920,17 +920,25 @@ code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft)
    ellas, pero en una tira que se reparte el ancho: son cuatro datos sueltos, no
    una rejilla que deba cuadrar con nada. */
 .personal {
-  /* Reparten el ancho entre todos: la tira ocupa la línea entera en vez de
-     apelotonarse a la izquierda. `space-between` sola dejaba el último dato
-     descolgado cuando faltaba alguno. */
-  display: flex; flex-wrap: wrap; gap: .35rem .8rem;
+  /* Los siete datos en UNA línea, sin saltos: se reparten el ancho y, si algo
+     no cabe, se recorta ese dato en vez de tirar el dorsal a una segunda fila. */
+  display: flex; flex-wrap: nowrap; gap: .35rem .7rem;
   padding: 0 0 .6rem; margin: 0 0 .7rem;
   border-bottom: 1px solid var(--border);
 }
 .personal__dato {
   display: flex; flex-direction: column; gap: .1rem;
-  flex: 1 1 auto; min-width: 0;
+  /* `1 1 0` reparte a partes iguales sin que el contenido mande; sin el
+     `min-width: 0` un texto largo se niega a encoger y desborda la fila. */
+  flex: 1 1 0; min-width: 0;
 }
+/* La bandera, con el nombre del país al lado y en la misma línea. */
+.personal__dato strong { display: flex; align-items: center; gap: .3rem; min-width: 0; }
+.bandera {
+  width: 1.15em; height: auto; flex: none;
+  border-radius: 2px; box-shadow: 0 0 0 1px var(--border);
+}
+.personal__pais { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .personal__label {
   font-size: clamp(.55rem, .72vw, .68rem);
   text-transform: uppercase; letter-spacing: .03em; color: var(--text-faint);
@@ -939,6 +947,7 @@ code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft)
 .personal__dato strong {
   font-size: clamp(.66rem, .95vw, .92rem);
   font-variant-numeric: tabular-nums; white-space: nowrap;
+  overflow: hidden; text-overflow: ellipsis;
 }
 
 .stat { display: flex; flex-direction: column; gap: .1rem; min-width: 0; }

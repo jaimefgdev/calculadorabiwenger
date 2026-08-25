@@ -752,7 +752,11 @@
       squad: { key: '', dir: 1 },
       spend: { key: 'total', dir: -1 },
       income: { key: 'total', dir: -1 },
-      detail: { key: 'amount', dir: -1 },  // dentro de la ficha de cada jugador
+      /* Dentro de la ficha de cada mánager. Por fecha, lo más reciente arriba:
+         sus movimientos se leen para seguir lo que ha hecho, y en ese orden se
+         entienden; por importe salía primero el fichaje más caro del verano y
+         lo de ayer enterrado. Las cabeceras siguen dejando ordenar a mano. */
+      detail: { key: 'date', dir: -1 },
       rounds: { key: 'points', dir: -1 },
       market: { key: '', dir: -1 }        // vacío = libres primero y por valor
     }
@@ -6545,7 +6549,9 @@
         const mes = hoy.getMonth() - f.getMonth();
         if (mes < 0 || (mes === 0 && hoy.getDate() < f.getDate())) anos--;
         partes.push({ que: 'Edad', valor: anos + ' años' });
-        partes.push({ que: 'Nacimiento', valor: dateFormat.format(f) });
+        /* Sin hora: `dateFormat` la lleva y aquí no pinta nada («1 ago 1993,
+           00:00»), que además era una hora inventada. */
+        partes.push({ que: 'Nacimiento', valor: soloFecha.format(f) });
       }
     }
 
@@ -6558,9 +6564,8 @@
         valor: bio.birthPlace + (prov && !mismo ? ' (' + prov + ')' : '') });
     }
     if (bio.country) {
-      const bandera = banderaDe(bio.country);
-      partes.push({ que: 'País',
-        valor: (bandera ? bandera + ' ' : '') + nombreDePais(bio.country) });
+      partes.push({ que: 'País', crudo: banderaDe(bio.country) +
+        '<span class="personal__pais">' + escapeHtml(nombreDePais(bio.country)) + '</span>' });
     }
     if (bio.number) partes.push({ que: 'Dorsal', valor: String(bio.number) });
     if (!partes.length) return '';
@@ -6571,7 +6576,9 @@
         return '<div class="personal__dato"' +
           (p.detalle ? ' title="' + escapeHtml(p.detalle) + '"' : '') + '>' +
           '<span class="personal__label">' + escapeHtml(p.que) + '</span>' +
-          '<strong>' + escapeHtml(p.valor) + '</strong></div>';
+          /* `crudo` ya viene armado (la bandera es una imagen); `valor` es
+             texto y se escapa. */
+          '<strong>' + (p.crudo ? p.crudo : escapeHtml(p.valor)) + '</strong></div>';
       }).join('') +
     '</div>';
   }
@@ -6694,15 +6701,16 @@
   /**
    * La bandera de un país a partir de su código.
    *
-   * Se arma con los dos «indicadores regionales» que le tocan a cada letra
-   * (ES → 🇪🇸). Es texto, no una imagen: no hay nada que descargar y se ve en
-   * cualquier sitio donde se vea el resto de la ficha.
+   * Se probó primero con emoji (los «indicadores regionales»), y en Windows no
+   * vale: no trae fuente de banderas, así que pintaba las dos letras del código
+   * —«Do República Dominicana»— en vez del dibujo. Se usa la imagen de la propia
+   * web de LaLiga, que es de donde sale el resto de la ficha y las tiene todas.
    */
   function banderaDe(codigo) {
-    const dos = String(codigo || '').toUpperCase();
-    if (!/^[A-Z]{2}$/.test(dos)) return '';
-    return String.fromCodePoint(0x1F1E6 + dos.charCodeAt(0) - 65) +
-      String.fromCodePoint(0x1F1E6 + dos.charCodeAt(1) - 65);
+    const dos = String(codigo || '').toLowerCase();
+    if (!/^[a-z]{2}$/.test(dos)) return '';
+    return '<img class="bandera" alt="" loading="lazy" src="' +
+      'https://assets.laliga.com/assets/public/flags/' + dos + '.svg">';
   }
 
   /** Los datos personales del futbolista, en su propia llamada. */
@@ -8439,6 +8447,9 @@
   const dateFormat = new Intl.DateTimeFormat('es-ES', {
     day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit'
   });
+  /* Igual que dateFormat pero sin hora: para fechas de nacimiento y demás,
+     donde la hora ni existe ni aporta. */
+  const soloFecha = new Intl.DateTimeFormat('es-ES', { day: 'numeric', month: 'short', year: 'numeric' });
   const dayFormat = new Intl.DateTimeFormat('es-ES', { weekday: 'long', day: 'numeric', month: 'long' });
   const timeFormat = new Intl.DateTimeFormat('es-ES', { hour: '2-digit', minute: '2-digit' });
 
