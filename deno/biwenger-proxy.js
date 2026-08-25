@@ -104,7 +104,7 @@ const CDN = 'https://cf.biwenger.com/api/v2';
    navegador normal y las cabeceras que este mandaría. */
 /* Marca de versión: se sube en cada cambio y se consulta con ?version=1.
    Sirve para saber desde fuera si el despliegue ha entrado o no. */
-const VERSION = '2026-08-25 · deno 28';
+const VERSION = '2026-08-25 · deno 29';
 
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ' +
   '(KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36';
@@ -1242,15 +1242,27 @@ async function proximaJornada() {
  */
 async function jornadaActualEfectiva() {
   const calendario = await seasonRounds().catch(function () { return []; });
-  const enJuego = calendario.filter(function (r) { return r.status === 'active' && (r.part || 1) === 1; })
-    .sort(function (a, b) { return (a.number || 0) - (b.number || 0); })[0] || null;
 
-  /* Con una jornada de verdad en juego, es ella la que manda: no hay que
-     mirar más allá. Antes se comparaba igualmente contra «lo próximo que
-     pite», y si eso resultaba ser un aplazado de otra jornada (part > 1) con
-     su hora ya pasada, el aviso de «cinco horas» saltaba siempre y se colaba
-     por delante de la jornada que sí estaba en juego. */
-  if (enJuego) return enJuego.id;
+  /* La jornada que se está jugando es la más antigua que ha empezado y no ha
+     terminado. Se mira el recuento de partidos, NO el campo `status`: con los
+     aplazados miente, y mucho —la jornada 1 dice «finished» llevando 6 de 10 y
+     con un partido rodando esa misma noche—. Mirando solo las «active» se la
+     saltaba y se caía en la rama de abajo, que devuelve la última cerrada: por
+     eso la pestaña se quedaba en la 2 con la 1 en juego.
+
+     Las que ni han empezado se descartan sin consultarlas, que cada una es una
+     petición; con cuatro sobra para encontrarla. */
+  const candidatas = calendario
+    .filter(function (r) { return (r.part || 1) === 1 && r.status !== 'pending'; })
+    .sort(function (a, b) { return (a.number || 0) - (b.number || 0); })
+    .slice(0, 4);
+
+  for (let i = 0; i < candidatas.length; i++) {
+    const suyo = await roundDetail(candidatas[i].id, null).catch(function () { return null; });
+    if (!suyo) continue;
+    const jugados = suyo.played || 0;
+    if (jugados > 0 && jugados < (suyo.games || 0)) return candidatas[i].id;
+  }
 
   /* Sin nada en juego: se sigue viendo la última cerrada hasta que a la
      siguiente jornada normal (part 1, nunca un aplazado suelto) le falten
@@ -1718,9 +1730,25 @@ async function matchDay(roundId, score, names, primas) {
   const salto = await saltoPorEquipo(detalle.number, score).catch(function () { return {}; });
   const delIndice = conSuperPica(puntosDeLaJornada(names, salto), detalle, primas);
 
-  const equipo = function (lado, estadoPartido) {
+  const equipo = function (lado, estadoPartido, confirmadas) {
     const once = [];
     const banquillo = [];
+
+    /* Con el partido ya rodando y sin que Biwenger haya confirmado el once, lo
+       que manda son alineaciones PROBABLES: nombres que puso antes del pitido y
+       que ya no valen. Enseñarlas junto a un marcador en vivo es peor que no
+       enseñar nada, porque parecen las de verdad. Antes de empezar sí se ven,
+       avisando de que son probables, que para eso están. */
+    const empezado = estadoPartido && estadoPartido !== 'pending' && estadoPartido !== 'preview';
+    if (empezado && !confirmadas) {
+      return {
+        id: lado.id != null ? lado.id : null,
+        name: lado.name || '',
+        score: lado.score != null ? lado.score : null,
+        xi: [],
+        bench: []
+      };
+    }
     /* Hasta que el partido no termina del todo, cualquier puntuación que
        llegue es la de la jornada anterior: Biwenger no la publica de verdad
        ni la pone a cero hasta el pitido final, ni mediado el partido. */
@@ -1765,8 +1793,8 @@ async function matchDay(roundId, score, names, primas) {
       /* Biwenger marca con «initialLineups» los partidos cuyos onces ya son
          los oficiales; sin esa marca, lo que hay son alineaciones probables. */
       confirmadas: !!game.initialLineups,
-      home: equipo(game.home || {}, game.status || null),
-      away: equipo(game.away || {}, game.status || null)
+      home: equipo(game.home || {}, game.status || null, !!game.initialLineups),
+      away: equipo(game.away || {}, game.status || null, !!game.initialLineups)
     };
   }).sort(function (a, b) { return String(a.start).localeCompare(String(b.start)); });
 
@@ -2482,31 +2510,7 @@ async function roundBoard(env, headers, jornada, listaNombres) {
   const calendar = await seasonRounds().catch(function () { return []; });
   let wanted = String(jornada) === 'actual' ? '' : String(jornada);
 
-  /* Cuál es «la jornada en la que estamos».
-
-     No vale preguntárselo a Biwenger: para él la actual es la última que cerró.
-     Tampoco vale su campo `status`, que miente con los aplazados —la jornada 1
-     dice «finished» llevando 6 partidos de 10—. Ni sirve mirar el próximo
-     partido: con uno de la 1 rodando ahora mismo, el siguiente ya es de la 3, y
-     la pestaña se iba a la 3.
-
-     Lo que no engaña es cuántos partidos lleva jugados. La jornada en la que
-     estamos es la más antigua que ha empezado y no ha terminado. Las que ni han
-     empezado se descartan sin preguntar por ellas, que cada consulta cuesta. */
-  if (!wanted) {
-    const empezadas = calendar
-      .filter(function (r) { return (r.part || 1) === 1 && r.status !== 'pending'; })
-      .sort(function (a, b) { return (a.number || 0) - (b.number || 0); })
-      .slice(0, 4);
-
-    for (let i = 0; i < empezadas.length && !wanted; i++) {
-      const suyo = await roundDetail(empezadas[i].id, null).catch(function () { return null; });
-      if (!suyo) continue;
-      const jugados = suyo.played || 0;
-      const total = suyo.games || 0;
-      if (jugados > 0 && jugados < total) wanted = String(empezadas[i].id);
-    }
-  }
+  /* «actual» ya viene resuelto de fuera, en jornadaActualEfectiva(). */
   /* La jornada va en la ruta, no como parámetro: su propia web pide
      /rounds/league/<id>. Con ?round= contestaba siempre la actual, y por eso
      elegir otra jornada no cambiaba nada. */
