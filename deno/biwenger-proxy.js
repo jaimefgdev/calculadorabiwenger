@@ -104,7 +104,7 @@ const CDN = 'https://cf.biwenger.com/api/v2';
    navegador normal y las cabeceras que este mandaría. */
 /* Marca de versión: se sube en cada cambio y se consulta con ?version=1.
    Sirve para saber desde fuera si el despliegue ha entrado o no. */
-const VERSION = '2026-08-25 · deno 15';
+const VERSION = '2026-08-25 · deno 16';
 
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ' +
   '(KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36';
@@ -214,8 +214,14 @@ const app = {
       const ficha = url.searchParams.get('estadisticas');
       if (ficha) {
         const sistema = await sistemaDeLaLiga(env);
-        const data = await playerStats(ficha, await players(sistema), sistema);
+        const nombres = await players(sistema);
+        const data = await playerStats(ficha, nombres, sistema);
         if (!data) return fail(404, 'No hay ficha de ese futbolista.', origin);
+        /* Estatura, peso y cuna: no están en Biwenger, se sacan de la web de
+           LaLiga. Va aquí y no en su propia llamada para que la web lo reciba
+           todo junto y no tenga que pedir dos veces al abrir un futbolista. */
+        data.bio = await datosDeLaLiga(env, nombres[String(ficha) + ':slug'])
+          .catch(function () { return null; });
         return new Response(JSON.stringify(data), {
           headers: Object.assign({ 'content-type': 'application/json; charset=utf-8' }, cors(origin))
         });
@@ -1773,6 +1779,79 @@ async function matchDay(roundId, score, names, primas) {
  * hay que sumar. Es tambi\u00e9n la \u00fanica fuente que da los puntos de jornadas ya
  * cerradas, que el \u00edndice deja de traer.
  */
+/**
+ * Estatura, peso, fecha y lugar de nacimiento, de la web de LaLiga.
+ *
+ * Biwenger no publica nada de esto y las alternativas están cerradas: SofaScore
+ * responde 403 aunque se imite un navegador entero, BeSoccer pide clave de
+ * pago, y la API de LaLiga necesita suscripción. Su web, en cambio, lleva la
+ * ficha en el JSON de la página, en centímetros y kilos.
+ *
+ * El enganche sale gratis: el slug de Biwenger y el de LaLiga coinciden
+ * («oso», «iago-aspas»), así que no hay que cruzar nombres ni arriesgarse a
+ * confundir a dos futbolistas. Al que no exista allí se le devuelve nada.
+ *
+ * Se cachea en el KV para siempre: la estatura de nadie cambia, y la página
+ * son 300 KB que no conviene volver a bajar.
+ */
+async function datosDeLaLiga(env, slug) {
+  if (!slug) return null;
+  const clave = 'bio-' + slug;
+
+  if (env.JORNADAS) {
+    try {
+      const guardado = await env.JORNADAS.get(clave);
+      if (guardado) return JSON.parse(guardado);
+    } catch (error) { /* se pide abajo */ }
+  }
+
+  const response = await fetch('https://www.laliga.com/en-GB/player/' +
+    encodeURIComponent(slug), { headers: NAVEGADOR });
+  if (!response.ok) return null;
+
+  const html = await response.text();
+  const marca = html.indexOf('__NEXT_DATA__');
+  if (marca === -1) return null;
+  const desde = html.indexOf('>', marca) + 1;
+  const hasta = html.indexOf('</script>', desde);
+  if (desde <= 0 || hasta <= desde) return null;
+
+  let arbol;
+  try { arbol = JSON.parse(html.slice(desde, hasta)); } catch (error) { return null; }
+
+  /* La ficha está colgada en algún punto del árbol; se reconoce porque es el
+     único nodo con estatura y peso a la vez. */
+  const buscar = function (nodo, hondo) {
+    if (!nodo || hondo > 6 || typeof nodo !== 'object') return null;
+    if (nodo.height !== undefined && nodo.weight !== undefined) return nodo;
+    const claves = Object.keys(nodo);
+    for (let i = 0; i < claves.length; i++) {
+      const hallado = buscar(nodo[claves[i]], hondo + 1);
+      if (hallado) return hallado;
+    }
+    return null;
+  };
+
+  const ficha = buscar(arbol.props || arbol, 0);
+  if (!ficha) return null;
+
+  const numero = function (v) { const n = Number(v); return n > 0 ? n : null; };
+  const bio = {
+    /* Nombre completo: en Biwenger casi siempre está el apodo. */
+    fullName: ficha.name || null,
+    height: numero(ficha.height),        // centímetros
+    weight: numero(ficha.weight),        // kilos
+    birthDate: ficha.date_of_birth ? String(ficha.date_of_birth).slice(0, 10) : null,
+    birthPlace: ficha.place_of_birth || null,
+    country: (ficha.country && ficha.country.id) || null
+  };
+
+  if (env.JORNADAS) {
+    try { await env.JORNADAS.put(clave, JSON.stringify(bio)); } catch (error) { /* da igual */ }
+  }
+  return bio;
+}
+
 async function playerStats(id, names, score) {
   const slug = names[String(id) + ':slug'];
   if (!slug) return null;
