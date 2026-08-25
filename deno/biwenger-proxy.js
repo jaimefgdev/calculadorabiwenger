@@ -104,7 +104,7 @@ const CDN = 'https://cf.biwenger.com/api/v2';
    navegador normal y las cabeceras que este mandaría. */
 /* Marca de versión: se sube en cada cambio y se consulta con ?version=1.
    Sirve para saber desde fuera si el despliegue ha entrado o no. */
-const VERSION = '2026-08-25 · deno 30';
+const VERSION = '2026-08-25 · deno 31';
 
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ' +
   '(KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36';
@@ -1788,8 +1788,11 @@ async function matchDay(roundId, score, names, primas) {
     const suyo = ((await respuesta.json().catch(function () { return {}; })).data) || {};
     if (!suyo.home || !suyo.away) return null;
     return {
+      status: suyo.status || null,
       home: equipo(suyo.home, suyo.status || null),
-      away: equipo(suyo.away, suyo.status || null)
+      away: equipo(suyo.away, suyo.status || null),
+      homeScore: (suyo.home || {}).score != null ? suyo.home.score : null,
+      awayScore: (suyo.away || {}).score != null ? suyo.away.score : null
     };
   };
 
@@ -1807,14 +1810,30 @@ async function matchDay(roundId, score, names, primas) {
     };
   }).sort(function (a, b) { return String(a.start).localeCompare(String(b.start)); });
 
-  /* A los que están rodando se les cambia el once por el bueno. Si la ficha del
-     partido no contesta, se deja el que hubiera: mejor uno viejo que ninguno. */
-  const rodando = partidos.filter(function (p) {
-    return p.status && p.status !== 'pending' && p.status !== 'preview' && p.status !== 'finished';
-  });
-  await Promise.all(rodando.map(function (p) {
+  /* A los que ya deberían estar rodando se les pide su propia ficha.
+     No basta con mirar el estado: un aplazado vive en DOS jornadas —la suya y
+     la mitad aplazada— y en la suya Biwenger lo deja congelado en «preview» con
+     la alineación de hace diez días. Valencia-Betis salía en la jornada 1 como
+     no empezado y con un Betis de Fran García, Natan y Bartra, mientras en el
+     campo estaban Firpo, Diego Llorente y Ángel Ortiz.
+
+     Así que lo que decide es el reloj: si la hora del pitido ya pasó y no
+     consta terminado, se pregunta por él. De paso llegan el estado y el
+     marcador de verdad. Si no contesta, se deja lo que hubiera. */
+  const ahoraMismo = Date.now();
+  const dudosos = partidos.filter(function (p) {
+    if (p.status === 'finished') return false;
+    const empezado = p.status && p.status !== 'pending' && p.status !== 'preview';
+    const yaTocaba = p.start && Date.parse(p.start) <= ahoraMismo;
+    return empezado || yaTocaba;
+  }).slice(0, 6);
+
+  await Promise.all(dudosos.map(function (p) {
     return onceEnVivo(p.id).then(function (bueno) {
       if (!bueno) return;
+      if (bueno.status) p.status = bueno.status;
+      if (bueno.homeScore != null) p.home.score = bueno.homeScore;
+      if (bueno.awayScore != null) p.away.score = bueno.awayScore;
       if ((bueno.home.xi || []).length) p.home = Object.assign({}, p.home, { xi: bueno.home.xi, bench: bueno.home.bench });
       if ((bueno.away.xi || []).length) p.away = Object.assign({}, p.away, { xi: bueno.away.xi, bench: bueno.away.bench });
     }).catch(function () { /* se deja lo que había */ });
