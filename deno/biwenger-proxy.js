@@ -104,7 +104,7 @@ const CDN = 'https://cf.biwenger.com/api/v2';
    navegador normal y las cabeceras que este mandaría. */
 /* Marca de versión: se sube en cada cambio y se consulta con ?version=1.
    Sirve para saber desde fuera si el despliegue ha entrado o no. */
-const VERSION = '2026-08-25 · deno 27';
+const VERSION = '2026-08-25 · deno 28';
 
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ' +
   '(KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36';
@@ -1131,13 +1131,28 @@ async function nextRound() {
 /** La jornada activa, si ya ha empezado y todavía le quedan partidos. */
 async function jornadaEnJuego() {
   const calendario = await seasonRounds().catch(function () { return []; });
-  const activas = calendario.filter(function (r) { return r.status === 'active' && (r.part || 1) === 1; })
-    .sort(function (a, b) { return (a.number || 0) - (b.number || 0); });
-  if (activas.length === 0) return null;
 
-  const ficha = activas[0];
-  const detalle = await roundDetail(ficha.id, null);
-  if (!detalle || !detalle.live) return null;
+  /* No vale fiarse de `status`: con los aplazados miente. La jornada 1 dice
+     «finished» llevando 6 partidos de 10, así que mirando solo las «active» se
+     la saltaba y la tarjeta se iba a la 3 —que no ha empezado— y la anunciaba
+     como «Inicio de la Jornada 3» teniendo un partido de la 1 rodando.
+
+     Lo que no engaña es el recuento: la jornada en juego es la más antigua que
+     ha empezado y no ha terminado. */
+  const candidatas = calendario
+    .filter(function (r) { return (r.part || 1) === 1 && r.status !== 'pending'; })
+    .sort(function (a, b) { return (a.number || 0) - (b.number || 0); })
+    .slice(0, 4);
+
+  let ficha = null;
+  let detalle = null;
+  for (let i = 0; i < candidatas.length && !ficha; i++) {
+    const suyo = await roundDetail(candidatas[i].id, null).catch(function () { return null; });
+    if (!suyo) continue;
+    const jugados = suyo.played || 0;
+    if (jugados > 0 && jugados < (suyo.games || 0)) { ficha = candidatas[i]; detalle = suyo; }
+  }
+  if (!ficha || !detalle) return null;
 
   const guide = await tvGuide().catch(function () { return []; });
   const matches = detalle.matches.map(function (partido) {
