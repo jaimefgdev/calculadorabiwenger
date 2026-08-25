@@ -236,7 +236,8 @@ const app = {
       const partidos = url.searchParams.get('partidos');
       if (partidos) {
         const sistema = await sistemaDeLaLiga(env);
-        const data = await matchDay(partidos, sistema, await players(sistema));
+        const data = await matchDay(partidos, sistema, await players(sistema),
+          await primasDeLaLiga(env).catch(function () { return null; }));
         if (!data) return fail(502, 'No se ha podido leer esa jornada.', origin);
         return new Response(JSON.stringify(data), {
           headers: Object.assign({ 'content-type': 'application/json; charset=utf-8' }, cors(origin))
@@ -1314,7 +1315,11 @@ async function primasDeLaLiga(env) {
       mvpJornada: num(s.bonusRoundMVP),
       /* Con esto en true, al que hace puntuación negativa le quitan dinero;
          sin él, el abono se queda en cero pero no resta. */
-      restaSiNegativo: s.bonusAllowNegative !== false
+      restaSiNegativo: s.bonusAllowNegative !== false,
+      /* Y con esto, la nota de quien se lleva la Súper Pica se recalcula con
+         ella dentro. Es un ajuste de la liga, no del sistema de puntuación,
+         por eso el índice de futbolistas nunca la trae. */
+      superPica: s.superPicaExtraPoints === true
     };
     if (env.JORNADAS) {
       try { await env.JORNADAS.put('primas', JSON.stringify(cache.primas)); } catch (e) { /* da igual */ }
@@ -1649,7 +1654,7 @@ async function globalRanking(env) {
  * Quien no tiene un «entra» es que salió de inicio: así se parte el once del
  * banquillo sin que Biwenger lo diga en ningún sitio.
  */
-async function matchDay(roundId, score, names) {
+async function matchDay(roundId, score, names, primas) {
   const detalle = await roundDetail(roundId, score);
   if (!detalle) return null;
 
@@ -1665,7 +1670,7 @@ async function matchDay(roundId, score, names) {
      que enseña la app, son los del índice de futbolistas con el sistema de la
      liga, esté la jornada en juego o cerrada. */
   const salto = await saltoPorEquipo(detalle.number, score).catch(function () { return {}; });
-  const delIndice = puntosDeLaJornada(names, salto);
+  const delIndice = conSuperPica(puntosDeLaJornada(names, salto), detalle, primas);
 
   const equipo = function (lado, estadoPartido) {
     const once = [];
@@ -1846,6 +1851,22 @@ async function playerStats(id, names, score) {
  * Si el salto se sale del array, no se devuelve nada: mejor dejarlo pendiente
  * que enseñar la nota de otra jornada, que es justo lo que pasaba antes.
  */
+/**
+ * Pone encima del marcador las notas recalculadas con Súper Pica.
+ *
+ * Solo hay una por partido, así que toca a diez futbolistas de trescientos y
+ * pico; para el resto no cambia nada. Sin esto, esos diez se quedan un punto
+ * o dos por debajo de lo que enseña Biwenger, y con ellos su mánager.
+ */
+function conSuperPica(marcador, detalle, primas) {
+  if (!primas || !primas.superPica) return marcador;
+  const picas = (detalle && detalle.picas) || {};
+  Object.keys(picas).forEach(function (id) {
+    if (typeof picas[id] === 'number') marcador[id] = picas[id];
+  });
+  return marcador;
+}
+
 function puntosDeLaJornada(names, salto) {
   const saltos = salto || {};
   const mapa = {};
@@ -2023,6 +2044,13 @@ async function roundDetail(roundId, score) {
      alinearlo, así que se recoge aquí: viene en el mismo informe que ya se
      recorre, sin una sola petición de más. */
   const mvps = {};
+  /* La Súper Pica del AS: una por partido. Cuando la liga la tiene activada,
+     Biwenger NO suma un extra al final —recalcula la nota entera con ella
+     dentro del AS y vuelve a hacer la media con SofaScore—, y el resultado
+     vive aparte, en `optionalPoints`. El campo `points` de siempre sigue
+     trayendo la nota sin Súper Pica, que es la que se nos quedaba corta:
+     Oso 14 donde su web enseñaba 15, Ryan 12 donde enseñaba 13. */
+  const picas = {};
 
   (data.games || []).forEach(function (game) {
     const local = game.home || {};
@@ -2040,6 +2068,8 @@ async function roundDetail(roundId, score) {
            puntosDeLaJornada(). */
         if (informe.points != null) puntos[id] = informe.points;
         if (informe.mvp) mvps[id] = true;
+        const extra = (informe.optionalPoints || {}).superPicaExtraPoints;
+        if (extra && extra.points != null) picas[id] = extra.points;
         (informe.events || []).forEach(function (evento) {
           lances.push({ id: id, type: evento.type, minute: evento.metadata != null ? evento.metadata : null });
         });
@@ -2090,6 +2120,7 @@ async function roundDetail(roundId, score) {
     puntos: puntos,
     fichas: fichas,
     mvps: mvps,
+    picas: picas,
     lances: lances,
     matches: partidos,
     played: jugados,
@@ -2237,14 +2268,14 @@ async function partidosDeJugador(env, id) {
  * Si todavía no ha publicado ninguno, se arma uno probando las catorce
  * formaciones y quedándose con la que más suma.
  */
-async function bestXi(roundId, names, score) {
+async function bestXi(roundId, names, score, primas) {
   const detalle = await roundDetail(roundId, score);
   if (!detalle) return null;
 
   /* Los puntos del detalle bailan entre peticiones; los del índice de
      futbolistas son los que enseña la app, en juego y ya cerrada. */
   const salto = await saltoPorEquipo(detalle.number, score).catch(function () { return {}; });
-  const delIndice = puntosDeLaJornada(names, salto);
+  const delIndice = conSuperPica(puntosDeLaJornada(names, salto), detalle, primas);
 
   const ficha = function (id) {
     const clave = String(id);
@@ -2362,7 +2393,8 @@ async function roundBoard(env, headers, jornada, listaNombres) {
   const numeroJornada = ficha.number != null ? ficha.number
     : ((detalle && detalle.number) != null ? detalle.number : null);
   const salto = await saltoPorEquipo(numeroJornada, score).catch(function () { return {}; });
-  const marcador = puntosDeLaJornada(names, salto);
+  const primas = await primasDeLaLiga(env).catch(function () { return null; });
+  const marcador = conSuperPica(puntosDeLaJornada(names, salto), detalle, primas);
 
   /* En qué anda el partido de cada club: sirve para distinguir al que no ha
      puntuado del que todavía no ha jugado. */
@@ -2414,22 +2446,12 @@ async function roundBoard(env, headers, jornada, listaNombres) {
       name: row.name || '',
       icon: iconUrl(row.icon),
       position: row.position != null ? row.position : null,
-      /* Mientras la jornada sigue viva Biwenger deja su marcador a cero, así
-         que el bueno es el que se suma aquí con el once delante. En cuanto la
-         cierra publica el suyo, y ese manda: trae los extras que su pantalla
-         aplica y el índice de futbolistas no (la Súper Pica del AS, que esta
-         liga tiene activada), y por eso alguna chapa se quedaba un punto corta
-         —Oso 14 en vez de 15— sin que ningún campo de la API lo explicara. */
-      /* Al que no le cuenta la jornada, Biwenger publica un cero oficial pero
-         en pantalla le sigue enseñando sus puntos tachados. Aquí se hace igual:
-         se queda lo sumado para poder pintarlo en rojo, y `counts` ya se
-         encarga de que no entre en la general. */
-      points: !empezada ? 0
-        : ((oficiales && !(lineup && lineup.count === false))
-          ? oficiales
-          : (once.length ? sumado : 0)),
-      /* Para poder decir en la web si el número es el definitivo de Biwenger o
-         todavía el que vamos sumando nosotros mientras ruedan los partidos. */
+      /* Manda lo calculado aquí, teniendo el once: con la Súper Pica aplicada
+         cuadra al punto con la tabla de Biwenger en los ocho mánagers de la
+         jornada 2. Su campo oficial no se usa —lleva toda la temporada a cero
+         mientras la jornada 1 siga con aplazados—, pero se manda al lado para
+         poder cotejarlo el día que lo publique. */
+      points: !empezada ? 0 : (once.length ? sumado : (oficiales || 0)),
       pointsOfficial: oficiales || null,
       played: !empezada ? 0
         : (once.length ? jugados : (lineup && lineup.played != null ? lineup.played : null)),
@@ -2494,16 +2516,15 @@ async function roundBoard(env, headers, jornada, listaNombres) {
   }
 
   const once = round.id != null
-    ? await bestXi(round.id, names, score).catch(function () { return null; })
+    ? await bestXi(round.id, names, score, primas).catch(function () { return null; })
     : null;
 
   /* ---------- Lo que cobra cada mánager por esta jornada ----------
      La liga paga por punto, por meter gente en el once ideal y por alinear al
      mejor de un partido o de la jornada. Biwenger no lo abona hasta el día
      siguiente de cerrarla, así que hasta entonces esto es una previsión: sale
-     de los mismos puntos que ya se enseñan, no de un número inventado. */
-  const primas = await primasDeLaLiga(env).catch(function () { return null; });
-
+     de los mismos puntos que ya se enseñan, no de un número inventado.
+     `primas` ya se pidió arriba, que es donde hace falta para la Súper Pica. */
   if (primas) {
     const enIdeal = {};
     ((once && once.players) || []).forEach(function (jugador) {
