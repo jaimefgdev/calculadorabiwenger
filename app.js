@@ -247,6 +247,18 @@
     };
   }
 
+  /* Cómo se llama cada movimiento según de qué post del tablón salga. Los que
+     no están aquí (market, transfer) son compras y ventas normales y se dicen
+     así. Tu liga permite cesiones e intercambios, aunque a día de hoy no se ha
+     hecho ninguna: en cuanto aparezcan, salen con su nombre. */
+  const MOVIMIENTOS_CON_NOMBRE = {
+    loan: 'Cesión',
+    loanReturn: 'Fin de cesión',
+    exchange: 'Intercambio',
+    clauseIncrement: 'Cláusula',
+    adminTransfer: 'Ajuste del admin'
+  };
+
   /* Tipos de post que mueven saldo y que todavía no se contabilizan. La clase
      la pone Biwenger en el `.content` del post (content loan, content exchange…). */
   const UNHANDLED_TYPES = {
@@ -1594,8 +1606,14 @@
     }
     const compra = movimiento.type !== 'sell';
     const otro = movimiento.otro || 'Mercado';
+    /* Una cesión o un intercambio mueven dinero igual que una compra, pero no
+       son una compra: llamarlos así engaña. El tablón dice de qué son en
+       `source`, así que se usa esa palabra y el color sigue marcando si el
+       dinero entra o sale. */
+    const nombre = MOVIMIENTOS_CON_NOMBRE[movimiento.source] ||
+      (compra ? 'Compra' : 'Venta');
     return '<span class="tag ' + (compra ? 'tag--buy' : 'tag--sell') + '">' +
-      (compra ? 'Compra' : 'Venta') +
+      escapeHtml(nombre) +
       ' <span class="tag__otro">(' + escapeHtml(otro) + ')</span></span>';
   }
 
@@ -2360,10 +2378,18 @@
   /**
    * La foto de un futbolista.
    *
-   * Biwenger publica una segunda foto, más trabajada, para un puñado de
-   * destacados (unos noventa de los quinientos y pico): la manda en `iconHero`
-   * y es la que enseña en su once ideal. Si ese futbolista tiene la suya, se
-   * usa; el resto se quedan con la de siempre.
+   * Biwenger tiene una segunda foto, más trabajada, para 91 de los 564
+   * futbolistas: la anuncia con `iconHero` y el archivo existe siempre
+   * («i/p/hero/<id>.png» responde 200 en los 91). Pero esa lista es FIJA —los
+   * mismos 91 con doce horas de diferencia—, así que no marca quién está en
+   * racha: solo dice quién tiene esa foto disponible. Biwenger enseña la normal
+   * casi siempre y la de héroe en algún sitio concreto, y esa condición no
+   * viene en ningún campo que recibamos.
+   *
+   * La regla es el ONCE IDEAL de la última jornada: solo a esos, y solo si la
+   * tienen hecha. Por eso `state.heroes` no son los 91, sino los pocos que la
+   * lucen ahora mismo —el proxy ya manda cruzada esa lista—. Poniéndosela a los
+   * 91 salía en gente que en su web lleva la normal (Le Normand, Ruibal).
    */
   function fotoDe(id) {
     const clave = String(id);
