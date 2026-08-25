@@ -104,7 +104,7 @@ const CDN = 'https://cf.biwenger.com/api/v2';
    navegador normal y las cabeceras que este mandaría. */
 /* Marca de versión: se sube en cada cambio y se consulta con ?version=1.
    Sirve para saber desde fuera si el despliegue ha entrado o no. */
-const VERSION = '2026-08-25 · deno 16';
+const VERSION = '2026-08-25 · deno 18';
 
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ' +
   '(KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36';
@@ -209,19 +209,29 @@ const app = {
         });
       }
 
+      /* ?bio=<id> son sus datos personales: estatura, peso, nacimiento y
+         dorsal. Va en su propia llamada a propósito. Metido dentro de
+         ?estadisticas obligaba a esa respuesta a esperar la descarga de la web
+         de LaLiga (300 KB la primera vez), y la ficha tardaba en abrirse. Así
+         las estadísticas llegan a su ritmo de siempre y esto aparece detrás. */
+      const quienEs = url.searchParams.get('bio');
+      if (quienEs) {
+        const sistema = await sistemaDeLaLiga(env);
+        const nombres = await players(sistema);
+        const data = await datosDeLaLiga(env, nombres[String(quienEs) + ':slug'],
+          nombres[String(quienEs)]).catch(function () { return null; });
+        return new Response(JSON.stringify(data || {}), {
+          headers: Object.assign({ 'content-type': 'application/json; charset=utf-8' }, cors(origin))
+        });
+      }
+
       /* ?estadisticas=<id> resume la temporada de un futbolista: partidos,
          goles, asistencias, minutos, tarjetas y puntos dentro y fuera. */
       const ficha = url.searchParams.get('estadisticas');
       if (ficha) {
         const sistema = await sistemaDeLaLiga(env);
-        const nombres = await players(sistema);
-        const data = await playerStats(ficha, nombres, sistema);
+        const data = await playerStats(ficha, await players(sistema), sistema);
         if (!data) return fail(404, 'No hay ficha de ese futbolista.', origin);
-        /* Estatura, peso y cuna: no están en Biwenger, se sacan de la web de
-           LaLiga. Va aquí y no en su propia llamada para que la web lo reciba
-           todo junto y no tenga que pedir dos veces al abrir un futbolista. */
-        data.bio = await datosDeLaLiga(env, nombres[String(ficha) + ':slug'])
-          .catch(function () { return null; });
         return new Response(JSON.stringify(data), {
           headers: Object.assign({ 'content-type': 'application/json; charset=utf-8' }, cors(origin))
         });
@@ -1794,30 +1804,168 @@ async function matchDay(roundId, score, names, primas) {
  * Se cachea en el KV para siempre: la estatura de nadie cambia, y la página
  * son 300 KB que no conviene volver a bajar.
  */
-async function datosDeLaLiga(env, slug) {
+/**
+ * La provincia de una localidad, vía Wikidata.
+ *
+ * Ninguna fuente de fútbol la publica: LaLiga y ESPN dan la localidad pelada,
+ * SofaScore bloquea, BeSoccer pide clave y FlashScore va por feeds firmados.
+ * Pero con la localidad ya en la mano, esto es un problema de geografía, y para
+ * eso Wikidata es pública, estable y gratis.
+ *
+ * El camino es «localidad → P131 (dónde está)». Tiene truco: a veces el primer
+ * P131 es la comarca y no la provincia (Martorell devuelve «Bajo Llobregat»),
+ * así que se prefiere la que se llame «provincia de…» y, si ninguna lo es, se
+ * sube un nivel más. Dos saltos como mucho.
+ *
+ * Se cachea por localidad, no por futbolista: las ciudades se repiten mucho
+ * entre jugadores y así se pregunta una vez por ciudad y para siempre.
+ */
+async function provinciaDe(env, ciudad) {
+  if (!ciudad) return null;
+  const clave = 'prov-' + ciudad.toLowerCase();
+
+  if (env.JORNADAS) {
+    try {
+      const guardado = await env.JORNADAS.get(clave);
+      if (guardado) {
+        const dato = JSON.parse(guardado);
+        return dato && dato.nada ? null : dato.nombre;
+      }
+    } catch (error) { /* se pregunta abajo */ }
+  }
+
+  const cabeceras = { 'user-agent': 'calculadora-biwenger/1.0', 'accept': 'application/json' };
+  /* Solo se recuerda lo que es una respuesta de verdad. Si la petición falla o
+     Wikipedia nos frena por ir deprisa, se devuelve nada PERO no se guarda: si
+     no, un tropiezo de un segundo dejaría esa ciudad sin provincia para
+     siempre, y encima sin forma de darse cuenta. */
+  const guardar = function (nombre) {
+    if (env.JORNADAS) {
+      try { env.JORNADAS.put(clave, JSON.stringify(nombre ? { nombre: nombre } : { nada: true })); }
+      catch (e) { /* da igual */ }
+    }
+    return nombre;
+  };
+
+  try {
+    /* De la localidad a su ficha en Wikidata, por la Wikipedia en español. */
+    const wiki = await fetch('https://es.wikipedia.org/w/api.php?action=query&prop=pageprops' +
+      '&format=json&titles=' + encodeURIComponent(ciudad), { headers: cabeceras });
+    if (!wiki.ok) return null;
+    const paginas = (((await wiki.json()).query) || {}).pages || {};
+    const primera = Object.keys(paginas).map(function (k) { return paginas[k]; })[0] || {};
+    let actual = (primera.pageprops || {}).wikibase_item;
+    /* Aquí sí es un «no»: la ciudad existe en la respuesta y no tiene ficha. */
+    if (!actual) return guardar(null);
+
+    /* Se sube por «está situado en» hasta dar con algo que sea una provincia. */
+    for (let salto = 0; salto < 2; salto++) {
+      const ficha = await fetch('https://www.wikidata.org/w/api.php?action=wbgetentities&ids=' +
+        encodeURIComponent(actual) + '&props=claims&format=json', { headers: cabeceras });
+      if (!ficha.ok) return null;
+      const claims = (((await ficha.json()).entities || {})[actual] || {}).claims || {};
+      const padres = (claims.P131 || [])
+        .map(function (c) { return (((c.mainsnak || {}).datavalue || {}).value || {}).id; })
+        .filter(Boolean);
+      if (!padres.length) return guardar(null);
+
+      const etiquetas = await fetch('https://www.wikidata.org/w/api.php?action=wbgetentities&ids=' +
+        padres.join('|') + '&props=labels&languages=es&format=json', { headers: cabeceras });
+      if (!etiquetas.ok) return null;
+      const entidades = ((await etiquetas.json()).entities) || {};
+
+      let primero = null;
+      for (let i = 0; i < padres.length; i++) {
+        const nombre = (((entidades[padres[i]] || {}).labels || {}).es || {}).value;
+        if (!nombre) continue;
+        if (primero === null) primero = { id: padres[i], nombre: nombre };
+        if (/^provincia de\s+/i.test(nombre)) {
+          return guardar(nombre.replace(/^provincia de\s+/i, ''));
+        }
+      }
+      /* Ninguna era provincia: en el último salto vale lo que haya (en Brasil
+         o Argentina el nivel de arriba es el estado, y sirve igual). */
+      if (!primero) return guardar(null);
+      if (salto === 1) return guardar(primero.nombre);
+      actual = primero.id;
+    }
+  } catch (error) {
+    /* Se cayó la red o la respuesta no era JSON: no se guarda nada, para poder
+       volver a intentarlo la próxima vez. */
+    return null;
+  }
+  return guardar(null);
+}
+
+function comoSlug(texto) {
+  return String(texto || '').toLowerCase()
+    .normalize('NFD').replace(/[̀-ͯ]/g, '')   // fuera tildes
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+}
+
+/**
+ * La ficha completa: lo de LaLiga más la provincia.
+ *
+ * Son dos cachés distintas a propósito. La de LaLiga guarda la descarga gorda
+ * (300 KB) y no caduca. La de la provincia va por localidad, se comparte entre
+ * futbolistas de la misma ciudad y sabe distinguir un «no tiene» de un «hoy no
+ * he podido preguntar». Metiendo la provincia dentro de la ficha, un tropiezo
+ * de Wikipedia se quedaba grabado para siempre en ese futbolista.
+ */
+async function datosDeLaLiga(env, slug, nombre) {
+  const bio = await fichaDeLaLiga(env, slug, nombre);
+  if (!bio) return null;
+  return Object.assign({}, bio, {
+    birthProvince: await provinciaDe(env, bio.birthPlace).catch(function () { return null; })
+  });
+}
+
+async function fichaDeLaLiga(env, slug, nombre) {
   if (!slug) return null;
   const clave = 'bio-' + slug;
 
   if (env.JORNADAS) {
     try {
       const guardado = await env.JORNADAS.get(clave);
-      if (guardado) return JSON.parse(guardado);
+      /* Los fallos también se recuerdan: si no, cada vez que se abriera ese
+         futbolista se repetirían las dos descargas para nada. */
+      if (guardado) {
+        const dato = JSON.parse(guardado);
+        return dato && dato.nada ? null : dato;
+      }
     } catch (error) { /* se pide abajo */ }
   }
 
-  const response = await fetch('https://www.laliga.com/en-GB/player/' +
-    encodeURIComponent(slug), { headers: NAVEGADOR });
-  if (!response.ok) return null;
+  /* Dos formas de nombrarlo. LaLiga unas veces usa el nombre largo («eric-
+     garcia») y otras el corto («brahim», «rodri»), y Biwenger guarda el largo
+     en el slug y el corto en el nombre. Probando los dos se pasa de acertar la
+     mitad a acertar cuatro de cada cinco. */
+  const intentos = [slug];
+  const corto = comoSlug(nombre);
+  if (corto && corto !== slug) intentos.push(corto);
 
-  const html = await response.text();
-  const marca = html.indexOf('__NEXT_DATA__');
-  if (marca === -1) return null;
-  const desde = html.indexOf('>', marca) + 1;
-  const hasta = html.indexOf('</script>', desde);
-  if (desde <= 0 || hasta <= desde) return null;
+  let arbol = null;
+  for (let i = 0; i < intentos.length && !arbol; i++) {
+    const response = await fetch('https://www.laliga.com/en-GB/player/' +
+      encodeURIComponent(intentos[i]), { headers: NAVEGADOR }).catch(function () { return null; });
+    if (!response || !response.ok) continue;
 
-  let arbol;
-  try { arbol = JSON.parse(html.slice(desde, hasta)); } catch (error) { return null; }
+    const html = await response.text();
+    const marca = html.indexOf('__NEXT_DATA__');
+    if (marca === -1) continue;
+    const desde = html.indexOf('>', marca) + 1;
+    const hasta = html.indexOf('</script>', desde);
+    if (desde <= 0 || hasta <= desde) continue;
+    try { arbol = JSON.parse(html.slice(desde, hasta)); } catch (error) { arbol = null; }
+  }
+
+  if (!arbol) {
+    if (env.JORNADAS) {
+      try { await env.JORNADAS.put(clave, JSON.stringify({ nada: true })); } catch (e) { /* da igual */ }
+    }
+    return null;
+  }
 
   /* La ficha está colgada en algún punto del árbol; se reconoce porque es el
      único nodo con estatura y peso a la vez. */
@@ -1842,8 +1990,11 @@ async function datosDeLaLiga(env, slug) {
     height: numero(ficha.height),        // centímetros
     weight: numero(ficha.weight),        // kilos
     birthDate: ficha.date_of_birth ? String(ficha.date_of_birth).slice(0, 10) : null,
+    /* Solo la localidad: LaLiga no publica la provincia por ningún lado. */
     birthPlace: ficha.place_of_birth || null,
-    country: (ficha.country && ficha.country.id) || null
+    /* Código de país (ES, BR). El nombre lo pone la web, que sabe traducirlo. */
+    country: (ficha.country && ficha.country.id) || null,
+    number: numero(((ficha.squads || [])[0] || {}).shirt_number)
   };
 
   if (env.JORNADAS) {
