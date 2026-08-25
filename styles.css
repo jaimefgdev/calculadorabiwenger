@@ -1481,11 +1481,13 @@ code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft)
 .jugador-card:hover .jugador-card__nombre { color: var(--accent); }
 .jugador-card:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 /* La medida la lleva la caja de la cara, igual que en el campo, pero aquí hay
-   sitio de sobra: caras más grandes y menos futbolistas por fila. */
-.jugador-card .face-box { display: block; width: min(90%, 84px); margin: 0 auto; }
+   sitio de sobra: caras más grandes y menos futbolistas por fila. Al pasar de
+   cinco a cuatro, cada hueco es un cuarto más ancho y el tope sube con él. */
+.jugador-card .face-box { display: block; width: min(90%, 104px); margin: 0 auto; }
 .jugador-card .pic-player { position: relative; z-index: 1; }
-/* El escudo crece con la cara para que la marca de agua siga cuadrando. */
-.jugador-card .crest--ghost { width: 86px; height: 85px; left: calc(50% - 12px); }
+/* El escudo crece con la cara, en la misma proporción, para que la marca de
+   agua siga cuadrando detrás en vez de quedarse pequeña y descentrada. */
+.jugador-card .crest--ghost { width: 106px; height: 105px; left: calc(50% - 15px); }
 /* Demarcación, arriba a la izquierda de la ficha y con su color. */
 .puesto {
   /* Metida hacia dentro: la ficha tiene las esquinas redondeadas y recorta lo
