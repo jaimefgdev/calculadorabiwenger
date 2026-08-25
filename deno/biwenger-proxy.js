@@ -104,7 +104,7 @@ const CDN = 'https://cf.biwenger.com/api/v2';
    navegador normal y las cabeceras que este mandaría. */
 /* Marca de versión: se sube en cada cambio y se consulta con ?version=1.
    Sirve para saber desde fuera si el despliegue ha entrado o no. */
-const VERSION = '2026-08-25 · deno 23';
+const VERSION = '2026-08-25 · deno 24';
 
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ' +
   '(KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36';
@@ -2465,7 +2465,28 @@ async function bestXi(roundId, names, score) {
  */
 async function roundBoard(env, headers, jornada, listaNombres) {
   const calendar = await seasonRounds().catch(function () { return []; });
-  const wanted = String(jornada) === 'actual' ? '' : String(jornada);
+  let wanted = String(jornada) === 'actual' ? '' : String(jornada);
+
+  /* «Actual» para Biwenger es la última que cerró, no la que se está jugando.
+     Con los aplazados eso se nota: la jornada 1 se partió en dos y su segunda
+     mitad se juega diez días después, pero él seguía diciendo «Jornada 2» y la
+     pestaña se quedaba clavada ahí mientras rodaba la 1.
+
+     Así que manda la jornada del próximo partido, que es la que ya calcula la
+     tarjeta de inicio. Y se devuelve su mitad de calendario (part 1), no la
+     aplazada: la aplazada no es una jornada aparte —repite los mismos
+     partidos— y el selector ni siquiera la lista, así que no se podría marcar
+     cuál se está viendo. Solo se hace el cambio si esa jornada ya ha empezado;
+     si no, se deja lo que diga él. */
+  if (!wanted) {
+    const enCurso = await nextRound().catch(function () { return null; });
+    if (enCurso && (enCurso.played || 0) > 0 && enCurso.number != null) {
+      const propia = calendar.filter(function (r) {
+        return (r.part || 1) === 1 && r.number === enCurso.number;
+      })[0];
+      if (propia && propia.id != null) wanted = String(propia.id);
+    }
+  }
   /* La jornada va en la ruta, no como parámetro: su propia web pide
      /rounds/league/<id>. Con ?round= contestaba siempre la actual, y por eso
      elegir otra jornada no cambiaba nada. */
