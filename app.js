@@ -463,6 +463,12 @@
       if (movement.type === 'buy') {
         row.spent += movement.amount;
         row.buys += 1;
+      } else if (movement.type === 'bonus') {
+        /* El abono de la jornada entra como ingreso, pero no es una venta: si
+           se contara como tal, el número de ventas y la media por venta
+           saldrían inflados. Puede ser negativo, si la liga resta por
+           puntuación negativa, y entonces baja el ingreso, que es lo suyo. */
+        row.earned += movement.amount;
       } else {
         row.earned += movement.amount;
         row.sells += 1;
