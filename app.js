@@ -1831,8 +1831,13 @@
     const vivoAhora = rodando ? marcadorEnVivo(rodando.home, rodando.away) : null;
 
     /* Con la jornada empezada el rótulo sobra: ya se ve el partido en curso o
-       los que van jugados. Solo se dice algo cuando aún no ha arrancado. */
-    $('round-label').textContent = enJuego ? '' : 'Inicio de la';
+       los que van jugados. Solo se dice algo cuando aún no ha arrancado.
+
+       Mirar solo `live` no bastaba: una jornada con la mitad jugada y el resto
+       aplazado no tiene ningún partido rodando ahora mismo, así que volvía a
+       anunciarse como «Inicio de la Jornada 1» con seis partidos ya en el
+       bote. Lo que decide es si ha arrancado, no si hay algo en juego. */
+    $('round-label').textContent = porEmpezar ? 'Inicio de la' : '';
     $('round-name').textContent = 'Jornada ' + (round.number || '');
 
     if (rodando) {
@@ -1854,10 +1859,11 @@
     } else {
       /* Antes de arrancar, ni fecha ni hora: la cuenta atras de al lado ya dice
          cuanto queda, que es lo que se mira, y la fecha solo hacia ruido. */
+      /* Ya arrancada, lo que se mira es por dónde va, no la fecha del siguiente
+         —esa la da la cuenta atrás de al lado—. Con los aplazados, la fecha
+         era encima la de dentro de diez días. */
       $('round-when').textContent = porEmpezar ? ''
-        : (enJuego
-          ? (round.played || 0) + ' de ' + (round.games || 0) + ' partidos jugados'
-          : dateFormat.format(new Date(round.start)));
+        : (round.played || 0) + ' de ' + (round.games || 0) + ' partidos jugados';
     }
 
     const matches = round.matches || [];
@@ -4626,7 +4632,14 @@
 
   const ROUND_VALUES = {
     name: function (row) { return (row.name || '').toLowerCase(); },
-    points: function (row) { return row.points == null ? -Infinity : row.points; },
+    /* Al que empezó la jornada en negativo se le enseñan sus puntos (tachados,
+       como hace Biwenger) pero para la tabla valen cero, que es lo que suman.
+       Si se ordena por lo que se ve, sale sexto teniendo un cero y adelanta a
+       gente que sí ha puntuado; Biwenger lo manda al último puesto. */
+    points: function (row) {
+      if (row.points == null) return -Infinity;
+      return row.counts === false ? 0 : row.points;
+    },
     general: function (row) {
       const total = puntosGenerales(row.name);
       return total == null ? -Infinity : total;
@@ -4994,7 +5007,8 @@
       (conDueno
         ? (chapaDeManager(jugador, 'dueno--alto') || statusMark(jugador, 'mark--esquina'))
         : statusMark(jugador, 'mark--esquina')) +
-      '<span class="pts pts--esquina' + (sinNota ? ' pts--sinnota' : '') + (negativa ? ' pts--neg' : '') + '">' +
+      '<span class="pts pts--esquina' + (sinNota ? ' pts--sinnota' : '') + (negativa ? ' pts--neg' : '') + '"' +
+        (jugador.fuera ? ' title="Ya no juega en LaLiga: no puntúa esta jornada"' : '') + '>' +
         marcaDePuntos(jugador) + '</span>' +
     '</span>';
   }
