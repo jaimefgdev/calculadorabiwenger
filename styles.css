@@ -56,6 +56,10 @@
   --neg:           #ff0033;
   --neg-soft:      rgba(255, 0, 51, .1);
 
+  /* La silueta del aspa de borrar. Se declara una vez aquí y no cambia con el
+     tema: el color no vive en el dibujo, lo pone la máscara. */
+  --aspa: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M4 4 L12 12 M12 4 L4 12' stroke='%23000' stroke-width='2.2' stroke-linecap='round'/%3E%3C/svg%3E");
+
   --radius:        14px;
   --radius-sm:     9px;
   --shadow:        0 1px 2px rgba(0, 0, 0, .5), 0 8px 24px rgba(0, 0, 0, .55);
@@ -1463,6 +1467,19 @@ code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft)
    Cada uno con la misma ficha que en el campo: escudo difuminado detrás de la
    cara, estado y puntos en sus círculos, y el nombre debajo. */
 #jugadores-buscar { min-width: 240px; }
+
+/* La aspa de borrar de los buscadores (Jugadores y Fichajes). El navegador la
+   pinta él y no deja cambiarle el color, así que se le quita la suya y se
+   dibuja la misma silueta como máscara: teñida ya sí, con el rojo del tema.
+   Va con `background-color`, que es lo que colorea una máscara. */
+input[type="search"]::-webkit-search-cancel-button {
+  -webkit-appearance: none; appearance: none;
+  width: 14px; height: 14px; cursor: pointer;
+  background-color: var(--neg);
+  -webkit-mask: var(--aspa) center / contain no-repeat;
+  mask: var(--aspa) center / contain no-repeat;
+}
+input[type="search"]::-webkit-search-cancel-button:hover { opacity: .75; }
 .jugadores-rejilla {
   /* Cuatro por fila, en el ordenador y en el móvil: sin consultas de medios,
      que en móvil se ve la misma cuadrícula escalada. */
