@@ -104,7 +104,7 @@ const CDN = 'https://cf.biwenger.com/api/v2';
    navegador normal y las cabeceras que este mandaría. */
 /* Marca de versión: se sube en cada cambio y se consulta con ?version=1.
    Sirve para saber desde fuera si el despliegue ha entrado o no. */
-const VERSION = '2026-08-25 · deno 20';
+const VERSION = '2026-08-25 · deno 21';
 
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ' +
   '(KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36';
@@ -218,8 +218,13 @@ const app = {
       if (quienEs) {
         const sistema = await sistemaDeLaLiga(env);
         const nombres = await players(sistema);
+        const clubDe = nombres['team:' + nombres[String(quienEs) + ':team']];
         const data = await datosDeLaLiga(env, nombres[String(quienEs) + ':slug'],
-          nombres[String(quienEs)]).catch(function () { return null; });
+          nombres[String(quienEs)], clubDe).catch(function () { return null; });
+        /* Si LaLiga no da dorsal, el de Biwenger sirve igual. */
+        if (data && !data.number && nombres[String(quienEs) + ':num'] != null) {
+          data.number = nombres[String(quienEs) + ':num'];
+        }
         return new Response(JSON.stringify(data || {}), {
           headers: Object.assign({ 'content-type': 'application/json; charset=utf-8' }, cors(origin))
         });
@@ -953,6 +958,8 @@ async function players(score) {
        La ruta siempre es la misma («i/p/hero/<id>.png»), así que basta con
        saber quién la tiene y la web ya la compone. */
     names[id + ':hero'] = !!source[id].iconHero;
+    /* El dorsal, por si la ficha de LaLiga no lo trae. */
+    names[id + ':num'] = source[id].number != null ? source[id].number : null;
     /* Las últimas jornadas suyas, para dibujar su racha. Los huecos («injured»,
        null) se guardan como null: se pintan igual, pero sin nota. */
     names[id + ':fit'] = partidos.map(function (nota) {
@@ -1897,6 +1904,23 @@ async function provinciaDe(env, ciudad) {
   return guardar(null);
 }
 
+/**
+ * ¿Son el mismo club? Cada web lo escribe a su manera —Biwenger dice
+ * «Barcelona» y LaLiga «FC Barcelona»; «Sevilla» y «Sevilla FC»—, así que se
+ * quitan las siglas y se comprueba si uno contiene al otro.
+ */
+function mismoEquipo(uno, otro) {
+  const limpiar = function (texto) {
+    return String(texto || '').toLowerCase()
+      .normalize('NFD').replace(/[̀-ͯ]/g, '')
+      .replace(/\b(fc|cf|ud|cd|rc|rcd|sd|sad|club|de|futbol|fútbol)\b/g, '')
+      .replace(/[^a-z0-9]+/g, '');
+  };
+  const a = limpiar(uno), b = limpiar(otro);
+  if (!a || !b) return false;
+  return a === b || a.indexOf(b) !== -1 || b.indexOf(a) !== -1;
+}
+
 function comoSlug(texto) {
   return String(texto || '').toLowerCase()
     .normalize('NFD').replace(/[̀-ͯ]/g, '')   // fuera tildes
@@ -1913,15 +1937,15 @@ function comoSlug(texto) {
  * he podido preguntar». Metiendo la provincia dentro de la ficha, un tropiezo
  * de Wikipedia se quedaba grabado para siempre en ese futbolista.
  */
-async function datosDeLaLiga(env, slug, nombre) {
-  const bio = await fichaDeLaLiga(env, slug, nombre);
+async function datosDeLaLiga(env, slug, nombre, equipo) {
+  const bio = await fichaDeLaLiga(env, slug, nombre, equipo);
   if (!bio) return null;
   return Object.assign({}, bio, {
     birthProvince: await provinciaDe(env, bio.birthPlace).catch(function () { return null; })
   });
 }
 
-async function fichaDeLaLiga(env, slug, nombre) {
+async function fichaDeLaLiga(env, slug, nombre, equipo) {
   if (!slug) return null;
   const clave = 'bio-' + slug;
 
@@ -1982,6 +2006,15 @@ async function fichaDeLaLiga(env, slug, nombre) {
 
   const ficha = buscar(arbol.props || arbol, 0);
   if (!ficha) return null;
+
+  /* Que sea de verdad ESE futbolista. Al probar el nombre corto se puede caer
+     en otro que se llame igual: buscando «yuri» sale Yuri de Souza, brasileño
+     de Maceió, y se le colocaba su cuna a Yuri Berchiche, que es de Zarautz y
+     juega en el Athletic. La prueba es el club: el impostor ni siquiera está
+     en una plantilla de LaLiga, y si lo estuviera sería en otra. Sin club que
+     cuadre, no se devuelve nada: mejor un hueco que el dato de otro. */
+  const suyo = ((ficha.squads || [])[0] || {}).team || null;
+  if (!suyo || (equipo && !mismoEquipo(equipo, suyo.nickname || suyo.name))) return null;
 
   const numero = function (v) { const n = Number(v); return n > 0 ? n : null; };
   const bio = {
