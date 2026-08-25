@@ -60,6 +60,13 @@
     return caja.data;
   }
 
+  /** Lista de ids a diccionario, para poder preguntar por uno de golpe. */
+  function comoDiccionario(lista) {
+    const mapa = {};
+    (lista || []).forEach(function (id) { mapa[String(id)] = true; });
+    return mapa;
+  }
+
   function cacheGuardar(nombre, data) {
     try {
       const todo = cacheTodo();
@@ -8472,12 +8479,15 @@
     state.round = payload.round || state.round;
     state.movers = payload.movers || state.movers;
     /* Los que tienen foto de destacado. Se guardan como diccionario para poder
-       preguntar por uno sin recorrer los noventa cada vez que se pinta una
-       cara, que son cientos por pantalla. */
+       preguntar por uno sin recorrer los setenta y pico cada vez que se pinta
+       una cara, que son cientos por pantalla.
+
+       Y se dejan también en la caché del navegador: si no, la primera pintada
+       sale con las fotos normales y tres segundos después, al llegar esta
+       lista, cambiaban solas delante de ti. */
     if (Array.isArray(payload.heroes)) {
-      const heroes = {};
-      payload.heroes.forEach(function (id) { heroes[String(id)] = true; });
-      state.heroes = heroes;
+      state.heroes = comoDiccionario(payload.heroes);
+      cacheGuardar('heroes', payload.heroes);
     }
     /* Altas y bajas de LaLiga: van en su propia vista dentro de Fichajes. */
     state.laligaMoves = payload.laligaMoves || state.laligaMoves || [];
@@ -9289,6 +9299,11 @@
   /* ---------- Arranque ---------- */
 
   function init() {
+    /* Lo primero de todo: quién lleva foto de destacado. Va antes de pintar
+       nada porque si llega después, las caras se cambian solas a los tres
+       segundos, delante del que está mirando. */
+    state.heroes = comoDiccionario(cacheLeer('heroes'));
+
     renderManagerFilter();
     bindEvents();
     engancharOperaciones();
