@@ -401,6 +401,14 @@ code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft)
 }
 /* El minuto, pegado al marcador y con su mismo peso. */
 .round__minuto { font-family: var(--mono); font-weight: 700; color: var(--marca); }
+
+/* El minuto del partido, centrado bajo el marcador al desplegarlo. Reaprovecha
+   el rótulo «En juego» y el reloj de la tarjeta de inicio, para que el mismo
+   dato se lea igual en los dos sitios. */
+.partido__reloj {
+  display: flex; align-items: center; justify-content: center; gap: .45rem;
+  margin: 0 0 .6rem;
+}
 /* En la lista de partidos el distintivo va como el de la cabecera, pero sin
    mayúsculas forzadas: ahí conviven con los nombres de los canales. */
 .round__live--fila { text-transform: none; letter-spacing: 0; gap: .3rem; }
@@ -968,6 +976,13 @@ code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft)
 .personal__dato strong {
   font-size: .95em;
   font-variant-numeric: tabular-nums; white-space: nowrap;
+}
+
+/* Las tres vistas de la ficha, como pestañas pegadas entre sí: se ve de un
+   golpe que son opciones de lo mismo y cuál está puesta. */
+.ficha__vistas { display: inline-flex; gap: .25rem; }
+.ficha__vista.is-current {
+  background: var(--accent); border-color: var(--accent); color: #fff;
 }
 
 /* Trayectoria por clubes, con sus cifras. La fila del club actual va marcada. */

@@ -5764,6 +5764,13 @@
               '</button>' +
               (abierto
                 ? '<div class="partido__detalle">' +
+                    /* Con el partido rodando, el minuto debajo del marcador: es
+                       lo primero que se busca al abrirlo, y arriba solo estaba
+                       escondido en el título del marcador. */
+                    (!acabado && vivo && vivo.reloj
+                      ? '<p class="partido__reloj"><span class="round__live">En juego</span>' +
+                        '<strong class="round__minuto">' + escapeHtml(vivo.reloj) + '</strong></p>'
+                      : '') +
                     (jugado ? ''
                       : '<p class="muted alin__aviso">' +
                         (juego.confirmadas ? 'Alineación confirmada.' : 'Alineaciones probables.') +
@@ -6852,6 +6859,22 @@
      El emparejamiento es por nombre y SE VALIDA CON EL CLUB. Sin eso se cuela
      otro futbolista: buscando «Balde» salen tres y «Yuri» devuelve al brasileño
      de Maceió en vez de a Berchiche, que es del Athletic. */
+  /* Las tres vistas de la ficha de un futbolista, en el orden en que se leen:
+     primero cómo va, luego quién es, y al final partido a partido. */
+  const VISTAS_FICHA = [
+    { clave: 'stats', rotulo: 'Estadísticas' },
+    { clave: 'ficha', rotulo: 'Ficha' },
+    { clave: 'partidos', rotulo: 'Partidos' }
+  ];
+
+  /** Cuál se está mirando. Sin elegir nada, las estadísticas. */
+  function vistaDeFicha(abierto) {
+    if (!abierto) return 'stats';
+    if (abierto.partidos) return 'partidos';
+    if (abierto.ficha) return 'ficha';
+    return 'stats';
+  }
+
   const SOFA = 'https://api.sofascore.com/api/v1';
   /* Lo manda en inglés. */
   const PIES = { Left: 'Zurdo', Right: 'Diestro', Both: 'Ambidiestro' };
@@ -7531,26 +7554,22 @@
           '</span>' +
           /* Mientras se elige rival, la pastilla estorba: su sitio lo ocupa el
              aspa que hay junto al buscador. */
+          /* Tres vistas del mismo futbolista, como pestañas: siempre hay una
+             activa y se salta entre ellas sin abrir ni cerrar nada. Comparar
+             va aparte porque no es una vista, es un modo que se superpone a la
+             que estés mirando. */
           (abierto.eligiendo ? '' :
-            /* Con los partidos o la ficha abiertos, comparar estorba: se deja
-               solo la pastilla para volver. */
-          (abierto.partidos || abierto.ficha ? '' :
+            '<span class="ficha__vistas">' +
+              VISTAS_FICHA.map(function (v) {
+                const activa = vistaDeFicha(abierto) === v.clave;
+                return '<button type="button" class="ambito ficha__vista' +
+                  (activa ? ' is-current' : '') + '" data-ficha-vista="' + v.clave + '"' +
+                  (activa ? ' aria-current="true"' : '') + '>' +
+                  v.rotulo + '</button>';
+              }).join('') +
+            '</span>' +
             '<button type="button" class="ambito ficha__comparar" data-comparar>' +
               (abierto.comparar ? 'Quitar comparación' : 'Comparar') + '</button>') +
-            /* Mientras estás eligiendo rival no hay dos a quien comparar, así
-               que el botón de partidos se esconde hasta que elijas; en cuanto
-               hay rival vuelve, y entonces enseña los de los dos. */
-            (abierto.ficha ? '' :
-              '<button type="button" class="ambito' + (abierto.partidos ? ' ficha__comparar' : '') +
-                '" data-partidos-de>' +
-                (abierto.partidos ? 'Ocultar partidos' : 'Partidos') + '</button>') +
-            /* Datos personales y trayectoria. Van tras su propia pastilla y en
-               esta misma ventana, no en otra: todo lo del futbolista se mira
-               aquí y se va cambiando con los botones. */
-            (abierto.partidos ? '' :
-              '<button type="button" class="ambito' + (abierto.ficha ? ' ficha__comparar' : '') +
-                '" data-ficha-de>' +
-                (abierto.ficha ? 'Ocultar ficha' : 'Ficha') + '</button>')) +
           '<button type="button" class="btn btn--ghost btn--close" data-price-close' +
             ' title="Cerrar" aria-label="Cerrar">✕</button>' +
         '</div>' +
@@ -9415,14 +9434,16 @@
     $('price-modal').addEventListener('click', function (event) {
       if (!state.priceModal) return;
 
-      if (event.target.closest('[data-ficha-de]')) {
-        state.priceModal.ficha = !state.priceModal.ficha;
-        renderPriceModal();
-        return;
-      }
-
-      if (event.target.closest('[data-partidos-de]')) {
-        state.priceModal.partidos = !state.priceModal.partidos;
+      /* Atributo propio: `data-vista` ya lo usa la pastilla tabla/campo de los
+         partidos, que se pinta dentro de esta misma ventana. */
+      const pestana = event.target.closest('[data-ficha-vista]');
+      if (pestana) {
+        const cual = pestana.getAttribute('data-ficha-vista');
+        /* Se guardan como dos banderas y no como un solo valor porque de ellas
+           cuelgan un montón de condiciones repartidas por la ficha; así el
+           cambio es de pestañas por fuera sin tocar todo eso por dentro. */
+        state.priceModal.partidos = cual === 'partidos';
+        state.priceModal.ficha = cual === 'ficha';
         if (state.priceModal.partidos) {
           ensurePartidosDe(state.priceModal.id);
           /* Comparando, hacen falta los del rival para poder ponerlos al lado. */
