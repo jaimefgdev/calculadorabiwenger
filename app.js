@@ -6509,6 +6509,47 @@
    * Lo que lleva el futbolista esta temporada. Los lances van con el mismo
    * icono que en los partidos; lo dem\u00e1s, con su nombre debajo.
    */
+  /**
+   * La tira de datos personales, delante de las estadísticas.
+   *
+   * Sale de la web de LaLiga (Biwenger no publica nada de esto). Solo se pintan
+   * los campos que vengan: de algún futbolista faltará la cuna o la estatura, y
+   * es mejor no enseñar el hueco que enseñarlo vacío.
+   */
+  function tiraPersonal(id) {
+    const datos = state.estadisticas[String(id)];
+    if (!datos || datos === 'pidiendo' || !datos.bio) return '';
+    const bio = datos.bio;
+
+    const partes = [];
+    if (bio.birthDate) {
+      const f = new Date(bio.birthDate + 'T00:00:00');
+      if (!isNaN(f.getTime())) {
+        /* La edad se calcula aquí y no se guarda: si no, envejecería mal. */
+        const hoy = new Date();
+        let anos = hoy.getFullYear() - f.getFullYear();
+        const mes = hoy.getMonth() - f.getMonth();
+        if (mes < 0 || (mes === 0 && hoy.getDate() < f.getDate())) anos--;
+        partes.push({ que: 'Edad', valor: anos + ' años',
+          detalle: dateFormat.format(f) });
+      }
+    }
+    if (bio.birthPlace) partes.push({ que: 'Nacido en', valor: bio.birthPlace });
+    if (bio.height) partes.push({ que: 'Estatura', valor: bio.height + ' cm' });
+    if (bio.weight) partes.push({ que: 'Peso', valor: bio.weight + ' kg' });
+    if (!partes.length) return '';
+
+    return '<div class="personal"' +
+      (bio.fullName ? ' title="' + escapeHtml(bio.fullName) + '"' : '') + '>' +
+      partes.map(function (p) {
+        return '<div class="personal__dato"' +
+          (p.detalle ? ' title="' + escapeHtml(p.detalle) + '"' : '') + '>' +
+          '<span class="personal__label">' + escapeHtml(p.que) + '</span>' +
+          '<strong>' + escapeHtml(p.valor) + '</strong></div>';
+      }).join('') +
+    '</div>';
+  }
+
   function estadisticasDeTemporada(id) {
     const datos = state.estadisticas[String(id)];
     /* Mientras no estén (o si no llegan) no se dice nada: aparecen solas al
@@ -7182,7 +7223,7 @@
            tampoco: esos cuadros son de uno solo y repiten, peor contadas, las
            mismas cifras que ya están enfrentadas arriba. */
         (abierto.partidos || abierto.soloPrecio || abierto.comparar
-          ? '' : estadisticasDeTemporada(abierto.id) + rachaDeTemporada(abierto.id)) +
+          ? '' : tiraPersonal(abierto.id) + estadisticasDeTemporada(abierto.id) + rachaDeTemporada(abierto.id)) +
         /* Desde los rankings solo interesan las estadísticas: ni el valor de
            mercado ni su evolución pintan nada ahí. Comparando, el gráfico de
            precio sería el de uno de los dos y engañaría: se deja fuera. */
@@ -7887,7 +7928,7 @@
               '<strong class="ranking__value">' + valor + '</strong>' +
             '</button>' +
             /* Se abre aquí mismo, hacia abajo, y solo con las estadísticas. */
-            (abierto ? '<div class="ranking__ficha">' + estadisticasDeTemporada(jugador.id) + '</div>' : '') +
+            (abierto ? '<div class="ranking__ficha">' + tiraPersonal(jugador.id) + estadisticasDeTemporada(jugador.id) + '</div>' : '') +
           '</li>';
         }).join('') + '</ol>' +
         /* Mismo «Ver menos» que en «suben y bajan», y en el mismo sitio: al

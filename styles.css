@@ -916,6 +916,25 @@ code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft)
   grid-template-columns: repeat(8, minmax(0, 1fr));
   margin-bottom: .9rem;
 }
+/* Datos personales del futbolista, delante de las estadísticas. Mismo aire que
+   ellas, pero en una tira que se reparte el ancho: son cuatro datos sueltos, no
+   una rejilla que deba cuadrar con nada. */
+.personal {
+  display: flex; flex-wrap: wrap; gap: .35rem 1.4rem;
+  padding: 0 0 .6rem; margin: 0 0 .7rem;
+  border-bottom: 1px solid var(--border);
+}
+.personal__dato { display: flex; flex-direction: column; gap: .1rem; min-width: 0; }
+.personal__label {
+  font-size: clamp(.55rem, .72vw, .68rem);
+  text-transform: uppercase; letter-spacing: .03em; color: var(--text-faint);
+  white-space: nowrap;
+}
+.personal__dato strong {
+  font-size: clamp(.66rem, .95vw, .92rem);
+  font-variant-numeric: tabular-nums; white-space: nowrap;
+}
+
 .stat { display: flex; flex-direction: column; gap: .1rem; min-width: 0; }
 .stat__label {
   font-size: clamp(.55rem, .72vw, .68rem);
