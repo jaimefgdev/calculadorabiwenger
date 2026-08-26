@@ -104,7 +104,7 @@ const CDN = 'https://cf.biwenger.com/api/v2';
    navegador normal y las cabeceras que este mandaría. */
 /* Marca de versión: se sube en cada cambio y se consulta con ?version=1.
    Sirve para saber desde fuera si el despliegue ha entrado o no. */
-const VERSION = '2026-08-26 · deno 35';
+const VERSION = '2026-08-26 · deno 36';
 
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ' +
   '(KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36';
@@ -1798,12 +1798,18 @@ async function matchDay(roundId, score, names, primas) {
     };
   };
 
+  /* La guía de televisión, la misma que usa la tarjeta de inicio. Sin esto la
+     pestaña de jornadas no sabía por dónde se ve cada partido. */
+  const guia = await tvGuide().catch(function () { return []; });
+
   const partidos = (data.games || []).map(function (game) {
+    const cuando = game.date ? game.date * 1000 : null;
     return {
       id: game.id,
-      start: game.date ? new Date(game.date * 1000).toISOString() : null,
+      start: cuando ? new Date(cuando).toISOString() : null,
       status: game.status || null,
       where: game.location || null,
+      tv: cuando ? channelFor(guia, cuando, (game.home || {}).name, (game.away || {}).name) : null,
       /* Biwenger marca con «initialLineups» los partidos cuyos onces ya son
          los oficiales; sin esa marca, lo que hay son alineaciones probables. */
       confirmadas: !!game.initialLineups,
