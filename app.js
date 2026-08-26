@@ -3838,15 +3838,12 @@
         '<button type="button" class="btn btn--ghost btn--close" data-op-cerrar' +
           ' title="Cerrar" aria-label="Cerrar">✕</button>' +
       '</div>' +
-      '<p class="op-texto">' + plantilla.length + ' futbolistas. ¿A qué precio?</p>' +
+      '<p class="op-texto">¿A qué precio quieres poner a la venta a todos los ' +
+        'jugadores de tu plantilla?</p>' +
       '<div class="lote-precios">' +
         MULTIPLOS_VENTA.map(function (m) {
-          const total = plantilla.reduce(function (suma, j) {
-            return suma + Math.round((j.marketValue || 0) * m.factor);
-          }, 0);
           return '<button type="button" class="btn lote-precio" data-lote-factor="' + m.factor + '">' +
-            '<strong>' + escapeHtml(m.rotulo) + '</strong>' +
-            '<span class="sub">' + money(total) + ' en total</span></button>';
+            escapeHtml(m.rotulo) + '</button>';
         }).join('') +
       '</div>' +
       '<p class="op-aviso"></p>');
