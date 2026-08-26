@@ -104,7 +104,7 @@ const CDN = 'https://cf.biwenger.com/api/v2';
    navegador normal y las cabeceras que este mandaría. */
 /* Marca de versión: se sube en cada cambio y se consulta con ?version=1.
    Sirve para saber desde fuera si el despliegue ha entrado o no. */
-const VERSION = '2026-08-26 · deno 36';
+const VERSION = '2026-08-27 · deno 37';
 
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ' +
   '(KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36';
@@ -1925,6 +1925,27 @@ async function playerStats(id, names, score) {
       ? informe.points[sistema]
       : (bruto['score' + sistema] != null ? bruto['score' + sistema] : 0);
 
+    /* Biwenger emite informe de TODO el que estaba convocado, juegue o no: el
+       suplente que se queda en el banquillo tiene el suyo, a cero. Contarlo
+       como partido jugado hacía que la ficha diera por titular a quien no pisó
+       el campo —Rodri salía con una titularidad llevando cero minutos—, porque
+       «titular» se calcula como jugados menos los que entraron de cambio.
+       Sin minutos no jugó, y punto. Si Biwenger no manda el dato de minutos no
+       se supone nada y se cuenta como jugado, que es lo de siempre. */
+    const minutos = bruto.minutesPlayed;
+    const jugado = minutos == null ? true : minutos > 0;
+    if (!jugado) {
+      /* Ni jugados, ni casa/fuera, ni racha: para él ese partido no existe.
+         La jornada sí se apunta, con su guion, que es lo que dibuja el hueco
+         en el gráfico de barras. */
+      const rondaFuera = (informe.match && informe.match.round) || {};
+      const nFuera = Number(String(rondaFuera.short || '').replace(/\D/g, '')) || null;
+      if (nFuera) {
+        jornadas.push({ number: nFuera, points: 0, sinNota: true, home: !!informe.home });
+      }
+      return;
+    }
+
     suma.played += 1;
     suma.minutes += bruto.minutesPlayed || 0;
     suma.goals += bruto.goals || 0;
@@ -1949,20 +1970,9 @@ async function playerStats(id, names, score) {
 
     const ronda = (informe.match && informe.match.round) || {};
     const numero = Number(String(ronda.short || '').replace(/\D/g, '')) || null;
-    /* Sin minutos no jugó, aunque Biwenger emita el informe (un suplente que se
-       queda en el banquillo lo tiene igual, a cero). En el gráfico de barras eso
-       tiene que salir como un guion, no como «0 pts»: un cero se lee como que
-       jugó y no puntuó, que es otra cosa. Si no viene el dato de minutos no se
-       supone nada y se cuenta como jugado. */
-    const minutos = bruto.minutesPlayed;
-    const jugado = minutos == null ? true : minutos > 0;
+    /* Aquí ya se sabe que jugó: los que no, salieron antes con su guion. */
     if (numero) {
-      jornadas.push({
-        number: numero,
-        points: jugado ? puntos : 0,
-        sinNota: !jugado,
-        home: !!informe.home
-      });
+      jornadas.push({ number: numero, points: puntos, sinNota: false, home: !!informe.home });
     }
   });
 
