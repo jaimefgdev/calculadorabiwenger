@@ -104,7 +104,7 @@ const CDN = 'https://cf.biwenger.com/api/v2';
    navegador normal y las cabeceras que este mandaría. */
 /* Marca de versión: se sube en cada cambio y se consulta con ?version=1.
    Sirve para saber desde fuera si el despliegue ha entrado o no. */
-const VERSION = '2026-08-26 · deno 33';
+const VERSION = '2026-08-26 · deno 34';
 
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ' +
   '(KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36';
@@ -1967,6 +1967,10 @@ async function playerStats(id, names, score) {
     /* Su club. La web lo necesita para emparejarlo en SofaScore sin colarse de
        futbolista: hay varios «Balde» y varios «Yuri», y el equipo los separa. */
     teamName: names['team:' + names[String(id) + ':team']] || null,
+    /* Y su slug, que lleva el nombre largo. Buscando por el corto se falla:
+       «Vini Jr» devuelve un jugador de fútbol sala, y «vinicius junior» sí da
+       con el del Real Madrid. */
+    slug: names[String(id) + ':slug'] || null,
     played: suma.played,
     minutes: suma.minutes,
     goals: suma.goals,
