@@ -313,6 +313,8 @@ code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft)
 .delta--down { color: var(--neg); }
 /* Sin cambio: el guion y la cifra en el color normal del texto. */
 .delta--igual { color: var(--text); }
+/* Lo que se ha movido hoy la plantilla entera, bajo su valor. */
+.delta--dia { display: block; margin-top: .1rem; font-size: .68rem; }
 
 .btn--icon { display: inline-grid; place-items: center; padding: .45rem .55rem; line-height: 0; }
 .bid { display: inline-flex; align-items: center; gap: .4rem; margin-right: .6rem; }
@@ -897,6 +899,11 @@ code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft)
 /* Junto al nombre, en las plantillas. */
 .crest--badge { width: 16px; height: 16px; flex: none; opacity: .9; }
 .with-crest { display: inline-flex; align-items: center; gap: .4rem; min-width: 0; }
+/* Sin esto, el nombre no puede encoger —un elemento flex no baja de lo que
+   mide su contenido— y se desborda por debajo del escudo, que queda escrito
+   encima de las últimas letras («Tchouame|ni»). Con `min-width: 0` sí cede, y
+   el nombre se corta con puntos suspensivos en vez de pisarse. */
+.with-crest > * { min-width: 0; }
 /* Marca de agua: detrás del jugador, asomando por la derecha y desvaneciéndose.
    Mismo tratamiento en el campo y en el banquillo. */
 .crest--ghost {
@@ -989,6 +996,14 @@ code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft)
 /* El elegido, marcado: es lo que dice qué va a pasar al aceptar. */
 .lote-precio.is-current {
   background: var(--accent); border-color: var(--accent); color: #fff;
+}
+/* Apagado mientras no haya precio elegido, y encendido en cuanto lo hay: el
+   botón mismo dice si ya se puede aceptar. */
+.op-botones [data-lote-aceptar][disabled] {
+  opacity: .4; cursor: not-allowed; filter: grayscale(1);
+}
+.op-botones [data-lote-aceptar]:not([disabled]) {
+  box-shadow: 0 0 0 2px var(--accent-soft, rgba(255,255,255,.15));
 }
 
 /* Las tres vistas de la ficha, como pestañas pegadas entre sí: se ve de un
@@ -1392,7 +1407,10 @@ code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft)
 .tag--buy  { background: var(--neg-soft); color: var(--neg); }
 .tag--sell { background: var(--pos-soft); color: var(--pos); }
 
-.player-name { font-weight: 560; }
+.player-name {
+  font-weight: 560;
+  min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
 .unknown { color: var(--text-faint); font-style: italic; }
 .sub { color: var(--text-faint); font-size: .78rem; font-weight: 400; }
 .col-bid { background: color-mix(in srgb, var(--accent) 6%, transparent); }
@@ -2265,6 +2283,9 @@ main.wrap { padding-top: 1.15rem; padding-bottom: 3.5rem; }
 }
 .op-oferta:first-of-type { border-top: 0; }
 .op-oferta__quien { display: flex; flex-direction: column; gap: .1rem; min-width: 0; flex: 1; }
+/* En el diálogo de ofertas el nombre convive con el importe y los botones, así
+   que es donde primero se queda sin sitio: se le deja el ancho que sobre. */
+.op-oferta__quien .with-crest { max-width: 100%; }
 /* Lo que queda para que caduque la oferta: en rojo, que es lo que urge. */
 .op-caduca { color: var(--neg); font-weight: 700; }
 .op-oferta__pasta { display: flex; flex-direction: column; align-items: flex-end; gap: .1rem; }

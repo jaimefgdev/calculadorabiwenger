@@ -1917,11 +1917,15 @@
         : rodando.homeScore + '–' + rodando.awayScore;
       /* El minuto va detrás del marcador, no en el rótulo: así se lee de
          corrido «0–0 84'» en vez de tener el dato partido en dos sitios. */
-      $('round-when').innerHTML = '<span class="round__live">En juego</span>' +
+      /* En el descanso lo dice el rótulo y el minuto se calla: el reloj está
+         parado y repetirlo detrás del marcador solo confunde. */
+      const enDescanso = !!(vivoAhora && vivoAhora.descanso);
+      $('round-when').innerHTML =
+        '<span class="round__live">' + (enDescanso ? 'Descanso' : 'En juego') + '</span>' +
         '<span class="round__ahora">' + escudoDeEquipo(rodando.homeId, rodando.home) +
           '<strong class="round__score">' + marca + '</strong>' +
           escudoDeEquipo(rodando.awayId, rodando.away) +
-          (vivoAhora && vivoAhora.reloj
+          (!enDescanso && vivoAhora && vivoAhora.reloj
             ? '<strong class="round__minuto">' + escapeHtml(vivoAhora.reloj) + '</strong>' : '') +
         '</span>';
     } else {
@@ -1982,8 +1986,9 @@
       /* El mismo distintivo que arriba —punto que late incluido— para que la
          lista y la cabecera se lean igual. */
       const estado = acabado ? '<span class="round__final">Final</span>'
-        : (rodando ? '<span class="round__live round__live--fila">En juego' +
-            (vivo && vivo.reloj
+        : (rodando ? '<span class="round__live round__live--fila">' +
+            (vivo && vivo.descanso ? 'Descanso' : 'En juego') +
+            (vivo && vivo.reloj && !vivo.descanso
               ? ' <strong class="round__minuto">' + escapeHtml(vivo.reloj) + '</strong>' : '') +
             '</span>'
           : (match.tv ? escapeHtml(match.tv) : '—'));
@@ -3779,7 +3784,7 @@
         setTimeout(function () { if (!fallos) cerrarOpModal(); }, 1800);
         return;
       }
-      opAviso('Yendo por ' + (i + 1) + ' de ' + ordenes.length + '…');
+      opAviso((i + 1) + ' de ' + ordenes.length + '…');
       mandarOperacion(ordenes[i])
         .then(function () { hechas++; })
         .catch(function () { fallos++; })
@@ -4330,12 +4335,15 @@
          futbolista: puestos allí, el clic no llegaba a ninguna parte. */
       const factor = event.target.closest('[data-lote-factor]');
       if (factor) {
-        loteFactor = Number(factor.getAttribute('data-lote-factor'));
+        const cual = Number(factor.getAttribute('data-lote-factor'));
+        /* Pulsando el que ya estaba puesto se quita: si te has equivocado de
+           fila, se desmarca sin tener que cerrar el diálogo. */
+        loteFactor = (loteFactor === cual) ? null : cual;
         Array.prototype.forEach.call(caja.querySelectorAll('[data-lote-factor]'), function (b) {
-          b.classList.toggle('is-current', b === factor);
+          b.classList.toggle('is-current', loteFactor != null && b === factor);
         });
         const aceptar = caja.querySelector('[data-lote-aceptar]');
-        if (aceptar) aceptar.disabled = false;
+        if (aceptar) aceptar.disabled = loteFactor == null;
         return;
       }
 
@@ -5546,12 +5554,21 @@
           const local = equipos.filter(function (e) { return e.homeAway === 'home'; })[0];
           const fuera = equipos.filter(function (e) { return e.homeAway === 'away'; })[0];
           if (!local || !fuera) return;
+          /* En el descanso ESPN sigue diciendo «en juego» y deja el reloj
+             clavado en el minuto en que se paró, así que parecía un partido
+             congelado. Se mira por varios sitios porque el nombre del estado no
+             siempre viene: vale la marca, el texto o el propio rótulo corto. */
+          const rotulo = String(estado.name || '') + ' ' +
+            String(estado.description || '') + ' ' + String(estado.shortDetail || '');
+          const descanso = /halftime|half\s*time|descanso/i.test(rotulo);
+
           vivos.push({
             home: (local.team && local.team.displayName) || '',
             away: (fuera.team && fuera.team.displayName) || '',
             homeScore: Number(local.score),
             awayScore: Number(fuera.score),
-            reloj: (evento.status && evento.status.displayClock) || ''
+            descanso: descanso,
+            reloj: descanso ? 'Descanso' : ((evento.status && evento.status.displayClock) || '')
           });
         });
       });
@@ -5943,8 +5960,11 @@
                        lo primero que se busca al abrirlo, y arriba solo estaba
                        escondido en el título del marcador. */
                     (!acabado && vivo && vivo.reloj
-                      ? '<p class="partido__reloj"><span class="round__live">En juego</span>' +
-                        '<strong class="round__minuto">' + escapeHtml(vivo.reloj) + '</strong></p>'
+                      ? '<p class="partido__reloj"><span class="round__live">' +
+                        (vivo.descanso ? 'Descanso' : 'En juego') + '</span>' +
+                        (vivo.descanso ? ''
+                          : '<strong class="round__minuto">' + escapeHtml(vivo.reloj) + '</strong>') +
+                        '</p>'
                       : '') +
                     (jugado ? ''
                       : '<p class="muted alin__aviso">' +
@@ -7925,6 +7945,12 @@
       const open = state.expandedSquad === squad.id;
       const value = squad.players.reduce(function (sum, p) { return sum + (p.marketValue || 0); }, 0);
       const paid = squad.players.reduce(function (sum, p) { return sum + (p.paid || 0); }, 0);
+      /* Lo que ha subido o bajado la plantilla entera de ayer a hoy: la suma de
+         lo que se ha movido cada futbolista. Es el mismo dato que ya sale en la
+         columna «Hoy» de tu plantilla, pero de todos a la vez. */
+      const hoy = squad.players.reduce(function (sum, p) {
+        return sum + (p.increment || 0);
+      }, 0);
 
       const detail = !open ? '' :
         '<tr class="detail-row"><td class="detail-cell" colspan="4"><div class="detail">' +
@@ -7983,7 +8009,13 @@
           '</button></td>' +
         '<td class="num" data-label="Jugadores">' + squad.players.length + '</td>' +
         '<td class="num" data-label="Pagado">' + (paid ? money(paid) : '<span class="sub">—</span>') + '</td>' +
-        '<td class="num" data-label="Valor de mercado"><strong>' + money(value) + '</strong></td>' +
+        '<td class="num" data-label="Valor de mercado"><strong>' + money(value) + '</strong>' +
+          /* Debajo del valor, no al lado: la columna es estrecha y en línea
+             empujaba el importe. Sin movimiento no se pinta nada, que un cero
+             en verde o rojo confunde. */
+          (hoy ? '<span class="delta delta--dia ' + (hoy > 0 ? 'delta--up' : 'delta--down') + '">' +
+            (hoy > 0 ? '▲ +' : '▼ −') + money(Math.abs(hoy)) + '</span>' : '') +
+        '</td>' +
       '</tr>' + detail;
     }).join('');
   }
