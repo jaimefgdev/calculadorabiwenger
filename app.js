@@ -7625,7 +7625,13 @@
              que estés mirando. */
           (abierto.eligiendo ? '' :
             '<span class="ficha__vistas">' +
-              VISTAS_FICHA.map(function (v) {
+              VISTAS_FICHA.filter(function (v) {
+                /* Comparando no hay pestaña Ficha: sus datos son de UNO
+                   —estatura, nacimiento, trayectoria— y no hay forma honrada de
+                   enfrentarlos a los del rival sin rehacerla entera. Se ofrece
+                   otra vez en cuanto quitas la comparación. */
+                return !(v.clave === 'ficha' && abierto.comparar);
+              }).map(function (v) {
                 const activa = vistaDeFicha(abierto) === v.clave;
                 return '<button type="button" class="ambito ficha__vista' +
                   (activa ? ' is-current' : '') + '" data-ficha-vista="' + v.clave + '"' +
@@ -7658,13 +7664,14 @@
         (abierto.eligiendo ? selectorDeComparacion(abierto.id) : '') +
         /* La ficha va sola, como los partidos: quien la abre quiere sus datos y
            su trayectoria, no repasar otra vez las cifras de la temporada. */
-        (abierto.ficha && !abierto.partidos
+        (abierto.ficha && !abierto.partidos && !abierto.comparar
           ? tiraPersonal(abierto.id) + trayectoria(abierto.id)
           : '') +
         /* Los partidos van solos: ni estadísticas ni gráficos. Y comparando
            tampoco: esos cuadros son de uno solo y repiten, peor contadas, las
            mismas cifras que ya están enfrentadas arriba. */
-        (abierto.ficha || abierto.partidos || abierto.soloPrecio || abierto.comparar
+        ((abierto.ficha && !abierto.comparar) || abierto.partidos ||
+          abierto.soloPrecio || abierto.comparar
           ? '' : estadisticasDeTemporada(abierto.id) + rachaDeTemporada(abierto.id)) +
         /* Desde los rankings solo interesan las estadísticas: ni el valor de
            mercado ni su evolución pintan nada ahí. Comparando, el gráfico de
@@ -9525,6 +9532,9 @@
           state.priceModal.eligiendo = false;
         } else {
           state.priceModal.eligiendo = !state.priceModal.eligiendo;
+          /* Y si estabas en la ficha, de vuelta a las estadísticas: es la única
+             vista que sí sabe enfrentar a dos. */
+          state.priceModal.ficha = false;
           ensureJugadores();
         }
         renderPriceModal();
@@ -9543,6 +9553,8 @@
         state.priceModal.comparar = elegido.getAttribute('data-comparar-con');
         state.priceModal.eligiendo = false;
         state.priceModal.busca = '';
+        /* Con rival elegido, la ficha se cierra: no sabe enseñar a dos. */
+        state.priceModal.ficha = false;
         ensureEstadisticas(state.priceModal.id);
         ensureEstadisticas(state.priceModal.comparar);
         /* Y su serie de precios, para el gráfico de los dos. */
