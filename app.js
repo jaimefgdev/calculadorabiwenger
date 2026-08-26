@@ -1574,6 +1574,9 @@
   function filteredMovements() {
     const text = normalize(state.filters.text);
     return movimientosConReparto().filter(function (movement) {
+      /* Los abonos de jornada no son fichajes: su sitio es el dinero de cada
+         mánager, no esta lista, donde solo estorban entre compras y ventas. */
+      if (movement.type === 'bonus') return false;
       if (state.filters.type && movement.type !== state.filters.type) return false;
       if (state.filters.manager && movement.manager !== state.filters.manager) return false;
       if (text) {
@@ -6905,19 +6908,48 @@
     return a === b || a.indexOf(b) !== -1 || b.indexOf(a) !== -1;
   }
 
-  async function buscarEnSofa(nombre, club) {
-    const url = SOFA + '/search/all?q=' + encodeURIComponent(nombre);
-    const datos = await fetch(url).then(function (r) { return r.ok ? r.json() : null; });
-    const gente = ((datos || {}).results || []).filter(function (x) {
-      return x.type === 'player' && x.entity && x.entity.id;
-    });
-    /* Con club conocido manda el club. Sin él, solo vale si hay uno y nada más:
-       con dos candidatos y sin forma de distinguirlos, mejor no enseñar nada. */
-    const cuadra = gente.filter(function (x) {
-      return mismoClub(club, (x.entity.team || {}).name);
-    });
-    if (cuadra.length) return cuadra[0].entity.id;
-    return (!club && gente.length === 1) ? gente[0].entity.id : null;
+  /**
+   * Su id en SofaScore, buscándolo por nombre.
+   *
+   * Se prueban varias formas porque el nombre corto de Biwenger a menudo no es
+   * el suyo allí. «Vini Jr» devuelve un jugador de fútbol sala; «vinicius
+   * junior» —su slug convertido en palabras— sí da con el del Real Madrid. Y a
+   * «Yusi Enríquez» allí lo llaman Youssef, así que solo aparece buscando el
+   * apellido suelto.
+   *
+   * Buscar por apellido es arriesgado —hay muchos Enríquez—, y por eso vale:
+   * cada resultado se valida contra el club de Biwenger, así que el que no sea
+   * de su equipo se descarta solo.
+   */
+  async function buscarEnSofa(nombre, club, slug) {
+    const intentos = [];
+    const anadir = function (q) {
+      const limpio = String(q || '').trim();
+      if (limpio && intentos.indexOf(limpio) === -1) intentos.push(limpio);
+    };
+    anadir(nombre);
+    const enPalabras = String(slug || '').replace(/-/g, ' ');
+    anadir(enPalabras);
+    /* El último trozo del slug suele ser el apellido. */
+    const trozos = enPalabras.split(/\s+/).filter(Boolean);
+    if (trozos.length > 1) anadir(trozos[trozos.length - 1]);
+
+    for (let i = 0; i < intentos.length; i++) {
+      const datos = await fetch(SOFA + '/search/all?q=' + encodeURIComponent(intentos[i]))
+        .then(function (r) { return r.ok ? r.json() : null; })
+        .catch(function () { return null; });
+      const gente = ((datos || {}).results || []).filter(function (x) {
+        return x.type === 'player' && x.entity && x.entity.id;
+      });
+      const cuadra = gente.filter(function (x) {
+        return mismoClub(club, (x.entity.team || {}).name);
+      });
+      if (cuadra.length) return cuadra[0].entity.id;
+      /* Sin club conocido solo vale un resultado único: con dos y sin forma de
+         distinguirlos, mejor no enseñar nada que enseñar el de otro. */
+      if (!club && gente.length === 1) return gente[0].entity.id;
+    }
+    return null;
   }
 
   /**
@@ -6983,19 +7015,19 @@
     }).sort(function (a, b) { return (b.hasta || 0) - (a.hasta || 0); });
   }
 
-  function ensureSofa(id, nombre, club) {
+  function ensureSofa(id, nombre, club, slug) {
     const clave = String(id);
     if (state.sofa[clave] !== undefined) return;
     state.sofa[clave] = 'pidiendo';
 
-    const guardado = cacheLeer('sofa3:' + clave);
+    const guardado = cacheLeer('sofa4:' + clave);
     if (guardado !== null && guardado !== undefined) {
       state.sofa[clave] = guardado;
       renderPriceModal();
       return;
     }
 
-    buscarEnSofa(nombre, club)
+    buscarEnSofa(nombre, club, slug)
       .then(function (sofaId) {
         if (!sofaId) return null;
         return Promise.all([
@@ -7026,7 +7058,7 @@
           career: dos[1] || []
         };
         state.sofa[clave] = ficha;
-        cacheGuardar('sofa3:' + clave, ficha);
+        cacheGuardar('sofa4:' + clave, ficha);
         renderPriceModal();
       })
       .catch(function () { state.sofa[clave] = null; });
@@ -7052,7 +7084,7 @@
         state.estadisticasAt = Date.now();
         /* Con el club ya en la mano se puede buscar en SofaScore sin colarse
            de futbolista. Por eso va aquí y no al abrir la ficha. */
-        if (payload && payload.name) ensureSofa(clave, payload.name, payload.teamName);
+        if (payload && payload.name) ensureSofa(clave, payload.name, payload.teamName, payload.slug);
         renderPriceModal();
         /* Puede estar abierta dentro de un ranking en vez de en la ficha. */
         if (state.datosDetalle) renderRankingsTemporada();
