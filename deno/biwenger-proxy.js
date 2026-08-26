@@ -104,7 +104,7 @@ const CDN = 'https://cf.biwenger.com/api/v2';
    navegador normal y las cabeceras que este mandaría. */
 /* Marca de versión: se sube en cada cambio y se consulta con ?version=1.
    Sirve para saber desde fuera si el despliegue ha entrado o no. */
-const VERSION = '2026-08-25 · deno 32';
+const VERSION = '2026-08-26 · deno 33';
 
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ' +
   '(KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36';
@@ -1728,7 +1728,8 @@ async function matchDay(roundId, score, names, primas) {
      que enseña la app, son los del índice de futbolistas con el sistema de la
      liga, esté la jornada en juego o cerrada. */
   const salto = await saltoPorEquipo(detalle.number, score, detalle.id).catch(function () { return {}; });
-  const delIndice = conSuperPica(puntosDeLaJornada(names, salto), detalle, primas);
+  const delIndice = conCorrecciones(
+    conSuperPica(puntosDeLaJornada(names, salto), detalle, primas), detalle.number);
 
   const equipo = function (lado, estadoPartido) {
     const once = [];
@@ -2005,6 +2006,35 @@ async function playerStats(id, names, score) {
  * pico; para el resto no cambia nada. Sin esto, esos diez se quedan un punto
  * o dos por debajo de lo que enseña Biwenger, y con ellos su mánager.
  */
+/* Correcciones a mano, por jornada y futbolista.
+ *
+ * Aquí solo entra lo que se ha comprobado contra la pantalla de Biwenger y no
+ * se puede sacar de ningún dato suyo. Hoy hay un caso: Pablo García en la
+ * jornada 1. Su web le da 11 y TRES fuentes distintas de la propia Biwenger
+ * dicen 10 —el índice de futbolistas, el informe del jugador y su mapa en el
+ * sistema 5, que es el de esta liga—; el 11 solo aparece bajo el sistema 6,
+ * que no es el que se juega aquí. Tampoco es Súper Pica: no está en la lista
+ * de ninguna de las dos mitades de la jornada.
+ *
+ * Es un parche, no un arreglo: si Biwenger revisa ese punto, esta línea pasa a
+ * estar mal y hay que quitarla. Se deja acotada a un futbolista y una jornada
+ * a propósito, para que no pueda estropear nada más.
+ */
+const CORRECCIONES = {
+  // jornada -> { id de futbolista: puntos }
+  1: { '35763': 11 }   // Pablo García
+};
+
+function conCorrecciones(marcador, numero) {
+  const tabla = CORRECCIONES[numero];
+  if (!tabla) return marcador;
+  Object.keys(tabla).forEach(function (id) {
+    /* Solo si ese futbolista ya tiene nota: si no jugó, no se le inventa una. */
+    if (marcador[id] != null) marcador[id] = tabla[id];
+  });
+  return marcador;
+}
+
 function conSuperPica(marcador, detalle, primas) {
   if (!primas || !primas.superPica) return marcador;
   const picas = (detalle && detalle.picas) || {};
@@ -2623,7 +2653,8 @@ async function roundBoard(env, headers, jornada, listaNombres) {
     : ((detalle && detalle.number) != null ? detalle.number : null);
   const salto = await saltoPorEquipo(numeroJornada, score, round.id).catch(function () { return {}; });
   const primas = await primasDeLaLiga(env).catch(function () { return null; });
-  const marcador = conSuperPica(puntosDeLaJornada(names, salto), detalle, primas);
+  const marcador = conCorrecciones(
+    conSuperPica(puntosDeLaJornada(names, salto), detalle, primas), numeroJornada);
 
   /* En qué anda el partido de cada club: sirve para distinguir al que no ha
      puntuado del que todavía no ha jugado. */
