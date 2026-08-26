@@ -1695,6 +1695,9 @@
   /* «19 ago 2026», sin hora: en las altas y bajas de LaLiga no hace falta. */
   const fechaCorta = new Intl.DateTimeFormat('es-ES', { day: 'numeric', month: 'short', year: 'numeric' });
   const diaCorto = (fecha) => fechaCorta.format(new Date(fecha));
+  /* Sin el año, para la lista de partidos de una jornada: «28 ago». Ahí el año
+     sobra —son todos de la misma semana— y solo roba sitio. */
+  const diaSinAno = new Intl.DateTimeFormat('es-ES', { day: 'numeric', month: 'short' });
 
   function renderMovimientosLaLiga() {
     const cuerpo = $('moves-body');
@@ -3846,10 +3849,25 @@
             escapeHtml(m.rotulo) + '</button>';
         }).join('') +
       '</div>' +
-      '<p class="op-aviso"></p>');
+      '<p class="op-aviso"></p>' +
+      /* Apagado hasta que se elija uno: así el botón no puede hacer nada
+         inesperado, y encendiéndose deja claro que ya hay precio escogido. */
+      '<div class="op-botones">' +
+        '<button type="button" class="btn btn--primary" data-lote-aceptar disabled>Aceptar</button>' +
+      '</div>');
+    loteFactor = null;
   }
 
-  /** Elegido el múltiplo, se confirma y se lanza. */
+  /* El múltiplo elegido en el diálogo, a la espera de que se acepte. */
+  let loteFactor = null;
+
+  /**
+   * Elegido el múltiplo, se hace y punto.
+   *
+   * Sin confirmar otra vez: elegir el precio ya es la confirmación —has abierto
+   * el diálogo y has escogido una de cinco opciones—, y volver a preguntar solo
+   * añade un clic para decir lo mismo.
+   */
   function loteVender(factor) {
     const plantilla = mySquad();
     const ordenes = plantilla.map(function (j) {
@@ -3859,9 +3877,21 @@
 
     const total = ordenes.reduce(function (suma, o) { return suma + o.price; }, 0);
     const cual = MULTIPLOS_VENTA.filter(function (m) { return m.factor === factor; })[0];
-    confirmarLote('Poner en venta ' + ordenes.length + ' futbolistas a ' +
-      (cual ? cual.rotulo.toLowerCase() : factor + '×') + ', ' + money(total) + ' en total.',
-      ordenes, function (n) { return n + ' puestos en venta.'; });
+
+    /* La ventana pasa a contar por dónde va; el precio elegido se queda a la
+       vista, que es lo que uno mira mientras espera. */
+    abrirOpModal(
+      '<div class="op-card__cab">' +
+        '<h3 id="op-modal-titulo">Poniendo la plantilla en venta</h3>' +
+        '<button type="button" class="btn btn--ghost btn--close" data-op-cerrar' +
+          ' title="Cerrar" aria-label="Cerrar">✕</button>' +
+      '</div>' +
+      '<p class="op-texto">' + ordenes.length + ' futbolistas a ' +
+        escapeHtml(cual ? cual.rotulo.toLowerCase() : factor + '×') +
+        ', ' + money(total) + ' en total.</p>' +
+      '<p class="op-aviso"></p>');
+
+    lanzarLote(ordenes, function (n) { return n + ' puestos en venta.'; });
   }
 
   /** Quitarlo del mercado, con su confirmación. */
@@ -4299,7 +4329,20 @@
          Estos botones viven en ESTE diálogo, no en el de la ficha del
          futbolista: puestos allí, el clic no llegaba a ninguna parte. */
       const factor = event.target.closest('[data-lote-factor]');
-      if (factor) { loteVender(Number(factor.getAttribute('data-lote-factor'))); return; }
+      if (factor) {
+        loteFactor = Number(factor.getAttribute('data-lote-factor'));
+        Array.prototype.forEach.call(caja.querySelectorAll('[data-lote-factor]'), function (b) {
+          b.classList.toggle('is-current', b === factor);
+        });
+        const aceptar = caja.querySelector('[data-lote-aceptar]');
+        if (aceptar) aceptar.disabled = false;
+        return;
+      }
+
+      if (event.target.closest('[data-lote-aceptar]')) {
+        if (loteFactor != null) loteVender(loteFactor);
+        return;
+      }
 
       if (event.target.closest('[data-lote-va]')) {
         if (loterPendiente) {
@@ -5871,6 +5914,16 @@
               '<button type="button" class="partido__cab" data-partido="' + juego.id + '"' +
                 ' aria-expanded="' + (abierto ? 'true' : 'false') + '"' +
                 (hayAlineacion ? '' : ' disabled') + '>' +
+                /* Cuándo se juega, a la izquierda. Solo con hora de verdad: los
+                   que aún no tienen horario confirmado se quedan en blanco en
+                   vez de enseñar una hora inventada. */
+                '<span class="partido__cuando">' + (function () {
+                  const t = juego.start ? Date.parse(juego.start) : NaN;
+                  if (isNaN(t)) return '';
+                  const d = new Date(t);
+                  return '<span class="partido__dia">' + escapeHtml(diaSinAno.format(d)) + '</span>' +
+                    '<span class="partido__hora">' + escapeHtml(timeFormat.format(d)) + '</span>';
+                })() + '</span>' +
                 '<span class="partido__equipo partido__equipo--local">' +
                   escapeHtml(juego.home.name) + crestOf({ team: juego.home.id, teamName: juego.home.name }, 'crest--badge') +
                 '</span>' +
@@ -5881,6 +5934,8 @@
                   crestOf({ team: juego.away.id, teamName: juego.away.name }, 'crest--badge') +
                   escapeHtml(juego.away.name) +
                 '</span>' +
+                /* Y por dónde se ve, a la derecha. */
+                '<span class="partido__tv">' + (juego.tv ? escapeHtml(juego.tv) : '') + '</span>' +
               '</button>' +
               (abierto
                 ? '<div class="partido__detalle">' +
