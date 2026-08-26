@@ -104,7 +104,7 @@ const CDN = 'https://cf.biwenger.com/api/v2';
    navegador normal y las cabeceras que este mandaría. */
 /* Marca de versión: se sube en cada cambio y se consulta con ?version=1.
    Sirve para saber desde fuera si el despliegue ha entrado o no. */
-const VERSION = '2026-08-26 · deno 34';
+const VERSION = '2026-08-26 · deno 35';
 
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ' +
   '(KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36';
@@ -1790,6 +1790,7 @@ async function matchDay(roundId, score, names, primas) {
     if (!suyo.home || !suyo.away) return null;
     return {
       status: suyo.status || null,
+      confirmadas: !!suyo.initialLineups,
       home: equipo(suyo.home, suyo.status || null),
       away: equipo(suyo.away, suyo.status || null),
       homeScore: (suyo.home || {}).score != null ? suyo.home.score : null,
@@ -1822,17 +1823,26 @@ async function matchDay(roundId, score, names, primas) {
      consta terminado, se pregunta por él. De paso llegan el estado y el
      marcador de verdad. Si no contesta, se deja lo que hubiera. */
   const ahoraMismo = Date.now();
+  /* También los que están a punto de empezar: las alineaciones se confirman en
+     la hora previa al pitido, y el feed de la jornada tarda en enterarse —dejaba
+     el Madrid-Real Sociedad como «probables» con un once viejo cuando su ficha
+     ya las daba por confirmadas y con Courtois, Mbappé y Vinícius dentro. */
+  const DOS_HORAS = 2 * 3600e3;
   const dudosos = partidos.filter(function (p) {
     if (p.status === 'finished') return false;
     const empezado = p.status && p.status !== 'pending' && p.status !== 'preview';
-    const yaTocaba = p.start && Date.parse(p.start) <= ahoraMismo;
-    return empezado || yaTocaba;
+    const cuando = p.start ? Date.parse(p.start) : NaN;
+    const aPuntoOPasado = !isNaN(cuando) && cuando - ahoraMismo <= DOS_HORAS;
+    return empezado || aPuntoOPasado;
   }).slice(0, 6);
 
   await Promise.all(dudosos.map(function (p) {
     return onceEnVivo(p.id).then(function (bueno) {
       if (!bueno) return;
       if (bueno.status) p.status = bueno.status;
+      /* La marca de «confirmadas» también sale de aquí: es lo que decide si la
+         web avisa de que el once es probable o definitivo. */
+      p.confirmadas = bueno.confirmadas;
       if (bueno.homeScore != null) p.home.score = bueno.homeScore;
       if (bueno.awayScore != null) p.away.score = bueno.awayScore;
       if ((bueno.home.xi || []).length) p.home = Object.assign({}, p.home, { xi: bueno.home.xi, bench: bueno.home.bench });
