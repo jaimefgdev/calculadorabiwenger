@@ -4294,6 +4294,21 @@
     caja.addEventListener('click', function (event) {
       if (event.target === caja) { cerrarOpModal(); return; }
       if (event.target.closest('[data-op-cerrar]')) { cerrarOpModal(); return; }
+
+      /* Vender en bloque: primero se elige el múltiplo y luego se confirma.
+         Estos botones viven en ESTE diálogo, no en el de la ficha del
+         futbolista: puestos allí, el clic no llegaba a ninguna parte. */
+      const factor = event.target.closest('[data-lote-factor]');
+      if (factor) { loteVender(Number(factor.getAttribute('data-lote-factor'))); return; }
+
+      if (event.target.closest('[data-lote-va]')) {
+        if (loterPendiente) {
+          const lote = loterPendiente;
+          loterPendiente = null;
+          lanzarLote(lote.ordenes, lote.comoVa);
+        }
+        return;
+      }
       if (event.target.closest('[data-op-volver]')) {
         /* Se vuelve a la lista solo si se salió de ella. */
         if (opPendiente && opPendiente.desdeOfertas) (volverA || abrirOfertas)();
@@ -9596,18 +9611,6 @@
 
       /* Atributo propio: `data-vista` ya lo usa la pastilla tabla/campo de los
          partidos, que se pinta dentro de esta misma ventana. */
-      const factor = event.target.closest('[data-lote-factor]');
-      if (factor) { loteVender(Number(factor.getAttribute('data-lote-factor'))); return; }
-
-      if (event.target.closest('[data-lote-va]')) {
-        if (loterPendiente) {
-          const lote = loterPendiente;
-          loterPendiente = null;
-          lanzarLote(lote.ordenes, lote.comoVa);
-        }
-        return;
-      }
-
       const pestana = event.target.closest('[data-ficha-vista]');
       if (pestana) {
         const cual = pestana.getAttribute('data-ficha-vista');
