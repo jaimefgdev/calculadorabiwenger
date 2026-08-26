@@ -20,7 +20,7 @@
 <link rel="dns-prefetch" href="https://cdn.biwenger.com">
 <!-- El ?v= se sube en cada publicación: obliga al navegador a bajar el archivo
      nuevo en vez de reutilizar el que tenga en caché. -->
-<link rel="stylesheet" href="styles.css?v=246">
+<link rel="stylesheet" href="styles.css?v=247">
 <!-- La tipografia se pide ya, sin esperar a que el CSS termine de leerse. -->
 <link rel="preload" href="GoogleSans-Regular.woff2" as="font" type="font/woff2" crossorigin>
 <!-- El escudo de Biwenger, el mismo que el del boton de Inicio. -->
@@ -270,6 +270,13 @@
     <div class="panel__head">
       <h2>Mi plantilla</h2>
       <p class="muted" id="squad-count">&nbsp;</p>
+    </div>
+    <!-- Acciones sobre toda la plantilla de una vez. Escriben en Biwenger, así
+         que las tres piden confirmación diciendo a cuántos afectan. -->
+    <div class="squad-lote">
+      <button type="button" class="btn btn--sm" data-lote="renovar">Renovar todas las ventas</button>
+      <button type="button" class="btn btn--sm" data-lote="retirar">Retirar todas las ventas</button>
+      <button type="button" class="btn btn--sm btn--primary" data-lote="vender">Vender toda la plantilla…</button>
     </div>
     <div class="table-scroll">
       <table class="table table--squad">
@@ -599,6 +606,6 @@
 
 </main>
 
-<script src="app.js?v=276"></script>
+<script src="app.js?v=277"></script>
 </body>
 </html>

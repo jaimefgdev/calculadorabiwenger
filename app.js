@@ -3730,6 +3730,143 @@
       quien + ' en venta por ' + money(precio) + '.');
   }
 
+  /* ---------- Acciones sobre toda la plantilla ----------
+     Las tres escriben en Biwenger y de golpe, así que ninguna se ejecuta sin
+     confirmar antes diciendo a cuántos futbolistas afecta y por cuánto. Van de
+     una en una, no todas a la vez: su API responde peor en ráfaga y así se
+     puede contar por dónde va y parar si algo falla. */
+
+  /* Los múltiplos del valor de mercado que se ofrecen al vender en bloque.
+     Poner el 500 % es la forma de «bloquear» la plantilla sin retirarla del
+     mercado: sigue en venta, pero a un precio que nadie va a pagar. */
+  const MULTIPLOS_VENTA = [
+    { factor: 1, rotulo: 'Valor de mercado' },
+    { factor: 1.2, rotulo: '120 %' },
+    { factor: 1.5, rotulo: '150 %' },
+    { factor: 2, rotulo: '200 %' },
+    { factor: 5, rotulo: '500 %' }
+  ];
+
+  /** Mis ventas abiertas ahora mismo. */
+  function misVentas() {
+    return (state.listings || []).filter(function (item) { return item && item.playerId; });
+  }
+
+  /**
+   * Lanza una lista de operaciones, una detrás de otra, contando por dónde va.
+   *
+   * Si una falla no se abandona el resto: se apunta y se sigue, porque parar a
+   * la mitad deja la plantilla en un estado peor que terminar. Al final se dice
+   * cuántas salieron y cuántas no.
+   */
+  function lanzarLote(ordenes, comoVa) {
+    if (!ordenes.length) { opAviso('No hay nada que hacer.', true); return; }
+
+    Array.prototype.forEach.call(document.querySelectorAll('#op-modal button'), function (b) {
+      b.disabled = true;
+    });
+
+    let hechas = 0;
+    let fallos = 0;
+    const siguiente = function (i) {
+      if (i >= ordenes.length) {
+        opAviso(comoVa(hechas, ordenes.length) +
+          (fallos ? ' · ' + fallos + (fallos === 1 ? ' falló' : ' fallaron') : ''), fallos > 0);
+        setTimeout(function () { syncNow(true); }, 600);
+        setTimeout(function () { if (!fallos) cerrarOpModal(); }, 1800);
+        return;
+      }
+      opAviso('Yendo por ' + (i + 1) + ' de ' + ordenes.length + '…');
+      mandarOperacion(ordenes[i])
+        .then(function () { hechas++; })
+        .catch(function () { fallos++; })
+        .then(function () { siguiente(i + 1); });
+    };
+    siguiente(0);
+  }
+
+  /** El aviso previo, con el recuento delante. */
+  function confirmarLote(texto, ordenes, comoVa) {
+    abrirOpModal(
+      '<div class="op-card__cab">' +
+        '<h3 id="op-modal-titulo">¿Seguro?</h3>' +
+        '<button type="button" class="btn btn--ghost btn--close" data-op-cerrar' +
+          ' title="Cerrar" aria-label="Cerrar">✕</button>' +
+      '</div>' +
+      '<p class="op-texto">' + escapeHtml(texto) + '</p>' +
+      '<p class="op-aviso"></p>' +
+      '<div class="op-botones">' +
+        '<button type="button" class="btn btn--ghost" data-op-cerrar>Cancelar</button>' +
+        '<button type="button" class="btn btn--primary" data-lote-va>Sí</button>' +
+      '</div>');
+    loterPendiente = { ordenes: ordenes, comoVa: comoVa };
+  }
+
+  let loterPendiente = null;
+
+  /** Renovar: se vuelve a publicar cada venta al mismo precio que tenía. */
+  function loteRenovar() {
+    const ventas = misVentas();
+    /* Su precio de venta, no su valor de mercado: renovar es volver a
+       publicarla tal y como estaba, no reajustarla. */
+    const ordenes = ventas.map(function (v) {
+      return { accion: 'vender', player: v.playerId, price: Math.round(v.price || 0), rechazar: false };
+    }).filter(function (o) { return o.price > 0; });
+    confirmarLote('Renovar ' + ordenes.length +
+      (ordenes.length === 1 ? ' venta' : ' ventas') + ', cada una a su precio actual.',
+      ordenes, function (n) { return n + (n === 1 ? ' venta renovada.' : ' ventas renovadas.'); });
+  }
+
+  /** Retirar: cada futbolista sale del mercado. */
+  function loteRetirar() {
+    const ordenes = misVentas().map(function (v) {
+      return { accion: 'quitar', player: v.playerId };
+    });
+    confirmarLote('Retirar del mercado ' + ordenes.length +
+      (ordenes.length === 1 ? ' venta.' : ' ventas.'),
+      ordenes, function (n) { return n + (n === 1 ? ' venta retirada.' : ' ventas retiradas.'); });
+  }
+
+  /** Vender todo: primero se elige a qué múltiplo del valor de mercado. */
+  function loteVenderMenu() {
+    const plantilla = mySquad();
+    if (!plantilla.length) { abrirOpModal('<p class="op-texto">Tu plantilla está vacía.</p>'); return; }
+
+    abrirOpModal(
+      '<div class="op-card__cab">' +
+        '<h3 id="op-modal-titulo">Vender toda la plantilla</h3>' +
+        '<button type="button" class="btn btn--ghost btn--close" data-op-cerrar' +
+          ' title="Cerrar" aria-label="Cerrar">✕</button>' +
+      '</div>' +
+      '<p class="op-texto">' + plantilla.length + ' futbolistas. ¿A qué precio?</p>' +
+      '<div class="lote-precios">' +
+        MULTIPLOS_VENTA.map(function (m) {
+          const total = plantilla.reduce(function (suma, j) {
+            return suma + Math.round((j.marketValue || 0) * m.factor);
+          }, 0);
+          return '<button type="button" class="btn lote-precio" data-lote-factor="' + m.factor + '">' +
+            '<strong>' + escapeHtml(m.rotulo) + '</strong>' +
+            '<span class="sub">' + money(total) + ' en total</span></button>';
+        }).join('') +
+      '</div>' +
+      '<p class="op-aviso"></p>');
+  }
+
+  /** Elegido el múltiplo, se confirma y se lanza. */
+  function loteVender(factor) {
+    const plantilla = mySquad();
+    const ordenes = plantilla.map(function (j) {
+      return { accion: 'vender', player: String(j.id),
+        price: Math.round((j.marketValue || 0) * factor), rechazar: false };
+    }).filter(function (o) { return o.price > 0; });
+
+    const total = ordenes.reduce(function (suma, o) { return suma + o.price; }, 0);
+    const cual = MULTIPLOS_VENTA.filter(function (m) { return m.factor === factor; })[0];
+    confirmarLote('Poner en venta ' + ordenes.length + ' futbolistas a ' +
+      (cual ? cual.rotulo.toLowerCase() : factor + '×') + ', ' + money(total) + ' en total.',
+      ordenes, function (n) { return n + ' puestos en venta.'; });
+  }
+
   /** Quitarlo del mercado, con su confirmación. */
   function abrirQuitar(playerId) {
     const mio = miJugador(playerId);
@@ -4126,6 +4263,16 @@
         pintarFichajes();
       });
     }
+
+    /* Las tres acciones sobre toda la plantilla. */
+    Array.prototype.forEach.call(document.querySelectorAll('[data-lote]'), function (boton) {
+      boton.addEventListener('click', function () {
+        const cual = boton.getAttribute('data-lote');
+        if (cual === 'renovar') loteRenovar();
+        else if (cual === 'retirar') loteRetirar();
+        else if (cual === 'vender') loteVenderMenu();
+      });
+    });
 
     const plantilla = $('squad-body');
     if (plantilla) {
@@ -9452,6 +9599,18 @@
 
       /* Atributo propio: `data-vista` ya lo usa la pastilla tabla/campo de los
          partidos, que se pinta dentro de esta misma ventana. */
+      const factor = event.target.closest('[data-lote-factor]');
+      if (factor) { loteVender(Number(factor.getAttribute('data-lote-factor'))); return; }
+
+      if (event.target.closest('[data-lote-va]')) {
+        if (loterPendiente) {
+          const lote = loterPendiente;
+          loterPendiente = null;
+          lanzarLote(lote.ordenes, lote.comoVa);
+        }
+        return;
+      }
+
       const pestana = event.target.closest('[data-ficha-vista]');
       if (pestana) {
         const cual = pestana.getAttribute('data-ficha-vista');
