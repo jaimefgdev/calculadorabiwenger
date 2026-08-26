@@ -6710,21 +6710,31 @@
         : String(fila.desde) + '–' + fin;
     };
 
+    /* A un portero, goles y asistencias no le cuentan nada: en su sitio van los
+       goles que le hicieron y los partidos que dejó la portería a cero. */
+    const portero = sofa.position === 'G';
+    const cabeceras = portero
+      ? ['<th class="num" title="Goles encajados">Encajados</th>',
+         '<th class="num" title="Partidos sin encajar">P. a cero</th>']
+      : ['<th class="num">Goles</th>',
+         '<th class="num" title="Asistencias">Asist.</th>'];
+
     return '<h4 class="stats__titulo">Trayectoria</h4>' +
       '<table class="table detail-table trayecto">' +
         '<thead><tr>' +
           '<th>Club</th><th class="num">Años</th>' +
           '<th class="num" title="Partidos jugados">PJ</th>' +
-          '<th class="num">Goles</th>' +
-          '<th class="num" title="Asistencias">Asist.</th>' +
+          cabeceras.join('') +
         '</tr></thead><tbody>' +
         sofa.career.map(function (fila, i) {
+          const uno = portero ? (fila.encajados || 0) : (fila.goles || 0);
+          const dos = portero ? (fila.cero || 0) : (fila.asist || 0);
           return '<tr' + (i === 0 ? ' class="trayecto__ahora"' : '') + '>' +
             '<td>' + escapeHtml(fila.club) + '</td>' +
             '<td class="num">' + escapeHtml(periodo(fila, i === 0)) + '</td>' +
             '<td class="num">' + (fila.pj || 0) + '</td>' +
-            '<td class="num">' + (fila.goles || 0) + '</td>' +
-            '<td class="num">' + (fila.asist || 0) + '</td>' +
+            '<td class="num">' + uno + '</td>' +
+            '<td class="num">' + dos + '</td>' +
           '</tr>';
         }).join('') + '</tbody></table>';
   }
@@ -6989,11 +6999,17 @@
       const club = ((t.dato.team || {}).name) || null;
       const st = t.dato.statistics || {};
       if (!club) return;
-      if (!porClub[club]) porClub[club] = { club: club, pj: 0, goles: 0, asist: 0, anos: [] };
+      if (!porClub[club]) {
+        porClub[club] = { club: club, pj: 0, goles: 0, asist: 0,
+          encajados: 0, cero: 0, anos: [] };
+      }
       const fila = porClub[club];
       fila.pj += st.appearances || 0;
       fila.goles += st.goals || 0;
       fila.asist += st.assists || 0;
+      /* Lo de los porteros: encajados y partidos sin encajar. */
+      fila.encajados += st.goalsConceded || 0;
+      fila.cero += st.cleanSheet || 0;
       if (t.ano) fila.anos.push(t.ano);
     });
 
@@ -7020,7 +7036,7 @@
     if (state.sofa[clave] !== undefined) return;
     state.sofa[clave] = 'pidiendo';
 
-    const guardado = cacheLeer('sofa4:' + clave);
+    const guardado = cacheLeer('sofa5:' + clave);
     if (guardado !== null && guardado !== undefined) {
       state.sofa[clave] = guardado;
       renderPriceModal();
@@ -7043,6 +7059,9 @@
           return sello ? new Date(sello * 1000).toISOString().slice(0, 10) : null;
         };
         const ficha = {
+          /* «G» es portero. De ello depende qué columnas tiene su trayectoria:
+             a un portero, goles y asistencias no le dicen nada. */
+          position: p.position || null,
           height: p.height || null,
           birthDate: dia(p.dateOfBirthTimestamp),
           country: (p.country || {}).alpha2 || null,
@@ -7058,7 +7077,7 @@
           career: dos[1] || []
         };
         state.sofa[clave] = ficha;
-        cacheGuardar('sofa4:' + clave, ficha);
+        cacheGuardar('sofa5:' + clave, ficha);
         renderPriceModal();
       })
       .catch(function () { state.sofa[clave] = null; });
