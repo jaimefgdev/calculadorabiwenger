@@ -1036,6 +1036,9 @@ code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft)
 .cartera__uno { display: block; font-size: .82rem; white-space: nowrap;
   overflow: hidden; text-overflow: ellipsis; }
 
+/* Titulo de un panel que no lleva cabecera con subtitulo. */
+.panel__titulo { margin: 0 0 .8rem; font-size: 1.05rem; }
+
 /* Quien metio esos goles o dio esas asistencias, al pinchar en la cifra. */
 .ranking__desglose {
   list-style: none; margin: .15rem 0 .5rem; padding: 0 .2rem 0 2.1rem;

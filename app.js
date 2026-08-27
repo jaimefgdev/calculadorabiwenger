@@ -4937,6 +4937,8 @@
         gaps: fila.gaps !== undefined ? fila.gaps : antes.gaps,
         type: fila.type || antes.type,
         // Lo importante: una respuesta vacía nunca borra la alineación guardada.
+        /* Lo nuevo manda: si llega un once con goles, sustituye al guardado
+           aunque el viejo tuviera los mismos jugadores. */
         xi: fila.xi && fila.xi.length ? fila.xi : (antes.xi || []),
         bench: fila.bench && fila.bench.length ? fila.bench : (antes.bench || []),
         xiValue: fila.xiValue || antes.xiValue || 0,
@@ -4962,6 +4964,20 @@
   }
 
   /** Pide una jornada al Worker; 'actual' es la que esté en juego. */
+  /**
+   * ¿Esa jornada guardada trae ya los goles y las asistencias?
+   *
+   * Una jornada cerrada se queda en la caché para siempre, y las que se
+   * guardaron antes de que el proxy mandara este dato se quedaban sin él sin
+   * forma de enterarse: el ranking de goles salía a cero en la jornada 2 y no
+   * había manera de refrescarlo. Si falta, se vuelve a pedir una vez.
+   */
+  function conGoles(jornada) {
+    return ((jornada && jornada.standings) || []).some(function (fila) {
+      return (fila.xi || []).some(function (j) { return j.goals !== undefined; });
+    });
+  }
+
   function ensureJornada(cual, forzar) {
     const config = loadSyncConfig();
     if (!config.url || !config.key) return;
@@ -4975,7 +4991,7 @@
        se quedan clavadas con lo que hubiera la primera vez (un cero de antes
        de empezar, o un marcador ya viejo). */
     const previa = cual !== 'actual' ? state.jornadas.datos[cual] : null;
-    const guardada = previa && jornadaCerrada(previa) ? previa : null;
+    const guardada = previa && jornadaCerrada(previa) && conGoles(previa) ? previa : null;
     if (guardada && !forzar) { state.jornadaVista = cual; return; }
     /* Solo se frena si ya se está pidiendo esa misma: antes, con una jornada
        a medio traer, elegir otra no hacía nada. */
