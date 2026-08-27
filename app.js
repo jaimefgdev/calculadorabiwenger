@@ -8085,16 +8085,9 @@
       return;
     }
 
-    const total = todas.reduce(function (s, o) { return s + o.ganancia; }, 0);
-    const buenas = todas.filter(function (o) { return o.ganancia > 0; }).length;
-
     caja.innerHTML =
       '<div class="panel__head">' +
         '<h2>Beneficio generado por jugadores comprados y después vendidos</h2>' +
-        '<p class="muted">' + todas.length +
-          (todas.length === 1 ? ' operación cerrada · ' : ' operaciones cerradas · ') +
-          buenas + ' con beneficio · ' +
-          (total >= 0 ? 'saldo +' : 'saldo −') + money(Math.abs(total)) + '</p>' +
       '</div>' +
       '<div class="table-scroll"><table class="table table--reventas"><thead><tr>' +
         '<th>Futbolista</th>' +
@@ -8196,15 +8189,13 @@
     caja.innerHTML =
       '<div class="panel__head">' +
         '<h2>Cómo se le da el mercado a cada uno</h2>' +
-        '<p class="muted">Lo ganado con los que ya vendió y lo que llevan encima ' +
-          'los que aún tiene. Los del reparto no cuentan: no se pagó por ellos.</p>' +
       '</div>' +
       '<div class="table-scroll"><table class="table table--mercadeo"><thead><tr>' +
         '<th>Jugador</th>' +
-        '<th class="num" title="Ganado con los futbolistas que compró y ya vendió. Esto ya está cobrado">Realizado</th>' +
-        '<th class="num" title="Lo que valen hoy los que aún tiene frente a lo que pagó. Cambia cada día y solo se hace real si vende">Latente</th>' +
+        '<th class="num" title="Ganado con los futbolistas que compró y ya vendió. Esto ya está cobrado">Compra/venta</th>' +
+        '<th class="num" title="Lo que valen hoy los que aún tiene frente a lo que pagó. Cambia cada día y solo se hace real si vende">Sin vender</th>' +
         '<th class="num">Total</th>' +
-        '<th title="Su mejor y su peor fichaje de los que todavía conserva">En cartera</th>' +
+        '<th title="Su mejor y su peor fichaje de los que todavía conserva">Mejor / peor</th>' +
       '</tr></thead><tbody>' +
       filas.map(function (f) {
         const apunte = function (uno, clase) {
@@ -8218,10 +8209,10 @@
         return '<tr>' +
           '<td data-label="Jugador"><span class="manager">' + avatar(f.name) +
             '<span class="manager__name">' + escapeHtml(f.name) + '</span></span></td>' +
-          '<td class="num" data-label="Realizado">' + celdaDinero(f.realizado) + '</td>' +
-          '<td class="num" data-label="Latente">' + celdaDinero(f.latente) + '</td>' +
+          '<td class="num" data-label="Compra/venta">' + celdaDinero(f.realizado) + '</td>' +
+          '<td class="num" data-label="Sin vender">' + celdaDinero(f.latente) + '</td>' +
           '<td class="num" data-label="Total"><strong>' + celdaDinero(f.total) + '</strong></td>' +
-          '<td class="cartera" data-label="En cartera">' +
+          '<td class="cartera" data-label="Mejor / peor">' +
             (f.mejor
               ? apunte(f.mejor, f.mejor.dif > 0 ? 'money-pos' : 'money-neg') +
                 (unico ? '' : apunte(f.peor, f.peor.dif > 0 ? 'money-pos' : 'money-neg'))
