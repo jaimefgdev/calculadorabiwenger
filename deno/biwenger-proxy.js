@@ -104,7 +104,7 @@ const CDN = 'https://cf.biwenger.com/api/v2';
    navegador normal y las cabeceras que este mandaría. */
 /* Marca de versión: se sube en cada cambio y se consulta con ?version=1.
    Sirve para saber desde fuera si el despliegue ha entrado o no. */
-const VERSION = '2026-08-28 · deno 45';
+const VERSION = '2026-08-28 · deno 46';
 
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ' +
   '(KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36';
@@ -2106,6 +2106,62 @@ function puntosDeLaJornada(names, salto) {
 }
 
 /**
+ * Las notas de una jornada, sacadas de la ficha de cada futbolista.
+ *
+ * Es la ÚNICA fuente que dice a qué jornada pertenece cada nota. Se probaron
+ * todas las demás y ninguna vale:
+ *
+ *   · el historial resumido (`fitness`) no trae la jornada, solo una lista, y
+ *     su orden no es deducible: el Barça la manda [J2, J1] y el Celta [J1, J2]
+ *     con los dos partidos de la jornada 1 jugados el mismo día. Contando
+ *     partidos por fecha o por número se acierta con unos y se falla con otros.
+ *   · el detalle de la jornada da unos puntos que no son los de la liga:
+ *     acertaba 1 de 9 contra la pantalla de Biwenger.
+ *
+ * Cuesta una consulta por futbolista, así que se piden por tandas para no
+ * disparar el límite de Biwenger y se guarda el resultado: una jornada cerrada
+ * no cambia nunca, y a partir de la segunda vez sale del almacén.
+ */
+async function notasDeLaJornada(env, ids, names, score, numero, cerrada) {
+  if (numero == null || !ids.length) return null;
+  const clave = 'notas-' + numero + '-' + (score || '');
+
+  if (env && env.JORNADAS) {
+    try {
+      const guardado = await env.JORNADAS.get(clave);
+      if (guardado) return JSON.parse(guardado);
+    } catch (error) { /* se pide abajo */ }
+  }
+
+  const mapa = {};
+  const TANDA = 6;
+  for (let i = 0; i < ids.length; i += TANDA) {
+    await Promise.all(ids.slice(i, i + TANDA).map(async function (id) {
+      const slug = names[String(id) + ':slug'];
+      if (!slug) return;
+      const respuesta = await fetch(CDN + '/players/la-liga/' + encodeURIComponent(slug) +
+        '?lang=es&fields=*,reports(*,points,match(*,round(*)))',
+        { headers: NAVEGADOR, cf: SIN_CACHE }).catch(function () { return null; });
+      if (!respuesta || !respuesta.ok) return;
+      const ficha = ((await respuesta.json().catch(function () { return {}; })).data) || {};
+      (ficha.reports || []).forEach(function (informe) {
+        const ronda = (informe.match && informe.match.round) || {};
+        const suya = Number(String(ronda.short || '').replace(/\D/g, '')) || null;
+        if (suya !== numero) return;
+        const nota = (informe.points || {})[String(score)];
+        if (typeof nota === 'number') mapa[String(id)] = nota;
+      });
+    }));
+  }
+
+  /* Solo se guarda lo de una jornada ya cerrada: lo de una en juego cambia. */
+  if (cerrada && env && env.JORNADAS && Object.keys(mapa).length) {
+    try { await env.JORNADAS.put(clave, JSON.stringify(mapa)); } catch (error) { /* da igual */ }
+  }
+  return mapa;
+}
+
+/**
  * Cuántos partidos ha jugado cada equipo DESPUÉS del suyo de esta jornada, que
  * es lo que hay que retroceder en su historial para dar con la nota de esta.
  *
@@ -2725,6 +2781,29 @@ async function roundBoard(env, headers, jornada, listaNombres) {
      tocado la alineación desde entonces. Aquí se empieza de cero: jugadores
      y puntos son de ESTA jornada, y esta jornada todavía no ha jugado nada. */
   const empezada = ficha.status && ficha.status !== 'pending';
+
+  /* Las notas buenas, de la ficha de cada futbolista alineado: es lo único que
+     dice a qué jornada pertenece cada una. Se piden solo de los que están en
+     alguna alineación —unos noventa, no los quinientos del índice— y se guardan
+     en cuanto la jornada cierra. Si algo falla, se sigue con el historial, que
+     acierta en la mayoría. */
+  const alineados = {};
+  (((data && data.league) || {}).standings || []).forEach(function (fila) {
+    const lineup = fila && fila.lineup;
+    ((lineup && lineup.players) || []).concat((lineup && (lineup.discarded || lineup.bench)) || [])
+      .forEach(function (entry) {
+        const j = (entry && typeof entry === 'object') ? ((entry.player || entry)) : { id: entry };
+        if (j && j.id != null) alineados[String(j.id)] = true;
+      });
+  });
+
+  const cerrada = ficha.status === 'finished' &&
+    !!detalle && (detalle.played || 0) >= (detalle.games || 0) && (detalle.games || 0) > 0;
+  const buenas = await notasDeLaJornada(env, Object.keys(alineados), names, score,
+    numeroJornada, cerrada).catch(function () { return null; });
+  if (buenas) {
+    Object.keys(buenas).forEach(function (id) { marcador[id] = buenas[id]; });
+  }
 
   const standings = (((data && data.league) || {}).standings || []).filter(Boolean).map(function (row) {
     const lineup = row.lineup || null;
