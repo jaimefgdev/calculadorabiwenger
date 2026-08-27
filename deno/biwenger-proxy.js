@@ -104,7 +104,7 @@ const CDN = 'https://cf.biwenger.com/api/v2';
    navegador normal y las cabeceras que este mandaría. */
 /* Marca de versión: se sube en cada cambio y se consulta con ?version=1.
    Sirve para saber desde fuera si el despliegue ha entrado o no. */
-const VERSION = '2026-08-27 · deno 40';
+const VERSION = '2026-08-27 · deno 41';
 
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ' +
   '(KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36';
@@ -2126,11 +2126,13 @@ async function saltoPorEquipo(numero, score, ronda) {
     if (partido.awayId != null) cuando[partido.awayId] = dia;
   });
 
-  /* Se miran TODAS las jornadas ya jugadas, incluidas las mitades aplazadas
-     (son partidos de verdad y cuentan para el orden), y de cada equipo se
-     cuentan los partidos que jugó DESPUÉS del suyo de esta jornada. */
+  /* Solo las jornadas propias (part 1). La mitad aplazada NO es una jornada
+     más: repite los mismos partidos que ya están en la suya, con su fecha real.
+     Contando las dos, el partido aplazado del Valencia se contaba dos veces, el
+     salto salía uno de más y se leía una casilla que no existe: sus futbolistas
+     se quedaban sin nota. */
   const jugadas = calendario.filter(function (r) {
-    return r.status === 'finished' || r.status === 'active';
+    return (r.part || 1) === 1 && (r.status === 'finished' || r.status === 'active');
   });
 
   for (let i = 0; i < jugadas.length; i++) {
