@@ -1,6 +1,6 @@
 {
   "name": "jaimefgdevcalc",
-  "short_name": "jaimefgdevcalc",
+  "short_name": "jfgdevcalc",
   "description": "Puntos, mercado y fichajes de la liga, con los números que Biwenger no da.",
   "start_url": "./",
   "scope": "./",
