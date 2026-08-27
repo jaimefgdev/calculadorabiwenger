@@ -1036,6 +1036,18 @@ code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft)
 .cartera__uno { display: block; font-size: .82rem; white-space: nowrap;
   overflow: hidden; text-overflow: ellipsis; }
 
+/* Quien metio esos goles o dio esas asistencias, al pinchar en la cifra. */
+.ranking__desglose {
+  list-style: none; margin: .15rem 0 .5rem; padding: 0 .2rem 0 2.1rem;
+}
+.ranking__desglose li {
+  display: flex; align-items: center; justify-content: space-between; gap: .6rem;
+  padding: .16rem 0; font-size: .82rem;
+  border-bottom: 1px solid var(--border);
+}
+.ranking__desglose li:last-child { border-bottom: 0; }
+.ranking__desglose strong { font-variant-numeric: tabular-nums; flex: none; }
+
 /* El saldo, en ámbar y más encendido cuanto más dinero hay. Cuatro tonos: con
    menos se confunden entre sí y con más no se distinguen. El negativo se queda
    con el rojo de siempre, que ya se entiende solo. */

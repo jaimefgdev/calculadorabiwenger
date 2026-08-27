@@ -699,6 +699,7 @@
     jugadoresCargando: false,
     estadisticas: {},       // resumen de temporada de cada futbolista
     sofa: {},               // trayectoria, pie y contrato, de SofaScore
+    golesAbierto: null,     // que desglose de goles esta desplegado
     partidos: {},           // partidos de cada jornada, con sus alineaciones
     partidosEstado: '',
     partidoAbierto: null,   // el partido cuyo detalle se está viendo
@@ -4289,6 +4290,18 @@
       });
     }
 
+    /* Desglose de goles y asistencias: se abre uno cada vez. */
+    const tandas = $('liga-tandas');
+    if (tandas) {
+      tandas.addEventListener('click', function (evento) {
+        const boton = evento.target.closest('[data-goles]');
+        if (!boton) return;
+        const cual = boton.getAttribute('data-goles');
+        state.golesAbierto = state.golesAbierto === cual ? null : cual;
+        renderTandasDeLiga();
+      });
+    }
+
     const pastilla = $('btn-ofertas');
     if (pastilla) pastilla.addEventListener('click', function () { abrirOfertas(); });
 
@@ -4554,6 +4567,48 @@
     return { jornadas: conPuntos.length, ganadas: ganadas, racha: ultimas };
   }
 
+  /**
+   * Goles y asistencias de cada mánager, contando solo lo que hicieron sus
+   * futbolistas ESTANDO ALINEADOS.
+   *
+   * Es lo que de verdad le sirvió: un gol de alguien que tenía en el banquillo
+   * no le dio nada, y uno de la jornada en que aún no lo tenía tampoco. Por eso
+   * se cuenta jornada a jornada sobre el once, y no sumando lo que lleve cada
+   * futbolista en la temporada.
+   */
+  function golesDeLaLiga() {
+    const por = {};
+
+    Object.keys(state.jornadas.datos || {}).forEach(function (id) {
+      const jornada = state.jornadas.datos[id];
+      /* La mitad aplazada repite los mismos partidos: contaría doble. */
+      if (!jornada || !jornada.round || (jornada.round.part || 1) !== 1) return;
+
+      (jornada.standings || []).forEach(function (fila) {
+        const manager = findManager(fila.name, null) || fila.name;
+        if (!por[manager]) por[manager] = { goles: 0, asist: 0, quien: {} };
+        const suyo = por[manager];
+
+        (fila.xi || []).forEach(function (jugador) {
+          const g = jugador.goals || 0;
+          const a = jugador.assists || 0;
+          if (!g && !a) return;
+          suyo.goles += g;
+          suyo.asist += a;
+          const clave = String(jugador.id);
+          if (!suyo.quien[clave]) {
+            suyo.quien[clave] = { id: clave, name: jugador.name, goles: 0, asist: 0,
+              team: jugador.team, teamName: jugador.teamName, position: jugador.position };
+          }
+          suyo.quien[clave].goles += g;
+          suyo.quien[clave].asist += a;
+        });
+      });
+    });
+
+    return por;
+  }
+
   function renderTandasDeLiga() {
     const caja = $('liga-tandas');
     if (!caja) return;
@@ -4585,9 +4640,59 @@
       '</div>';
     };
 
+    /* Goles y asistencias, con el desglose de quién los hizo al pinchar. */
+    const golesPor = golesDeLaLiga();
+
+    const conDesglose = function (titulo, campo, sufijo) {
+      const filas = MANAGERS.map(function (nombre) {
+        const suyo = golesPor[nombre] || { quien: {} };
+        return { name: nombre, valor: suyo[campo] || 0, quien: suyo.quien || {} };
+      }).sort(function (a, b) {
+        return (b.valor - a.valor) || a.name.localeCompare(b.name, 'es');
+      });
+
+      return '<div class="ranking">' +
+        '<h3 class="ranking__title">' + titulo + '</h3>' +
+        '<ol class="ranking__list">' + filas.map(function (fila) {
+          const clave = campo + '|' + fila.name;
+          const abierto = state.golesAbierto === clave;
+          /* Los que aportaron algo, de más a menos. */
+          const suyos = Object.keys(fila.quien)
+            .map(function (k) { return fila.quien[k]; })
+            .filter(function (j) { return (j[campo === 'goles' ? 'goles' : 'asist'] || 0) > 0; })
+            .sort(function (a, b) {
+              const x = campo === 'goles' ? 'goles' : 'asist';
+              return b[x] - a[x];
+            });
+
+          return '<li class="ranking__row">' +
+            '<button type="button" class="ranking__boton"' +
+              ' data-goles="' + escapeHtml(clave) + '"' +
+              ' aria-expanded="' + (abierto ? 'true' : 'false') + '"' +
+              (suyos.length ? '' : ' disabled') + '>' +
+              '<span class="ranking__quien"><span class="manager">' + avatar(fila.name) +
+                '<span class="manager__name">' + escapeHtml(fila.name) + '</span></span></span>' +
+              '<strong class="ranking__value">' + fila.valor + sufijo + '</strong>' +
+            '</button>' +
+            (abierto && suyos.length
+              ? '<ul class="ranking__desglose">' + suyos.map(function (j) {
+                  const n = campo === 'goles' ? j.goles : j.asist;
+                  return '<li><span class="with-crest">' +
+                    playerName({ playerId: j.id, player: j.name, position: j.position }) +
+                    crestOf(j, 'crest--badge') + '</span>' +
+                    '<strong>' + n + '</strong></li>';
+                }).join('') + '</ul>'
+              : '') +
+          '</li>';
+        }).join('') + '</ol>' +
+      '</div>';
+    };
+
     /* El rótulo es siempre el mismo aunque todavía no se hayan jugado tres:
        se suman las que haya y, al llegar a tres, cuadra solo. */
     caja.innerHTML =
+      conDesglose('Más goles', 'goles', '') +
+      conDesglose('Más asistencias', 'asist', '') +
       lista('Más jornadas ganadas', datos.ganadas, '') +
       lista('Mejor racha <span class="ranking__matiz">(últimas 3 jornadas)</span>',
         datos.racha, ' pts');
