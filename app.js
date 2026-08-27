@@ -4609,9 +4609,45 @@
     return por;
   }
 
+  /* Las jornadas guardadas antes de que el proxy mandara goles y asistencias
+     se quedan sin ese dato, y como una jornada cerrada no se vuelve a pedir
+     nunca, el ranking salía a cero para siempre. Aquí se piden esas y solo
+     esas, una vez por sesión: al llegar, la mezcla las completa y el ranking
+     se rehace solo. */
+  let golesPedidos = false;
+
+  function ensureGolesDeJornadas() {
+    if (golesPedidos) return;
+    const config = loadSyncConfig();
+    if (!config.url || !config.key) return;
+
+    const faltan = Object.keys(state.jornadas.datos || {}).filter(function (id) {
+      const jornada = state.jornadas.datos[id];
+      if (!jornada || !jornada.round || (jornada.round.part || 1) !== 1) return false;
+      return !conGoles(jornada);
+    });
+    if (!faltan.length) return;
+    golesPedidos = true;
+
+    Promise.all(faltan.map(function (id) {
+      return fetch(config.url.replace(/\/+$/, '') + '/?key=' + encodeURIComponent(config.key) +
+        '&jornada=' + encodeURIComponent(id), { headers: { 'accept': 'application/json' } })
+        .then(function (r) { return r.json(); })
+        .then(function (payload) {
+          if (payload && !payload.error && payload.round) mergeJornada(payload, true);
+        })
+        .catch(function () { /* si falla, se queda como estaba */ });
+    })).then(function () {
+      renderTandasDeLiga();
+      renderJornadas();
+    });
+  }
+
   function renderTandasDeLiga() {
     const caja = $('liga-tandas');
     if (!caja) return;
+
+    ensureGolesDeJornadas();
 
     const datos = tandasDeLaLiga();
     if (!datos.jornadas) {
@@ -7926,11 +7962,20 @@
       '<div class="picker__backdrop" data-price-close></div>' +
       '<div class="picker__card modal__card" role="dialog" aria-modal="true" aria-label="Ficha de ' +
         escapeHtml(abierto.name) + '">' +
-        '<div class="picker__head ficha__head">' +
-          '<span class="with-crest">' +
-            faceOf(abierto.id, 'ficha__face') +
+        /* La cabecera va en vertical: la cara grande y centrada, el nombre
+           debajo y las pestañas al final. En horizontal, con el nombre, cinco
+           pastillas y el aspa en la misma línea, no cabía nada y la foto era un
+           sello diminuto que no servía para reconocer a nadie. */
+        '<div class="picker__head ficha__head ficha__head--alto">' +
+          '<button type="button" class="btn btn--ghost btn--close ficha__cerrar"' +
+            ' data-price-close title="Cerrar" aria-label="Cerrar">✕</button>' +
+          '<span class="ficha__retrato">' +
+            faceOf(abierto.id, 'ficha__face ficha__face--grande') +
+            crestOf(ficha, 'crest--badge ficha__escudo') +
+          '</span>' +
+          '<span class="ficha__nombre">' +
             '<strong>' + escapeHtml(abierto.name) + '</strong>' +
-            crestOf(ficha, 'crest--badge') + statusMark(ficha, 'mark--row') +
+            statusMark(ficha, 'mark--row') +
           '</span>' +
           /* Mientras se elige rival, la pastilla estorba: su sitio lo ocupa el
              aspa que hay junto al buscador. */
@@ -7956,8 +8001,6 @@
             '</span>' +
             '<button type="button" class="ambito ficha__comparar" data-comparar>' +
               (abierto.comparar ? 'Quitar comparación' : 'Comparar') + '</button>') +
-          '<button type="button" class="btn btn--ghost btn--close" data-price-close' +
-            ' title="Cerrar" aria-label="Cerrar">✕</button>' +
         '</div>' +
         '<p class="muted ficha__datos">' + datos + '</p>' +
         /* Lesionado o sancionado: el parte de Biwenger («Retorno estimado:

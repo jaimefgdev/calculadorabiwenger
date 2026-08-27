@@ -1036,6 +1036,27 @@ code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft)
 .cartera__uno { display: block; font-size: .82rem; white-space: nowrap;
   overflow: hidden; text-overflow: ellipsis; }
 
+/* Cabecera de la ficha de un futbolista, en vertical: cara, nombre y pestanas. */
+.ficha__head--alto {
+  position: relative;
+  display: flex; flex-direction: column; align-items: center; gap: .5rem;
+  padding-top: .4rem; text-align: center;
+}
+/* El aspa, suelta en la esquina, para no robar sitio a la fila de pestanas. */
+.ficha__cerrar { position: absolute; top: 0; right: 0; }
+/* La cara, con su escudo colgando de la esquina. */
+.ficha__retrato { position: relative; display: inline-block; }
+.ficha__face--grande { width: 96px; height: 96px; }
+.ficha__escudo { position: absolute; right: -2px; bottom: -2px; width: 26px; height: 26px; }
+.ficha__nombre {
+  display: flex; align-items: center; justify-content: center; gap: .4rem;
+  font-size: 1.1rem; line-height: 1.2;
+}
+/* Las pestanas y el boton de comparar, centrados y con sitio para envolver. */
+.ficha__head--alto .ficha__vistas,
+.ficha__head--alto .ficha__comparar { margin: 0; }
+.ficha__head--alto > .ficha__vistas { flex-wrap: wrap; justify-content: center; }
+
 /* Titulo de un panel que no lleva cabecera con subtitulo. */
 .panel__titulo { margin: 0 0 .8rem; font-size: 1.05rem; }
 
