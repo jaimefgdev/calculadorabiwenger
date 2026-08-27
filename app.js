@@ -4629,18 +4629,21 @@
     if (!faltan.length) return;
     golesPedidos = true;
 
-    Promise.all(faltan.map(function (id) {
-      return fetch(config.url.replace(/\/+$/, '') + '/?key=' + encodeURIComponent(config.key) +
-        '&jornada=' + encodeURIComponent(id), { headers: { 'accept': 'application/json' } })
+    /* De una en una y con un respiro entre medias. Pedirlas todas a la vez
+       hacia que Biwenger cortara por exceso de consultas, y entonces no llegaba
+       ninguna: la jornada se quedaba sin puntos y parecia rota. */
+    const siguiente = function (i) {
+      if (i >= faltan.length) { renderTandasDeLiga(); renderJornadas(); return; }
+      fetch(config.url.replace(/\/+$/, '') + '/?key=' + encodeURIComponent(config.key) +
+        '&jornada=' + encodeURIComponent(faltan[i]), { headers: { 'accept': 'application/json' } })
         .then(function (r) { return r.json(); })
         .then(function (payload) {
           if (payload && !payload.error && payload.round) mergeJornada(payload, true);
         })
-        .catch(function () { /* si falla, se queda como estaba */ });
-    })).then(function () {
-      renderTandasDeLiga();
-      renderJornadas();
-    });
+        .catch(function () { /* si falla, se queda como estaba */ })
+        .then(function () { setTimeout(function () { siguiente(i + 1); }, 1200); });
+    };
+    siguiente(0);
   }
 
   function renderTandasDeLiga() {
