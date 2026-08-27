@@ -751,6 +751,23 @@ code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft)
   background: color-mix(in srgb, var(--pos) 18%, transparent);
 }
 .bench--encima { outline: 2px solid var(--pos); outline-offset: 3px; border-radius: 10px; }
+/* Y donde NO cabe, en rojo: soltar ahí no va a hacer nada, y sin decirlo
+   parece que la app no responde. */
+.pitch__slot--nope::before {
+  content: ''; position: absolute; inset: -4px 2px;
+  border: 2px solid var(--neg); border-radius: 10px;
+  background: color-mix(in srgb, var(--neg) 15%, transparent);
+  pointer-events: none;
+}
+.bench--nope { outline: 2px solid var(--neg); outline-offset: 3px; border-radius: 10px; }
+
+/* Arrastrando no se selecciona texto. En el móvil no pasa, pero en el PC al
+   tirar de un suplente se iba seleccionando su nombre y el de los de al lado,
+   y quedaba todo en azul. */
+#pitch, #bench {
+  user-select: none; -webkit-user-select: none;
+  -webkit-touch-callout: none;
+}
 /* Doble clase a propósito: `.pic-player` fija 24 px más abajo y, a igualdad
    de peso, ganaría por ir después. */
 /* La medida la lleva la caja; la foto la rellena. Si el ancho fuera un
@@ -1018,6 +1035,20 @@ code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft)
 .cartera { line-height: 1.35; }
 .cartera__uno { display: block; font-size: .82rem; white-space: nowrap;
   overflow: hidden; text-overflow: ellipsis; }
+
+/* El saldo, en ámbar y más encendido cuanto más dinero hay. Cuatro tonos: con
+   menos se confunden entre sí y con más no se distinguen. El negativo se queda
+   con el rojo de siempre, que ya se entiende solo. */
+.saldo { font-variant-numeric: tabular-nums; }
+.saldo--1 { color: #a8752a; }
+.saldo--2 { color: #c8902f; }
+.saldo--3 { color: #e0a935; }
+.saldo--4 { color: #ffc94a; }
+/* En claro los tonos altos se pierden sobre el blanco: se oscurecen todos. */
+:root[data-tema="claro"] .saldo--1 { color: #8a5f1e; }
+:root[data-tema="claro"] .saldo--2 { color: #a2731f; }
+:root[data-tema="claro"] .saldo--3 { color: #b8851f; }
+:root[data-tema="claro"] .saldo--4 { color: #cf951c; }
 
 /* Comprados y vendidos: el beneficio manda, asi que va en negrita y con su
    color; los dias, discretos, que solo dan contexto. */

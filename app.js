@@ -1479,12 +1479,16 @@
           (row.earned ? '<span class="money-pos">+' + money(row.earned) + '</span>' : '<span class="zero">' + money(0) + '</span>') + '</td>' +
         '<td class="num" data-label="Valor equipo">' +
           (row.teamValue == null ? '<span class="unknown">—</span>' : money(row.teamValue)) + '</td>' +
+        /* Menos de once no da ni para alinear: se avisa en rojo. */
         '<td class="num" data-label="Jug.">' +
-          (row.players == null ? '<span class="unknown">—</span>' : row.players) + '</td>' +
+          (row.players == null ? '<span class="unknown">—</span>'
+            : '<span class="' + (row.players < 11 ? 'money-neg' : '') + '"' +
+              (row.players < 11 ? ' title="No llega a once: no puede completar la alineación"' : '') +
+              '>' + row.players + '</span>') + '</td>' +
         /* El saldo, pegado a la puja máxima: son las dos cifras que se miran
            juntas para saber hasta dónde puedes llegar. */
         '<td class="num" data-label="Saldo"><strong>' +
-          '<span class="' + (negative ? 'money-neg' : '') + '">' + money(row.balance) + '</span></strong>' +
+          '<span class="' + tonoDeSaldo(row.balance) + '">' + money(row.balance) + '</span></strong>' +
           (row.officialBalance != null && row.officialBalance !== row.balance
             ? '<span class="mismatch" title="Biwenger dice ' + money(row.officialBalance) +
               '. La diferencia sale de movimientos que el tablón no detalla: cesiones, bonus de jornada o cláusulas.">≠</span>'
@@ -2730,10 +2734,11 @@
   function limpiarArrastre() {
     if (arrastre && arrastre.fantasma) arrastre.fantasma.remove();
     Array.prototype.forEach.call(
-      document.querySelectorAll('.pitch__slot--vale, .pitch__slot--encima, .bench--encima, .pitch__slot--origen'),
+      document.querySelectorAll('.pitch__slot--vale, .pitch__slot--encima, .bench--encima, ' +
+        '.pitch__slot--origen, .pitch__slot--nope, .bench--nope'),
       function (el) {
         el.classList.remove('pitch__slot--vale', 'pitch__slot--encima',
-          'bench--encima', 'pitch__slot--origen');
+          'bench--encima', 'pitch__slot--origen', 'pitch__slot--nope', 'bench--nope');
       });
     arrastre = null;
   }
@@ -2852,13 +2857,22 @@
         moverFantasma(evento);
         const destino = destinoBajo(evento);
         Array.prototype.forEach.call(
-          document.querySelectorAll('.pitch__slot--encima, .bench--encima'),
-          function (el) { el.classList.remove('pitch__slot--encima', 'bench--encima'); });
-        if (destino && destino.tipo === 'campo' &&
-            cabeEn(arrastre.id, destino.el.getAttribute('data-puesto'))) {
-          destino.el.classList.add('pitch__slot--encima');
-        } else if (destino && destino.tipo === 'banquillo' && arrastre.desdeHueco) {
-          destino.el.classList.add('bench--encima');
+          document.querySelectorAll('.pitch__slot--encima, .bench--encima, ' +
+            '.pitch__slot--nope, .bench--nope'),
+          function (el) {
+            el.classList.remove('pitch__slot--encima', 'bench--encima',
+              'pitch__slot--nope', 'bench--nope');
+          });
+        /* Encima de un sitio válido, verde; encima de uno que no admite a ese
+           futbolista, rojo. Antes ahí no pasaba nada y parecía que la app se
+           había quedado colgada, cuando lo que ocurría es que no cabía. */
+        if (destino && destino.tipo === 'campo') {
+          const cabe = cabeEn(arrastre.id, destino.el.getAttribute('data-puesto'));
+          destino.el.classList.add(cabe ? 'pitch__slot--encima' : 'pitch__slot--nope');
+        } else if (destino && destino.tipo === 'banquillo') {
+          /* Al banquillo solo se puede mandar a uno que venga del campo: el que
+             ya está sentado no tiene a dónde ir. */
+          destino.el.classList.add(arrastre.desdeHueco ? 'bench--encima' : 'bench--nope');
         }
         return;
       }
@@ -8167,6 +8181,24 @@
         peor: (detalle[nombre] || {}).peor || null
       };
     }).sort(function (a, b) { return b.total - a.total; });
+  }
+
+  /**
+   * El color del saldo, por tramos.
+   *
+   * En rojo el que debe dinero, y en ámbar el que tiene, más encendido cuanto
+   * más le queda: de un vistazo se ve quién puede pelear una puja y quién no.
+   * Los cortes salen de los saldos que se dan de verdad en la liga, que van de
+   * cuatro cifras a veinte millones; con tramos fijos y redondos, casi todos
+   * caerían en el mismo color y no distinguirían nada.
+   */
+  function tonoDeSaldo(saldo) {
+    if (saldo == null) return '';
+    if (saldo < 0) return 'money-neg';
+    if (saldo < 1000000) return 'saldo saldo--1';        // por debajo del millón
+    if (saldo < 5000000) return 'saldo saldo--2';
+    if (saldo < 10000000) return 'saldo saldo--3';
+    return 'saldo saldo--4';                              // diez millones o más
   }
 
   /** Un importe con su signo y su color; cero en gris, que no es ni bueno ni malo. */
