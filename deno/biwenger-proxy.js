@@ -104,7 +104,7 @@ const CDN = 'https://cf.biwenger.com/api/v2';
    navegador normal y las cabeceras que este mandaría. */
 /* Marca de versión: se sube en cada cambio y se consulta con ?version=1.
    Sirve para saber desde fuera si el despliegue ha entrado o no. */
-const VERSION = '2026-08-27 · deno 37';
+const VERSION = '2026-08-27 · deno 38';
 
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ' +
   '(KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36';
@@ -1932,8 +1932,13 @@ async function playerStats(id, names, score) {
        «titular» se calcula como jugados menos los que entraron de cambio.
        Sin minutos no jugó, y punto. Si Biwenger no manda el dato de minutos no
        se supone nada y se cuenta como jugado, que es lo de siempre. */
+    /* La señal buena es que el informe traiga `points`. Comprobado: al que jugó
+       le llegan `points`, `rawStats` y `events`; al convocado que se quedó en el
+       banquillo, el informe pelado —solo `match` y `home`—. Mirar los minutos no
+       basta: en esos informes `rawStats` no viene, así que `minutesPlayed` es
+       `undefined` y se colaba como jugado. */
     const minutos = bruto.minutesPlayed;
-    const jugado = minutos == null ? true : minutos > 0;
+    const jugado = informe.points != null && (minutos == null ? true : minutos > 0);
     if (!jugado) {
       /* Ni jugados, ni casa/fuera, ni racha: para él ese partido no existe.
          La jornada sí se apunta, con su guion, que es lo que dibuja el hueco
