@@ -1013,6 +1013,10 @@ code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft)
   background: var(--accent); border-color: var(--accent); color: #fff;
 }
 
+/* Comprados y vendidos: el beneficio manda, asi que va en negrita y con su
+   color; los dias, discretos, que solo dan contexto. */
+.table--reventas td[data-label="Dias"] { color: var(--text-faint); font-size: .82rem; }
+
 /* Trayectoria por clubes, con sus cifras. La fila del club actual va marcada. */
 .trayecto { margin: 0 0 .9rem; font-size: .84rem; }
 .trayecto th { color: var(--text-faint); font-weight: 600; }

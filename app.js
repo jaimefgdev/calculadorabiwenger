@@ -8020,6 +8020,110 @@
     }).join('');
   }
 
+
+
+  /* ---------- Comprados y vendidos ----------
+     Cada futbolista que alguien fichó y luego soltó: lo que ganó o perdió con
+     él y cuánto lo tuvo. Es lo único del tablón que dice si un mánager sabe
+     comprar barato, porque el resto de cifras solo cuentan cuánto mueve.
+
+     Las compras y las ventas se emparejan EN ORDEN: la primera venta cierra la
+     primera compra. Con eso, al que se compró dos veces se le cuentan sus dos
+     operaciones por separado en vez de mezclarlas en una media que no existió.
+     Lo comprado y aún no vendido no sale: todavía no ha ganado ni perdido
+     nada. */
+  function operacionesCerradas() {
+    const abiertas = {};
+    const cerradas = [];
+
+    state.movements
+      .filter(function (m) { return m.playerId && (m.type === 'buy' || m.type === 'sell'); })
+      .slice()
+      .sort(function (a, b) {
+        return (a.timestamp || 0) - (b.timestamp || 0);
+      })
+      .forEach(function (m) {
+        const clave = m.manager + '|' + m.playerId;
+        if (m.type === 'buy') {
+          if (!abiertas[clave]) abiertas[clave] = [];
+          abiertas[clave].push(m);
+          return;
+        }
+        const compra = (abiertas[clave] || []).shift();
+        /* Sin compra detrás es del reparto: no hay beneficio que calcular. */
+        if (!compra) return;
+        const dias = (m.timestamp && compra.timestamp)
+          ? Math.max(0, Math.round((m.timestamp - compra.timestamp) / 86400000))
+          : null;
+        cerradas.push({
+          playerId: m.playerId,
+          player: m.player,
+          team: m.team,
+          teamName: m.teamName,
+          position: m.position,
+          manager: m.manager,
+          compra: compra.amount,
+          venta: m.amount,
+          ganancia: m.amount - compra.amount,
+          dias: dias,
+          desde: compra.date,
+          hasta: m.date
+        });
+      });
+
+    return cerradas.sort(function (a, b) { return b.ganancia - a.ganancia; });
+  }
+
+  function renderReventas() {
+    const caja = $('reventas');
+    if (!caja) return;
+
+    const todas = operacionesCerradas();
+    if (!todas.length) {
+      caja.innerHTML = '<div class="panel__head"><h2>Comprados y vendidos</h2></div>' +
+        '<p class="muted">Todavía nadie ha vendido a un futbolista que hubiera comprado.</p>';
+      return;
+    }
+
+    const total = todas.reduce(function (s, o) { return s + o.ganancia; }, 0);
+    const buenas = todas.filter(function (o) { return o.ganancia > 0; }).length;
+
+    caja.innerHTML =
+      '<div class="panel__head">' +
+        '<h2>Comprados y vendidos</h2>' +
+        '<p class="muted">' + todas.length +
+          (todas.length === 1 ? ' operación cerrada · ' : ' operaciones cerradas · ') +
+          buenas + ' con beneficio · ' +
+          (total >= 0 ? 'saldo +' : 'saldo −') + money(Math.abs(total)) + '</p>' +
+      '</div>' +
+      '<div class="table-scroll"><table class="table table--reventas"><thead><tr>' +
+        '<th>Futbolista</th>' +
+        '<th>Jugador</th>' +
+        '<th class="num">Compra</th>' +
+        '<th class="num">Venta</th>' +
+        '<th class="num">Beneficio</th>' +
+        '<th class="num" title="Días que lo tuvo en su plantilla">Días</th>' +
+      '</tr></thead><tbody>' +
+      todas.map(function (o) {
+        return '<tr>' +
+          '<td data-label="Futbolista"><span class="with-crest">' +
+            playerName({ playerId: o.playerId, player: o.player, position: o.position }) +
+            crestOf(o, 'crest--badge') + '</span></td>' +
+          '<td data-label="Jugador"><span class="manager">' + avatar(o.manager) +
+            '<span class="manager__name">' + escapeHtml(o.manager) + '</span></span></td>' +
+          '<td class="num" data-label="Compra">' + money(o.compra) + '</td>' +
+          '<td class="num" data-label="Venta">' + money(o.venta) + '</td>' +
+          '<td class="num" data-label="Beneficio"><strong class="' +
+            (o.ganancia > 0 ? 'money-pos' : (o.ganancia < 0 ? 'money-neg' : '')) + '">' +
+            (o.ganancia > 0 ? '+' : (o.ganancia < 0 ? '−' : '')) +
+            money(Math.abs(o.ganancia)) + '</strong></td>' +
+          '<td class="num" data-label="Días">' +
+            (o.dias == null ? '<span class="sub">—</span>'
+              : o.dias + (o.dias === 1 ? ' día' : ' días')) + '</td>' +
+        '</tr>';
+      }).join('') + '</tbody></table></div>';
+  }
+
   /* ---------- Rankings de gasto e ingresos ---------- */
 
   /* ---------- Quién puntúa en la liga ----------
@@ -8923,7 +9027,7 @@
     renderPlantilla();
     renderWarnings();
     if (state.tab === 'managers') { renderManagers(); renderSquads(); renderTandasDeLiga(); }
-    if (state.tab === 'fichajes') { renderDataKpis(); renderKpiCharts(); renderSpending(); pintarFichajes(); }
+    if (state.tab === 'fichajes') { renderDataKpis(); renderKpiCharts(); renderSpending(); pintarFichajes(); renderReventas(); }
     if (state.tab === 'datos') { ensureSquads(); ensureLaLiga(); ensureRecuento(); renderRankings(); renderRankingsTemporada(); }
     if (state.tab === 'mercado') { renderMarket(); renderMovers(); }
     if (state.tab === 'jugadores') { ensureJugadores(); renderJugadores(); }
