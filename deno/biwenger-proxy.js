@@ -104,7 +104,7 @@ const CDN = 'https://cf.biwenger.com/api/v2';
    navegador normal y las cabeceras que este mandaría. */
 /* Marca de versión: se sube en cada cambio y se consulta con ?version=1.
    Sirve para saber desde fuera si el despliegue ha entrado o no. */
-const VERSION = '2026-08-28 · deno 46';
+const VERSION = '2026-08-28 · deno 47';
 
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ' +
   '(KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36';
@@ -2763,9 +2763,10 @@ async function roundBoard(env, headers, jornada, listaNombres) {
     : ((detalle && detalle.number) != null ? detalle.number : null);
   const salto = await saltoPorEquipo(numeroJornada, score, round.id).catch(function () { return {}; });
   const primas = await primasDeLaLiga(env).catch(function () { return null; });
-  const marcador = conCorrecciones(
-    conSuperPica(puntosDeLaJornada(names, salto),
-      detalle, primas), numeroJornada);
+  /* La base sale del historial; abajo se sustituye por las notas buenas y solo
+     entonces se aplican la Súper Pica y las correcciones. Al revés se perdían:
+     las notas buenas pisaban lo que ya se había ajustado. */
+  const base = puntosDeLaJornada(names, salto);
 
   /* En qué anda el partido de cada club: sirve para distinguir al que no ha
      puntuado del que todavía no ha jugado. */
@@ -2802,8 +2803,12 @@ async function roundBoard(env, headers, jornada, listaNombres) {
   const buenas = await notasDeLaJornada(env, Object.keys(alineados), names, score,
     numeroJornada, cerrada).catch(function () { return null; });
   if (buenas) {
-    Object.keys(buenas).forEach(function (id) { marcador[id] = buenas[id]; });
+    Object.keys(buenas).forEach(function (id) { base[id] = buenas[id]; });
   }
+
+  /* Y ahora sí: la Súper Pica de esta liga y las correcciones, encima de las
+     notas buenas. */
+  const marcador = conCorrecciones(conSuperPica(base, detalle, primas), numeroJornada);
 
   const standings = (((data && data.league) || {}).standings || []).filter(Boolean).map(function (row) {
     const lineup = row.lineup || null;
