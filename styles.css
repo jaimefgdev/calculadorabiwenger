@@ -1013,6 +1013,12 @@ code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft)
   background: var(--accent); border-color: var(--accent); color: #fff;
 }
 
+/* Mejor y peor fichaje en cartera: uno debajo del otro, que en linea no
+   caben dos nombres con su importe. */
+.cartera { line-height: 1.35; }
+.cartera__uno { display: block; font-size: .82rem; white-space: nowrap;
+  overflow: hidden; text-overflow: ellipsis; }
+
 /* Comprados y vendidos: el beneficio manda, asi que va en negrita y con su
    color; los dias, discretos, que solo dan contexto. */
 .table--reventas td[data-label="Dias"] { color: var(--text-faint); font-size: .82rem; }

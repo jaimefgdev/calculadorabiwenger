@@ -8080,7 +8080,7 @@
 
     const todas = operacionesCerradas();
     if (!todas.length) {
-      caja.innerHTML = '<div class="panel__head"><h2>Comprados y vendidos</h2></div>' +
+      caja.innerHTML = '<div class="panel__head"><h2>Beneficio generado por jugadores comprados y después vendidos</h2></div>' +
         '<p class="muted">Todavía nadie ha vendido a un futbolista que hubiera comprado.</p>';
       return;
     }
@@ -8090,7 +8090,7 @@
 
     caja.innerHTML =
       '<div class="panel__head">' +
-        '<h2>Comprados y vendidos</h2>' +
+        '<h2>Beneficio generado por jugadores comprados y después vendidos</h2>' +
         '<p class="muted">' + todas.length +
           (todas.length === 1 ? ' operación cerrada · ' : ' operaciones cerradas · ') +
           buenas + ' con beneficio · ' +
@@ -8120,6 +8120,113 @@
           '<td class="num" data-label="Días">' +
             (o.dias == null ? '<span class="sub">—</span>'
               : o.dias + (o.dias === 1 ? ' día' : ' días')) + '</td>' +
+        '</tr>';
+      }).join('') + '</tbody></table></div>';
+  }
+
+
+  /* ---------- Cómo se le da el mercado a cada uno ----------
+     Tres cifras que responden preguntas distintas y que sumadas en una sola se
+     taparían entre ellas: en esta liga hay quien gana vendiendo y pierde con lo
+     que se queda, y al revés.
+
+       realizado  lo ganado con los que compró Y YA VENDIÓ. No se mueve.
+       latente    lo que valen hoy los que aún tiene, frente a lo que pagó.
+                  Cambia cada día con el mercado, y solo se hace real si vende.
+       total      el balance de su gestión.
+
+     Los del reparto se quedan fuera de las dos: sin precio de compra no hay
+     beneficio que calcular. */
+  function balanceDeMercado() {
+    const realizado = {};
+    operacionesCerradas().forEach(function (o) {
+      realizado[o.manager] = (realizado[o.manager] || 0) + o.ganancia;
+    });
+
+    const latente = {};
+    const detalle = {};
+    squadList().forEach(function (equipo) {
+      const manager = findManager(equipo.name, null) || equipo.name;
+      let suma = 0;
+      const suyos = [];
+      (equipo.players || []).forEach(function (jugador) {
+        if (jugador.paid == null) return;
+        const dif = (jugador.marketValue || 0) - jugador.paid;
+        suma += dif;
+        suyos.push({ name: jugador.name, dif: dif });
+      });
+      latente[manager] = suma;
+      suyos.sort(function (a, b) { return b.dif - a.dif; });
+      detalle[manager] = { mejor: suyos[0] || null, peor: suyos[suyos.length - 1] || null };
+    });
+
+    return MANAGERS.map(function (nombre) {
+      const r = realizado[nombre] || 0;
+      const l = latente[nombre] || 0;
+      return {
+        name: nombre,
+        realizado: r,
+        latente: l,
+        total: r + l,
+        mejor: (detalle[nombre] || {}).mejor || null,
+        peor: (detalle[nombre] || {}).peor || null
+      };
+    }).sort(function (a, b) { return b.total - a.total; });
+  }
+
+  /** Un importe con su signo y su color; cero en gris, que no es ni bueno ni malo. */
+  function celdaDinero(valor) {
+    if (!valor) return '<span class="sub">' + money(0) + '</span>';
+    return '<span class="' + (valor > 0 ? 'money-pos' : 'money-neg') + '">' +
+      (valor > 0 ? '+' : '−') + money(Math.abs(valor)) + '</span>';
+  }
+
+  function renderMercadeo() {
+    const caja = $('mercadeo');
+    if (!caja) return;
+
+    const filas = balanceDeMercado();
+    const hayAlgo = filas.some(function (f) { return f.realizado || f.latente; });
+    if (!hayAlgo) {
+      caja.innerHTML = '<div class="panel__head"><h2>Cómo se le da el mercado a cada uno</h2></div>' +
+        '<p class="muted">Todavía no hay fichajes con los que medir esto.</p>';
+      return;
+    }
+
+    caja.innerHTML =
+      '<div class="panel__head">' +
+        '<h2>Cómo se le da el mercado a cada uno</h2>' +
+        '<p class="muted">Lo ganado con los que ya vendió y lo que llevan encima ' +
+          'los que aún tiene. Los del reparto no cuentan: no se pagó por ellos.</p>' +
+      '</div>' +
+      '<div class="table-scroll"><table class="table table--mercadeo"><thead><tr>' +
+        '<th>Jugador</th>' +
+        '<th class="num" title="Ganado con los futbolistas que compró y ya vendió. Esto ya está cobrado">Realizado</th>' +
+        '<th class="num" title="Lo que valen hoy los que aún tiene frente a lo que pagó. Cambia cada día y solo se hace real si vende">Latente</th>' +
+        '<th class="num">Total</th>' +
+        '<th title="Su mejor y su peor fichaje de los que todavía conserva">En cartera</th>' +
+      '</tr></thead><tbody>' +
+      filas.map(function (f) {
+        const apunte = function (uno, clase) {
+          if (!uno) return '';
+          return '<span class="cartera__uno">' + escapeHtml(uno.name) +
+            ' <span class="' + clase + '">' + (uno.dif > 0 ? '+' : '−') +
+            money(Math.abs(uno.dif)) + '</span></span>';
+        };
+        /* Con un solo fichaje en cartera, mejor y peor son el mismo: se dice una vez. */
+        const unico = f.mejor && f.peor && f.mejor.name === f.peor.name;
+        return '<tr>' +
+          '<td data-label="Jugador"><span class="manager">' + avatar(f.name) +
+            '<span class="manager__name">' + escapeHtml(f.name) + '</span></span></td>' +
+          '<td class="num" data-label="Realizado">' + celdaDinero(f.realizado) + '</td>' +
+          '<td class="num" data-label="Latente">' + celdaDinero(f.latente) + '</td>' +
+          '<td class="num" data-label="Total"><strong>' + celdaDinero(f.total) + '</strong></td>' +
+          '<td class="cartera" data-label="En cartera">' +
+            (f.mejor
+              ? apunte(f.mejor, f.mejor.dif > 0 ? 'money-pos' : 'money-neg') +
+                (unico ? '' : apunte(f.peor, f.peor.dif > 0 ? 'money-pos' : 'money-neg'))
+              : '<span class="sub">—</span>') +
+          '</td>' +
         '</tr>';
       }).join('') + '</tbody></table></div>';
   }
@@ -9027,7 +9134,7 @@
     renderPlantilla();
     renderWarnings();
     if (state.tab === 'managers') { renderManagers(); renderSquads(); renderTandasDeLiga(); }
-    if (state.tab === 'fichajes') { renderDataKpis(); renderKpiCharts(); renderSpending(); pintarFichajes(); renderReventas(); }
+    if (state.tab === 'fichajes') { renderDataKpis(); renderKpiCharts(); renderSpending(); pintarFichajes(); renderReventas(); renderMercadeo(); }
     if (state.tab === 'datos') { ensureSquads(); ensureLaLiga(); ensureRecuento(); renderRankings(); renderRankingsTemporada(); }
     if (state.tab === 'mercado') { renderMarket(); renderMovers(); }
     if (state.tab === 'jugadores') { ensureJugadores(); renderJugadores(); }
