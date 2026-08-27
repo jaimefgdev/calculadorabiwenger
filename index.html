@@ -26,6 +26,14 @@
 <!-- El escudo de Biwenger, el mismo que el del boton de Inicio. -->
 <link rel="icon" type="image/svg+xml" href="biwenger.svg">
 <link rel="apple-touch-icon" href="biwenger.svg">
+<!-- Con esto Chrome ofrece «Instalar aplicación»: queda un icono en el
+     escritorio del movil y abre a pantalla completa, sin barra del navegador. -->
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#0d0d0d">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Calculadora">
 </head>
 <body>
 
@@ -614,5 +622,16 @@
 </main>
 
 <script src="app.js?v=291"></script>
+<script>
+  /* El service worker solo cachea los archivos de la app, nunca los datos.
+     Se registra al final para que no compita con la primera carga. */
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', function () {
+      navigator.serviceWorker.register('sw.js').catch(function () {
+        /* Sin service worker la app funciona igual: esto solo es velocidad. */
+      });
+    });
+  }
+</script>
 </body>
 </html>

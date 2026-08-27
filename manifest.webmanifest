@@ -1,0 +1,27 @@
+{
+  "name": "Calculadora Biwenger",
+  "short_name": "Calculadora",
+  "description": "Puntos, mercado y fichajes de la liga, con los números que Biwenger no da.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#0d0d0d",
+  "theme_color": "#0d0d0d",
+  "lang": "es",
+  "dir": "ltr",
+  "icons": [
+    {
+      "src": "biwenger.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "biwenger.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "maskable"
+    }
+  ]
+}
