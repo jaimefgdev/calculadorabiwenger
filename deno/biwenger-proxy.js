@@ -104,7 +104,7 @@ const CDN = 'https://cf.biwenger.com/api/v2';
    navegador normal y las cabeceras que este mandaría. */
 /* Marca de versión: se sube en cada cambio y se consulta con ?version=1.
    Sirve para saber desde fuera si el despliegue ha entrado o no. */
-const VERSION = '2026-08-27 · deno 38';
+const VERSION = '2026-08-27 · deno 40';
 
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ' +
   '(KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36';
@@ -2153,7 +2153,11 @@ async function saltoPorEquipo(numero, score, ronda) {
 }
 
 /** Un jugador de una alineación de jornada, con lo que puntuó. */
-function roundPlayer(entry, names, puntos, partidoDe, enCasa) {
+/* Lo que hizo cada futbolista en la jornada, de los lances del detalle:
+     1 gol · 2 gol de penalti · 3 asistencia
+   Se cuenta aquí y no en la web para no tener que cruzar allí la alineación con
+   el parte de cada partido. */
+function roundPlayer(entry, names, puntos, partidoDe, enCasa, lances) {
   /* Biwenger manda unas veces el futbolista entero y otras solo su número. */
   const suelto = entry != null && typeof entry !== 'object';
   const player = suelto ? { id: entry } : ((entry && entry.player) || entry);
@@ -2161,6 +2165,8 @@ function roundPlayer(entry, names, puntos, partidoDe, enCasa) {
   const id = String(player.id);
   const marcador = puntos || {};
   const equipo = names[id + ':team'] != null ? names[id + ':team'] : null;
+  /* Sus lances de esta jornada: 1 gol, 2 gol de penalti, 3 asistencia. */
+  const suyos = (lances || []).filter(function (l) { return String(l.id) === id; });
 
   /* El que se ha ido de LaLiga sigue en la alineación de quien lo tenía, pero
      ya no tiene equipo en el índice. No es que su partido esté por jugarse: es
@@ -2202,6 +2208,11 @@ function roundPlayer(entry, names, puntos, partidoDe, enCasa) {
     /* Para poder decir en la web por qué no tiene nota, y para dejarlo fuera
        de la cuenta de jugadores: Biwenger enseña diez, no once. */
     fuera: fuera,
+    /* Lo que hizo esa jornada. Va aquí porque el detalle de la jornada ya trae
+       los lances y así la web no tiene que cruzar la alineación con el parte de
+       cada partido para saber quién marcó. */
+    goals: suyos.filter(function (l) { return l.type === 1 || l.type === 2; }).length,
+    assists: suyos.filter(function (l) { return l.type === 3; }).length,
     home: casa == null ? null : casa,
     marketValue: names[id + ':price'] != null ? Math.round(names[id + ':price']) : null,
     team: equipo,
@@ -2709,11 +2720,15 @@ async function roundBoard(env, headers, jornada, listaNombres) {
   const standings = (((data && data.league) || {}).standings || []).filter(Boolean).map(function (row) {
     const lineup = row.lineup || null;
     const once = colocarEnSistema(
-      ((lineup && lineup.players) || []).map(function (entry) { return roundPlayer(entry, names, marcador, partidoDe, enCasa); }).filter(Boolean),
+      ((lineup && lineup.players) || []).map(function (entry) { return roundPlayer(entry, names, marcador, partidoDe, enCasa,
+        (detalle && detalle.lances) || []); }).filter(Boolean),
       lineup && lineup.type);
     /* Biwenger llama «discarded» a los que se quedaron fuera: el banquillo. */
     const banquillo = ((lineup && (lineup.discarded || lineup.bench)) || [])
-      .map(function (entry) { return roundPlayer(entry, names, marcador, partidoDe, enCasa); }).filter(Boolean);
+      .map(function (entry) {
+        return roundPlayer(entry, names, marcador, partidoDe, enCasa,
+          (detalle && detalle.lances) || []);
+      }).filter(Boolean);
 
     /* Biwenger deja la clasificación de la jornada a cero hasta que la cierra,
        así que mientras tanto se suma el once a mano y los puntos van subiendo
