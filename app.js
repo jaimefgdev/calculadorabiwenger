@@ -1477,16 +1477,18 @@
           (row.spent ? '<span class="money-neg">−' + money(row.spent) + '</span>' : '<span class="zero">' + money(0) + '</span>') + '</td>' +
         '<td class="num" data-label="Ingresado">' +
           (row.earned ? '<span class="money-pos">+' + money(row.earned) + '</span>' : '<span class="zero">' + money(0) + '</span>') + '</td>' +
+        '<td class="num" data-label="Valor equipo">' +
+          (row.teamValue == null ? '<span class="unknown">—</span>' : money(row.teamValue)) + '</td>' +
+        '<td class="num" data-label="Jug.">' +
+          (row.players == null ? '<span class="unknown">—</span>' : row.players) + '</td>' +
+        /* El saldo, pegado a la puja máxima: son las dos cifras que se miran
+           juntas para saber hasta dónde puedes llegar. */
         '<td class="num" data-label="Saldo"><strong>' +
           '<span class="' + (negative ? 'money-neg' : '') + '">' + money(row.balance) + '</span></strong>' +
           (row.officialBalance != null && row.officialBalance !== row.balance
             ? '<span class="mismatch" title="Biwenger dice ' + money(row.officialBalance) +
               '. La diferencia sale de movimientos que el tablón no detalla: cesiones, bonus de jornada o cláusulas.">≠</span>'
             : '') + '</td>' +
-        '<td class="num" data-label="Valor equipo">' +
-          (row.teamValue == null ? '<span class="unknown">—</span>' : money(row.teamValue)) + '</td>' +
-        '<td class="num" data-label="Jug.">' +
-          (row.players == null ? '<span class="unknown">—</span>' : row.players) + '</td>' +
         '<td class="num col-bid" data-label="Puja máxima">' +
           (row.maxBid == null ? '<span class="unknown">—</span>' : '<strong>' + signedCell(row.maxBid) + '</strong>') + '</td>' +
       '</tr>' + (expanded ? managerDetail(row.name) : '');
@@ -1511,9 +1513,9 @@
       '<td class="num" data-label="Ventas">' + totals.sells + '</td>' +
       '<td class="num" data-label="Gastado">' + (totals.spent ? '−' + money(totals.spent) : money(0)) + '</td>' +
       '<td class="num" data-label="Ingresado">' + (totals.earned ? '+' + money(totals.earned) : money(0)) + '</td>' +
-      '<td class="num" data-label="Saldo">' + money(totals.balance) + '</td>' +
       '<td class="num" data-label="Valor equipo">' + (totals.teamValue ? money(totals.teamValue) : '<span class="unknown">—</span>') + '</td>' +
       '<td class="num" data-label="Jug.">' + (totals.players || '') + '</td>' +
+      '<td class="num" data-label="Saldo">' + money(totals.balance) + '</td>' +
       '<td class="num" data-label="Puja máxima">' +
         '<span class="pie-nota">(saldo + 25 % valor equipo)</span></td>' +
     '</tr>';
