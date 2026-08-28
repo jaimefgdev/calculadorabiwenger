@@ -5372,6 +5372,10 @@
         state.jugadoresCargando = false;
         cacheGuardar('jugadores', payload);
         renderJugadores();
+        /* El índice es lo que trae las demarcaciones que faltan: en cuanto
+           llega hay que volver a pintar las plantillas, o se quedan con las
+           chapas que había cuando se dibujaron (ninguna, si llegó después). */
+        if ($('squads-body') && squadList().length) renderSquads();
       })
       .catch(function () {
         state.jugadoresCargando = false;
@@ -7469,11 +7473,28 @@
   }
 
   /** Las operaciones de ese futbolista en la liga, de la más reciente atrás. */
-  function playerHistory(ficha) {
+  function playerHistory(ficha, id) {
+    /* A los del reparto no los compró nadie, así que no tienen operación y su
+       ficha se quedaba sin decir de quién son. Se les pinta una fila igual que
+       las demás, con un guion donde iría el importe: el dueño se ve, y no se
+       inventa un dinero que nunca se pagó. */
+    const llegada = acquisitionOf(id != null ? id : ficha.id);
+    const delReparto = !!(llegada && llegada.paid == null && llegada.since);
+    const filaReparto = !delReparto ? '' :
+      '<tr>' +
+        '<td class="detail-date">' + escapeHtml(shortDay(llegada.since)) + '</td>' +
+        '<td><span class="tag tag--reparto">Reparto</span></td>' +
+        '<td>' + (llegada.owner
+          ? '<span class="manager">' + avatar(llegada.owner) +
+            '<span class="manager__name">' + escapeHtml(llegada.owner) + '</span></span>'
+          : '<span class="sub">—</span>') + '</td>' +
+        '<td class="num"><strong class="sub">–</strong></td>' +
+      '</tr>';
+
     /* Sin operaciones no se dice nada: el hueco vacío ya lo cuenta. */
-    if (!ficha.moves || ficha.moves.length === 0) return '';
-    return '<table class="detail-table ficha__historial"><tbody>' +
-      ficha.moves.map(function (movimiento) {
+    if (!filaReparto && (!ficha.moves || ficha.moves.length === 0)) return '';
+    return '<table class="detail-table ficha__historial"><tbody>' + filaReparto +
+      (ficha.moves || []).map(function (movimiento) {
         const compra = movimiento.type === 'buy';
         return '<tr>' +
           '<td class="detail-date">' + escapeHtml(movimiento.date || '—') + '</td>' +
@@ -7956,7 +7977,10 @@
       ficha.position ? POSITION_NAMES[ficha.position] : null,
       ficha.teamName,
       ficha.points != null ? ficha.points + (ficha.points === 1 ? ' punto' : ' puntos') : null,
-      ficha.owner ? '<strong>' + escapeHtml(ficha.owner) + '</strong>' : '<strong>Libre</strong>'
+      /* De quién es, en ámbar: es el dato que más se busca al abrir una ficha y
+         entre el resto del renglón gris se perdía. */
+      '<strong class="ficha__dueno">' +
+        escapeHtml(ficha.owner ? ficha.owner : 'Libre') + '</strong>'
     ].filter(Boolean).join(' · ');
 
     caja.hidden = false;
@@ -7970,6 +7994,12 @@
       '<div class="ficha__wrap">' +
       '<span class="ficha__retrato">' +
         faceOf(abierto.id, 'ficha__face ficha__face--grande') +
+        /* Las demarcaciones van en la esquina CONTRARIA al escudo: las dos en
+           el mismo lado se pisaban, y el que juega en dos puestos lleva dos
+           chapas. */
+        '<span class="ficha__puestos">' +
+          chapaDePuesto(ficha.position, '', otrosPuestosDe(ficha, abierto.id)) +
+        '</span>' +
         crestOf(ficha, 'crest--badge ficha__escudo') +
       '</span>' +
       '<div class="picker__card modal__card ficha__card" role="dialog" aria-modal="true" aria-label="Ficha de ' +
@@ -7992,6 +8022,7 @@
              va aparte porque no es una vista, es un modo que se superpone a la
              que estés mirando. */
           (abierto.eligiendo ? '' :
+            '<span class="ficha__acciones">' +
             '<span class="ficha__vistas">' +
               VISTAS_FICHA.filter(function (v) {
                 /* Comparando no hay pestaña Ficha: sus datos son de UNO
@@ -8008,7 +8039,8 @@
               }).join('') +
             '</span>' +
             '<button type="button" class="ambito ficha__comparar" data-comparar>' +
-              (abierto.comparar ? 'Quitar comparación' : 'Comparar') + '</button>') +
+              (abierto.comparar ? 'Quitar comparación' : 'Comparar') + '</button>' +
+            '</span>') +
         '</div>' +
         '<p class="muted ficha__datos">' + datos + '</p>' +
         /* Lesionado o sancionado: el parte de Biwenger («Retorno estimado:
@@ -8095,9 +8127,13 @@
             })() +
             /* Lo más alto y lo más bajo que ha llegado a valer, con su fecha. */
             topesDePrecio(puntos))) +
-        (!abierto.partidos && !abierto.ficha && ficha.moves && ficha.moves.length
-          ? '<h3 class="bench__title">En la liga</h3>' + playerHistory(ficha)
-          : '') +
+        /* El título solo si hay tabla debajo: el reparto también cuenta como
+           historial, así que la condición la decide `playerHistory`. */
+        (function () {
+          if (abierto.partidos || abierto.ficha) return '';
+          const historial = playerHistory(ficha, abierto.id);
+          return historial ? '<h3 class="bench__title">En la liga</h3>' + historial : '';
+        })() +
       '</div></div>';
 
     /* Los rótulos largos de las estadísticas encogen hasta verse enteros. */
@@ -8119,6 +8155,10 @@
 
   function renderSquads() {
     ensureSquads();
+    /* La demarcación de muchos no viene en la plantilla, solo en el índice de
+       la competición. Sin pedirlo aquí, quien entraba directo a Plantillas sin
+       pasar por Jugadores veía las chapas a medias. */
+    ensureJugadores();
     const body = $('squads-body');
     const list = squadList();
 

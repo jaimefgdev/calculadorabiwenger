@@ -1044,7 +1044,7 @@ code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft)
   width: min(100%, 640px); max-height: 100%;
   display: flex; flex-direction: column; align-items: center;
   /* Hueco para la mitad de arriba del retrato. */
-  padding-top: 70px;
+  padding-top: 85px;
 }
 .ficha__retrato {
   position: absolute; top: 0; left: 50%; transform: translateX(-50%);
@@ -1055,14 +1055,28 @@ code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft)
    diminuta y el escudo la tapaba entera. Con la tercera clase esta gana siempre,
    este donde este en el archivo. */
 .pic-player.ficha__face.ficha__face--grande {
-  width: 140px; height: 140px;
+  width: 170px; height: 170px;
   /* Un aro del color del fondo para separarlo del borde de la tarjeta. */
   box-shadow: 0 0 0 5px var(--bg-elev), inset 0 0 0 1px rgba(0, 0, 0, .18);
 }
-.ficha__escudo { position: absolute; right: 6px; bottom: 6px; width: 34px; height: 34px; }
+.ficha__escudo { position: absolute; right: 8px; bottom: 8px; width: 40px; height: 40px; }
+/* Las demarcaciones, en la esquina contraria al escudo. En columna porque los
+   que valen para dos o tres puestos llevan varias chapas y en fila se salian
+   del circulo por la izquierda. */
+.ficha__puestos {
+  position: absolute; left: 4px; bottom: 8px; z-index: 1;
+  display: flex; flex-direction: column-reverse; align-items: center; gap: 3px;
+}
+.ficha__puestos .puestos { display: flex; flex-direction: column-reverse; gap: 3px; }
+/* De quien es el futbolista, en ambar: el dato que mas se busca al abrir la
+   ficha, que en gris se perdia entre el puesto, el equipo y los puntos. */
+.ficha__dueno { color: var(--marca, #ffc233); }
+/* Los del reparto no se compraron: su fila del historial lleva su propia
+   etiqueta y un guion en lugar de importe. */
+.tag--reparto { background: var(--bg-surface); color: var(--marca, #ffc233); }
 /* La tarjeta empieza a media foto: el hueco de arriba deja sitio a su mitad
    inferior sin que el nombre se le meta debajo. */
-.ficha__card { padding-top: 78px; }
+.ficha__card { padding-top: 93px; }
 
 /* Cabecera: nombre y pestanas, ya sin la foto. */
 .ficha__head--alto {
@@ -1071,15 +1085,21 @@ code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft)
   padding-top: 0; text-align: center;
 }
 /* El aspa, suelta en la esquina, para no robar sitio a la fila de pestanas. */
-.ficha__cerrar { position: absolute; top: -70px; right: 0; z-index: 3; }
+.ficha__cerrar { position: absolute; top: -85px; right: 0; z-index: 3; }
 .ficha__nombre {
   display: flex; align-items: center; justify-content: center; gap: .4rem;
   font-size: 1.1rem; line-height: 1.2;
 }
-/* Las pestanas y el boton de comparar, centrados y con sitio para envolver. */
+/* Pestanas y «Comparar» en la MISMA fila. El hueco grande del gap separa el
+   boton de las pestanas: no es una vista mas, es un modo que se superpone a la
+   que estes mirando, y pegado a ellas parecia una cuarta pestana. */
+.ficha__acciones {
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: center;
+  gap: .35rem 1.6rem;
+}
 .ficha__head--alto .ficha__vistas,
 .ficha__head--alto .ficha__comparar { margin: 0; }
-.ficha__head--alto > .ficha__vistas { flex-wrap: wrap; justify-content: center; }
+.ficha__head--alto .ficha__vistas { flex-wrap: wrap; justify-content: center; }
 
 /* Titulo de un panel que no lleva cabecera con subtitulo. */
 .panel__titulo { margin: 0 0 .8rem; font-size: 1.05rem; }
@@ -2468,11 +2488,17 @@ main.wrap { padding-top: 1.15rem; padding-bottom: 3.5rem; }
 /* En el gráfico ampliado las cifras completas necesitan más sitio a la izquierda. */
 .modal__card .viz__tick { font-size: .62rem; }
 
-/* Aspa para cerrar el gráfico ampliado. */
+/* El aspa de cerrar, la misma en todos los menús, diálogos y paneles: siempre
+   en rojo, para que se reconozca de un vistazo sin leer nada. Al pasar por
+   encima se invierte —rojo de fondo, aspa blanca— en vez del gris de `.btn`. */
 .btn--close {
   display: grid; place-items: center;
   width: 30px; height: 30px; padding: 0;
   font-size: .9rem; line-height: 1; border-radius: 50%;
+  color: var(--accent);
+}
+.btn--close:hover, .btn--close:focus-visible {
+  background: var(--accent); border-color: var(--accent); color: #fff;
 }
 
 /* Rastreador del ratón sobre el gráfico ampliado. */
