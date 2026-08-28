@@ -104,7 +104,7 @@ const CDN = 'https://cf.biwenger.com/api/v2';
    navegador normal y las cabeceras que este mandaría. */
 /* Marca de versión: se sube en cada cambio y se consulta con ?version=1.
    Sirve para saber desde fuera si el despliegue ha entrado o no. */
-const VERSION = '2026-08-28 · deno 52';
+const VERSION = '2026-08-28 · deno 53';
 
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ' +
   '(KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36';
@@ -888,12 +888,28 @@ async function players(score) {
     Date.now() - cache.playersAt < vigencia;
   if (fresh) return cache.players;
 
-  const response = await fetch(fresco(CDN + '/competitions/la-liga/data?lang=es&score=' +
-    encodeURIComponent(sistema)), { headers: NAVEGADOR, cf: SIN_CACHE });
-  if (!response.ok) return cache.players || {};
+  /* Este índice es la columna vertebral de todo: de él salen los nombres, los
+     precios, los puestos y los equipos. Si la descarga falla y se devuelve
+     vacío, la web entera se queda en «Jugador 1679» a 0 €. Así que se reintenta
+     una vez —el fallo típico es un límite de consultas momentáneo de
+     Biwenger— y, si tampoco, se sirve el último bueno aunque esté pasado: un
+     índice de hace una hora es infinitamente mejor que ninguno. */
+  let response = await fetch(fresco(CDN + '/competitions/la-liga/data?lang=es&score=' +
+    encodeURIComponent(sistema)), { headers: NAVEGADOR, cf: SIN_CACHE })
+    .catch(function () { return null; });
+  if (!response || !response.ok) {
+    await new Promise(function (listo) { setTimeout(listo, 1500); });
+    response = await fetch(fresco(CDN + '/competitions/la-liga/data?lang=es&score=' +
+      encodeURIComponent(sistema)), { headers: NAVEGADOR, cf: SIN_CACHE })
+      .catch(function () { return null; });
+  }
+  if (!response || !response.ok) return cache.players || {};
 
-  const body = await response.json();
+  const body = await response.json().catch(function () { return {}; });
   const source = (body.data && body.data.players) || {};
+  /* Una respuesta buena pero sin futbolistas dentro tampoco vale: antes de
+     pisar el índice guardado hay que tener algo que poner en su lugar. */
+  if (!Object.keys(source).length) return cache.players || {};
   const names = {};
   Object.keys(source).forEach(function (id) {
     names[id] = source[id].name;
@@ -2254,7 +2270,7 @@ async function notasDeLaJornada(env, ids, names, score, numero, cerrada) {
        · y han contestado TODAS las fichas. Antes bastaba con que el mapa no
          estuviera vacío, así que un límite de consultas de Biwenger a media
          tanda congelaba una jornada a medias y ya no había forma de arreglarla. */
-  if (cerrada && completo && env && env.JORNADAS && await jornadaZanjada(numero)) {
+  if (cerrada && completo && env && env.JORNADAS && await jornadaZanjada(numero, score)) {
     try {
       await env.JORNADAS.put(clave,
         JSON.stringify({ notas: mapa, posiciones: posiciones, vistos: vistos }));
@@ -2273,11 +2289,24 @@ async function notasDeLaJornada(env, ids, names, score, numero, cerrada) {
  * aplazada todavía `active`, y así se guardaban como definitivas notas que
  * seguían cambiando.
  */
-async function jornadaZanjada(numero) {
+async function jornadaZanjada(numero, score) {
   if (numero == null) return false;
   const calendario = await seasonRounds().catch(function () { return []; });
   const suyas = calendario.filter(function (r) { return r.number === numero; });
-  return suyas.length > 0 && suyas.every(function (r) { return r.status === 'finished'; });
+  if (!suyas.length) return false;
+
+  /* Se miran los PARTIDOS, no el `status` de la ronda. Biwenger deja la ronda
+     aplazada en `active` mucho después de que se hayan jugado todos sus
+     partidos —la de la jornada 1 lleva así desde que acabó—, y fiándose de ese
+     estado la jornada no se daba nunca por cerrada: no se guardaba en el KV y
+     se volvían a pedir las noventa fichas cada diez minutos. Eso agotaba el
+     límite de consultas de Biwenger y tumbaba el índice de futbolistas, que es
+     lo que dejaba el mercado sin nombres y a cero. */
+  for (let i = 0; i < suyas.length; i++) {
+    const d = await roundDetail(suyas[i].id, score).catch(function () { return null; });
+    if (!d || !(d.games > 0) || (d.played || 0) < d.games) return false;
+  }
+  return true;
 }
 
 /**
