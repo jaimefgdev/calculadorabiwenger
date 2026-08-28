@@ -104,7 +104,7 @@ const CDN = 'https://cf.biwenger.com/api/v2';
    navegador normal y las cabeceras que este mandaría. */
 /* Marca de versión: se sube en cada cambio y se consulta con ?version=1.
    Sirve para saber desde fuera si el despliegue ha entrado o no. */
-const VERSION = '2026-08-28 · deno 56';
+const VERSION = '2026-08-28 · deno 57';
 
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ' +
   '(KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36';
@@ -214,7 +214,7 @@ const app = {
       const ficha = url.searchParams.get('estadisticas');
       if (ficha) {
         const sistema = await sistemaDeLaLiga(env);
-        const data = await playerStats(ficha, await players(sistema), sistema);
+        const data = await playerStats(ficha, await players(sistema), sistema, env);
         if (!data) return fail(404, 'No hay ficha de ese futbolista.', origin);
         return new Response(JSON.stringify(data), {
           headers: Object.assign({ 'content-type': 'application/json; charset=utf-8' }, cors(origin))
@@ -1953,7 +1953,65 @@ async function matchDay(roundId, score, names, primas) {
  * Se cachea en el KV para siempre: la estatura de nadie cambia, y la página
  * son 300 KB que no conviene volver a bajar.
  */
-async function playerStats(id, names, score) {
+/**
+ * Cuántas Súper Picas lleva cada futbolista esta temporada.
+ *
+ * El premio NO está en su ficha: se pidió `optionalPoints` ahí y viene vacío.
+ * Solo aparece en el feed de cada jornada, en `superPicaExtraPoints`, que
+ * `roundDetail` ya recoge en `detalle.picas`. Así que hay que recorrer las
+ * jornadas, y por eso se lleva la cuenta guardada y solo se miran las nuevas:
+ * una jornada cerrada no cambia, y repasar las treinta y ocho en cada ficha era
+ * justo el atracón de peticiones que tumbó el índice.
+ *
+ * Ojo: `rawStats.picas` es OTRA cosa —el recuento del indicador del AS— y no
+ * sirve para esto: Pedri hizo 3 en la jornada 1 y no se llevó la Súper Pica,
+ * y Guridi la ganó con 2.
+ */
+async function superPicasDeLaTemporada(env, score) {
+  const clave = 'superpicas-' + (score || '');
+  const calendario = await seasonRounds().catch(function () { return []; });
+  const jugadas = calendario.filter(function (r) { return r.status === 'finished' || r.status === 'active'; });
+
+  let caja = cache.superPicas && cache.superPicas.clave === clave ? cache.superPicas : null;
+  if (!caja && env && env.JORNADAS) {
+    try {
+      const crudo = await env.JORNADAS.get(clave);
+      if (crudo) caja = Object.assign({ clave: clave }, JSON.parse(crudo));
+    } catch (error) { /* se empieza de cero */ }
+  }
+  if (!caja) caja = { clave: clave, cuenta: {}, hechas: [] };
+
+  const pendientes = jugadas.filter(function (r) {
+    return caja.hechas.indexOf(String(r.id)) === -1;
+  });
+
+  for (let i = 0; i < pendientes.length; i++) {
+    if (i) await new Promise(function (listo) { setTimeout(listo, 300); });
+    const detalle = await roundDetail(pendientes[i].id, score).catch(function () { return null; });
+    if (!detalle) continue;
+    /* Solo cuentan las jornadas CERRADAS del todo. Una en juego puede repartir
+       mas Super Picas cuando acaben los partidos que faltan, y como aqui se
+       suma sobre lo ya guardado, contarla ahora la duplicaria al cerrarse. */
+    const zanjada = (detalle.played || 0) >= (detalle.games || 0) && (detalle.games || 0) > 0;
+    if (!zanjada) continue;
+
+    Object.keys(detalle.picas || {}).forEach(function (quien) {
+      caja.cuenta[quien] = (caja.cuenta[quien] || 0) + 1;
+    });
+    caja.hechas.push(String(pendientes[i].id));
+  }
+
+  cache.superPicas = caja;
+  if (pendientes.length && env && env.JORNADAS) {
+    try {
+      await env.JORNADAS.put(clave,
+        JSON.stringify({ cuenta: caja.cuenta, hechas: caja.hechas }));
+    } catch (error) { /* da igual, se recalcula */ }
+  }
+  return caja.cuenta;
+}
+
+async function playerStats(id, names, score, env) {
   const slug = names[String(id) + ':slug'];
   if (!slug) return null;
 
@@ -1962,6 +2020,12 @@ async function playerStats(id, names, score) {
      jornada, ni los equipos, ni los minutos. Hay que pedir cada cosa por su
      nombre; si no, los informes llegan pelados y no se puede saber ni de qué
      partido eran ni qué hizo el futbolista en él. */
+  /* Las Súper Picas de la temporada, de la cuenta guardada. Si algo falla se
+     enseña cero antes que romper la ficha entera por un dato de adorno. */
+  const cuentaPicas = await superPicasDeLaTemporada(env, sistema)
+    .catch(function () { return {}; });
+  const picas = cuentaPicas[String(id)] || 0;
+
   const campos = 'fields=*,reports(*,points,rawStats,' +
     'match(*,round(*),home(*),away(*)),events(*))';
   const response = await fetch(CDN + '/players/la-liga/' + encodeURIComponent(slug) +
@@ -2081,6 +2145,9 @@ async function playerStats(id, names, score) {
     home: { played: suma.home.played, points: suma.home.points, average: media(suma.home.points, suma.home.played) },
     away: { played: suma.away.played, points: suma.away.points, average: media(suma.away.points, suma.away.played) },
     rounds: jornadas,
+    /* Súper Picas ganadas esta temporada. Va aparte porque no sale de su ficha
+       —ahí no viene— sino del feed de cada jornada. */
+    superPicas: picas,
     updatedAt: new Date().toISOString()
   };
 }
