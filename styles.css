@@ -1046,12 +1046,19 @@ code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft)
      medir, asi que no activaba nunca su scroll y la ficha salia cortada. */
   width: min(100%, 640px); height: 100%;
   display: flex; flex-direction: column; align-items: center;
-  /* Hueco para la mitad de arriba del retrato. */
-  padding-top: 85px;
 }
+/* El retrato va en el flujo, no en `absolute`. Colocandolo suelto habia que
+   reservarle el hueco con un `padding` y la cadena de alturas quedaba a merced
+   de eso; asi ocupa su sitio el solo y a la tarjeta le queda exactamente lo que
+   sobra, que es lo que le permite desplazarse por dentro. */
 .ficha__retrato {
-  position: absolute; top: 0; left: 50%; transform: translateX(-50%);
-  z-index: 2; display: inline-block;
+  position: relative; z-index: 2; flex: none;
+  /* `line-height: 0` es lo que quita el hueco de linea que todo `inline-block`
+     arrastra debajo: con el, la caja del retrato era mas alta que la foto y las
+     chapas, ancladas abajo, caian fuera del circulo y pisaban el nombre. */
+  line-height: 0;
+  /* La tarjeta arranca a media foto: se le come la mitad de abajo. */
+  margin-bottom: -85px;
 }
 /* Las tres clases van a proposito: mas abajo hay un `.pic-player.ficha__face`
    a 40 px que empata en especificidad y, por ir despues, ganaba; la foto salia
@@ -1074,8 +1081,12 @@ html.con-ficha { scrollbar-gutter: stable; }
    que valen para dos o tres puestos llevan varias chapas y en fila se salian
    del circulo por la izquierda. */
 .ficha__puestos {
-  position: absolute; left: 4px; bottom: 8px; z-index: 1;
+  /* Espejo del escudo: mismos 8 px, en la esquina de enfrente. */
+  position: absolute; left: 8px; bottom: 8px; z-index: 1;
   display: flex; flex-direction: column-reverse; align-items: center; gap: 3px;
+  /* El retrato lleva `line-height: 0` para que no le sobre caja por debajo;
+     aqui dentro hace falta la normal o el texto de las chapas se aplasta. */
+  line-height: normal;
 }
 .ficha__puestos .puestos { display: flex; flex-direction: column-reverse; gap: 3px; }
 /* De quien es el futbolista, en ambar: el dato que mas se busca al abrir la
@@ -1088,8 +1099,9 @@ html.con-ficha { scrollbar-gutter: stable; }
    inferior sin que el nombre se le meta debajo. */
 /* `min-height: 0` es lo que le deja encoger: un hijo de un flex no baja por
    defecto de lo que mide su contenido, y sin esto crecia hacia abajo en vez de
-   desplazarse por dentro. */
-.ficha__card { padding-top: 93px; min-height: 0; }
+   desplazarse por dentro. Con `flex: 1 1 auto` se queda con el hueco que deja
+   el retrato, ni mas ni menos, y ahi si funciona su `overflow-y: auto`. */
+.ficha__card { padding-top: 93px; flex: 1 1 auto; min-height: 0; }
 
 /* Cabecera: nombre y pestanas, ya sin la foto. */
 .ficha__head--alto {
