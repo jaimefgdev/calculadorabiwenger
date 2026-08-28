@@ -1598,12 +1598,21 @@
     let delta = 0;
     let count = 0;
     let squadDelta = 0;
+    /* La puja máxima es el saldo más el 25 % del valor del equipo, así que al
+       simular hay que mover TAMBIÉN ese valor: comprando entra un futbolista y
+       vendiendo sale. Sin esto, simular una venta de 10 M subía la puja máxima
+       10 M, cuando de verdad sube esos 10 M menos el 25 % de lo que él valía. */
+    let teamDelta = 0;
     state.offers.concat(marketSales()).forEach(function (offer) {
       if (!state.sim[offer.id]) return;
       count += 1;
+      /* Lo que vale hoy el futbolista. Si no se supiera, el importe de la
+         operación, que es lo más parecido que hay a mano. */
+      const suyo = offer.playerId ? playerInfo(offer.playerId) : null;
+      const valor = (suyo && suyo.marketValue != null) ? suyo.marketValue : offer.amount;
       // Una puja ganada suma un jugador; una venta aceptada resta uno.
-      if (offer.direction === 'out') { delta -= offer.amount; squadDelta += 1; }
-      else { delta += offer.amount; squadDelta -= 1; }
+      if (offer.direction === 'out') { delta -= offer.amount; squadDelta += 1; teamDelta += valor; }
+      else { delta += offer.amount; squadDelta -= 1; teamDelta -= valor; }
     });
 
     const teamValue = mine ? mine.teamValue : null;
@@ -1614,7 +1623,8 @@
       delta: delta,
       count: count,
       balance: base + delta,
-      maxBid: teamValue == null ? null : base + delta + teamValue * TEAM_VALUE_SHARE,
+      maxBid: teamValue == null ? null
+        : base + delta + Math.max(0, teamValue + teamDelta) * TEAM_VALUE_SHARE,
       squad: squad == null ? null : squad + squadDelta
     };
   }
@@ -1789,6 +1799,11 @@
     note.hidden = false;
     note.innerHTML = 'Saldo <strong class="' + (sim.balance < 0 ? 'money-neg' : '') + '">' +
       money(sim.balance) + '</strong>' +
+      /* Con el saldo no basta para saber si podrás ir a por alguien: lo que
+         manda al pujar es el saldo más el 25 % del valor del equipo, y eso se
+         mueve con cada operación que marcas. */
+      (sim.maxBid == null ? '' : ' · Puja máxima <strong class="bid-amount">' +
+        money(sim.maxBid) + '</strong>') +
       (sim.squad == null ? '' : ' · <strong>' + sim.squad +
         (sim.squad === 1 ? ' jugador' : ' jugadores') + '</strong>');
   }
@@ -1807,7 +1822,10 @@
         });
       })
       .map(function (item) {
-        return { id: marketSaleId(item), amount: listingValue(item), direction: 'in' };
+        /* Con `playerId`: la simulación lo necesita para saber cuánto vale y
+           poder bajar el valor del equipo al venderlo. */
+        return { id: marketSaleId(item), amount: listingValue(item),
+          direction: 'in', playerId: item.playerId };
       });
   }
 
