@@ -1060,6 +1060,13 @@ code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft)
   box-shadow: 0 0 0 5px var(--bg-elev), inset 0 0 0 1px rgba(0, 0, 0, .18);
 }
 .ficha__escudo { position: absolute; right: 8px; bottom: 8px; width: 40px; height: 40px; }
+/* Con una ficha abierta el fondo no se mueve: lo unico que se desplaza es la
+   tarjeta. En las dos —html y body— porque segun donde este el scroll manda una
+   u otra, y `scrollbar-gutter` deja el hueco de la barra para que la pagina no
+   pegue un salto lateral al abrirla y otro al cerrarla. */
+html.con-ficha, html.con-ficha body { overflow: hidden; }
+html.con-ficha { scrollbar-gutter: stable; }
+
 /* Las demarcaciones, en la esquina contraria al escudo. En columna porque los
    que valen para dos o tres puestos llevan varias chapas y en fila se salian
    del circulo por la izquierda. */

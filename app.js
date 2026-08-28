@@ -7475,19 +7475,33 @@
   /** Las operaciones de ese futbolista en la liga, de la más reciente atrás. */
   function playerHistory(ficha, id) {
     /* A los del reparto no los compró nadie, así que no tienen operación y su
-       ficha se quedaba sin decir de quién son. Se les pinta una fila igual que
-       las demás, con un guion donde iría el importe: el dueño se ve, y no se
-       inventa un dinero que nunca se pagó. */
+       ficha se quedaba sin decir de quién fueron. Hay DOS rastros y hacen falta
+       los dos:
+
+         · si todavía lo tiene alguien, está en su plantilla sin haberlo pagado;
+         · y si ya lo vendió —Riquelme, de Atlético Jordaan— en ninguna plantilla
+           queda nada. Lo que lo delata entonces es que su PRIMER movimiento sea
+           una venta: nadie puede vender lo que no compró antes, así que si la
+           primera vez que aparece es vendiéndolo, lo tenía del reparto.
+
+       Mirando solo las plantillas de hoy, el segundo caso no salía nunca. */
     const llegada = acquisitionOf(id != null ? id : ficha.id);
-    const delReparto = !!(llegada && llegada.paid == null && llegada.since);
-    const filaReparto = !delReparto ? '' :
+    const cronologico = (ficha.moves || []).slice().reverse();
+    const primero = cronologico[0];
+    const reparto = (llegada && llegada.paid == null && llegada.since)
+      ? { quien: llegada.owner, cuando: shortDay(llegada.since) }
+      : ((primero && primero.type === 'sell' && primero.manager)
+          ? { quien: primero.manager, cuando: null }
+          : null);
+
+    const filaReparto = !reparto ? '' :
       '<tr>' +
-        '<td class="detail-date">' + escapeHtml(shortDay(llegada.since)) + '</td>' +
+        /* Del que ya vendió no se sabe el día: el reparto no es una operación
+           del tablón y no tiene fecha. Se deja en blanco antes que inventarla. */
+        '<td class="detail-date">' + (reparto.cuando ? escapeHtml(reparto.cuando) : '—') + '</td>' +
         '<td><span class="tag tag--reparto">Reparto</span></td>' +
-        '<td>' + (llegada.owner
-          ? '<span class="manager">' + avatar(llegada.owner) +
-            '<span class="manager__name">' + escapeHtml(llegada.owner) + '</span></span>'
-          : '<span class="sub">—</span>') + '</td>' +
+        '<td><span class="manager">' + avatar(reparto.quien) +
+          '<span class="manager__name">' + escapeHtml(reparto.quien) + '</span></span></td>' +
         '<td class="num"><strong class="sub">–</strong></td>' +
       '</tr>';
 
@@ -7949,6 +7963,11 @@
   function renderPriceModal() {
     const caja = $('price-modal');
     const abierto = state.priceModal;
+    /* Con la ficha abierta, la rueda del ratón movía la página de detrás en
+       cuanto la tarjeta llegaba a su tope. Se congela el fondo mientras esté
+       abierta: dentro se desplaza la tarjeta y punto, y se sale por el aspa o
+       pinchando fuera. */
+    document.documentElement.classList.toggle('con-ficha', !!abierto);
     if (!abierto) { caja.hidden = true; caja.innerHTML = ''; return; }
 
     const serie = state.priceSeries[abierto.id];
