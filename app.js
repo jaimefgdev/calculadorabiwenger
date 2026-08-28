@@ -4986,7 +4986,15 @@
     });
 
     (payload.standings || []).forEach(function (fila) {
-      recordarPosiciones(fila.xi); recordarPosiciones(fila.bench);
+      /* Del once NO se aprende la demarcación: ahí `position` es la línea en la
+         que lo alineó el mánager, no de qué juega. Guardándola se le quedaba a
+         Sucic la chapa de delantero en toda la web por haberlo puesto arriba
+         alguien. Se usa `posReal`, que es la suya, y el banquillo, que no está
+         colocado en ningún sistema. */
+      recordarPosiciones((fila.xi || []).map(function (j) {
+        return { id: j.id, position: j.posReal, altPositions: j.altPositions };
+      }));
+      recordarPosiciones(fila.bench);
     });
 
     state.jornadas.datos[id] = {
@@ -9500,6 +9508,42 @@
 
   const PROXY_VIEJO = 'biwenger-calc.jaime-5e2.workers.dev';
   const PROXY_NUEVO = 'https://calculadorabiwenger.jaimefgdev.deno.net';
+
+  /**
+   * Gancho de diagnóstico: `calcDiag()` en la consola del navegador.
+   *
+   * Escupe, para la jornada que estés mirando, el once de cada mánager con lo
+   * que le hemos puesto a cada futbolista: su id, en qué línea está alineado, la
+   * nota, y si esa nota la hemos calculado nosotros o la manda Biwenger.
+   *
+   * Está aquí porque todo el `state` vive dentro del IIFE y desde fuera no se ve
+   * nada: cuadrar los puntos a ciegas costó varias versiones seguidas sin poder
+   * saber si un ajuste se estaba aplicando o ni siquiera se llegaba a él.
+   */
+  window.calcDiag = function (cual) {
+    const datos = (state.jornadas && state.jornadas.datos) || {};
+    const claves = Object.keys(datos);
+    if (!claves.length) return 'No hay ninguna jornada cargada. Abre Jornadas primero.';
+
+    const clave = cual == null ? String(state.jornadaVista) : claves.filter(function (k) {
+      const r = datos[k].round || {};
+      return String(k) === String(cual) || String(r.number) === String(cual);
+    })[0];
+    const jornada = datos[clave] || datos[claves[0]];
+    if (!jornada) return 'Esa jornada no está cargada.';
+
+    const cabecera = 'Jornada ' + ((jornada.round || {}).number || '?') +
+      ' (id ' + ((jornada.round || {}).id || '?') + ')';
+    return cabecera + '\n' + (jornada.standings || []).map(function (fila) {
+      return fila.name + ' = ' + fila.points +
+        (fila.gaps ? '  [huecos ' + fila.gaps + ']' : '') + '\n' +
+        (fila.xi || []).map(function (j) {
+          return '    ' + String(j.id).padEnd(7) + String(j.name || '').padEnd(20) +
+            ' suya=' + j.posReal + ' alineado=' + j.position + '  nota=' + j.points +
+            (j.nuestra ? '  (calculada)' : '  (de Biwenger)');
+        }).join('\n');
+    }).join('\n');
+  };
 
   function loadSyncConfig() {
     try {
