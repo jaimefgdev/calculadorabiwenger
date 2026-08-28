@@ -2279,6 +2279,14 @@ main.wrap { padding-top: 1.15rem; padding-bottom: 3.5rem; }
 
 /* ---------- Comparar dos futbolistas ---------- */
 .ficha__comparar { margin-left: auto; }
+/* «Comparar» no es una vista mas, es un modo que se superpone a la que estes
+   mirando: mismo fondo de pildora que las demas, pero letras y contorno en
+   rojo para que no se lea como una cuarta pestana. El `:hover` va aparte
+   porque `.ambito:hover` tiene dos clases y si no le ganaba el gris. */
+.ficha__comparar,
+.ficha__comparar:hover {
+  color: var(--accent); border-color: var(--accent);
+}
 .comparar { margin: .6rem 0; }
 .comparar__barra { display: flex; align-items: center; gap: .4rem; margin-bottom: .5rem; }
 .comparar__barra .field { flex: 1; min-width: 0; }
