@@ -104,7 +104,7 @@ const CDN = 'https://cf.biwenger.com/api/v2';
    navegador normal y las cabeceras que este mandaría. */
 /* Marca de versión: se sube en cada cambio y se consulta con ?version=1.
    Sirve para saber desde fuera si el despliegue ha entrado o no. */
-const VERSION = '2026-08-28 · deno 49';
+const VERSION = '2026-08-28 · deno 50';
 
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ' +
   '(KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36';
@@ -2170,9 +2170,8 @@ async function notasDeLaJornada(env, ids, names, score, numero, cerrada) {
      caducan solas, sin tener que vaciar nada a mano. */
   const clave = 'notas-v3-' + numero + '-' + (score || '');
 
-  /* Sin slug no hay ficha que consultar: esos no cuentan para decidir si el
-     mapa está completo, o nunca lo estaría. */
-  const pedibles = ids.filter(function (id) { return !!names[String(id) + ':slug']; });
+  /* Todos son pedibles: sin slug se pide por id, que también vale como ruta. */
+  const pedibles = ids.map(String);
   if (!pedibles.length) return null;
   const estanTodos = function (vistos) {
     return pedibles.every(function (id) { return vistos.indexOf(String(id)) !== -1; });
@@ -2211,8 +2210,8 @@ async function notasDeLaJornada(env, ids, names, score, numero, cerrada) {
   const TANDA = 6;
   for (let i = 0; i < pedibles.length; i += TANDA) {
     await Promise.all(pedibles.slice(i, i + TANDA).map(async function (id) {
-      const slug = names[String(id) + ':slug'];
-      const respuesta = await fetch(CDN + '/players/la-liga/' + encodeURIComponent(slug) +
+      const quien = names[String(id) + ':slug'] || String(id);
+      const respuesta = await fetch(CDN + '/players/la-liga/' + encodeURIComponent(quien) +
         '?lang=es&fields=*,reports(*,points,rawStats,match(*,round(*)))',
         { headers: NAVEGADOR, cf: SIN_CACHE }).catch(function () { return null; });
       if (!respuesta || !respuesta.ok) return;
@@ -2635,7 +2634,6 @@ async function partidosDeJugador(env, id) {
   const clave = String(id);
   const slug = names[clave + ':slug'];
   const suEquipo = names[clave + ':team'];
-  if (!slug) return { player: clave, matches: [] };
 
   /* Su ficha trae, partido a partido, el rival, el resultado, los lances y
      —esto solo está aquí— los minutos jugados. El detalle de jornada no los
@@ -2646,11 +2644,22 @@ async function partidosDeJugador(env, id) {
      partido eran ni qué hizo el futbolista en él. */
   const campos = 'fields=*,reports(*,points,rawStats,' +
     'match(*,round(*),home(*),away(*)),events(*))';
-  const response = await fetch(CDN + '/players/la-liga/' + encodeURIComponent(slug) +
-    '?lang=es&' + campos + '&score=' + encodeURIComponent(score), { headers: NAVEGADOR });
-  if (!response.ok) return { player: clave, matches: [] };
+  /* Se prueba por slug y, si falla, por id. El id SIEMPRE vale como ruta
+     —`/players/la-liga/19441` responde igual que `/players/la-liga/pedri`—, y
+     así el que no tiene slug en el índice, o lo tiene cambiado porque Biwenger
+     se lo renombró, deja de quedarse sin partidos. Antes se devolvía la lista
+     vacía y en su ficha salía «todavía no hay partidos suyos». */
+  const pedirFicha = async function (quien) {
+    if (!quien) return null;
+    const r = await fetch(CDN + '/players/la-liga/' + encodeURIComponent(quien) +
+      '?lang=es&' + campos + '&score=' + encodeURIComponent(score),
+      { headers: NAVEGADOR }).catch(function () { return null; });
+    if (!r || !r.ok) return null;
+    return (await r.json().catch(function () { return {}; })).data || null;
+  };
 
-  const data = (await response.json()).data || {};
+  const data = (await pedirFicha(slug)) || (await pedirFicha(clave));
+  if (!data) return { player: clave, matches: [] };
   const suyos = {};
 
   (data.reports || []).forEach(function (informe) {
