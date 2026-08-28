@@ -720,6 +720,11 @@ code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft)
    y la cara ocupa casi todo el hueco: así crecen con el campo en vez de
    quedarse en un tamaño fijo. */
 .pitch__slot {
+  /* Escalonado como en el campo de Biwenger: cuanto mas abierto juega, mas
+     adelantado. `--rango` lo pone la web (0 el mas centrado de su linea, 1 el
+     siguiente...). En porcentaje de la propia casilla, que crece con el campo,
+     asi que la proporcion se mantiene en cualquier tamano. */
+  transform: translateY(calc(var(--rango, 0) * -42%));
   position: relative; display: flex; flex-direction: column; align-items: center;
   gap: .2rem; width: 18%; min-width: 0;
 }
@@ -1885,6 +1890,11 @@ input[type="search"]::-webkit-search-cancel-button:hover { opacity: .75; }
      el tope sobra sitio, y ese sobrante es el que la centra. */
   flex: 1 1 88px; max-width: 104px;
 }
+/* La de Puntos lleva siete casillas y con 88 px de base la septima se caia a
+   una fila ella sola. Con 74 caben las siete y crecen para llenar la linea; el
+   tope sube porque aqui no sobra sitio que repartir. Los rotulos largos
+   («Media fuera», «Super Picas») los encoge `ajustarNombres()`. */
+.stats__rejilla--siete .stat { flex: 1 1 74px; max-width: 132px; }
 .stat__label { font-size: .64rem; color: var(--text-faint); text-transform: uppercase; letter-spacing: .03em; }
 .stat strong { font-size: .95rem; font-variant-numeric: tabular-nums; }
 

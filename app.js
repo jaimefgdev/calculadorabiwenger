@@ -865,6 +865,46 @@
     });
   }
 
+  /**
+   * Coloca una línea del campo como la coloca Biwenger.
+   *
+   * Su campo no las dibuja rectas ni en el orden en que llegan los futbolistas:
+   * pone al primero en el centro y va alternando —el segundo a su izquierda, el
+   * tercero a su derecha, el cuarto más a la izquierda…—, y adelanta a cada uno
+   * cuanto más abierto juega, en escalones.
+   *
+   * Deducido de su propia web con un 5-4-1: llamando A,B,C,D,E al orden en que
+   * llegan, su línea de cinco sale D-B-A-C-E y la de cuatro, D-B-A-C. Cuadra
+   * también con los dos delanteros de un 4-4-2 (sale B-A) y con el punta solo.
+   *
+   * Devuelve la línea ya ordenada, y con `rango` en cada uno: 0 el más centrado,
+   * 1 el siguiente, y así hacia fuera. Ese número es el que luego lo adelanta.
+   */
+  function comoBiwenger(linea) {
+    const n = (linea || []).length;
+    if (!n) return [];
+
+    const huecos = new Array(n);
+    const centro = Math.floor(n / 2);
+    huecos[centro] = linea[0];
+
+    let izquierda = centro - 1;
+    let derecha = centro + 1;
+    for (let i = 1; i < n; i++) {
+      /* Los impares a la izquierda y los pares a la derecha; cuando un lado se
+         agota, todo lo que queda se va al otro. */
+      const vaIzquierda = (i % 2 === 1 && izquierda >= 0) || derecha > n - 1;
+      if (vaIzquierda) huecos[izquierda--] = linea[i];
+      else huecos[derecha++] = linea[i];
+    }
+
+    return huecos.map(function (jugador, i) {
+      /* Distancia al centro de la línea. Con `floor` sale entera también en las
+         líneas pares, donde las dos casillas de dentro valen lo mismo. */
+      return { jugador: jugador, rango: Math.floor(Math.abs(i - (n - 1) / 2)) };
+    });
+  }
+
   /** Cómo se llama de verdad: el del índice manda sobre el que traiga el dato. */
   function comoSeLlama(jugador) {
     if (!jugador) return '';
@@ -2639,14 +2679,15 @@
     });
   }
 
-  function pitchSlot(key, position) {
+  function pitchSlot(key, position, rango) {
     const id = state.xi.slots[key];
     const player = id ? playerById(id) : null;
     const face = player
       ? faceOf(player.id, 'pitch__face')
       : '<span class="pic-player pitch__face pitch__face--empty"></span>';
 
-    return '<div class="pitch__slot" data-hueco="' + key + '" data-puesto="' + position + '"' +
+    return '<div class="pitch__slot" style="--rango:' + (rango || 0) + '"' +
+      ' data-hueco="' + key + '" data-puesto="' + position + '"' +
       (id ? ' data-lleva="' + escapeHtml(String(id)) + '"' : '') + '>' +
       crestOf(player, 'crest--ghost') +
       '<span class="face-box">' + face +
@@ -2962,9 +3003,16 @@
       '<span class="pitch__area pitch__area--bottom" aria-hidden="true"></span>' +
       '<span class="pitch__spot" aria-hidden="true"></span>' +
       rows.map(function (row) {
-        const slots = [];
-        for (let i = 0; i < row.count; i++) slots.push(pitchSlot(row.position + '-' + i, row.position));
-        return '<div class="pitch__line">' + slots.join('') + '</div>';
+        /* Se colocan las CASILLAS, no los futbolistas: cada una conserva su
+           clave (`3-0`, `3-1`…), que es lo que se guarda y lo que usa el
+           arrastre. Solo cambia dónde se dibuja, para que se vea como en
+           Biwenger: la primera al centro y las demás alternando hacia fuera. */
+        const claves = [];
+        for (let i = 0; i < row.count; i++) claves.push(row.position + '-' + i);
+        return '<div class="pitch__line">' +
+          comoBiwenger(claves).map(function (puesto) {
+            return pitchSlot(puesto.jugador, row.position, puesto.rango);
+          }).join('') + '</div>';
       }).join('');
 
     // Suplentes: los de la plantilla que no estén en el once.
@@ -5266,8 +5314,9 @@
     });
 
     const filas = [4, 3, 2, 1].map(function (pos) {
-      const huecos = porLinea[pos].map(function (jugador) {
-        return '<div class="pitch__slot">' +
+      const huecos = comoBiwenger(porLinea[pos]).map(function (puesto) {
+        const jugador = puesto.jugador;
+        return '<div class="pitch__slot" style="--rango:' + puesto.rango + '">' +
           crestOf(jugador, 'crest--ghost') +
           caraDeAlineacion(jugador, 'pitch__face', conDueno) +
           '<span class="pitch__name">' + escapeHtml(comoSeLlama(jugador)) + '</span>' +
@@ -6114,8 +6163,9 @@
       (porLinea[pos] || porLinea[3]).push(jugador);
     });
 
-    const hueco = function (jugador) {
-      return '<div class="pitch__slot">' +
+    const hueco = function (puesto) {
+      const jugador = puesto.jugador;
+      return '<div class="pitch__slot" style="--rango:' + puesto.rango + '">' +
         caraDeAlineacion(jugador, 'pitch__face', true) +
         '<span class="pitch__name">' + escapeHtml(comoSeLlama(jugador)) + '</span>' +
         (jugador.events && jugador.events.length
@@ -6124,7 +6174,8 @@
     };
 
     const lineas = [4, 3, 2, 1].map(function (pos) {
-      return '<div class="pitch__line">' + porLinea[pos].map(hueco).join('') + '</div>';
+      return '<div class="pitch__line">' +
+        comoBiwenger(porLinea[pos]).map(hueco).join('') + '</div>';
     }).join('');
 
     return '<div class="alin">' +
@@ -7231,7 +7282,10 @@
 
       '<div class="stats__grupo">' +
         '<h4 class="stats__titulo">Puntos</h4>' +
-        '<div class="stats__rejilla">' +
+        /* Siete casillas: con el ancho de las demás se le caía «Súper Picas» a
+           una segunda fila él solo. Esta rejilla las estrecha para que entren
+           todas en una línea. */
+        '<div class="stats__rejilla stats__rejilla--siete">' +
           celda('Totales', numero(datos.points)) +
           celda('Media', decimal(datos.average)) +
           celda('Casa', numero(datos.home.points)) +
