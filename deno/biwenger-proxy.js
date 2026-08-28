@@ -104,7 +104,7 @@ const CDN = 'https://cf.biwenger.com/api/v2';
    navegador normal y las cabeceras que este mandaría. */
 /* Marca de versión: se sube en cada cambio y se consulta con ?version=1.
    Sirve para saber desde fuera si el despliegue ha entrado o no. */
-const VERSION = '2026-08-28 · deno 47';
+const VERSION = '2026-08-28 · deno 48';
 
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ' +
   '(KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36';
@@ -2124,28 +2124,62 @@ function puntosDeLaJornada(names, salto) {
  */
 async function notasDeLaJornada(env, ids, names, score, numero, cerrada) {
   if (numero == null || !ids.length) return null;
-  const clave = 'notas-' + numero + '-' + (score || '');
+  /* v2 a propósito: la clave vieja se quedó con las notas de la J1 tomadas
+     mientras la ronda aplazada seguía abierta, y como no se comprobaba nada al
+     leerlas, esa foto mala se devolvía para siempre. Cambiando el nombre
+     caducan solas, sin tener que vaciar nada a mano. */
+  const clave = 'notas-v2-' + numero + '-' + (score || '');
+
+  /* Sin slug no hay ficha que consultar: esos no cuentan para decidir si el
+     mapa está completo, o nunca lo estaría. */
+  const pedibles = ids.filter(function (id) { return !!names[String(id) + ':slug']; });
+  if (!pedibles.length) return null;
+  const estanTodos = function (vistos) {
+    return pedibles.every(function (id) { return vistos.indexOf(String(id)) !== -1; });
+  };
+
+  /* Copia en memoria, para cuando la jornada aún no se puede dar por zanjada:
+     sin ella habría que releer noventa fichas en CADA petición. */
+  if (!cache.notas) cache.notas = {};
+  const enMemoria = cache.notas[clave];
+  if (enMemoria && Date.now() - enMemoria.at < 10 * 60 * 1000 && estanTodos(enMemoria.vistos)) {
+    return enMemoria.notas;
+  }
 
   if (env && env.JORNADAS) {
     try {
       const guardado = await env.JORNADAS.get(clave);
-      if (guardado) return JSON.parse(guardado);
+      if (guardado) {
+        const caja = JSON.parse(guardado);
+        /* Solo vale si se leyeron las fichas de TODOS los que se piden ahora.
+           Si aparece alguien nuevo —un fichaje alineado después—, se vuelve a
+           pedir en vez de dejarlo con la nota del historial, que falla. */
+        if (caja && caja.notas && estanTodos(caja.vistos || [])) return caja.notas;
+      }
     } catch (error) { /* se pide abajo */ }
   }
 
   const mapa = {};
+  /* Fichas leídas de verdad. No es lo mismo que `mapa`: quien no jugó esa
+     jornada no tiene nota, y aun así su ficha se consultó. Sin esta distinción,
+     un suplente que no salió dejaba el mapa «incompleto» para siempre. */
+  const vistos = [];
   const TANDA = 6;
-  for (let i = 0; i < ids.length; i += TANDA) {
-    await Promise.all(ids.slice(i, i + TANDA).map(async function (id) {
+  for (let i = 0; i < pedibles.length; i += TANDA) {
+    await Promise.all(pedibles.slice(i, i + TANDA).map(async function (id) {
       const slug = names[String(id) + ':slug'];
-      if (!slug) return;
       const respuesta = await fetch(CDN + '/players/la-liga/' + encodeURIComponent(slug) +
         '?lang=es&fields=*,reports(*,points,match(*,round(*)))',
         { headers: NAVEGADOR, cf: SIN_CACHE }).catch(function () { return null; });
       if (!respuesta || !respuesta.ok) return;
       const ficha = ((await respuesta.json().catch(function () { return {}; })).data) || {};
+      vistos.push(String(id));
       (ficha.reports || []).forEach(function (informe) {
         const ronda = (informe.match && informe.match.round) || {};
+        /* Se compara por `short`, no por id de ronda: el partido aplazado de
+           una jornada vive en una ronda distinta («Jornada 1 (aplazada)») que
+           lleva el mismo «J1». Por id se quedaban sin nota los ocho equipos
+           que jugaron su partido de la 1 más tarde. */
         const suya = Number(String(ronda.short || '').replace(/\D/g, '')) || null;
         if (suya !== numero) return;
         const nota = (informe.points || {})[String(score)];
@@ -2154,11 +2188,38 @@ async function notasDeLaJornada(env, ids, names, score, numero, cerrada) {
     }));
   }
 
-  /* Solo se guarda lo de una jornada ya cerrada: lo de una en juego cambia. */
-  if (cerrada && env && env.JORNADAS && Object.keys(mapa).length) {
-    try { await env.JORNADAS.put(clave, JSON.stringify(mapa)); } catch (error) { /* da igual */ }
+  const completo = estanTodos(vistos);
+  cache.notas[clave] = { at: Date.now(), notas: mapa, vistos: vistos };
+
+  /* Se guarda para siempre solo si se cumplen las DOS cosas:
+       · la jornada está zanjada de verdad —su ronda y la aplazada, que lleva su
+         mismo número—, porque hasta entonces Biwenger sigue moviendo notas;
+       · y han contestado TODAS las fichas. Antes bastaba con que el mapa no
+         estuviera vacío, así que un límite de consultas de Biwenger a media
+         tanda congelaba una jornada a medias y ya no había forma de arreglarla. */
+  if (cerrada && completo && env && env.JORNADAS && await jornadaZanjada(numero)) {
+    try {
+      await env.JORNADAS.put(clave, JSON.stringify({ notas: mapa, vistos: vistos }));
+    } catch (error) { /* da igual */ }
   }
   return mapa;
+}
+
+/**
+ * ¿Está esta jornada zanjada del todo?
+ *
+ * No basta con que lo esté su ronda. Los aplazados viven en una ronda aparte
+ * —«Jornada 1 (aplazada)», `part` 2— con el MISMO `short`, y trae los mismos
+ * diez partidos que la suya. Mientras esa siga abierta, Biwenger puede seguir
+ * moviendo las notas de la jornada: la J1 tenía su ronda ya `finished` con la
+ * aplazada todavía `active`, y así se guardaban como definitivas notas que
+ * seguían cambiando.
+ */
+async function jornadaZanjada(numero) {
+  if (numero == null) return false;
+  const calendario = await seasonRounds().catch(function () { return []; });
+  const suyas = calendario.filter(function (r) { return r.number === numero; });
+  return suyas.length > 0 && suyas.every(function (r) { return r.status === 'finished'; });
 }
 
 /**
