@@ -372,18 +372,24 @@ code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft)
 .round__game:last-child { border-bottom: 0; }
 .round__hour { font-family: var(--mono); color: var(--text-soft); }
 .round__vs { margin: 0 .35rem; color: var(--text-faint); }
-.round__tv { font-size: .78rem; color: var(--accent); text-align: right; }
+/* El canal en ambar: el rojo se lo queda «En juego», que es el aviso que tiene
+   que cantar. Un dato de consulta y una alerta no pueden ir del mismo color. */
+.round__tv { font-size: .78rem; color: var(--marca); text-align: right; }
 
 /* ---------- Jornada en juego ---------- */
 .round__live {
   display: inline-flex; align-items: center; gap: .35rem;
   font-family: var(--font); font-size: .78rem; font-weight: 700;
   text-transform: uppercase; letter-spacing: .05em;
-  color: var(--marca);
+  /* Rojo: es lo que hay que ver de un vistazo al entrar. */
+  color: var(--accent);
 }
+/* El minuto va dentro del distintivo y hereda su color: en ambar, al lado del
+   rotulo rojo, parecian dos cosas distintas. */
+.round__live .round__minuto { color: inherit; }
 .round__live::before {
   content: ''; width: .5rem; height: .5rem; border-radius: 50%;
-  background: var(--marca); animation: latido 1.6s ease-in-out infinite;
+  background: var(--accent); animation: latido 1.6s ease-in-out infinite;
 }
 @keyframes latido { 0%, 100% { opacity: 1; } 50% { opacity: .25; } }
 @media (prefers-reduced-motion: reduce) { .round__live::before { animation: none; } }

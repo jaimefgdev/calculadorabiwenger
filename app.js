@@ -4064,7 +4064,6 @@
       return;
     }
     const huecos = once.length - puestos;
-    const jornada = state.round && state.round.number;
 
     abrirOpModal(
       '<div class="op-card__cab">' +
@@ -4074,8 +4073,9 @@
       '</div>' +
       '<dl class="op-datos">' +
         '<div><dt>Sistema</dt><dd><strong>' + escapeHtml(state.xi.type) + '</strong></dd></div>' +
+        /* Sin la jornada: la alineacion se manda a la que toque, no se elige
+           aqui, asi que el dato no anadia nada a la decision. */
         '<div><dt>Titulares</dt><dd>' + puestos + ' de ' + once.length + '</dd></div>' +
-        (jornada ? '<div><dt>Jornada</dt><dd>' + jornada + '</dd></div>' : '') +
       '</dl>' +
       (huecos
         ? '<p class="op-texto">Quedan ' + huecos + (huecos === 1 ? ' hueco' : ' huecos') +
