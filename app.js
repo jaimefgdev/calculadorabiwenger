@@ -8006,6 +8006,10 @@
        abierta: dentro se desplaza la tarjeta y punto, y se sale por el aspa o
        pinchando fuera. */
     document.documentElement.classList.toggle('con-ficha', !!abierto);
+    /* Y el contenedor pasa de grid a flex mientras esté la ficha: es lo que le
+       da altura definida al envoltorio para que la tarjeta pueda desplazarse
+       por dentro en vez de crecer sin tope. */
+    caja.classList.toggle('picker--ficha', !!abierto);
     if (!abierto) { caja.hidden = true; caja.innerHTML = ''; return; }
 
     const serie = state.priceSeries[abierto.id];

@@ -2129,7 +2129,16 @@ main.wrap { padding-top: 1.15rem; padding-bottom: 3.5rem; }
 .spark { background: none; border: 0; padding: 0; cursor: pointer; }
 .spark:hover svg, .spark:focus-visible svg { opacity: .75; }
 /* Gráfico ampliado, centrado en la pantalla. */
+/* Flex, no grid, y esta es la razon: `.picker` es `display: grid`, y en grid un
+   `height: 100%` de un hijo se resuelve contra SU FILA, que se dimensiona por su
+   contenido y por tanto es indefinida. El envoltorio de la ficha acababa
+   midiendo `auto`, la tarjeta crecia sin tope y su `overflow-y: auto` no se
+   activaba nunca: la ficha salia cortada por abajo sin poder desplazarla, y
+   daba igual cuantas alturas se tocaran mas adentro. Con flex y `stretch`, el
+   envoltorio recibe la altura real del modal —que si es definida, porque es
+   `fixed` con `inset: 0`— y a partir de ahi la cadena funciona. */
 .picker--modal { position: fixed; z-index: 60; }
+.picker--ficha { display: flex; align-items: stretch; justify-content: center; }
 /* La altura la manda el hueco visible, no la página: en móvil la página es más
    alta de lo que se ve. */
 .modal__card { width: min(100%, 640px); max-height: 100%; }
