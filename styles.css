@@ -1050,10 +1050,11 @@ code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft)
   position: absolute; top: 0; left: 50%; transform: translateX(-50%);
   z-index: 2; display: inline-block;
 }
-/* Doble clase a proposito: mas abajo hay un `.pic-player.ficha__face` a 40 px
-   que, con una sola clase aqui, ganaba por ser mas especifico y la foto salia
-   diminuta. */
-.pic-player.ficha__face--grande {
+/* Las tres clases van a proposito: mas abajo hay un `.pic-player.ficha__face`
+   a 40 px que empata en especificidad y, por ir despues, ganaba; la foto salia
+   diminuta y el escudo la tapaba entera. Con la tercera clase esta gana siempre,
+   este donde este en el archivo. */
+.pic-player.ficha__face.ficha__face--grande {
   width: 140px; height: 140px;
   /* Un aro del color del fondo para separarlo del borde de la tarjeta. */
   box-shadow: 0 0 0 5px var(--bg-elev), inset 0 0 0 1px rgba(0, 0, 0, .18);
