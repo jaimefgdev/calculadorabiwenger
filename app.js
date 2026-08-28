@@ -7480,7 +7480,12 @@
 
        Mirando solo las plantillas de hoy, el segundo caso no salía nunca. */
     const llegada = acquisitionOf(id != null ? id : ficha.id);
-    const cronologico = (ficha.moves || []).slice().reverse();
+    /* Ordenado por fecha de verdad, no dando la vuelta a la lista: `ficha.moves`
+       viene de más nuevo a más viejo, pero eso depende de cómo llegue el tablón
+       y un `reverse()` a ciegas puede dejarlo justo al revés. */
+    const cronologico = (ficha.moves || []).slice().sort(function (a, b) {
+      return (a.timestamp || 0) - (b.timestamp || 0);
+    });
     const primero = cronologico[0];
     const reparto = (llegada && llegada.paid == null && llegada.since)
       ? { quien: llegada.owner, cuando: shortDay(llegada.since) }
@@ -9484,6 +9489,15 @@
 
      Si algún día quieres volver a Cloudflare a mano, se respeta: la mudanza
      solo se hace una vez, y queda anotada. */
+  /* Qué versión de este archivo está corriendo de verdad. Se lee del `?v=` de
+     su propia etiqueta, así que no hay que acordarse de subirla en dos sitios:
+     si el navegador te sirve un app.js viejo, aquí sale el número viejo. */
+  const VERSION_WEB = (function () {
+    const etiqueta = document.querySelector('script[src*="app.js"]');
+    const trozo = etiqueta && /[?&]v=(\d+)/.exec(etiqueta.getAttribute('src') || '');
+    return trozo ? trozo[1] : '?';
+  })();
+
   const PROXY_VIEJO = 'biwenger-calc.jaime-5e2.workers.dev';
   const PROXY_NUEVO = 'https://calculadorabiwenger.jaimefgdev.deno.net';
 
@@ -9547,8 +9561,12 @@
       { headers: { 'accept': 'application/json' } })
       .then(function (response) { return response.json(); })
       .then(function (payload) {
+        /* Se enseñan las DOS versiones juntas, la del proxy y la de esta web.
+           Al depurar los puntos se perdían horas sin saber cuál de las dos era
+           vieja: el proxy sin desplegar, o el navegador sirviendo un app.js
+           guardado. Con las dos delante se ve de un vistazo. */
         const rotulo = payload && payload.version
-          ? 'Worker ' + payload.version
+          ? 'Worker ' + payload.version + ' · web v' + VERSION_WEB
           : (payload && payload.error) || '';
         /* Solo en el panel de conexión: encima del reloj estorbaba. */
         hueco.textContent = rotulo;
