@@ -1041,7 +1041,10 @@ code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft)
    tarjeta porque esta lleva scroll y la recortaria. */
 .ficha__wrap {
   position: relative;
-  width: min(100%, 640px); max-height: 100%;
+  /* `height`, no `max-height`: un maximo no cuenta como altura definida, y el
+     `max-height: 100%` de la tarjeta de dentro se quedaba sin nada contra que
+     medir, asi que no activaba nunca su scroll y la ficha salia cortada. */
+  width: min(100%, 640px); height: 100%;
   display: flex; flex-direction: column; align-items: center;
   /* Hueco para la mitad de arriba del retrato. */
   padding-top: 85px;
@@ -1083,7 +1086,10 @@ html.con-ficha { scrollbar-gutter: stable; }
 .tag--reparto { background: var(--bg-surface); color: var(--marca, #ffc233); }
 /* La tarjeta empieza a media foto: el hueco de arriba deja sitio a su mitad
    inferior sin que el nombre se le meta debajo. */
-.ficha__card { padding-top: 93px; }
+/* `min-height: 0` es lo que le deja encoger: un hijo de un flex no baja por
+   defecto de lo que mide su contenido, y sin esto crecia hacia abajo en vez de
+   desplazarse por dentro. */
+.ficha__card { padding-top: 93px; min-height: 0; }
 
 /* Cabecera: nombre y pestanas, ya sin la foto. */
 .ficha__head--alto {
