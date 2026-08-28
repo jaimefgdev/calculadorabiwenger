@@ -104,7 +104,7 @@ const CDN = 'https://cf.biwenger.com/api/v2';
    navegador normal y las cabeceras que este mandaría. */
 /* Marca de versión: se sube en cada cambio y se consulta con ?version=1.
    Sirve para saber desde fuera si el despliegue ha entrado o no. */
-const VERSION = '2026-08-28 · deno 48';
+const VERSION = '2026-08-28 · deno 49';
 
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ' +
   '(KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36';
@@ -2056,9 +2056,14 @@ async function playerStats(id, names, score) {
  * estar mal y hay que quitarla. Se deja acotada a un futbolista y una jornada
  * a propósito, para que no pueda estropear nada más.
  */
+/* Vacía a propósito. Aquí estaba Pablo García con 11 en la jornada 1, puesto a
+   mano porque su ficha daba 10 y no se sabía por qué. Ya se sabe: es delantero,
+   marcó de delantero (gol de 3) y gijonudo lo alineó de medio (gol de 4). Eso
+   lo hace ahora `recolocarGoles`, que además lo hace BIEN: por mánager. Este
+   parche era global y le habría dado 11 también a quien lo alineara de
+   delantero, donde lo correcto son 10. */
 const CORRECCIONES = {
   // jornada -> { id de futbolista: puntos }
-  1: { '35763': 11 }   // Pablo García
 };
 
 function conCorrecciones(marcador, numero) {
@@ -2069,6 +2074,41 @@ function conCorrecciones(marcador, numero) {
     if (marcador[id] != null) marcador[id] = tabla[id];
   });
   return marcador;
+}
+
+/* Lo que vale un gol según la línea en la que juegas: 6 de portero, 5 de
+   defensa, 4 de medio y 3 de delantero. */
+const VALOR_GOL = { 1: 6, 2: 5, 3: 4, 4: 3 };
+
+/**
+ * Recoloca el gol del que está alineado fuera de su puesto.
+ *
+ * La nota de la ficha está calculada en la posición en la que JUGÓ, pero
+ * Biwenger la recalcula según la línea en la que lo pone cada mánager: un medio
+ * que marca, puesto de delantero, vale un punto menos, porque su gol pasa de
+ * valer 4 a valer 3. Y como depende de la alineación, esto no se puede tocar en
+ * el marcador —que es común a toda la liga—: solo aquí, con el once delante.
+ *
+ * Jornada 1: Sucic marcó de medio y Bella lo alineó de delantero. Su ficha da
+ * 8; Biwenger le pone 7 en ese once, y a quien lo alineara de medio, 8.
+ */
+function recolocarGoles(once, goles, posReales) {
+  return once.map(function (jugador) {
+    const suyos = goles[jugador.id] || 0;
+    if (!suyos || jugador.points == null) return jugador;
+    /* Solo sobre la nota que hemos calculado nosotros: la que manda Biwenger ya
+       la trae recolocada, y ajustarla otra vez la estropearía. */
+    if (!jugador.nuestra) return jugador;
+
+    const real = posReales[jugador.id];
+    const puesta = jugador.position;
+    if (real == null || puesta == null || real === puesta) return jugador;
+    if (VALOR_GOL[real] == null || VALOR_GOL[puesta] == null) return jugador;
+
+    return Object.assign({}, jugador, {
+      points: jugador.points + (VALOR_GOL[puesta] - VALOR_GOL[real]) * suyos
+    });
+  });
 }
 
 function conSuperPica(marcador, detalle, primas) {
@@ -2128,7 +2168,7 @@ async function notasDeLaJornada(env, ids, names, score, numero, cerrada) {
      mientras la ronda aplazada seguía abierta, y como no se comprobaba nada al
      leerlas, esa foto mala se devolvía para siempre. Cambiando el nombre
      caducan solas, sin tener que vaciar nada a mano. */
-  const clave = 'notas-v2-' + numero + '-' + (score || '');
+  const clave = 'notas-v3-' + numero + '-' + (score || '');
 
   /* Sin slug no hay ficha que consultar: esos no cuentan para decidir si el
      mapa está completo, o nunca lo estaría. */
@@ -2143,7 +2183,7 @@ async function notasDeLaJornada(env, ids, names, score, numero, cerrada) {
   if (!cache.notas) cache.notas = {};
   const enMemoria = cache.notas[clave];
   if (enMemoria && Date.now() - enMemoria.at < 10 * 60 * 1000 && estanTodos(enMemoria.vistos)) {
-    return enMemoria.notas;
+    return enMemoria;
   }
 
   if (env && env.JORNADAS) {
@@ -2154,12 +2194,16 @@ async function notasDeLaJornada(env, ids, names, score, numero, cerrada) {
         /* Solo vale si se leyeron las fichas de TODOS los que se piden ahora.
            Si aparece alguien nuevo —un fichaje alineado después—, se vuelve a
            pedir en vez de dejarlo con la nota del historial, que falla. */
-        if (caja && caja.notas && estanTodos(caja.vistos || [])) return caja.notas;
+        if (caja && caja.notas && estanTodos(caja.vistos || [])) return caja;
       }
     } catch (error) { /* se pide abajo */ }
   }
 
   const mapa = {};
+  /* En qué puesto jugó de verdad esa jornada. Hace falta para poder recolocar
+     su gol cuando el mánager lo alinea en otra línea, y viene en el mismo
+     `rawStats` que ya trae la petición: no cuesta una consulta más. */
+  const posiciones = {};
   /* Fichas leídas de verdad. No es lo mismo que `mapa`: quien no jugó esa
      jornada no tiene nota, y aun así su ficha se consultó. Sin esta distinción,
      un suplente que no salió dejaba el mapa «incompleto» para siempre. */
@@ -2169,7 +2213,7 @@ async function notasDeLaJornada(env, ids, names, score, numero, cerrada) {
     await Promise.all(pedibles.slice(i, i + TANDA).map(async function (id) {
       const slug = names[String(id) + ':slug'];
       const respuesta = await fetch(CDN + '/players/la-liga/' + encodeURIComponent(slug) +
-        '?lang=es&fields=*,reports(*,points,match(*,round(*)))',
+        '?lang=es&fields=*,reports(*,points,rawStats,match(*,round(*)))',
         { headers: NAVEGADOR, cf: SIN_CACHE }).catch(function () { return null; });
       if (!respuesta || !respuesta.ok) return;
       const ficha = ((await respuesta.json().catch(function () { return {}; })).data) || {};
@@ -2184,12 +2228,19 @@ async function notasDeLaJornada(env, ids, names, score, numero, cerrada) {
         if (suya !== numero) return;
         const nota = (informe.points || {})[String(score)];
         if (typeof nota === 'number') mapa[String(id)] = nota;
+        /* La posición jugada viene como una marca suelta —`pos3: true`—, no
+           como un número. */
+        const bruto = informe.rawStats || {};
+        const marca = Object.keys(bruto).filter(function (campo) {
+          return /^pos[1-5]$/.test(campo) && bruto[campo];
+        })[0];
+        if (marca) posiciones[String(id)] = Number(marca.slice(3));
       });
     }));
   }
 
   const completo = estanTodos(vistos);
-  cache.notas[clave] = { at: Date.now(), notas: mapa, vistos: vistos };
+  cache.notas[clave] = { at: Date.now(), notas: mapa, posiciones: posiciones, vistos: vistos };
 
   /* Se guarda para siempre solo si se cumplen las DOS cosas:
        · la jornada está zanjada de verdad —su ronda y la aplazada, que lleva su
@@ -2199,10 +2250,11 @@ async function notasDeLaJornada(env, ids, names, score, numero, cerrada) {
          tanda congelaba una jornada a medias y ya no había forma de arreglarla. */
   if (cerrada && completo && env && env.JORNADAS && await jornadaZanjada(numero)) {
     try {
-      await env.JORNADAS.put(clave, JSON.stringify({ notas: mapa, vistos: vistos }));
+      await env.JORNADAS.put(clave,
+        JSON.stringify({ notas: mapa, posiciones: posiciones, vistos: vistos }));
     } catch (error) { /* da igual */ }
   }
-  return mapa;
+  return { notas: mapa, posiciones: posiciones, vistos: vistos };
 }
 
 /**
@@ -2314,10 +2366,15 @@ function roundPlayer(entry, names, puntos, partidoDe, enCasa, lances) {
      así van subiendo según acaba cada partido. Al que ya no está se le fuerza
      el vacío: si no, se le colaría por el índice la nota de la última jornada
      que llegó a jugar. */
+  const suya = !suelto && entry && entry.points != null ? entry.points
+    : (player.points != null ? player.points : null);
   const puntuacion = (sinTerminar || fuera) ? null
-    : (!suelto && entry && entry.points != null ? entry.points
-      : (player.points != null ? player.points
-        : (marcador[id] != null ? marcador[id] : null)));
+    : (suya != null ? suya : (marcador[id] != null ? marcador[id] : null));
+
+  /* ¿La nota la ha puesto Biwenger o la hemos calculado nosotros? Importa para
+     recolocar el gol del que está alineado fuera de su puesto: la de Biwenger
+     YA viene con ese ajuste hecho, y volver a aplicárselo la dejaría mal. */
+  const nuestra = !(sinTerminar || fuera) && suya == null && marcador[id] != null;
 
   const pendiente = sinTerminar;
   /* Si jugaba en casa o fuera esa jornada: rinden distinto y se compara. */
@@ -2329,6 +2386,7 @@ function roundPlayer(entry, names, puntos, partidoDe, enCasa, lances) {
     position: player.position != null ? player.position
       : (names[id + ':pos'] != null ? names[id + ':pos'] : null),
     points: puntuacion,
+    nuestra: nuestra,
     pending: pendiente,
     /* Para poder decir en la web por qué no tiene nota, y para dejarlo fuera
        de la cuenta de jugadores: Biwenger enseña diez, no once. */
@@ -2863,9 +2921,28 @@ async function roundBoard(env, headers, jornada, listaNombres) {
     !!detalle && (detalle.played || 0) >= (detalle.games || 0) && (detalle.games || 0) > 0;
   const buenas = await notasDeLaJornada(env, Object.keys(alineados), names, score,
     numeroJornada, cerrada).catch(function () { return null; });
-  if (buenas) {
-    Object.keys(buenas).forEach(function (id) { base[id] = buenas[id]; });
+  if (buenas && buenas.notas) {
+    Object.keys(buenas.notas).forEach(function (id) { base[id] = buenas.notas[id]; });
   }
+
+  /* En qué puesto jugó cada uno de verdad. De la ficha si la hemos leído; si
+     no, su demarcación de siempre, que es la que acierta casi siempre. */
+  const posReales = {};
+  Object.keys((detalle && detalle.fichas) || {}).forEach(function (id) {
+    const p = detalle.fichas[id].position;
+    if (p != null) posReales[id] = p;
+  });
+  Object.keys((buenas && buenas.posiciones) || {}).forEach(function (id) {
+    posReales[id] = buenas.posiciones[id];
+  });
+
+  /* Goles de cada uno esta jornada, para poder recolocarlos si el mánager lo
+     alineó en otra línea. Solo los de jugada (tipo 1): el de penalti (tipo 2)
+     es otro concepto en el baremo. */
+  const golesDe = {};
+  ((detalle && detalle.lances) || []).forEach(function (lance) {
+    if (lance && lance.type === 1) golesDe[String(lance.id)] = (golesDe[String(lance.id)] || 0) + 1;
+  });
 
   /* Y ahora sí: la Súper Pica de esta liga y las correcciones, encima de las
      notas buenas. */
@@ -2873,10 +2950,12 @@ async function roundBoard(env, headers, jornada, listaNombres) {
 
   const standings = (((data && data.league) || {}).standings || []).filter(Boolean).map(function (row) {
     const lineup = row.lineup || null;
-    const once = colocarEnSistema(
+    /* Primero se coloca el once en sus líneas y solo después se recolocan los
+       goles: hasta que no está puesto no se sabe de qué juega cada uno aquí. */
+    const once = recolocarGoles(colocarEnSistema(
       ((lineup && lineup.players) || []).map(function (entry) { return roundPlayer(entry, names, marcador, partidoDe, enCasa,
         (detalle && detalle.lances) || []); }).filter(Boolean),
-      lineup && lineup.type);
+      lineup && lineup.type), golesDe, posReales);
     /* Biwenger llama «discarded» a los que se quedaron fuera: el banquillo. */
     const banquillo = ((lineup && (lineup.discarded || lineup.bench)) || [])
       .map(function (entry) {
