@@ -104,7 +104,7 @@ const CDN = 'https://cf.biwenger.com/api/v2';
    navegador normal y las cabeceras que este mandaría. */
 /* Marca de versión: se sube en cada cambio y se consulta con ?version=1.
    Sirve para saber desde fuera si el despliegue ha entrado o no. */
-const VERSION = '2026-08-28 · deno 55';
+const VERSION = '2026-08-28 · deno 56';
 
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ' +
   '(KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36';
@@ -3241,11 +3241,39 @@ async function roundBoard(env, headers, jornada, listaNombres) {
      ha capturado la alineación desde el móvil, aquí sigue estando. */
   if (payload.round.id != null) {
     payload = mezclarJornada(await kvLeer(env, payload.round.id), payload);
+    refrescarNombres(payload, names);
     const alineaciones = payload.standings.filter(function (fila) { return (fila.xi || []).length; }).length;
     if (alineaciones) await kvGuardar(env, payload.round.id, payload);
   }
 
   return payload;
+}
+
+/**
+ * Vuelve a poner el nombre de cada futbolista con el índice de AHORA.
+ *
+ * El nombre se escribe dentro del once cuando se calcula la jornada, y la
+ * jornada se guarda. Si en ese momento el índice estaba caído —Biwenger corta
+ * las consultas y devuelve un 200 sin datos—, se guardaba «Jugador 19441» y ahí
+ * se quedaba para siempre, aunque el índice volviera al minuto siguiente: nadie
+ * lo recalculaba. Repasándolo aquí, en cada respuesta, esas jornadas se curan
+ * solas en cuanto Biwenger contesta una vez.
+ */
+function refrescarNombres(payload, names) {
+  if (!names || !Object.keys(names).length) return;   // sin índice, no se toca nada
+  const arreglar = function (lista) {
+    (lista || []).forEach(function (jugador) {
+      if (!jugador || jugador.id == null) return;
+      const bueno = names[String(jugador.id)];
+      if (bueno) jugador.name = bueno;
+    });
+  };
+  (payload.standings || []).forEach(function (fila) {
+    arreglar(fila.xi);
+    arreglar(fila.bench);
+  });
+  /* El once ideal viene como { type, points, players }, no como lista suelta. */
+  arreglar(payload.bestXi && payload.bestXi.players);
 }
 
 /**
