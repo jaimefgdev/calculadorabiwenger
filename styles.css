@@ -1089,16 +1089,27 @@ html.con-ficha { scrollbar-gutter: stable; }
    que valen para dos o tres puestos llevan varias chapas y en fila se salian
    del circulo por la izquierda. */
 .ficha__puestos {
-  /* A media altura del circulo, no en la esquina de abajo: ahi caia fuera de la
-     foto, en el hueco que deja la curva, y quedaba descolgada. En el centro
-     apoya sobre el borde izquierdo, que es su punto mas ancho. */
-  position: absolute; left: 2px; top: 50%; transform: translateY(-50%); z-index: 1;
-  display: flex; flex-direction: column; align-items: center; gap: 3px;
+  /* A la altura del escudo: su centro vertical cae donde el del escudo, en el
+     lado de enfrente. Ahi la curva del circulo ya se ha retirado, asi que la
+     chapa se apoya en el borde sin meterse en la cara y queda muy por encima
+     del nombre. Los que juegan en dos o tres puestos llevan el SUYO arriba del
+     todo y los de repuesto debajo; anclado por abajo, la pila crece hacia
+     arriba segun se anaden, y el escudo y la ultima chapa quedan siempre a la
+     misma altura. */
+  position: absolute; left: 0; bottom: 18px; z-index: 1;
+  display: flex; flex-direction: column; align-items: flex-start; gap: 3px;
   /* El retrato lleva `line-height: 0` para que no le sobre caja por debajo;
      aqui dentro hace falta la normal o el texto de las chapas se aplasta. */
   line-height: normal;
 }
-.ficha__puestos .puestos { display: flex; flex-direction: column-reverse; gap: 3px; }
+/* Igual dentro: `chapaDePuesto` emite la suya primero y las de repuesto detras,
+   asi que en `column` sale la suya arriba, que es como se lee. */
+.ficha__puestos .puestos { display: flex; flex-direction: column; gap: 3px; }
+/* `.puesto` es `absolute` por defecto —esta pensada para la esquina de una
+   tarjeta—, asi que aqui el flex no la colocaba: se posaba en `top: 4px;
+   left: 4px` del ancla, el contenedor se quedaba sin tamano y la chapa acababa
+   sobre la cara. En estatico si la coloca la columna. */
+.ficha__puestos .puesto { position: static; }
 /* De quien es el futbolista, en ambar: el dato que mas se busca al abrir la
    ficha, que en gris se perdia entre el puesto, el equipo y los puntos. */
 .ficha__dueno { color: var(--marca, #ffc233); }
