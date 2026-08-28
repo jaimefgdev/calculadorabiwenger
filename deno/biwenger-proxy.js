@@ -104,7 +104,7 @@ const CDN = 'https://cf.biwenger.com/api/v2';
    navegador normal y las cabeceras que este mandaría. */
 /* Marca de versión: se sube en cada cambio y se consulta con ?version=1.
    Sirve para saber desde fuera si el despliegue ha entrado o no. */
-const VERSION = '2026-08-28 · deno 53';
+const VERSION = '2026-08-28 · deno 54';
 
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ' +
   '(KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36';
@@ -2232,6 +2232,12 @@ async function notasDeLaJornada(env, ids, names, score, numero, cerrada) {
   const vistos = [];
   const TANDA = 6;
   for (let i = 0; i < pedibles.length; i += TANDA) {
+    /* Un respiro entre tandas. Noventa fichas seguidas a toda velocidad es lo
+       que hacía que Biwenger cortara, y cuando corta no falla solo esto: cae
+       también la descarga del índice de futbolistas y la web entera se queda
+       sin nombres ni precios. Quince tandas a 400 ms son seis segundos, y solo
+       la primera vez de cada jornada. */
+    if (i) await new Promise(function (listo) { setTimeout(listo, 400); });
     await Promise.all(pedibles.slice(i, i + TANDA).map(async function (id) {
       const quien = names[String(id) + ':slug'] || String(id);
       const respuesta = await fetch(CDN + '/players/la-liga/' + encodeURIComponent(quien) +
