@@ -4999,6 +4999,9 @@
 
     state.jornadas.datos[id] = {
       round: payload.round,
+      /* Qué versión del proxy calculó estos puntos: si lo guardado se quedó
+         atrás, aquí se ve. */
+      calc: payload.calc || (previo && previo.calc) || null,
       standings: filas,
       /* Si esta vez no llega, se conserva el que ya hubiera guardado. */
       bestXi: payload.bestXi || (previo && previo.bestXi) || null,
@@ -5039,7 +5042,32 @@
        de empezar, o un marcador ya viejo). */
     const previa = cual !== 'actual' ? state.jornadas.datos[cual] : null;
     const guardada = previa && jornadaCerrada(previa) && conGoles(previa) ? previa : null;
-    if (guardada && !forzar) { state.jornadaVista = cual; return; }
+    /* Lo guardado se enseña al momento, pero una vez por sesión se vuelve a
+       pedir por detrás aunque la jornada esté cerrada.
+
+       Una jornada cerrada no cambia en Biwenger, pero SÍ cambia lo que nosotros
+       calculamos con ella: cada arreglo del proxy da otros puntos. Sin esto, lo
+       guardado se servía para siempre y un despliegue nuevo no llegaba nunca al
+       navegador —la jornada 1 se quedó días con números viejos mientras yo
+       desplegaba correcciones que no se veían—. Una vez por sesión no cuesta
+       nada y garantiza que lo desplegado acabe llegando. */
+    if (guardada && !forzar) {
+      state.jornadaVista = cual;
+      if (!state.jornadasRefrescadas) state.jornadasRefrescadas = {};
+      if (!state.jornadasRefrescadas[cual]) {
+        state.jornadasRefrescadas[cual] = true;
+        fetch(config.url.replace(/\/+$/, '') + '/?key=' + encodeURIComponent(config.key) +
+          '&jornada=' + encodeURIComponent(cual), { headers: { 'accept': 'application/json' } })
+          .then(function (response) { return response.json(); })
+          .then(function (payload) {
+            if (payload.error || !payload.round) return;
+            mergeJornada(payload, true);
+            renderJornadas(); renderManagers(); renderRankings();
+          })
+          .catch(function () { /* se queda lo guardado, que ya está pintado */ });
+      }
+      return;
+    }
     /* Solo se frena si ya se está pidiendo esa misma: antes, con una jornada
        a medio traer, elegir otra no hacía nada. */
     if (state.jornadaEstado === 'cargando' && state.jornadaPidiendo === String(cual)) return;
@@ -9533,7 +9561,9 @@
     if (!jornada) return 'Esa jornada no está cargada.';
 
     const cabecera = 'Jornada ' + ((jornada.round || {}).number || '?') +
-      ' (id ' + ((jornada.round || {}).id || '?') + ')';
+      ' (id ' + ((jornada.round || {}).id || '?') + ')' +
+      '\ncalculada por: ' + (jornada.calc || 'sin marca (guardada antes de deno 52)') +
+      '\nguardada: ' + (jornada.savedAt || '?');
     return cabecera + '\n' + (jornada.standings || []).map(function (fila) {
       return fila.name + ' = ' + fila.points +
         (fila.gaps ? '  [huecos ' + fila.gaps + ']' : '') + '\n' +
