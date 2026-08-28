@@ -845,6 +845,13 @@
   const posicionConocida = {};
   /* Y las de repuesto, para poder pintar las dos chapas en cualquier tabla. */
   const altConocida = {};
+  /* Y su nombre. Las jornadas guardadas llevan el nombre escrito dentro, y las
+     que se calcularon con el índice del proxy caído se quedaron con «Jugador
+     19441» grabado para siempre. Teniendo aquí el índice de LaLiga no hace
+     falta esperar a que nadie las recalcule: se pinta el bueno. */
+  const nombreConocido = {};
+  /* Justo lo que NO hay que aprender: el relleno de cuando falta el nombre. */
+  const ES_RELLENO = /^Jugador\s+\d+$/;
 
   function recordarPosiciones(lista) {
     (lista || []).forEach(function (jugador) {
@@ -853,7 +860,17 @@
       if (jugador.altPositions && jugador.altPositions.length) {
         altConocida[String(jugador.id)] = jugador.altPositions;
       }
+      const como = jugador.name || jugador.player;
+      if (como && !ES_RELLENO.test(como)) nombreConocido[String(jugador.id)] = como;
     });
+  }
+
+  /** Cómo se llama de verdad: el del índice manda sobre el que traiga el dato. */
+  function comoSeLlama(jugador) {
+    if (!jugador) return '';
+    const guardado = jugador.name || jugador.player || '';
+    if (jugador.id == null) return guardado;
+    return nombreConocido[String(jugador.id)] || guardado;
   }
 
   /** Las demarcaciones de repuesto de alguien, vengan en el objeto o guardadas. */
@@ -874,10 +891,15 @@
     const puesto = movement.position != null ? movement.position
       : (posicionConocida[String(id)] != null ? posicionConocida[String(id)] : null);
 
+    /* El nombre bueno manda sobre el que traiga el dato: lo guardado puede
+       llevar el relleno «Jugador 19441» de cuando el índice del proxy estaba
+       caído, y eso no se cura solo. */
+    const como = (id != null && nombreConocido[String(id)]) || movement.player;
+
     return '<span class="player" data-player-id="' + escapeHtml(String(id || '')) + '">' +
       (sinChapa ? '' : chapaDePuesto(puesto, 'puesto--fila',
         otrosPuestosDe(movement, movement.playerId))) + pic + '<span class="player-name">' +
-      escapeHtml(movement.player) + '</span></span>';
+      escapeHtml(como) + '</span></span>';
   }
 
   function escapeHtml(value) {
@@ -2631,7 +2653,7 @@
         chapaDePuesto(player && player.position, 'puesto--esquina', otrosPuestosDe(player)) +
         statusMark(player, 'mark--esquina') + pointsBadge(player, 'pts--esquina') +
       '</span>' +
-      '<span class="pitch__name">' + (player ? escapeHtml(player.name) : '—') + '</span>' +
+      '<span class="pitch__name">' + (player ? escapeHtml(comoSeLlama(player)) : '—') + '</span>' +
       '<button type="button" class="pitch__pick" data-slot="' + key + '" data-position="' + position + '"' +
         ' aria-label="Cambiar el ' + POSITION_NAMES[position] +
         (player ? ': ahora ' + escapeHtml(player.name) : '') + '"></button>' +
@@ -2957,7 +2979,7 @@
           return '<div class="bench__player" data-lleva="' + escapeHtml(String(player.id)) + '">' +
             crestOf(player, 'crest--ghost') +
             caraConChapas(player, 'bench__face') +
-            '<span class="bench__name">' + escapeHtml(player.name) + '</span>' +
+            '<span class="bench__name">' + escapeHtml(comoSeLlama(player)) + '</span>' +
           '</div>';
         }).join('');
 
@@ -5248,7 +5270,7 @@
         return '<div class="pitch__slot">' +
           crestOf(jugador, 'crest--ghost') +
           caraDeAlineacion(jugador, 'pitch__face', conDueno) +
-          '<span class="pitch__name">' + escapeHtml(jugador.name) + '</span>' +
+          '<span class="pitch__name">' + escapeHtml(comoSeLlama(jugador)) + '</span>' +
         '</div>';
       }).join('');
       return '<div class="pitch__line">' + huecos + '</div>';
@@ -5272,7 +5294,7 @@
           return '<div class="bench__player">' +
             crestOf(jugador, 'crest--ghost') +
             caraDeAlineacion(jugador, 'bench__face') +
-            '<span class="bench__name">' + escapeHtml(jugador.name) + '</span>' +
+            '<span class="bench__name">' + escapeHtml(comoSeLlama(jugador)) + '</span>' +
           '</div>';
         }).join('') + '</div>';
 
@@ -6095,7 +6117,7 @@
     const hueco = function (jugador) {
       return '<div class="pitch__slot">' +
         caraDeAlineacion(jugador, 'pitch__face', true) +
-        '<span class="pitch__name">' + escapeHtml(jugador.name) + '</span>' +
+        '<span class="pitch__name">' + escapeHtml(comoSeLlama(jugador)) + '</span>' +
         (jugador.events && jugador.events.length
           ? '<span class="pitch__lances">' + lancesDe(jugador) + '</span>' : '') +
       '</div>';
@@ -6118,7 +6140,7 @@
           '<div class="bench">' + equipo.bench.map(function (jugador) {
             return '<div class="bench__player">' +
               caraDeAlineacion(jugador, 'bench__face', true) +
-              '<span class="bench__name">' + escapeHtml(jugador.name) + '</span>' +
+              '<span class="bench__name">' + escapeHtml(comoSeLlama(jugador)) + '</span>' +
               (jugador.events && jugador.events.length
                 ? '<span class="bench__lances">' + lancesDe(jugador) + '</span>' : '') +
             '</div>';
