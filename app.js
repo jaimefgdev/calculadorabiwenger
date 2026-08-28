@@ -8112,9 +8112,11 @@
         '<div class="picker__head ficha__head ficha__head--alto">' +
           '<button type="button" class="btn btn--ghost btn--close ficha__cerrar"' +
             ' data-price-close title="Cerrar" aria-label="Cerrar">✕</button>' +
+          /* Sin el circulito de estado: justo debajo va el parte de Biwenger
+             («Lesion en el biceps femoral...»), que lo dice con todas las
+             letras. El icono solo repetia lo mismo peor. */
           '<span class="ficha__nombre">' +
             '<strong>' + escapeHtml(abierto.name) + '</strong>' +
-            statusMark(ficha, 'mark--row') +
           '</span>' +
           /* Mientras se elige rival, la pastilla estorba: su sitio lo ocupa el
              aspa que hay junto al buscador. */

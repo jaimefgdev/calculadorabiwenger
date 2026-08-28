@@ -1869,15 +1869,21 @@ input[type="search"]::-webkit-search-cancel-button:hover { opacity: .75; }
   font-size: .66rem; font-weight: 650; text-transform: uppercase;
   letter-spacing: .05em; color: var(--text-faint); margin-bottom: .3rem;
 }
+/* Flex, no grid: en grid la ultima fila deja el hueco a la derecha y con una
+   casilla menos que la de arriba quedaba descolgada. Envolviendo con flex, el
+   sobrante se reparte a los lados y esa fila sale centrada bajo la anterior. */
 .stats__rejilla {
-  display: grid; gap: .5rem;
-  grid-template-columns: repeat(auto-fit, minmax(88px, 1fr));
+  display: flex; flex-wrap: wrap; justify-content: center; gap: .5rem;
 }
 /* El dato, centrado bajo su rótulo: pegado a la izquierda se leía torcido. */
 .stats__rejilla .stat {
   display: flex; flex-direction: column; align-items: center; gap: .1rem;
   padding: .35rem .5rem; text-align: center;
   background: var(--bg-surface); border-radius: var(--radius-sm);
+  /* Crecen para llenar su fila, pero con tope: sin el, la fila corta estiraba
+     sus casillas hasta ocupar todo el ancho y volvia a no verse centrada. Con
+     el tope sobra sitio, y ese sobrante es el que la centra. */
+  flex: 1 1 88px; max-width: 104px;
 }
 .stat__label { font-size: .64rem; color: var(--text-faint); text-transform: uppercase; letter-spacing: .03em; }
 .stat strong { font-size: .95rem; font-variant-numeric: tabular-nums; }
