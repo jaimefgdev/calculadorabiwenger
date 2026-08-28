@@ -7963,7 +7963,16 @@
     ajustarFichaALaVista();
     caja.innerHTML =
       '<div class="picker__backdrop" data-price-close></div>' +
-      '<div class="picker__card modal__card" role="dialog" aria-modal="true" aria-label="Ficha de ' +
+      /* La foto va FUERA de la tarjeta, no dentro: la tarjeta lleva scroll y
+         recortaría lo que sobresale, así que el retrato no podría asomar por
+         encima de su borde. Aquí queda flotando y la tarjeta arranca a media
+         altura de él. */
+      '<div class="ficha__wrap">' +
+      '<span class="ficha__retrato">' +
+        faceOf(abierto.id, 'ficha__face ficha__face--grande') +
+        crestOf(ficha, 'crest--badge ficha__escudo') +
+      '</span>' +
+      '<div class="picker__card modal__card ficha__card" role="dialog" aria-modal="true" aria-label="Ficha de ' +
         escapeHtml(abierto.name) + '">' +
         /* La cabecera va en vertical: la cara grande y centrada, el nombre
            debajo y las pestañas al final. En horizontal, con el nombre, cinco
@@ -7972,10 +7981,6 @@
         '<div class="picker__head ficha__head ficha__head--alto">' +
           '<button type="button" class="btn btn--ghost btn--close ficha__cerrar"' +
             ' data-price-close title="Cerrar" aria-label="Cerrar">✕</button>' +
-          '<span class="ficha__retrato">' +
-            faceOf(abierto.id, 'ficha__face ficha__face--grande') +
-            crestOf(ficha, 'crest--badge ficha__escudo') +
-          '</span>' +
           '<span class="ficha__nombre">' +
             '<strong>' + escapeHtml(abierto.name) + '</strong>' +
             statusMark(ficha, 'mark--row') +
@@ -8093,7 +8098,7 @@
         (!abierto.partidos && !abierto.ficha && ficha.moves && ficha.moves.length
           ? '<h3 class="bench__title">En la liga</h3>' + playerHistory(ficha)
           : '') +
-      '</div>';
+      '</div></div>';
 
     /* Los rótulos largos de las estadísticas encogen hasta verse enteros. */
     ajustarNombres();

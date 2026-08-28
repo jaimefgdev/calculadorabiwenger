@@ -1036,18 +1036,38 @@ code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft)
 .cartera__uno { display: block; font-size: .82rem; white-space: nowrap;
   overflow: hidden; text-overflow: ellipsis; }
 
-/* Cabecera de la ficha de un futbolista, en vertical: cara, nombre y pestanas. */
+/* La ficha de un futbolista: un retrato grande y redondo asomando por encima
+   de la tarjeta, que arranca a media altura de él. La foto va fuera de la
+   tarjeta porque esta lleva scroll y la recortaria. */
+.ficha__wrap {
+  position: relative;
+  width: min(100%, 640px); max-height: 100%;
+  display: flex; flex-direction: column; align-items: center;
+  /* Hueco para la mitad de arriba del retrato. */
+  padding-top: 70px;
+}
+.ficha__retrato {
+  position: absolute; top: 0; left: 50%; transform: translateX(-50%);
+  z-index: 2; display: inline-block;
+}
+.ficha__face--grande {
+  width: 140px; height: 140px;
+  /* Un aro del color del fondo para separarlo del borde de la tarjeta. */
+  box-shadow: 0 0 0 5px var(--bg-elev), inset 0 0 0 1px rgba(0, 0, 0, .18);
+}
+.ficha__escudo { position: absolute; right: 6px; bottom: 6px; width: 34px; height: 34px; }
+/* La tarjeta empieza a media foto: el hueco de arriba deja sitio a su mitad
+   inferior sin que el nombre se le meta debajo. */
+.ficha__card { padding-top: 78px; }
+
+/* Cabecera: nombre y pestanas, ya sin la foto. */
 .ficha__head--alto {
   position: relative;
   display: flex; flex-direction: column; align-items: center; gap: .5rem;
-  padding-top: .4rem; text-align: center;
+  padding-top: 0; text-align: center;
 }
 /* El aspa, suelta en la esquina, para no robar sitio a la fila de pestanas. */
-.ficha__cerrar { position: absolute; top: 0; right: 0; }
-/* La cara, con su escudo colgando de la esquina. */
-.ficha__retrato { position: relative; display: inline-block; }
-.ficha__face--grande { width: 96px; height: 96px; }
-.ficha__escudo { position: absolute; right: -2px; bottom: -2px; width: 26px; height: 26px; }
+.ficha__cerrar { position: absolute; top: -70px; right: 0; z-index: 3; }
 .ficha__nombre {
   display: flex; align-items: center; justify-content: center; gap: .4rem;
   font-size: 1.1rem; line-height: 1.2;
