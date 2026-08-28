@@ -11,7 +11,7 @@
 
 /* Se sube en cada publicación: al cambiar, el navegador tira lo guardado y se
    baja los archivos nuevos. Sin esto, un cambio en app.js podría no llegar. */
-const VERSION = 'calc-v1';
+const VERSION = 'calc-v2';
 
 /* Lo que hace falta para pintar la app aunque no haya red. */
 const BASICOS = [
@@ -70,8 +70,17 @@ self.addEventListener('fetch', function (evento) {
   /* Primero la red, y lo guardado como red de seguridad. Al revés —caché
      primero— una publicación nueva podía tardar días en llegar, que es
      exactamente el lío del `?v=` pero peor, porque ni recargando se arregla. */
+  /* `reload` a propósito: sin esto, `fetch` pasa por la caché HTTP del
+     navegador, y si Chrome tiene guardado el index.html viejo nos lo da a
+     nosotros y nosotros se lo servimos a la página tan contentos. Publicabas y
+     en el PC no cambiaba nada ni recargando, mientras que en el móvil —sin ese
+     index.html guardado— sí. Así la petición sale siempre a la red de verdad. */
+  const aLaRed = new Request(peticion.url, {
+    cache: 'reload', credentials: 'same-origin', mode: 'same-origin'
+  });
+
   evento.respondWith(
-    fetch(peticion).then(function (respuesta) {
+    fetch(aLaRed).then(function (respuesta) {
       if (respuesta && respuesta.ok) {
         const copia = respuesta.clone();
         caches.open(VERSION).then(function (cache) { cache.put(peticion, copia); });

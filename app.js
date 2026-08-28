@@ -7128,20 +7128,16 @@
     };
 
     return '<div class="stats">' +
+      /* Participaci\u00f3n y juego iban en dos apartados, y era una separaci\u00f3n
+         artificial: todo son n\u00fameros de lo mismo. Una sola rejilla. */
       '<div class="stats__grupo">' +
-        '<h4 class="stats__titulo">Participaci\u00f3n</h4>' +
+        '<h4 class="stats__titulo">N\u00fameros de la temporada</h4>' +
         '<div class="stats__rejilla">' +
           celda('Partidos', numero(datos.played)) +
           celda('Minutos', numero(datos.minutes)) +
           celda('Titular', numero(datos.played) - numero(datos.subsIn)) +
           celda('Suplente', numero(datos.subsIn)) +
           celda('Cambio', numero(datos.subsOut)) +
-        '</div>' +
-      '</div>' +
-
-      '<div class="stats__grupo">' +
-        '<h4 class="stats__titulo">Juego</h4>' +
-        '<div class="stats__rejilla">' +
           /* Al portero le interesan los goles que le meten, no los que mete. */
           (portero ? celda('Goles encajados', numero(datos.conceded))
                    : celda('Goles', numero(datos.goals))) +
@@ -7152,11 +7148,9 @@
                  : celda('Gol cada', golCada(datos)) +
                    celda('Media goles p/p', decimal(datos.goalsPerGame))) +
           celda('Asistencias', numero(datos.assists)) +
-          /* Cuántos ganó jugando él: lo mandaba el servidor y no se enseñaba. */
-          celda('Ganados', numero(datos.wins)) +
           celda('Amarillas', numero(datos.yellow)) +
           celda('Rojas', numero(datos.red)) +
-      '</div>' +
+        '</div>' +
       '</div>' +
 
       '<div class="stats__grupo">' +
@@ -7507,8 +7501,11 @@
 
     /* Sin operaciones no se dice nada: el hueco vacío ya lo cuenta. */
     if (!filaReparto && (!ficha.moves || ficha.moves.length === 0)) return '';
+    /* De lo más viejo a lo más nuevo: se lee como lo que es, la historia del
+       futbolista, empezando por cómo llegó y acabando por lo último que pasó.
+       `ficha.moves` viene del revés, por eso el `cronologico` de arriba. */
     return '<table class="detail-table ficha__historial"><tbody>' + filaReparto +
-      (ficha.moves || []).map(function (movimiento) {
+      cronologico.map(function (movimiento) {
         const compra = movimiento.type === 'buy';
         return '<tr>' +
           '<td class="detail-date">' + escapeHtml(movimiento.date || '—') + '</td>' +

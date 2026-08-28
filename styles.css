@@ -1102,7 +1102,7 @@ html.con-ficha { scrollbar-gutter: stable; }
    que estes mirando, y pegado a ellas parecia una cuarta pestana. */
 .ficha__acciones {
   display: flex; flex-wrap: wrap; align-items: center; justify-content: center;
-  gap: .35rem 1.6rem;
+  gap: .35rem 2.8rem;
 }
 .ficha__head--alto .ficha__vistas,
 .ficha__head--alto .ficha__comparar { margin: 0; }
