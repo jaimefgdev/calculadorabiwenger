@@ -9489,7 +9489,18 @@
       panel.hidden = panel.getAttribute('data-panel') !== name;
     });
     if (name === 'managers') { renderManagers(); renderSquads(); renderTandasDeLiga(); }
-    if (name === 'fichajes') { renderDataKpis(); renderKpiCharts(); renderSpending(); pintarFichajes(); }
+    /* Los dos últimos faltaban aquí y solo se pintaban desde `render()`, así que
+       al entrar en la pestaña salían como dos cuadros grises vacíos y solo se
+       llenaban si por casualidad ocurría un repintado completo estando ya
+       dentro (una sincronización, un cambio en el tablón...). De ahí que unas
+       veces cargaran y otras hubiera que recargar varias veces.
+       `ensureSquads` porque «Cómo se le da el mercado» necesita las plantillas
+       para la plusvalía latente, y al llegar repinta él solo. */
+    if (name === 'fichajes') {
+      ensureSquads();
+      renderDataKpis(); renderKpiCharts(); renderSpending(); pintarFichajes();
+      renderReventas(); renderMercadeo();
+    }
     if (name === 'datos') { ensureSquads(); ensureLaLiga(); ensureRecuento(); renderRankings(); renderRankingsTemporada(); }
     if (name === 'mercado') { ensureMarket(); renderMarket(); renderMovers(); }
     if (name === 'jugadores') { ensureJugadores(); renderJugadores(); }
