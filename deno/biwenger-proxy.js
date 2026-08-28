@@ -104,7 +104,7 @@ const CDN = 'https://cf.biwenger.com/api/v2';
    navegador normal y las cabeceras que este mandaría. */
 /* Marca de versión: se sube en cada cambio y se consulta con ?version=1.
    Sirve para saber desde fuera si el despliegue ha entrado o no. */
-const VERSION = '2026-08-28 · deno 54';
+const VERSION = '2026-08-28 · deno 55';
 
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ' +
   '(KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36';
@@ -903,13 +903,27 @@ async function players(score) {
       encodeURIComponent(sistema)), { headers: NAVEGADOR, cf: SIN_CACHE })
       .catch(function () { return null; });
   }
-  if (!response || !response.ok) return cache.players || {};
+  /* Ni con el reintento: se tira de lo que haya, primero de memoria y luego de
+     la copia del KV. Y se deja `playersAt` dos minutos atrás del vencimiento
+     para volver a intentarlo pronto, en vez de quedarse una hora con lo viejo. */
+  const deReserva = async function () {
+    if (cache.players && Object.keys(cache.players).length) return cache.players;
+    const guardado = await indiceDeReserva(sistema);
+    if (!guardado) return cache.players || {};
+    cache.players = guardado;
+    cache.playersScore = sistema;
+    cache.playersAt = Date.now() - vigencia + 2 * 60 * 1000;
+    return guardado;
+  };
+
+  if (!response || !response.ok) return await deReserva();
 
   const body = await response.json().catch(function () { return {}; });
   const source = (body.data && body.data.players) || {};
-  /* Una respuesta buena pero sin futbolistas dentro tampoco vale: antes de
-     pisar el índice guardado hay que tener algo que poner en su lugar. */
-  if (!Object.keys(source).length) return cache.players || {};
+  /* Una respuesta buena pero sin futbolistas dentro tampoco vale: es lo que
+     contesta Biwenger cuando corta las consultas, y guardarla dejaba la web sin
+     nombres durante una hora entera. */
+  if (!Object.keys(source).length) return await deReserva();
   const names = {};
   Object.keys(source).forEach(function (id) {
     names[id] = source[id].name;
@@ -971,7 +985,31 @@ async function players(score) {
   cache.players = names;
   cache.playersAt = Date.now();
   cache.playersScore = sistema;
+
+  /* Copia en el KV, como mucho cada seis horas. Son 121 KiB —cuatro trozos— y
+     veinte escrituras al día: nada. Sirve para que un corte de Biwenger no deje
+     la web ciega: sin índice no hay nombres ni precios, y todo sale como
+     «Jugador 19441» a 0 €. Los precios de una copia de hace horas no son los de
+     hoy, pero se parecen; ningún nombre es infinitamente peor. */
+  if (JORNADAS && Date.now() - (cache.indiceAt || 0) > 6 * 60 * 60 * 1000) {
+    cache.indiceAt = Date.now();
+    JORNADAS.put('indice-' + sistema, JSON.stringify(names))
+      .catch(function () { cache.indiceAt = 0; });   // si falla, se reintenta
+  }
   return names;
+}
+
+/** El último índice bueno que se guardó, para cuando Biwenger no contesta. */
+async function indiceDeReserva(sistema) {
+  if (!JORNADAS) return null;
+  try {
+    const crudo = await JORNADAS.get('indice-' + sistema);
+    if (!crudo) return null;
+    const guardado = JSON.parse(crudo);
+    return Object.keys(guardado).length ? guardado : null;
+  } catch (error) {
+    return null;
+  }
 }
 
 /* ---------- Guía de televisión ----------
