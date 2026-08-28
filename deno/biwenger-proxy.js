@@ -104,7 +104,7 @@ const CDN = 'https://cf.biwenger.com/api/v2';
    navegador normal y las cabeceras que este mandaría. */
 /* Marca de versión: se sube en cada cambio y se consulta con ?version=1.
    Sirve para saber desde fuera si el despliegue ha entrado o no. */
-const VERSION = '2026-08-28 · deno 57';
+const VERSION = '2026-08-28 · deno 58';
 
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ' +
   '(KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36';
@@ -1234,7 +1234,25 @@ async function jornadaEnJuego() {
 
 /** Próxima jornada: número, hora del primer partido y los partidos uno a uno. */
 async function proximaJornada() {
-  const response = await fetch(fresco(CDN + '/rounds/la-liga/next?lang=es'),
+  /* Biwenger tiene un `/rounds/la-liga/next`, pero devuelve la ronda que tiene
+     el PRÓXIMO PARTIDO, no la próxima jornada. Con un adelantado se va de
+     madre: el 28 de agosto contestaba «Jornada 6», porque la 6 tiene un Real
+     Sociedad-Celta el 3 de septiembre y el primer partido de la 4 es el día 4.
+     Y mientras tanto la 3 estaba empezando esa misma tarde.
+
+     Así que la jornada se elige aquí, por calendario: la que esté en juego si
+     hay alguna y, si no, la siguiente POR NÚMERO. Nunca una mitad aplazada
+     (part 2), que no es una jornada más. */
+  const calendario = await seasonRounds().catch(function () { return []; });
+  const propias = calendario
+    .filter(function (r) { return (r.part || 1) === 1; })
+    .sort(function (a, b) { return (a.number || 0) - (b.number || 0); });
+
+  const cual = propias.filter(function (r) { return r.status === 'active'; })[0] ||
+    propias.filter(function (r) { return r.status !== 'finished'; })[0];
+  if (!cual) return null;
+
+  const response = await fetch(fresco(CDN + '/rounds/la-liga/' + encodeURIComponent(cual.id) + '?lang=es'),
     { headers: NAVEGADOR, cf: SIN_CACHE });
   if (!response.ok) return null;
 
