@@ -1046,7 +1046,15 @@ code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft)
      medir, asi que no activaba nunca su scroll y la ficha salia cortada. */
   width: min(100%, 640px); height: 100%;
   display: flex; flex-direction: column; align-items: center;
+  /* El scroll va AQUI, en el envoltorio, no dentro de la tarjeta. La foto es
+     hermana de la tarjeta —tiene que serlo, porque asoma por encima de su borde
+     y la tarjeta la recortaria—, asi que con el scroll dentro de la tarjeta el
+     contenido subia y la foto se quedaba flotando encima, suelta. Aqui se
+     desplazan las dos juntas, como una sola pieza. */
+  overflow-y: auto;
+  scrollbar-width: none;
 }
+.ficha__wrap::-webkit-scrollbar { width: 0; height: 0; }
 /* El retrato va en el flujo, no en `absolute`. Colocandolo suelto habia que
    reservarle el hueco con un `padding` y la cadena de alturas quedaba a merced
    de eso; asi ocupa su sitio el solo y a la tarjeta le queda exactamente lo que
@@ -1081,9 +1089,11 @@ html.con-ficha { scrollbar-gutter: stable; }
    que valen para dos o tres puestos llevan varias chapas y en fila se salian
    del circulo por la izquierda. */
 .ficha__puestos {
-  /* Espejo del escudo: mismos 8 px, en la esquina de enfrente. */
-  position: absolute; left: 8px; bottom: 8px; z-index: 1;
-  display: flex; flex-direction: column-reverse; align-items: center; gap: 3px;
+  /* A media altura del circulo, no en la esquina de abajo: ahi caia fuera de la
+     foto, en el hueco que deja la curva, y quedaba descolgada. En el centro
+     apoya sobre el borde izquierdo, que es su punto mas ancho. */
+  position: absolute; left: 2px; top: 50%; transform: translateY(-50%); z-index: 1;
+  display: flex; flex-direction: column; align-items: center; gap: 3px;
   /* El retrato lleva `line-height: 0` para que no le sobre caja por debajo;
      aqui dentro hace falta la normal o el texto de las chapas se aplasta. */
   line-height: normal;
@@ -1097,11 +1107,14 @@ html.con-ficha { scrollbar-gutter: stable; }
 .tag--reparto { background: var(--bg-surface); color: var(--marca, #ffc233); }
 /* La tarjeta empieza a media foto: el hueco de arriba deja sitio a su mitad
    inferior sin que el nombre se le meta debajo. */
-/* `min-height: 0` es lo que le deja encoger: un hijo de un flex no baja por
-   defecto de lo que mide su contenido, y sin esto crecia hacia abajo en vez de
-   desplazarse por dentro. Con `flex: 1 1 auto` se queda con el hueco que deja
-   el retrato, ni mas ni menos, y ahi si funciona su `overflow-y: auto`. */
-.ficha__card { padding-top: 93px; flex: 1 1 auto; min-height: 0; }
+/* La tarjeta ya NO se desplaza por dentro: crece lo que necesite y quien se
+   desplaza es el envoltorio, con la foto incluida. Doble clase para poder anular
+   el `max-height: 100%` y el `overflow-y: auto` que le llegan de
+   `.picker__card` y `.modal__card`, que estan mas abajo en el archivo. */
+.picker__card.ficha__card {
+  padding-top: 93px;
+  flex: none; max-height: none; overflow: visible;
+}
 
 /* Cabecera: nombre y pestanas, ya sin la foto. */
 .ficha__head--alto {
