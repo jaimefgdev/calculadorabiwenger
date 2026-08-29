@@ -651,10 +651,13 @@ code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft)
   position: relative;
   display: flex; flex-direction: column; justify-content: space-around;
   gap: .4rem;
-  width: min(100%, 460px);
+  width: min(100%, 500px);
   aspect-ratio: 68 / 96;
   margin: 0 auto;
-  padding: 1.2rem .6rem;
+  /* Más aire arriba y abajo: los de las puntas de cada línea van adelantados
+     (el escalonado de Biwenger), y en un 3-2-5 el que más sube se salía por el
+     borde de arriba. */
+  padding: 2.2rem .6rem;
   border-radius: 6px;
   /* Césped: franjas de corte alternas, grano fino de hierba, sombra en los
      bordes y los cuatro córners dibujados con el propio fondo. */
@@ -719,9 +722,11 @@ code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft)
 .pitch__area--top::after { top: 72%; }
 .pitch__area--bottom::after { bottom: 72%; }
 .pitch__line { position: relative; z-index: 1; }
-/* Si en una línea no caben todos —un 4-6-0 en pantalla estrecha—, pasan a la
-   siguiente en vez de encogerse hasta no leerse. */
-.pitch__line { display: flex; flex-wrap: wrap; justify-content: space-evenly; gap: .25rem; }
+/* NUNCA se parte una línea. Antes envolvía, y con seis en el medio (4-6-0,
+   3-6-1) los que no cabían se iban a una fila de más y parecía que faltaban
+   futbolistas. Ahora se reparten el ancho y encogen: seis caben igual que
+   cuatro, solo que más juntos. */
+.pitch__line { display: flex; flex-wrap: nowrap; justify-content: space-evenly; gap: .25rem; }
 /* El hueco se mide en porcentaje de la línea (cinco caben en la más poblada)
    y la cara ocupa casi todo el hueco: así crecen con el campo en vez de
    quedarse en un tamaño fijo. */
@@ -732,7 +737,12 @@ code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft)
      asi que la proporcion se mantiene en cualquier tamano. */
   transform: translateY(calc(var(--rango, 0) * -42%));
   position: relative; display: flex; flex-direction: column; align-items: center;
-  gap: .2rem; width: 18%; min-width: 0;
+  gap: .2rem; min-width: 0;
+  /* Se reparten la línea a partes iguales, con tope: hasta cinco quedan al
+     ancho de siempre y el sobrante lo reparte `space-evenly`; con seis, cada
+     uno cede lo justo para que entren todos. La cara va al 92 % del hueco, así
+     que encoge con él sola. */
+  flex: 1 1 0; width: auto; max-width: 18%;
 }
 
 /* ---------- Arrastrar y soltar en el campo ---------- */
