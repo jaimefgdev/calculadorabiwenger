@@ -7373,10 +7373,11 @@
      de Maceió en vez de a Berchiche, que es del Athletic. */
   /* Las tres vistas de la ficha de un futbolista, en el orden en que se leen:
      primero cómo va, luego quién es, y al final partido a partido. */
+  /* El orden de las pestañas sale de aquí. */
   const VISTAS_FICHA = [
     { clave: 'stats', rotulo: 'Estadísticas' },
-    { clave: 'ficha', rotulo: 'Ficha' },
-    { clave: 'partidos', rotulo: 'Partidos' }
+    { clave: 'partidos', rotulo: 'Partidos' },
+    { clave: 'ficha', rotulo: 'Ficha' }
   ];
 
   /** Cuál se está mirando. Sin elegir nada, las estadísticas. */
