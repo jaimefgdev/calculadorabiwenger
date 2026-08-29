@@ -7646,11 +7646,15 @@
     const cronologico = (ficha.moves || []).slice().sort(function (a, b) {
       return (b.timestamp || 0) - (a.timestamp || 0);
     });
-    const primero = cronologico[0];
+    /* OJO: el rastro del reparto está en el movimiento MÁS ANTIGUO, y la lista
+       va de más nuevo a más viejo, así que es el último. Mirando el primero
+       —como se hacía cuando la lista iba al revés— salía reparto en cualquiera
+       cuya última operación fuese una venta, que es casi todo el mundo. */
+    const masViejo = cronologico[cronologico.length - 1];
     const reparto = (llegada && llegada.paid == null && llegada.since)
       ? { quien: llegada.owner, cuando: shortDay(llegada.since) }
-      : ((primero && primero.type === 'sell' && primero.manager)
-          ? { quien: primero.manager, cuando: null }
+      : ((masViejo && masViejo.type === 'sell' && masViejo.manager)
+          ? { quien: masViejo.manager, cuando: null }
           : null);
 
     const filaReparto = !reparto ? '' :

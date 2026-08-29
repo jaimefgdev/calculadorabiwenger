@@ -2689,14 +2689,26 @@ main.wrap { padding-top: 1.15rem; padding-bottom: 3.5rem; }
    puntos suspensivos. El `max-width: 0` es lo que le permite encoger: sin el,
    una celda de tabla nunca baja de lo que mide su contenido y empujaba la cifra
    fuera del borde. */
-.ficha__historial td.num { width: 1%; white-space: nowrap; font-size: .82rem; }
-.ficha__historial td:nth-child(3) { max-width: 0; }
+/* Anchos fijos y repartidos a mano. En `auto`, el nombre del manager empujaba
+   la cifra fuera de la tarjeta; y con `max-width: 0` para que cediera, la celda
+   se encogia al minimo y se comia el nombre ENTERO, dejando solo la foto. Con
+   `table-layout: fixed` cada columna mide lo suyo, el manager se queda con lo
+   que sobra y solo se recorta si de verdad no cabe. */
+.ficha__historial { table-layout: fixed; font-size: .8rem; }
+.ficha__historial td:nth-child(1) { width: 7.4rem; }   /* fecha */
+.ficha__historial td:nth-child(2) { width: 6.6rem; }   /* compra / venta */
+.ficha__historial td:nth-child(4) { width: 6.4rem; }   /* importe */
+.ficha__historial td.num { white-space: nowrap; font-size: .82rem; }
 .ficha__historial .manager { min-width: 0; }
 .ficha__historial .manager__name {
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 /* La fecha tampoco parte en dos lineas, que descuadraba el alto de la fila. */
 .ficha__historial td.detail-date { white-space: nowrap; font-size: .76rem; }
+/* La foto del manager, un pelin mas pequena aqui: con 28 px se comia el sitio
+   del nombre en una tabla ya estrecha. */
+.ficha__historial .avatar { width: 22px; height: 22px; font-size: .58rem; }
+.ficha__historial .manager { gap: .35rem; }
 .player { cursor: pointer; }
 /* Resumen de la evolución, centrado bajo el gráfico. */
 .viz-resumen { text-align: center; margin-top: .4rem; }
