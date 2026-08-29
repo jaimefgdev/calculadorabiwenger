@@ -104,7 +104,7 @@ const CDN = 'https://cf.biwenger.com/api/v2';
    navegador normal y las cabeceras que este mandaría. */
 /* Marca de versión: se sube en cada cambio y se consulta con ?version=1.
    Sirve para saber desde fuera si el despliegue ha entrado o no. */
-const VERSION = '2026-08-29 · deno 59';
+const VERSION = '2026-08-29 · deno 60';
 
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ' +
   '(KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36';
@@ -2323,7 +2323,7 @@ function puntosDeLaJornada(names, salto) {
  * disparar el límite de Biwenger y se guarda el resultado: una jornada cerrada
  * no cambia nunca, y a partir de la segunda vez sale del almacén.
  */
-async function notasDeLaJornada(env, ids, names, score, numero, cerrada) {
+async function notasDeLaJornada(env, ids, names, score, numero, cerrada, partidoDe) {
   if (numero == null || !ids.length) return null;
   /* v2 a propósito: la clave vieja se quedó con las notas de la J1 tomadas
      mientras la ronda aplazada seguía abierta, y como no se comprobaba nada al
@@ -2331,8 +2331,21 @@ async function notasDeLaJornada(env, ids, names, score, numero, cerrada) {
      caducan solas, sin tener que vaciar nada a mano. */
   const clave = 'notas-v3-' + numero + '-' + (score || '');
 
-  /* Todos son pedibles: sin slug se pide por id, que también vale como ruta. */
-  const pedibles = ids.map(String);
+  /* Solo se piden las fichas de los que YA tienen el partido acabado. Al que le
+     queda por jugar no hay nota que sacarle —y `roundPlayer` la descartaría de
+     todas formas—, así que pedirla es tirar consultas.
+
+     Importa mucho más de lo que parece: mientras la jornada está viva esto se
+     repite cada pocos minutos, y pedir noventa fichas una y otra vez es lo que
+     hacía que Biwenger cortara y el índice de futbolistas llegara vacío, con la
+     web entera en «Jugador 1679» a 0 €. Con este filtro se empieza pidiendo un
+     puñado y va creciendo según acaban los partidos; cuando acaban todos, se
+     guarda en el KV y no se vuelve a pedir nunca. */
+  const pedibles = ids.map(String).filter(function (id) {
+    if (!partidoDe) return true;                  // sin saberlo, se piden todas
+    const equipo = names[id + ':team'];
+    return equipo != null && partidoDe[equipo] === 'finished';
+  });
   if (!pedibles.length) return null;
   const estanTodos = function (vistos) {
     return pedibles.every(function (id) { return vistos.indexOf(String(id)) !== -1; });
@@ -2889,11 +2902,20 @@ async function partidosDeJugador(env, id) {
     return (jornada.part || 1) === 1 && !suyos[jornada.number];
   });
   const detalles = {};
-  await Promise.all(propias.map(function (jornada) {
-    return roundDetail(jornada.id, score)
-      .then(function (d) { detalles[jornada.id] = d; })
-      .catch(function () { detalles[jornada.id] = null; });
-  }));
+  /* Por tandas de seis con un respiro, no las treinta y ocho de golpe. Una
+     ráfaga así es de las que hacen que Biwenger corte las consultas, y cuando
+     corta no falla solo esto: cae también el índice de futbolistas y la web se
+     queda sin nombres ni precios. Casi todas salen de la caché, así que en la
+     práctica esto no se nota. */
+  const TANDA_JORNADAS = 6;
+  for (let i = 0; i < propias.length; i += TANDA_JORNADAS) {
+    if (i) await new Promise(function (listo) { setTimeout(listo, 250); });
+    await Promise.all(propias.slice(i, i + TANDA_JORNADAS).map(function (jornada) {
+      return roundDetail(jornada.id, score)
+        .then(function (d) { detalles[jornada.id] = d; })
+        .catch(function () { detalles[jornada.id] = null; });
+    }));
+  }
 
   const salida = [];
   for (let i = 0; i < calendario.length; i++) {
@@ -3109,7 +3131,7 @@ async function roundBoard(env, headers, jornada, listaNombres) {
   const cerrada = ficha.status === 'finished' &&
     !!detalle && (detalle.played || 0) >= (detalle.games || 0) && (detalle.games || 0) > 0;
   const buenas = await notasDeLaJornada(env, Object.keys(alineados), names, score,
-    numeroJornada, cerrada).catch(function () { return null; });
+    numeroJornada, cerrada, partidoDe).catch(function () { return null; });
   if (buenas && buenas.notas) {
     Object.keys(buenas.notas).forEach(function (id) { base[id] = buenas.notas[id]; });
   }
@@ -3761,12 +3783,46 @@ function priceOn(prices, stamp) {
  * se ha revalorizado quien llegó en el reparto inicial, que no tiene precio de
  * compra con el que comparar.
  */
+/**
+ * Recorre una lista en tandas, con un respiro entre ellas.
+ *
+ * Biwenger corta las consultas cuando le llega una ráfaga, y cuando corta no
+ * falla solo lo que la provocó: se cae también la descarga del índice de
+ * futbolistas y la web entera se queda en «Jugador 1679» a 0 €, sin nombres ni
+ * precios. Por eso NINGUNA lista larga se pide de golpe.
+ */
+async function porTandas(lista, tam, pausa, hacer) {
+  for (let i = 0; i < lista.length; i += tam) {
+    if (i) await new Promise(function (listo) { setTimeout(listo, pausa); });
+    await Promise.all(lista.slice(i, i + tam).map(hacer));
+  }
+}
+
+/**
+ * Separa los que ya tienen la serie de precios guardada de los que hay que
+ * pedir. Los guardados se resuelven de golpe: frenarlos también sería regalar
+ * cuatro segundos de espera en cada carga de jornada sin tocar la red.
+ */
+function precioYaGuardado(ids, names) {
+  const listos = [], porPedir = [];
+  (ids || []).forEach(function (id) {
+    const clave = String(id).trim();
+    if (!clave) return;
+    const slug = names[clave + ':slug'] || clave;
+    (cache.prices[slug] ? listos : porPedir).push(clave);
+  });
+  return { listos: listos, porPedir: porPedir };
+}
+
 async function pricesOnDay(ids, dia, names) {
   const stamp = /^\d{4}-\d{2}-\d{2}$/.test(dia) ? ymd(dia) : null;
   const salida = {};
   if (!stamp) return salida;
 
-  await Promise.all(ids.map(async function (id) {
+  /* Son los once de cada mánager: casi noventa. De golpe era la ráfaga más
+     grande que soltábamos, y en cada carga de jornada. Los que ya están
+     guardados se resuelven sin frenos; solo se dosifican los que van a la red. */
+  const uno = async function (id) {
     const clave = String(id).trim();
     if (!clave) return;
     const slug = names[clave + ':slug'] || clave;
@@ -3775,7 +3831,10 @@ async function pricesOnDay(ids, dia, names) {
       const valor = prices ? priceOn(prices, stamp) : null;
       if (valor != null) salida[clave] = Math.round(valor);
     } catch (error) { /* ese jugador se queda sin dato */ }
-  }));
+  };
+  const reparto = precioYaGuardado(ids, names);
+  await Promise.all(reparto.listos.map(uno));
+  await porTandas(reparto.porPedir, 6, 250, uno);
 
   return salida;
 }
@@ -3786,7 +3845,7 @@ async function pricesOnDay(ids, dia, names) {
  */
 async function priceSeries(ids, dias, names) {
   const salida = {};
-  await Promise.all(ids.map(async function (id) {
+  const uno = async function (id) {
     const clave = String(id).trim();
     if (!clave) return;
     const slug = names[clave + ':slug'] || clave;
@@ -3799,7 +3858,10 @@ async function priceSeries(ids, dias, names) {
         return [par[0], Math.round(par[1])];
       });
     } catch (error) { /* ese jugador se queda sin serie */ }
-  }));
+  };
+  const reparto = precioYaGuardado(ids, names);
+  await Promise.all(reparto.listos.map(uno));
+  await porTandas(reparto.porPedir, 6, 250, uno);
   return salida;
 }
 
