@@ -1840,13 +1840,17 @@ input[type="search"]::-webkit-search-cancel-button:hover { opacity: .75; }
   box-sizing: border-box; height: 12px;
   padding: 1px .34em 0; font-size: .46rem; letter-spacing: .01em;
 }
-/* Con tres demarcaciones, las tres en una sola fila y algo mas apretadas.
-   Antes se partia en dos alturas —dos arriba y la tercera debajo— y ese bloque
-   de dos pisos tapaba media cara y chocaba con la marca de estado, que va en la
-   esquina de enfrente. En fila ocupan lo mismo de ancho y la mitad de alto. */
-.puestos--tres.puestos--esquina { flex-wrap: nowrap; width: auto; }
-.puestos--tres.puestos--esquina .puesto {
-  padding: 1px .22em 0; font-size: .4rem; letter-spacing: 0;
+/* Con tres demarcaciones: dos arriba y la tercera debajo, centrada. En una sola
+   fila se comian el ancho entero de la cara y se metian debajo de la marca de
+   estado, que va en la esquina de enfrente.
+   El ancho es el justo de las dos de arriba (dos chapas y su hueco), para que
+   la de abajo quede centrada bajo ellas y el bloque no ocupe de mas. Y va un
+   pelin mas adentro que las de una o dos: al ser mas alto, colgando de la
+   esquina se salia de la foto. */
+.puestos--tres.puestos--esquina {
+  flex-wrap: wrap; justify-content: center; row-gap: 1px;
+  width: 32px;
+  transform: translate(-1px, 0);
 }
 /* Hueco fijo: así la cara y el nombre empiezan en la misma vertical en todas
    las filas, lleven una demarcación o tres. */
