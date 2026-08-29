@@ -3385,6 +3385,43 @@
      Todo lo de aquí escribe en tu cuenta: se manda al Worker, que es quien
      tiene el token, y nunca sin que lo confirmes en el diálogo. */
 
+  /**
+   * Deja la venta reflejada AL MOMENTO, sin esperar a la sincronía.
+   *
+   * Biwenger tarda un poco en dar por hecha la operación, así que la sincronía
+   * va con retraso a propósito: preguntando antes se leería el estado de antes
+   * y la pantalla daría un salto atrás. Pero eso son casi dos segundos en los
+   * que aquí no pasaba nada, mientras que en su web el futbolista aparece en
+   * venta al instante.
+   *
+   * Se sabe todo lo necesario —quién y a cuánto—, así que se apunta ya y la
+   * sincronía solo lo confirma. Si al final Biwenger no lo aceptara, la propia
+   * sincronía lo quita: nunca se inventa nada que ella no vaya a corroborar.
+   */
+  function apuntarVentaYa(orden) {
+    if (!orden || orden.accion !== 'vender' || orden.player == null) return;
+    const id = String(orden.player);
+    if (!Array.isArray(state.listings)) state.listings = [];
+    /* Si ya estaba en venta, solo cambia el precio (es un «renovar»). */
+    const puesto = state.listings.filter(function (v) {
+      return String(v.playerId) === id;
+    })[0];
+    if (puesto) { puesto.price = Math.round(orden.price || 0); render(); return; }
+
+    const ficha = playerInfo(id) || {};
+    state.listings.push({
+      playerId: id,
+      player: comoSeLlama({ id: id, name: ficha.name }) || ('Jugador ' + id),
+      price: Math.round(orden.price || 0),
+      marketValue: ficha.marketValue != null ? ficha.marketValue : null,
+      /* Sin fecha de caducidad: la pone Biwenger y llega con la sincronía. */
+      until: null,
+      team: ficha.team != null ? ficha.team : null,
+      teamName: ficha.teamName || null
+    });
+    render();
+  }
+
   function mandarOperacion(orden) {
     const config = loadSyncConfig();
     if (!config.url || !config.key) {
@@ -3397,7 +3434,7 @@
     })
       .then(function (response) { return response.json(); })
       .then(function (payload) {
-        if (payload.hecho) return payload;
+        if (payload.hecho) { apuntarVentaYa(orden); return payload; }
         const fallo = new Error(payload.error || 'Biwenger no ha completado la operación.');
         /* El Worker cuenta qué intentó y qué le contestaron: se enseña debajo
            del error, que es lo que hace falta para saber por dónde falla. */
@@ -8155,7 +8192,6 @@
     const primero = puntos.length ? puntos[0].price : 0;
     const ultimo = puntos.length ? puntos[puntos.length - 1].price : 0;
     const sube = ultimo >= primero;
-    const salto = ultimo - primero;
 
     const ficha = playerInfo(abierto.id);
     const sube2 = ficha.increment > 0;
@@ -8292,9 +8328,11 @@
                     : null }) +
               '<div class="viz-tip" hidden></div>' +
             '</div>' +
-            '<p class="muted viz-resumen">De ' + money(primero) + ' a <strong>' + money(ultimo) + '</strong>' +
-              ' · <span class="delta ' + (sube ? 'delta--up' : 'delta--down') + '">' +
-              (sube ? '▲ +' : '▼ −') + money(Math.abs(salto)) + '</span></p>' +
+            /* Solo lo que vale hoy. El «de X a Y» y su variación ya salen justo
+               debajo, desglosados por periodos (1D, 3D, 7D…), así que aquí
+               repetían lo mismo peor contado. */
+            '<p class="viz-resumen">Valor de mercado: ' +
+              '<strong class="viz-resumen__valor">' + money(ultimo) + '</strong></p>' +
             (function () {
               /* De lo más reciente a lo más lejano (1d, 3d, 7d…), igual que en
                  la comparación. Con `slice()` antes de invertir: `reverse()`

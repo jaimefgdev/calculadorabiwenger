@@ -2712,6 +2712,9 @@ main.wrap { padding-top: 1.15rem; padding-bottom: 3.5rem; }
 .player { cursor: pointer; }
 /* Resumen de la evolución, centrado bajo el gráfico. */
 .viz-resumen { text-align: center; margin-top: .4rem; }
+/* El rotulo en blanco y la cifra en ambar y negrita: es el dato que se busca al
+   abrir la ficha, y en gris se perdia entre el grafico y los periodos. */
+.viz-resumen__valor { color: var(--marca, #ffc233); font-weight: 700; }
 
 /* Variación por periodos, bajo el gráfico de precio. */
 /* Todo en una línea, también en móvil: etiquetas cortas e importes compactos. */
