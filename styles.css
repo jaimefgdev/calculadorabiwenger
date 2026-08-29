@@ -887,7 +887,7 @@ code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft)
      por fuera del borde izquierdo de la foto, se lo comia el `overflow: hidden`
      —que hace falta para que el escudo de marca de agua no se desborde—. Con el
      hueco cabe dentro de la caja y se ve entero. */
-  padding-inline: 10px;
+  padding-inline: 14px;
   position: relative; overflow: hidden;
   display: flex; flex-direction: column; align-items: center; gap: .3rem;
   min-width: 0; text-align: center;
@@ -1635,7 +1635,7 @@ html.con-ficha { scrollbar-gutter: stable; }
   .market-grid .puestos--fila .puesto { padding: 1px .18em 0; font-size: .46rem; }
   /* Nombrando las dos clases para ganarle a la regla general, que va después. */
   .market-grid .puestos--tres.puestos--fila .puesto {
-    font-size: .4rem; padding: 1px .14em 0; letter-spacing: 0;
+    font-size: .4rem; padding: 1px .14em 0; letter-spacing: 0; text-indent: 0;
   }
   /* Y el sitio sale de apretar etiquetas, relojes y cabeceras. */
   .market-grid .table--offers td[data-label="Operación"] .tag { font-size: .58rem; padding-inline: .3rem; }
@@ -1808,7 +1808,12 @@ input[type="search"]::-webkit-search-cancel-button:hover { opacity: .75; }
      los rabillos las dejaba altas. Se compensa arriba, y en `em` para que
      valga igual en las chapas grandes que en las de las caras. */
   padding: .25em .42em .14em;
-  font-size: .68rem; font-weight: 700; letter-spacing: .03em; line-height: 1;
+  /* El `letter-spacing` mete un hueco DETRAS de la ultima letra, asi que al
+     centrar la caja la tinta queda media pizca a la izquierda. Un `text-indent`
+     del mismo tamano lo compensa exactamente: ensancha la caja por delante lo
+     mismo que sobra por detras, y la tinta vuelve al centro. */
+  font-size: .68rem; font-weight: 700; letter-spacing: .03em; text-indent: .03em;
+  line-height: 1;
   color: #fff; border-radius: 100px;
 }
 /* Amarillo más oscuro que el de las tarjetas: sobre el claro, las letras
@@ -1826,9 +1831,12 @@ input[type="search"]::-webkit-search-cancel-button:hover { opacity: .75; }
    relleno en píxeles y desplazamiento entero, no en porcentaje. */
 .puesto--esquina {
   top: 0; left: 0; transform: translate(-3px, -1px);
-  /* 13 px de alto: con 6 de tinta, quedan 3,5 arriba y 3,5 abajo, clavado. */
+  /* Alto entero y un pixel de sesgo arriba, igual que las agrupadas. Sin el, las
+     mayusculas —que no bajan del renglon— se apoyaban en la parte alta de la
+     linea y la chapa parecia con el texto subido. Es la que salia descentrada
+     mientras las de dos y tres se veian bien. */
   box-sizing: border-box; height: 13px;
-  padding: 0 .38em; font-size: .52rem;
+  padding: 1px .38em 0; font-size: .52rem;
 }
 /* Dos demarcaciones: mandan las chapas en fila dentro de un envoltorio. */
 .puestos { display: inline-flex; align-items: center; gap: 2px; }
@@ -1843,7 +1851,7 @@ input[type="search"]::-webkit-search-cancel-button:hover { opacity: .75; }
 .puestos--esquina .puesto {
   /* Con 12 de alto y 1 arriba, la tinta queda a 3 y 3. */
   box-sizing: border-box; height: 12px;
-  padding: 1px .34em 0; font-size: .46rem; letter-spacing: .01em;
+  padding: 1px .34em 0; font-size: .46rem; letter-spacing: .01em; text-indent: .01em;
 }
 /* Con tres demarcaciones: dos arriba y la tercera debajo, centrada. En una sola
    fila se comian el ancho entero de la cara y se metian debajo de la marca de
@@ -1861,7 +1869,7 @@ input[type="search"]::-webkit-search-cancel-button:hover { opacity: .75; }
   width: 35px;
   /* Fuera del borde izquierdo de la foto: el bloque es el doble de alto que una
      chapa sola y encima de la cara tapaba medio futbolista. */
-  transform: translate(-10px, -1px);
+  transform: translate(-14px, -1px);
 }
 .puestos--tres.puestos--esquina .puesto {
   width: 17px; padding: 1px 0 0;
@@ -1880,7 +1888,7 @@ input[type="search"]::-webkit-search-cancel-button:hover { opacity: .75; }
    ya se hizo en las chapas de las caras. */
 .puestos--fila .puesto { flex: none; box-sizing: border-box; height: 13px; padding: 1px .4em 0; font-size: .56rem; }
 /* Con tres, las letras se aprietan un poco para no salirse del hueco. */
-.puestos--tres.puestos--fila .puesto { padding: 1px .24em 0; font-size: .48rem; letter-spacing: 0; }
+.puestos--tres.puestos--fila .puesto { padding: 1px .24em 0; font-size: .48rem; letter-spacing: 0; text-indent: 0; }
 
 /* Sin nota todavía: el circulito se ve, pero apagado. */
 .pts--sinnota { color: #555; }
