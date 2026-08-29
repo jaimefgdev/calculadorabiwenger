@@ -883,6 +883,11 @@ code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft)
   grid-template-columns: repeat(4, minmax(0, 1fr));
 }
 .bench__player {
+  /* Un respiro a los lados. Sin el, el bloque de tres demarcaciones, que sale
+     por fuera del borde izquierdo de la foto, se lo comia el `overflow: hidden`
+     —que hace falta para que el escudo de marca de agua no se desborde—. Con el
+     hueco cabe dentro de la caja y se ve entero. */
+  padding-inline: 10px;
   position: relative; overflow: hidden;
   display: flex; flex-direction: column; align-items: center; gap: .3rem;
   min-width: 0; text-align: center;
@@ -1627,10 +1632,10 @@ html.con-ficha { scrollbar-gutter: stable; }
   /* El hueco de las chapas cabe entero: con tres demarcaciones se salía y se
      montaba encima de la cara del futbolista. */
   .market-grid .puestos--fila { width: 44px; margin-right: .2rem; }
-  .market-grid .puestos--fila .puesto { padding: .25em .18em .14em; font-size: .46rem; }
+  .market-grid .puestos--fila .puesto { padding: 1px .18em 0; font-size: .46rem; }
   /* Nombrando las dos clases para ganarle a la regla general, que va después. */
   .market-grid .puestos--tres.puestos--fila .puesto {
-    font-size: .4rem; padding: .25em .14em .14em; letter-spacing: 0;
+    font-size: .4rem; padding: 1px .14em 0; letter-spacing: 0;
   }
   /* Y el sitio sale de apretar etiquetas, relojes y cabeceras. */
   .market-grid .table--offers td[data-label="Operación"] .tag { font-size: .58rem; padding-inline: .3rem; }
@@ -1849,8 +1854,17 @@ input[type="search"]::-webkit-search-cancel-button:hover { opacity: .75; }
    esquina se salia de la foto. */
 .puestos--tres.puestos--esquina {
   flex-wrap: wrap; justify-content: center; row-gap: 1px;
-  width: 32px;
-  transform: translate(-1px, 0);
+  /* 17 + 1 de hueco + 17: el ancho exacto de dos chapas. Fijandolo aqui y
+     abajo, arriba caen SIEMPRE dos y la tercera debajo, centrada respecto a
+     ellas. Con el ancho suelto, «MC DF» medía mas que el hueco —la M es muy
+     ancha— y se partia en una arriba y dos abajo. */
+  width: 35px;
+  /* Fuera del borde izquierdo de la foto: el bloque es el doble de alto que una
+     chapa sola y encima de la cara tapaba medio futbolista. */
+  transform: translate(-10px, -1px);
+}
+.puestos--tres.puestos--esquina .puesto {
+  width: 17px; padding: 1px 0 0;
 }
 /* Hueco fijo: así la cara y el nombre empiezan en la misma vertical en todas
    las filas, lleven una demarcación o tres. */
@@ -1858,9 +1872,15 @@ input[type="search"]::-webkit-search-cancel-button:hover { opacity: .75; }
   width: 50px; flex: none; justify-content: flex-start;
   margin-right: .25rem; vertical-align: middle;
 }
-.puestos--fila .puesto { flex: none; padding: .25em .4em .14em; font-size: .56rem; }
+/* Alto entero y relleno vertical en pixeles, no en `em`. A 9 px de letra un
+   `.25em`/`.14em` cae en medios pixeles, y el navegador redondea la tinta hacia
+   arriba en unas chapas y hacia abajo en otras: por eso unas se veian centradas
+   y otras no. Con alto entero centra el flex, y el pixel de arriba compensa que
+   las mayusculas no bajan del renglon y de suyo quedan altas. Es lo mismo que
+   ya se hizo en las chapas de las caras. */
+.puestos--fila .puesto { flex: none; box-sizing: border-box; height: 13px; padding: 1px .4em 0; font-size: .56rem; }
 /* Con tres, las letras se aprietan un poco para no salirse del hueco. */
-.puestos--tres.puestos--fila .puesto { padding: .25em .24em .14em; font-size: .48rem; letter-spacing: 0; }
+.puestos--tres.puestos--fila .puesto { padding: 1px .24em 0; font-size: .48rem; letter-spacing: 0; }
 
 /* Sin nota todavía: el circulito se ve, pero apagado. */
 .pts--sinnota { color: #555; }
@@ -1868,7 +1888,10 @@ input[type="search"]::-webkit-search-cancel-button:hover { opacity: .75; }
 /* En las tablas va delante del nombre, en la misma línea. */
 .puesto--fila {
   position: static; flex: none;
-  padding: .25em .4em .14em; margin-right: .25rem;
+  /* Misma caja que las agrupadas, por lo mismo: alto entero y relleno en
+     pixeles, o las de una demarcacion salian a otra altura que las de dos. */
+  box-sizing: border-box; height: 13px;
+  padding: 1px .4em 0; margin-right: .25rem;
   font-size: .56rem;
 }
 
