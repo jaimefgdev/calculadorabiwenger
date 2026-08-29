@@ -898,7 +898,12 @@
     if (n === 6) {
       const orden = [3, 1, 0, 5, 2, 4];       // D B A F C E
       const rangos = [2, 1, 0, 2.4, 1, 2];
-      const desx = [0, 0, 55, -55, 0, 0];
+      /* Medido sobre su 4-6-0, con los bordes del césped a la altura del medio
+         campo (x 272 a 580): los seis van de 0,114 a 0,841 del ancho, o sea el
+         73 %, mientras que seis columnas iguales ocupan el 83 %. Estos son los
+         desplazamientos que llevan cada columna a su sitio, en % del ancho de
+         una casilla, simétricos: +32/+37/+39 y sus negativos. */
+      const desx = [32, 37, 39, -39, -37, -32];
       return orden.map(function (cual, i) {
         return { jugador: linea[cual], rango: rangos[i], desx: desx[i] };
       });

@@ -651,7 +651,10 @@ code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft)
   position: relative;
   display: flex; flex-direction: column; justify-content: space-around;
   gap: .4rem;
-  width: min(100%, 500px);
+  /* 540: con seis en una línea, y juntándose las dos del centro como hace
+     Biwenger, hace falta este ancho para que las caras de los cuatro de fuera
+     no se toquen. */
+  width: min(100%, 540px);
   aspect-ratio: 68 / 96;
   margin: 0 auto;
   /* Más aire arriba y abajo: los de las puntas de cada línea van adelantados
