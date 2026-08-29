@@ -104,7 +104,7 @@ const CDN = 'https://cf.biwenger.com/api/v2';
    navegador normal y las cabeceras que este mandaría. */
 /* Marca de versión: se sube en cada cambio y se consulta con ?version=1.
    Sirve para saber desde fuera si el despliegue ha entrado o no. */
-const VERSION = '2026-08-28 · deno 58';
+const VERSION = '2026-08-29 · deno 59';
 
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ' +
   '(KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36';
@@ -1234,26 +1234,25 @@ async function jornadaEnJuego() {
 
 /** Próxima jornada: número, hora del primer partido y los partidos uno a uno. */
 async function proximaJornada() {
-  /* Biwenger tiene un `/rounds/la-liga/next`, pero devuelve la ronda que tiene
-     el PRÓXIMO PARTIDO, no la próxima jornada. Con un adelantado se va de
-     madre: el 28 de agosto contestaba «Jornada 6», porque la 6 tiene un Real
-     Sociedad-Celta el 3 de septiembre y el primer partido de la 4 es el día 4.
-     Y mientras tanto la 3 estaba empezando esa misma tarde.
+  /* Manda la jornada EN CURSO. Si no hay ninguna rodando, entonces sí vale la
+     de Biwenger: su `/rounds/la-liga/next` devuelve la ronda que tiene el
+     próximo partido, y sin nada en juego eso es exactamente lo que se quiere
+     anunciar, aunque sea de una jornada más adelante —la 6 tiene un Real
+     Sociedad-Celta el 3 de septiembre, antes del primer partido de la 4, y ese
+     es el siguiente partido de verdad—.
 
-     Así que la jornada se elige aquí, por calendario: la que esté en juego si
-     hay alguna y, si no, la siguiente POR NÚMERO. Nunca una mitad aplazada
-     (part 2), que no es una jornada más. */
+     Lo que no puede es pisar a la que se está jugando: el 28 de agosto la
+     tarjeta anunciaba «Inicio de la Jornada 6» con la 3 empezando esa tarde. */
   const calendario = await seasonRounds().catch(function () { return []; });
-  const propias = calendario
-    .filter(function (r) { return (r.part || 1) === 1; })
-    .sort(function (a, b) { return (a.number || 0) - (b.number || 0); });
+  const enJuego = calendario.filter(function (r) {
+    return (r.part || 1) === 1 && r.status === 'active';
+  }).sort(function (a, b) { return (a.number || 0) - (b.number || 0); })[0];
 
-  const cual = propias.filter(function (r) { return r.status === 'active'; })[0] ||
-    propias.filter(function (r) { return r.status !== 'finished'; })[0];
-  if (!cual) return null;
+  const url = enJuego
+    ? CDN + '/rounds/la-liga/' + encodeURIComponent(enJuego.id) + '?lang=es'
+    : CDN + '/rounds/la-liga/next?lang=es';
 
-  const response = await fetch(fresco(CDN + '/rounds/la-liga/' + encodeURIComponent(cual.id) + '?lang=es'),
-    { headers: NAVEGADOR, cf: SIN_CACHE });
+  const response = await fetch(fresco(url), { headers: NAVEGADOR, cf: SIN_CACHE });
   if (!response.ok) return null;
 
   const data = (await response.json()).data || {};
@@ -1976,19 +1975,27 @@ async function matchDay(roundId, score, names, primas) {
  *
  * El premio NO está en su ficha: se pidió `optionalPoints` ahí y viene vacío.
  * Solo aparece en el feed de cada jornada, en `superPicaExtraPoints`, que
- * `roundDetail` ya recoge en `detalle.picas`. Así que hay que recorrer las
- * jornadas, y por eso se lleva la cuenta guardada y solo se miran las nuevas:
- * una jornada cerrada no cambia, y repasar las treinta y ocho en cada ficha era
- * justo el atracón de peticiones que tumbó el índice.
+ * `roundDetail` ya recoge en `detalle.picas`. Sale uno por partido.
  *
- * Ojo: `rawStats.picas` es OTRA cosa —el recuento del indicador del AS— y no
- * sirve para esto: Pedri hizo 3 en la jornada 1 y no se llevó la Súper Pica,
- * y Guridi la ganó con 2.
+ * Ojo con DOS cosas, que las dos me las he comido ya:
+ *
+ *   · `rawStats.picas` es OTRA cosa —el recuento del indicador del AS— y no
+ *     vale: Pedri hizo 3 en la jornada 1 y no se llevó la Súper Pica, y Guridi
+ *     la ganó con 2.
+ *   · y solo cuentan las rondas propias (part 1). La mitad aplazada repite los
+ *     MISMOS partidos que la suya, así que contando las dos salía el doble:
+ *     Mbappé aparecía con 2 Súper Picas teniendo solo la de la jornada 1.
+ *
+ * Se lleva la cuenta guardada y solo se miran las jornadas nuevas: una cerrada
+ * no cambia, y repasar las treinta y ocho en cada ficha era justo el atracón de
+ * peticiones que tumbó el índice de futbolistas.
  */
 async function superPicasDeLaTemporada(env, score) {
-  const clave = 'superpicas-' + (score || '');
+  const clave = 'superpicas-v2-' + (score || '');
   const calendario = await seasonRounds().catch(function () { return []; });
-  const jugadas = calendario.filter(function (r) { return r.status === 'finished' || r.status === 'active'; });
+  const jugadas = calendario.filter(function (r) {
+    return (r.part || 1) === 1 && (r.status === 'finished' || r.status === 'active');
+  });
 
   let caja = cache.superPicas && cache.superPicas.clave === clave ? cache.superPicas : null;
   if (!caja && env && env.JORNADAS) {
@@ -2003,30 +2010,38 @@ async function superPicasDeLaTemporada(env, score) {
     return caja.hechas.indexOf(String(r.id)) === -1;
   });
 
+  /* Lo que se devuelve: lo guardado más lo que llevan las jornadas que aún no
+     están consolidadas, la que se esté jugando incluida. En la caja, en cambio,
+     solo entra lo de las CERRADAS del todo. Esa es la diferencia que permite
+     enseñar las de una jornada en curso sin duplicarlas al cerrarse: lo vivo se
+     recalcula cada vez y nunca se guarda. */
+  const cuenta = {};
+  Object.keys(caja.cuenta).forEach(function (quien) { cuenta[quien] = caja.cuenta[quien]; });
+
+  let consolidada = false;
   for (let i = 0; i < pendientes.length; i++) {
     if (i) await new Promise(function (listo) { setTimeout(listo, 300); });
     const detalle = await roundDetail(pendientes[i].id, score).catch(function () { return null; });
     if (!detalle) continue;
-    /* Solo cuentan las jornadas CERRADAS del todo. Una en juego puede repartir
-       mas Super Picas cuando acaben los partidos que faltan, y como aqui se
-       suma sobre lo ya guardado, contarla ahora la duplicaria al cerrarse. */
+
+    const suyas = Object.keys(detalle.picas || {});
+    suyas.forEach(function (quien) { cuenta[quien] = (cuenta[quien] || 0) + 1; });
+
     const zanjada = (detalle.played || 0) >= (detalle.games || 0) && (detalle.games || 0) > 0;
     if (!zanjada) continue;
-
-    Object.keys(detalle.picas || {}).forEach(function (quien) {
-      caja.cuenta[quien] = (caja.cuenta[quien] || 0) + 1;
-    });
+    suyas.forEach(function (quien) { caja.cuenta[quien] = (caja.cuenta[quien] || 0) + 1; });
     caja.hechas.push(String(pendientes[i].id));
+    consolidada = true;
   }
 
   cache.superPicas = caja;
-  if (pendientes.length && env && env.JORNADAS) {
+  if (consolidada && env && env.JORNADAS) {
     try {
       await env.JORNADAS.put(clave,
         JSON.stringify({ cuenta: caja.cuenta, hechas: caja.hechas }));
     } catch (error) { /* da igual, se recalcula */ }
   }
-  return caja.cuenta;
+  return cuenta;
 }
 
 async function playerStats(id, names, score, env) {
@@ -2034,16 +2049,16 @@ async function playerStats(id, names, score, env) {
   if (!slug) return null;
 
   const sistema = String(score || 1);
-  /* Biwenger vació el comodín: 'reports(*)' ya no trae los puntos, ni la
-     jornada, ni los equipos, ni los minutos. Hay que pedir cada cosa por su
-     nombre; si no, los informes llegan pelados y no se puede saber ni de qué
-     partido eran ni qué hizo el futbolista en él. */
+
   /* Las Súper Picas de la temporada, de la cuenta guardada. Si algo falla se
      enseña cero antes que romper la ficha entera por un dato de adorno. */
   const cuentaPicas = await superPicasDeLaTemporada(env, sistema)
     .catch(function () { return {}; });
   const picas = cuentaPicas[String(id)] || 0;
-
+  /* Biwenger vació el comodín: 'reports(*)' ya no trae los puntos, ni la
+     jornada, ni los equipos, ni los minutos. Hay que pedir cada cosa por su
+     nombre; si no, los informes llegan pelados y no se puede saber ni de qué
+     partido eran ni qué hizo el futbolista en él. */
   const campos = 'fields=*,reports(*,points,rawStats,' +
     'match(*,round(*),home(*),away(*)),events(*))';
   const response = await fetch(CDN + '/players/la-liga/' + encodeURIComponent(slug) +
