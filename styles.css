@@ -1889,6 +1889,11 @@ input[type="search"]::-webkit-search-cancel-button:hover { opacity: .75; }
 .stats__rejilla {
   display: flex; flex-wrap: wrap; justify-content: center; gap: .5rem;
 }
+/* La de Puntos lleva siete casillas y con 88 px de base la septima se caia a
+   una fila ella sola. Con 74 caben las siete y crecen para llenar la linea.
+   Doble clase a proposito: la regla general va justo debajo y con una sola le
+   ganaba por orden. */
+.stats__rejilla.stats__rejilla--siete .stat { flex: 1 1 74px; max-width: 132px; }
 /* El dato, centrado bajo su rótulo: pegado a la izquierda se leía torcido. */
 .stats__rejilla .stat {
   display: flex; flex-direction: column; align-items: center; gap: .1rem;
@@ -1899,11 +1904,6 @@ input[type="search"]::-webkit-search-cancel-button:hover { opacity: .75; }
      el tope sobra sitio, y ese sobrante es el que la centra. */
   flex: 1 1 88px; max-width: 104px;
 }
-/* La de Puntos lleva siete casillas y con 88 px de base la septima se caia a
-   una fila ella sola. Con 74 caben las siete y crecen para llenar la linea; el
-   tope sube porque aqui no sobra sitio que repartir. Los rotulos largos
-   («Media fuera», «Super Picas») los encoge `ajustarNombres()`. */
-.stats__rejilla--siete .stat { flex: 1 1 74px; max-width: 132px; }
 .stat__label { font-size: .64rem; color: var(--text-faint); text-transform: uppercase; letter-spacing: .03em; }
 .stat strong { font-size: .95rem; font-variant-numeric: tabular-nums; }
 

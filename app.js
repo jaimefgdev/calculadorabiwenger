@@ -7293,7 +7293,7 @@
           celda('Fuera', numero(datos.away.points)) +
           celda('Media fuera', decimal(datos.away.average)) +
           /* Las Súper Picas del AS que ha ganado esta temporada. No es la nota:
-             es el premio, y recalcula la del partido entero. */
+             es el premio, uno por partido. */
           celda('Súper Picas', numero(datos.superPicas)) +
         '</div>' +
       '</div>' +
