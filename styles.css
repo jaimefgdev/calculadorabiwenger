@@ -735,7 +735,11 @@ code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft)
      adelantado. `--rango` lo pone la web (0 el mas centrado de su linea, 1 el
      siguiente...). En porcentaje de la propia casilla, que crece con el campo,
      asi que la proporcion se mantiene en cualquier tamano. */
-  transform: translateY(calc(var(--rango, 0) * -42%));
+  /* `--rango` adelanta (cuanto mas abierto juega) y `--desx` acerca al centro.
+     Solo lo usa la linea de seis, donde Biwenger junta las dos casillas
+     centrales en la misma columna. Los dos en % de la propia casilla, que crece
+     con el campo, asi que la proporcion aguanta a cualquier tamano. */
+  transform: translate(calc(var(--desx, 0) * 1%), calc(var(--rango, 0) * -42%));
   position: relative; display: flex; flex-direction: column; align-items: center;
   gap: .2rem; min-width: 0;
   /* Se reparten la línea a partes iguales, con tope: hasta cinco quedan al
@@ -2674,8 +2678,22 @@ main.wrap { padding-top: 1.15rem; padding-bottom: 3.5rem; }
 .ficha__head .with-crest { gap: .5rem; }
 .pic-player.ficha__face { width: 40px; height: 40px; }
 .ficha__datos { margin-bottom: .6rem; }
-.ficha__historial { margin-top: .3rem; }
-.ficha__historial td { padding: .3rem .4rem; }
+.ficha__historial { margin-top: .3rem; width: 100%; }
+.ficha__historial td { padding: .3rem .35rem; }
+/* El importe es EL dato de la fila: no puede salirse de la tarjeta ni partirse.
+   Se le da su ancho entero y sin cortes, y quien cede es el nombre del manager
+   —hay alguno larguisimo, «Jose Mario dos Santos Mourinho»— que se recorta con
+   puntos suspensivos. El `max-width: 0` es lo que le permite encoger: sin el,
+   una celda de tabla nunca baja de lo que mide su contenido y empujaba la cifra
+   fuera del borde. */
+.ficha__historial td.num { width: 1%; white-space: nowrap; font-size: .82rem; }
+.ficha__historial td:nth-child(3) { max-width: 0; }
+.ficha__historial .manager { min-width: 0; }
+.ficha__historial .manager__name {
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+/* La fecha tampoco parte en dos lineas, que descuadraba el alto de la fila. */
+.ficha__historial td.detail-date { white-space: nowrap; font-size: .76rem; }
 .player { cursor: pointer; }
 /* Resumen de la evolución, centrado bajo el gráfico. */
 .viz-resumen { text-align: center; margin-top: .4rem; }

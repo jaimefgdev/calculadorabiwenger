@@ -20,7 +20,7 @@
 <link rel="dns-prefetch" href="https://cdn.biwenger.com">
 <!-- El ?v= se sube en cada publicación: obliga al navegador a bajar el archivo
      nuevo en vez de reutilizar el que tenga en caché. -->
-<link rel="stylesheet" href="styles.css?v=286">
+<link rel="stylesheet" href="styles.css?v=289">
 <!-- La tipografia se pide ya, sin esperar a que el CSS termine de leerse. -->
 <link rel="preload" href="GoogleSans-Regular.woff2" as="font" type="font/woff2" crossorigin>
 <!-- El escudo de Biwenger, el mismo que el del boton de Inicio. -->
@@ -622,14 +622,39 @@
 
 </main>
 
-<script src="app.js?v=316"></script>
+<script src="app.js?v=318"></script>
 <script>
   /* El service worker solo cachea los archivos de la app, nunca los datos.
-     Se registra al final para que no compita con la primera carga. */
+     Se registra al final para que no compita con la primera carga.
+
+     Y se le obliga a buscar versión nueva. En el PC basta con recargar, pero la
+     app instalada en el móvil casi nunca «navega»: se abre y se reanuda, así
+     que el navegador no llega a comprobar si hay un service worker nuevo y se
+     queda sirviendo el index.html viejo —y con él, un app.js viejo— durante
+     días. Se le pregunta al arrancar y cada vez que la app vuelve al primer
+     plano; cuando el nuevo toma el control, se recarga una sola vez. */
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', function () {
-      navigator.serviceWorker.register('sw.js').catch(function () {
+      navigator.serviceWorker.register('sw.js').then(function (registro) {
+        var mirar = function () { registro.update().catch(function () {}); };
+        mirar();
+        document.addEventListener('visibilitychange', function () {
+          if (!document.hidden) mirar();
+        });
+      }).catch(function () {
         /* Sin service worker la app funciona igual: esto solo es velocidad. */
+      });
+
+      /* Una sola recarga, y solo si YA había un service worker mandando. En la
+         primera visita no hay nada viejo que sustituir, y para cuando salta el
+         evento `controller` ya apunta al nuevo, así que hay que haberlo mirado
+         antes: si no, la primera visita se recargaría sola sin motivo. */
+      var habiaControl = !!navigator.serviceWorker.controller;
+      var recargando = false;
+      navigator.serviceWorker.addEventListener('controllerchange', function () {
+        if (recargando || !habiaControl) return;
+        recargando = true;
+        window.location.reload();
       });
     });
   }

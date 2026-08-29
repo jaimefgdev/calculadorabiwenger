@@ -884,6 +884,26 @@
     const n = (linea || []).length;
     if (!n) return [];
 
+    /* La de SEIS no es una fila y tiene su propia forma. Medido en su 4-6-0, con
+       el campo de x 275 a 687:
+
+         Kubo 275/360 · Pedri 377/411 · Ruibal 482/458 · + 495/343 ·
+         Dotor 582/411 · Redondo 687/360
+
+       Los dos del centro COMPARTEN columna (482 y 495) y uno se va arriba del
+       todo y el otro abajo del todo. O sea: el sexto ya no cabe más afuera, así
+       que se mete en la columna central por encima de todos. `desx` junta esas
+       dos casillas, y el 2,4 de altura sale de que sube 115 px donde un escalón
+       normal son 48. */
+    if (n === 6) {
+      const orden = [3, 1, 0, 5, 2, 4];       // D B A F C E
+      const rangos = [2, 1, 0, 2.4, 1, 2];
+      const desx = [0, 0, 55, -55, 0, 0];
+      return orden.map(function (cual, i) {
+        return { jugador: linea[cual], rango: rangos[i], desx: desx[i] };
+      });
+    }
+
     const huecos = new Array(n);
     const centro = Math.floor(n / 2);
     huecos[centro] = linea[0];
@@ -901,7 +921,7 @@
     return huecos.map(function (jugador, i) {
       /* Distancia al centro de la línea. Con `floor` sale entera también en las
          líneas pares, donde las dos casillas de dentro valen lo mismo. */
-      return { jugador: jugador, rango: Math.floor(Math.abs(i - (n - 1) / 2)) };
+      return { jugador: jugador, rango: Math.floor(Math.abs(i - (n - 1) / 2)), desx: 0 };
     });
   }
 
@@ -2679,14 +2699,14 @@
     });
   }
 
-  function pitchSlot(key, position, rango) {
+  function pitchSlot(key, position, rango, desx) {
     const id = state.xi.slots[key];
     const player = id ? playerById(id) : null;
     const face = player
       ? faceOf(player.id, 'pitch__face')
       : '<span class="pic-player pitch__face pitch__face--empty"></span>';
 
-    return '<div class="pitch__slot" style="--rango:' + (rango || 0) + '"' +
+    return '<div class="pitch__slot" style="--rango:' + (rango || 0) + ';--desx:' + (desx || 0) + '"' +
       ' data-hueco="' + key + '" data-puesto="' + position + '"' +
       (id ? ' data-lleva="' + escapeHtml(String(id)) + '"' : '') + '>' +
       crestOf(player, 'crest--ghost') +
@@ -3011,7 +3031,7 @@
         for (let i = 0; i < row.count; i++) claves.push(row.position + '-' + i);
         return '<div class="pitch__line">' +
           comoBiwenger(claves).map(function (puesto) {
-            return pitchSlot(puesto.jugador, row.position, puesto.rango);
+            return pitchSlot(puesto.jugador, row.position, puesto.rango, puesto.desx);
           }).join('') + '</div>';
       }).join('');
 
@@ -5316,7 +5336,7 @@
     const filas = [4, 3, 2, 1].map(function (pos) {
       const huecos = comoBiwenger(porLinea[pos]).map(function (puesto) {
         const jugador = puesto.jugador;
-        return '<div class="pitch__slot" style="--rango:' + puesto.rango + '">' +
+        return '<div class="pitch__slot" style="--rango:' + puesto.rango + ';--desx:' + (puesto.desx || 0) + '">' +
           crestOf(jugador, 'crest--ghost') +
           caraDeAlineacion(jugador, 'pitch__face', conDueno) +
           '<span class="pitch__name">' + escapeHtml(comoSeLlama(jugador)) + '</span>' +
@@ -6165,7 +6185,7 @@
 
     const hueco = function (puesto) {
       const jugador = puesto.jugador;
-      return '<div class="pitch__slot" style="--rango:' + puesto.rango + '">' +
+      return '<div class="pitch__slot" style="--rango:' + puesto.rango + ';--desx:' + (puesto.desx || 0) + '">' +
         caraDeAlineacion(jugador, 'pitch__face', true) +
         '<span class="pitch__name">' + escapeHtml(comoSeLlama(jugador)) + '</span>' +
         (jugador.events && jugador.events.length
@@ -7614,11 +7634,12 @@
 
        Mirando solo las plantillas de hoy, el segundo caso no salía nunca. */
     const llegada = acquisitionOf(id != null ? id : ficha.id);
-    /* Ordenado por fecha de verdad, no dando la vuelta a la lista: `ficha.moves`
-       viene de más nuevo a más viejo, pero eso depende de cómo llegue el tablón
-       y un `reverse()` a ciegas puede dejarlo justo al revés. */
+    /* Lo MÁS RECIENTE arriba, siempre. Se ordena por fecha de verdad y no dando
+       la vuelta a la lista: `ficha.moves` suele venir de más nuevo a más viejo,
+       pero eso depende de cómo llegue el tablón y un `reverse()` a ciegas puede
+       dejarlo justo al revés. */
     const cronologico = (ficha.moves || []).slice().sort(function (a, b) {
-      return (a.timestamp || 0) - (b.timestamp || 0);
+      return (b.timestamp || 0) - (a.timestamp || 0);
     });
     const primero = cronologico[0];
     const reparto = (llegada && llegada.paid == null && llegada.since)
@@ -7640,10 +7661,9 @@
 
     /* Sin operaciones no se dice nada: el hueco vacío ya lo cuenta. */
     if (!filaReparto && (!ficha.moves || ficha.moves.length === 0)) return '';
-    /* De lo más viejo a lo más nuevo: se lee como lo que es, la historia del
-       futbolista, empezando por cómo llegó y acabando por lo último que pasó.
-       `ficha.moves` viene del revés, por eso el `cronologico` de arriba. */
-    return '<table class="detail-table ficha__historial"><tbody>' + filaReparto +
+    /* Lo último que pasó, arriba del todo. El reparto va al final porque es lo
+       más antiguo de todo: es cómo llegó a la liga, antes de nada. */
+    return '<table class="detail-table ficha__historial"><tbody>' +
       cronologico.map(function (movimiento) {
         const compra = movimiento.type === 'buy';
         return '<tr>' +
@@ -7656,7 +7676,7 @@
           '<td class="num"><strong class="' + (compra ? 'money-neg' : 'money-pos') + '">' +
             (compra ? '−' : '+') + money(movimiento.amount) + '</strong></td>' +
         '</tr>';
-      }).join('') + '</tbody></table>';
+      }).join('') + filaReparto + '</tbody></table>';
   }
 
   /**
