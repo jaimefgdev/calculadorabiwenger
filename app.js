@@ -5783,7 +5783,7 @@
           escapeHtml(String(jugador.id)) + '">' +
         crestOf(jugador, 'crest--ghost') +
         caraConChapas(jugador, 'pitch__face') +
-        '<span class="jugador-card__nombre player-name">' + escapeHtml(jugador.name) + '</span>' +
+        '<span class="jugador-card__nombre player-name">' + escapeHtml(comoSeLlama(jugador)) + '</span>' +
       '</button>';
     }).join('');
 
@@ -8778,7 +8778,10 @@
           const ficha = porJugador[clave];
           /* Puede haber cambiado de manos: manda el último que lo alineó. */
           ficha.owner = fila.name;
-          ficha.name = jugador.name || ficha.name;
+          /* Y el nombre bueno manda sobre el guardado: las jornadas que se
+             calcularon con el índice del proxy caído llevan dentro «Jugador
+             19441», y eso no se cura solo. */
+          ficha.name = comoSeLlama({ id: clave, name: jugador.name }) || ficha.name;
           ficha.rounds.push({
             number: numero,
             points: jugador.points || 0,
@@ -8946,7 +8949,7 @@
           /* Cerrada: cara, escudo y nombre, que puede salir cortado. Abierta:
              solo el nombre, entero, que es lo que hacía falta leer. */
           (abierto
-            ? '<span class="ranking__nombre">' + escapeHtml(jugador.name) +
+            ? '<span class="ranking__nombre">' + escapeHtml(comoSeLlama(jugador)) +
                 (jugador.teamName ? ' <span class="sub">· ' + escapeHtml(jugador.teamName) + '</span>' : '') +
               '</span>'
             : '<span class="ranking__quien">' +
@@ -9289,7 +9292,7 @@
             '<button type="button" class="ranking__boton" data-ficha="' +
               escapeHtml(clave) + '" aria-expanded="' + (abierto ? 'true' : 'false') + '">' +
               (abierto
-                ? '<span class="ranking__nombre">' + escapeHtml(jugador.name) +
+                ? '<span class="ranking__nombre">' + escapeHtml(comoSeLlama(jugador)) +
                     (jugador.teamName ? ' <span class="sub">· ' + escapeHtml(jugador.teamName) + '</span>' : '') +
                   '</span>'
                 : '<span class="ranking__quien">' +
@@ -9813,6 +9816,48 @@
             (j.nuestra ? '  (calculada)' : '  (de Biwenger)');
         }).join('\n');
     }).join('\n');
+  };
+
+  /**
+   * `calcJugador("Lemar")` en la consola: de dónde sale su recuento.
+   *
+   * El total se arma sumando las jornadas guardadas, así que cuando cuenta de
+   * más hay que ver CUÁL sobra: una repetida, una que no debería estar
+   * guardada, o una en la que ni siquiera jugó.
+   */
+  window.calcJugador = function (quien) {
+    const busca = normalize(String(quien || ''));
+    if (!busca) return 'Dime un nombre, por ejemplo: calcJugador("Lemar")';
+
+    const lineas = ['JORNADAS GUARDADAS'];
+    Object.keys(state.jornadas.datos).map(function (id) {
+      const j = state.jornadas.datos[id];
+      const r = (j && j.round) || {};
+      return { id: id, numero: r.number, part: r.part, propia: esJornadaPropia(r),
+               filas: (j.standings || []).filter(function (f) { return (f.xi || []).length; }).length };
+    }).sort(function (a, b) { return (a.numero || 0) - (b.numero || 0); })
+      .forEach(function (g) {
+        lineas.push('  id ' + g.id + '  J' + g.numero + '  part ' + g.part +
+          '  ' + (g.propia ? 'cuenta' : 'NO cuenta') + '  ' + g.filas + ' alineaciones');
+      });
+
+    const suyo = futbolistasAlineados(null).filter(function (j) {
+      return normalize(j.name || '').indexOf(busca) !== -1;
+    });
+    if (!suyo.length) {
+      lineas.push('', 'No encuentro a nadie con ese nombre.');
+      return lineas.join('\n');
+    }
+
+    suyo.forEach(function (j) {
+      lineas.push('', j.name + '  (id ' + j.id + ', de ' + j.owner + ')',
+        '  partidos: ' + j.played + '   puntos: ' + j.points);
+      (j.rounds || []).forEach(function (r) {
+        lineas.push('    J' + r.number + '  ' + (r.sinNota ? 'sin nota' : r.points + ' pts') +
+          (r.home === true ? '  (casa)' : (r.home === false ? '  (fuera)' : '')));
+      });
+    });
+    return lineas.join('\n');
   };
 
   function loadSyncConfig() {
