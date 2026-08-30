@@ -8800,8 +8800,33 @@
 
     return Object.keys(porJugador).map(function (clave) {
       const ficha = porJugador[clave];
-      ficha.rounds.sort(function (a, b) { return (a.number || 0) - (b.number || 0); });
-      ficha.played = ficha.rounds.length;          // partidos con su equipo ya jugado
+
+      /* Una jornada, un partido. Si el mismo número aparece dos veces —la
+         mitad aplazada de una jornada trae los mismos partidos, y basta con
+         que una copia vieja se cuele en lo guardado— se queda una sola. Sin
+         esto salían «4 partidos» habiéndose jugado tres jornadas, y encima el
+         gráfico enseñaba tres barras porque él sí agrupa por número: la tabla
+         y el gráfico se contradecían. Se prefiere la entrada con nota. */
+      const porNumero = {};
+      ficha.rounds.forEach(function (r) {
+        const antes = porNumero[r.number];
+        if (!antes || (antes.points == null && r.points != null)) porNumero[r.number] = r;
+      });
+      ficha.rounds = Object.keys(porNumero)
+        .map(function (n) { return porNumero[n]; })
+        .sort(function (a, b) { return (a.number || 0) - (b.number || 0); });
+
+      /* Y los totales se recalculan sobre lo que ha quedado, que si no seguían
+         llevando dentro los puntos de la copia repetida. */
+      ficha.points = 0; ficha.pointsHome = 0; ficha.playedHome = 0;
+      ficha.pointsAway = 0; ficha.playedAway = 0;
+      ficha.rounds.forEach(function (r) {
+        ficha.points += r.points || 0;
+        if (r.home === true) { ficha.pointsHome += r.points || 0; ficha.playedHome += 1; }
+        else if (r.home === false) { ficha.pointsAway += r.points || 0; ficha.playedAway += 1; }
+      });
+
+      ficha.played = ficha.rounds.length;          // jornadas con su partido jugado
       ficha.media = ficha.played ? ficha.points / ficha.played : null;
       return ficha;
     });
@@ -8829,11 +8854,18 @@
       return Math.abs(porJornada[n].points);
     }).concat([1]));
 
+    /* Hasta donde llegan sus datos. De ahí para adelante son jornadas que no se
+       han jugado todavía, y esas no se señalan: no hay nada que contar. */
+    const ultima = Math.max.apply(null, conDatos.map(Number));
+
     let columnas = '';
     for (let jornada = 1; jornada <= JORNADAS_LIGA; jornada++) {
       const dato = porJornada[jornada];
       if (!dato) {
-        columnas += '<span class="barras__col barras__col--vacia"></span>';
+        /* Jornada ya disputada en la que no jugó: se puede señalar igual que
+           las demás, con su número y un guion en vez de puntos. */
+        columnas += '<span class="barras__col barras__col--vacia"' +
+          (jornada <= ultima ? ' data-j="' + jornada + '" data-p="–"' : '') + '></span>';
         continue;
       }
 
