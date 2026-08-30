@@ -5746,7 +5746,6 @@
 
     if (!state.jugadores) {
       caja.innerHTML = '<p class="muted">Cargando futbolistas\u2026</p>';
-      $('jugadores-cuenta').textContent = '';
       return;
     }
 
@@ -5766,15 +5765,6 @@
         return puestos.indexOf(otro) !== -1;
       });
     });
-
-        /* Solo se dice algo cuando se está filtrando. */
-    /* El recuento solo tiene sentido buscando por nombre, que es cuando no
-       sabes cuantos vas a encontrar. Filtrando por demarcacion sobra: ya ves lo
-       que has marcado y el numero no dice nada. */
-    $('jugadores-cuenta').textContent =
-      (busca && lista.length !== state.jugadores.length)
-        ? lista.length + ' de ' + state.jugadores.length
-        : '';
 
     if (lista.length === 0) {
       caja.innerHTML = '<p class="muted">Ning\u00fan futbolista con ese nombre.</p>';
