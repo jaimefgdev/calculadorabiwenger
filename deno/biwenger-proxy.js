@@ -104,7 +104,7 @@ const CDN = 'https://cf.biwenger.com/api/v2';
    navegador normal y las cabeceras que este mandaría. */
 /* Marca de versión: se sube en cada cambio y se consulta con ?version=1.
    Sirve para saber desde fuera si el despliegue ha entrado o no. */
-const VERSION = '2026-08-29 · deno 60';
+const VERSION = '2026-08-30 · deno 61';
 
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ' +
   '(KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36';
@@ -2788,6 +2788,10 @@ async function roundDetail(roundId, score) {
     id: data.id != null ? data.id : roundId,
     number: Number(String(data.short || '').replace(/\D/g, '')) || null,
     name: data.name || null,
+    /* La mitad de la jornada, de la propia ronda. Hace falta como respaldo por
+       si el calendario no la trae: sin ella, una jornada aplazada se colaba
+       como si fuera propia. */
+    part: data.part || 1,
     status: data.status || null,
     ideal: data.idealLineup || null,
     puntos: puntos,
@@ -3337,13 +3341,21 @@ async function roundBoard(env, headers, jornada, listaNombres) {
   let payload = {
     round: {
       id: round.id != null ? round.id : null,
-      number: ficha.number || null,
+      /* Si el calendario no trae esta ronda —pasa: se pide una que se acaba de
+         crear, o `seasonRounds` viene de una copia vieja—, `ficha` llega vacía
+         y salían `number: null` y `part: 1`. Con eso, la JORNADA 1 APLAZADA se
+         guardaba como si fuera una jornada propia sin número, y de ahí contaba
+         como una jornada más: a Lemar le salían 4 partidos habiéndose jugado
+         tres, y a Buonanotte 2 habiendo jugado 1. El detalle de la ronda sí
+         sabe quién es, así que se usa de respaldo. */
+      number: ficha.number != null ? ficha.number
+        : ((detalle && detalle.number) != null ? detalle.number : null),
       name: ficha.name || (round.id ? 'Jornada ' + round.id : ''),
       /* La mitad aplazada de una jornada (part 2) repite los mismos partidos
          que la primera. Sin esta marca aquí, la web no podía distinguirlas y
          contaba dos veces a los mismos futbolistas. */
-      part: ficha.part || 1,
-      status: ficha.status || null
+      part: ficha.part || (detalle && detalle.part) || 1,
+      status: ficha.status || (detalle && detalle.status) || null
     },
     rounds: calendar,
     standings: standings,
