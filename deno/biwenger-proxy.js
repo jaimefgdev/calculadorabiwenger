@@ -104,7 +104,7 @@ const CDN = 'https://cf.biwenger.com/api/v2';
    navegador normal y las cabeceras que este mandaría. */
 /* Marca de versión: se sube en cada cambio y se consulta con ?version=1.
    Sirve para saber desde fuera si el despliegue ha entrado o no. */
-const VERSION = '2026-08-30 · deno 61';
+const VERSION = '2026-08-30 · deno 62';
 
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ' +
   '(KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36';
@@ -897,6 +897,7 @@ async function players(score) {
   let response = await fetch(fresco(CDN + '/competitions/la-liga/data?lang=es&score=' +
     encodeURIComponent(sistema)), { headers: NAVEGADOR, cf: SIN_CACHE })
     .catch(function () { return null; });
+  apuntarCorteDelCdn(response);
   if (!response || !response.ok) {
     await new Promise(function (listo) { setTimeout(listo, 1500); });
     response = await fetch(fresco(CDN + '/competitions/la-liga/data?lang=es&score=' +
@@ -2372,6 +2373,10 @@ async function notasDeLaJornada(env, ids, names, score, numero, cerrada, partido
     } catch (error) { /* se pide abajo */ }
   }
 
+  /* Con el CDN cortado no se piden noventa fichas: se sigue con el historial,
+     que acierta en la mayoría, y se vuelve a intentar cuando levante. */
+  if (cdnCortado()) return null;
+
   const mapa = {};
   /* En qué puesto jugó de verdad esa jornada. Hace falta para poder recolocar
      su gol cuando el mánager lo alinea en otra línea, y viene en el mismo
@@ -3796,6 +3801,26 @@ function priceOn(prices, stamp) {
  * compra con el que comparar.
  */
 /**
+ * ¿Nos ha cortado el CDN hace nada?
+ *
+ * La API privada ya llevaba freno (`cache.limitedUntil`), pero el CDN —de donde
+ * salen el índice, las fichas y los precios— no tenía ninguno: si cortaba, se
+ * le seguía preguntando en cada petición y eso solo alarga el castigo. Se marca
+ * al primer 429 y durante ese rato se deja de pedir lo prescindible.
+ */
+function cdnCortado() {
+  return !!(cache.cdnHasta && Date.now() < cache.cdnHasta);
+}
+
+function apuntarCorteDelCdn(respuesta) {
+  if (respuesta && (respuesta.status === 429 || respuesta.status === 403)) {
+    cache.cdnHasta = Date.now() + 90 * 1000;
+    return true;
+  }
+  return false;
+}
+
+/**
  * Recorre una lista en tandas, con un respiro entre ellas.
  *
  * Biwenger corta las consultas cuando le llega una ráfaga, y cuando corta no
@@ -3831,6 +3856,34 @@ async function pricesOnDay(ids, dia, names) {
   const salida = {};
   if (!stamp) return salida;
 
+  /* Lo que valia cada uno un dia concreto NO cambia nunca: ese dia ya paso. Se
+     guarda en el KV y solo se preguntan los que falten.
+
+     Sin esto, cada arranque en frio del proxy —cualquier despliegue— volvia a
+     pedir el historico de precios de los casi cien alineados, y eso es lo que
+     acaba haciendo que Biwenger corte las consultas y la web se quede sin
+     nombres ni precios. Son unos 6 KB: nada. */
+  const claveDia = 'precios-' + stamp;
+  let guardados = {};
+  if (JORNADAS) {
+    try {
+      const crudo = await JORNADAS.get(claveDia);
+      if (crudo) guardados = JSON.parse(crudo) || {};
+    } catch (error) { /* se piden todos */ }
+  }
+  const porPedir = [];
+  (ids || []).forEach(function (id) {
+    const clave = String(id).trim();
+    if (!clave) return;
+    if (guardados[clave] != null) salida[clave] = guardados[clave];
+    else porPedir.push(clave);
+  });
+  if (!porPedir.length) return salida;
+  /* Cortado: se devuelve lo que hubiera guardado. El valor del once es un
+     desempate, no un dato esencial: no merece insistir y alargar el corte. */
+  if (cdnCortado()) return salida;
+  ids = porPedir;
+
   /* Son los once de cada mánager: casi noventa. De golpe era la ráfaga más
      grande que soltábamos, y en cada carga de jornada. Los que ya están
      guardados se resuelven sin frenos; solo se dosifican los que van a la red. */
@@ -3848,6 +3901,12 @@ async function pricesOnDay(ids, dia, names) {
   await Promise.all(reparto.listos.map(uno));
   await porTandas(reparto.porPedir, 6, 250, uno);
 
+  /* Y se guarda lo aprendido, para no volver a preguntarlo jamas. */
+  if (JORNADAS && Object.keys(salida).length) {
+    try {
+      await JORNADAS.put(claveDia, JSON.stringify(Object.assign(guardados, salida)));
+    } catch (error) { /* da igual: se recalcula */ }
+  }
   return salida;
 }
 
