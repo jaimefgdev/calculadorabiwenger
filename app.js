@@ -5763,9 +5763,13 @@
     });
 
         /* Solo se dice algo cuando se está filtrando. */
-    $('jugadores-cuenta').textContent = lista.length === state.jugadores.length
-      ? ''
-      : lista.length + ' de ' + state.jugadores.length;
+    /* El recuento solo tiene sentido buscando por nombre, que es cuando no
+       sabes cuantos vas a encontrar. Filtrando por demarcacion sobra: ya ves lo
+       que has marcado y el numero no dice nada. */
+    $('jugadores-cuenta').textContent =
+      (busca && lista.length !== state.jugadores.length)
+        ? lista.length + ' de ' + state.jugadores.length
+        : '';
 
     if (lista.length === 0) {
       caja.innerHTML = '<p class="muted">Ning\u00fan futbolista con ese nombre.</p>';
