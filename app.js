@@ -4631,6 +4631,11 @@
    */
   function esJornadaPropia(round) {
     if (!round) return false;
+    /* Sin número no se puede colocar en la temporada, así que no cuenta para
+       nada. Es justo lo que le pasaba a la jornada 1 aplazada cuando se guardó:
+       llegó como «Jnull, part 1» y se colaba como una jornada más, sumándole un
+       partido de más a todo el que estuviera alineado en ella. */
+    if (round.number == null) return false;
     if (round.part != null) return round.part === 1;
     const ficha = (state.jornadas.list || []).filter(function (r) {
       return String(r.id) === String(round.id);
