@@ -20,7 +20,7 @@
 <link rel="dns-prefetch" href="https://cdn.biwenger.com">
 <!-- El ?v= se sube en cada publicación: obliga al navegador a bajar el archivo
      nuevo en vez de reutilizar el que tenga en caché. -->
-<link rel="stylesheet" href="styles.css?v=292">
+<link rel="stylesheet" href="styles.css?v=293">
 <!-- La tipografia se pide ya, sin esperar a que el CSS termine de leerse. -->
 <link rel="preload" href="GoogleSans-Regular.woff2" as="font" type="font/woff2" crossorigin>
 <!-- El escudo de Biwenger, el mismo que el del boton de Inicio. -->
@@ -564,6 +564,20 @@
         <input id="jugadores-buscar" class="field" type="search" spellcheck="false"
           placeholder="Buscar futbolista o equipo…" aria-label="Buscar futbolista">
       </div>
+      <!-- Filtro por demarcacion. «Todos» manda mientras no elijas ninguna;
+           en cuanto marcas una o varias, se apaga solo. -->
+      <div class="puesto-filtros" role="group" aria-label="Filtrar por demarcación">
+        <button type="button" class="puesto-filtro puesto-filtro--todos is-on"
+          data-puesto-filtro="0" aria-pressed="true">Todos</button>
+        <button type="button" class="puesto-filtro puesto-filtro--por"
+          data-puesto-filtro="1" aria-pressed="false">PT</button>
+        <button type="button" class="puesto-filtro puesto-filtro--def"
+          data-puesto-filtro="2" aria-pressed="false">DF</button>
+        <button type="button" class="puesto-filtro puesto-filtro--med"
+          data-puesto-filtro="3" aria-pressed="false">MC</button>
+        <button type="button" class="puesto-filtro puesto-filtro--del"
+          data-puesto-filtro="4" aria-pressed="false">DL</button>
+      </div>
       <div id="jugadores-body" class="jugadores-rejilla"></div>
     </section>
   </div>
@@ -622,7 +636,7 @@
 
 </main>
 
-<script src="app.js?v=322"></script>
+<script src="app.js?v=323"></script>
 <script>
   /* El service worker solo cachea los archivos de la app, nunca los datos.
      Se registra al final para que no compita con la primera carga.

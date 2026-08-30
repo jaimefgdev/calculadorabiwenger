@@ -1835,6 +1835,33 @@ input[type="search"]::-webkit-search-cancel-button:hover { opacity: .75; }
 }
 /* Amarillo más oscuro que el de las tarjetas: sobre el claro, las letras
    blancas no se leían. */
+/* ---------- Filtro por demarcacion (pestana Jugadores) ---------- */
+.puesto-filtros {
+  display: flex; flex-wrap: wrap; gap: .35rem;
+  margin: 0 0 .8rem;
+}
+/* Apagadas de fabrica: mismo gris que cualquier pildora, sin color. El color de
+   su demarcacion solo aparece al marcarlas, que es lo que dice de un vistazo
+   por que estas filtrando. */
+.puesto-filtro {
+  font: inherit; font-size: .74rem; font-weight: 700; letter-spacing: .03em;
+  padding: .26rem .7rem;
+  color: var(--text-soft); background: var(--bg-surface);
+  border: 1px solid var(--border); border-radius: 100px;
+  cursor: pointer;
+}
+.puesto-filtro:hover { border-color: var(--border-hover); color: var(--text); }
+.puesto-filtro:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+/* Encendidas: el color de su chapa, el mismo que llevan sobre las caras. */
+.puesto-filtro--por.is-on { background: #b8860b; border-color: #b8860b; color: #fff; }
+.puesto-filtro--def.is-on { background: #2a78d6; border-color: #2a78d6; color: #fff; }
+.puesto-filtro--med.is-on { background: #1baf7a; border-color: #1baf7a; color: #fff; }
+.puesto-filtro--del.is-on { background: #e0142c; border-color: #e0142c; color: #fff; }
+/* «Todos» no tiene demarcacion propia: se enciende en el rojo de la casa. */
+.puesto-filtro--todos.is-on {
+  background: var(--accent-soft); border-color: var(--accent); color: var(--accent);
+}
+
 .puesto--por { background: #b8860b; }                 /* portero */
 .puesto--def { background: #2a78d6; }                 /* defensa */
 .puesto--med { background: #1baf7a; }                 /* medio */

@@ -707,6 +707,8 @@
     laliga: null,           // todos los futbolistas de la competición
     ambito: { nuestra: 'total', laliga: 'total' },   // total · en casa · fuera
     puesto: { nuestra: '0', laliga: '0' },           // demarcación: 0 son todas
+    /* Demarcaciones marcadas en la pestana Jugadores. Vacio = todas. */
+    puestosJugadores: [],
     laligaCargando: false,
     listings: [],
     lineup: null,          // mi alineación en Biwenger
@@ -5721,6 +5723,18 @@
     '</span>';
   }
 
+  /** Enciende o apaga cada filtro de demarcacion segun lo marcado. */
+  function pintarFiltrosDePuesto() {
+    const puestos = state.puestosJugadores || [];
+    Array.prototype.forEach.call(document.querySelectorAll('[data-puesto-filtro]'), function (boton) {
+      const cual = Number(boton.getAttribute('data-puesto-filtro'));
+      /* «Todos» se enciende justo cuando no hay ninguna marcada. */
+      const on = cual ? puestos.indexOf(cual) !== -1 : puestos.length === 0;
+      boton.classList.toggle('is-on', on);
+      boton.setAttribute('aria-pressed', on ? 'true' : 'false');
+    });
+  }
+
   function renderJugadores() {
     const caja = $('jugadores-body');
     if (!caja) return;
@@ -5733,12 +5747,20 @@
 
     /* Se busca sin acentos ni may\u00fasculas, por nombre y por equipo. */
     const busca = normalize($('jugadores-buscar').value || '');
-    const lista = busca
-      ? state.jugadores.filter(function (jugador) {
-          return normalize(jugador.name).indexOf(busca) !== -1 ||
-            normalize(jugador.teamName || '').indexOf(busca) !== -1;
-        })
-      : state.jugadores;
+    /* Y por demarcacion. Sin ninguna marcada valen todas, que es «Todos».
+       Cuenta tambien la de repuesto: quien vale de medio y de delantero sale en
+       los dos filtros, igual que lleva las dos chapas. */
+    const puestos = state.puestosJugadores || [];
+    const lista = state.jugadores.filter(function (jugador) {
+      if (busca &&
+          normalize(jugador.name).indexOf(busca) === -1 &&
+          normalize(jugador.teamName || '').indexOf(busca) === -1) return false;
+      if (!puestos.length) return true;
+      if (puestos.indexOf(jugador.position) !== -1) return true;
+      return (otrosPuestosDe(jugador) || []).some(function (otro) {
+        return puestos.indexOf(otro) !== -1;
+      });
+    });
 
         /* Solo se dice algo cuando se está filtrando. */
     $('jugadores-cuenta').textContent = lista.length === state.jugadores.length
@@ -10401,6 +10423,25 @@
     }
 
     $('jugadores-buscar').addEventListener('input', renderJugadores);
+
+    /* Los filtros por demarcacion. Se marcan de una a cuatro; «Todos» no es una
+       mas, es la ausencia de filtro: al pulsarla se apagan las demas, y al
+       marcar cualquiera se apaga ella sola. */
+    Array.prototype.forEach.call(document.querySelectorAll('[data-puesto-filtro]'), function (boton) {
+      boton.addEventListener('click', function () {
+        const cual = Number(boton.getAttribute('data-puesto-filtro'));
+        const puestos = state.puestosJugadores || [];
+        if (!cual) {
+          state.puestosJugadores = [];
+        } else {
+          const donde = puestos.indexOf(cual);
+          if (donde === -1) puestos.push(cual); else puestos.splice(donde, 1);
+          state.puestosJugadores = puestos;
+        }
+        pintarFiltrosDePuesto();
+        renderJugadores();
+      });
+    });
 
     /* La ficha se abre pulsando el nombre del futbolista, esté donde esté. */
     ['moves-body', 'market-body', 'squads-body', 'listings-body',
