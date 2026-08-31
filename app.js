@@ -745,6 +745,8 @@
     offers: [],            // pujas enviadas y ofertas recibidas, pendientes
     me: null,              // saldo y puja máxima oficiales del usuario
     syncing: false,
+    /* Una sincronía pedida mientras corría otra: se hace al acabar. */
+    syncPendiente: false,
     syncFails: 0,          // fallos seguidos, para espaciar los reintentos
     nextSyncAt: 0,         // no se vuelve a intentar antes de este momento
     lastSync: null,
@@ -930,6 +932,44 @@
          líneas pares, donde las dos casillas de dentro valen lo mismo. */
       return { jugador: jugador, rango: Math.floor(Math.abs(i - (n - 1) / 2)), desx: 0 };
     });
+  }
+
+  /* Cada marca con su logo. Uno por MARCA, no por canal: los partidos saltan
+     entre «M+ LaLiga 2», «DAZN LaLiga 3» y demás variantes numeradas, y tener
+     un archivo por cada una sería inmantenible. El número, si lo hay, va al
+     lado del logo. */
+  const CANALES = [
+    { marca: 'movistar', logo: 'tv/movistar.svg', nombre: 'Movistar',
+      busca: /^(m\+|movistar)/i },
+    { marca: 'dazn',     logo: 'tv/dazn.svg',     nombre: 'DAZN',
+      busca: /dazn/i },
+    { marca: 'orange',   logo: 'tv/orange.svg',   nombre: 'Orange',
+      busca: /orange/i },
+    { marca: 'laliga',   logo: 'tv/laliga.svg',   nombre: 'LaLiga TV',
+      busca: /^laliga/i }
+  ];
+
+  /**
+   * El canal como logo. Si no se reconoce la marca —«Canal por confirmar» y
+   * cualquiera nuevo— se deja el texto tal cual, que es mejor que nada.
+   *
+   * El logo va sobre una chapa clara a propósito: son logos de marca, pensados
+   * para fondo blanco, y sobre el fondo oscuro de la web varios no se verían.
+   */
+  function canalConLogo(nombre) {
+    const texto = String(nombre || '').trim();
+    if (!texto) return '';
+
+    const cual = CANALES.filter(function (c) { return c.busca.test(texto); })[0];
+    if (!cual) return escapeHtml(texto);
+
+    /* El número de la variante, si lo lleva: «M+ LaLiga 2» -> «2». */
+    const numero = (texto.match(/\b(\d+)\s*$/) || [])[1] || '';
+
+    return '<span class="canal canal--' + cual.marca + '" title="' + escapeHtml(texto) + '">' +
+      '<img class="canal__logo" src="' + cual.logo + '" alt="' + escapeHtml(cual.nombre) + '" loading="lazy">' +
+      (numero ? '<span class="canal__num">' + escapeHtml(numero) + '</span>' : '') +
+    '</span>';
   }
 
   /** Cómo se llama de verdad: el del índice manda sobre el que traiga el dato. */
@@ -2105,7 +2145,7 @@
             (vivo && vivo.reloj && !vivo.descanso
               ? ' <strong class="round__minuto">' + escapeHtml(vivo.reloj) + '</strong>' : '') +
             '</span>'
-          : (match.tv ? escapeHtml(match.tv) : '—'));
+          : (match.tv ? canalConLogo(match.tv) : '—'));
 
       return header +
         '<div class="round__game' + (rodando ? ' round__game--live' : '') +
@@ -3949,6 +3989,13 @@
       if (i >= ordenes.length) {
         opAviso(comoVa(hechas, ordenes.length) +
           (fallos ? ' · ' + fallos + (fallos === 1 ? ' falló' : ' fallaron') : ''), fallos > 0);
+        /* Los botones vuelven a la vida al acabar. Solo se reactivaban cuando
+           fallaba la petición entera: si el lote terminaba con algún fallo
+           suelto, el diálogo se quedaba con TODOS los botones muertos —el de
+           cerrar incluido— y no había manera de salir de ahí. */
+        Array.prototype.forEach.call(document.querySelectorAll('#op-modal button'), function (b) {
+          b.disabled = false;
+        });
         setTimeout(function () { syncNow(true); }, 600);
         setTimeout(function () { if (!fallos) cerrarOpModal(); }, 1800);
         return;
@@ -6342,7 +6389,7 @@
                   escapeHtml(juego.away.name) +
                 '</span>' +
                 /* Y por dónde se ve, a la derecha. */
-                '<span class="partido__tv">' + (juego.tv ? escapeHtml(juego.tv) : '') + '</span>' +
+                '<span class="partido__tv">' + (juego.tv ? canalConLogo(juego.tv) : '') + '</span>' +
               '</button>' +
               (abierto
                 ? '<div class="partido__detalle">' +
@@ -10061,7 +10108,13 @@
    *                        abre paneles ni roba el foco, solo deja el aviso.
    */
   function syncNow(auto) {
-    if (state.syncing) return;
+    /* Ya hay una en marcha: no se tira esta, se apunta. Antes se descartaba en
+       silencio, y aceptando dos ventas seguidas la segunda caía justo mientras
+       corría la sincronía de la primera —que ahora tarda más, porque el proxy
+       va dosificando las peticiones—. Se perdía, la pantalla no se refrescaba
+       nunca y parecía que la app se quedaba bloqueada. */
+    if (state.syncing) { state.syncPendiente = true; return; }
+    state.syncPendiente = false;
 
     const url = collapse($('sync-url').value);
     const key = $('sync-key').value.trim();
@@ -10128,6 +10181,11 @@
         state.syncing = false;
         $('btn-sync').disabled = false;
         $('btn-sync-top').disabled = false;
+        /* Y si mientras tanto se pidió otra, ahora sí. */
+        if (state.syncPendiente) {
+          state.syncPendiente = false;
+          setTimeout(function () { syncNow(true); }, 400);
+        }
       });
   }
 

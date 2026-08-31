@@ -263,8 +263,11 @@ code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft)
   grid-template-columns: repeat(2, minmax(0, 1fr));
   align-items: start;
 }
-/* La de ventas lleva una columna más de contenido: se le da más ancho. */
-#panel-inicio .market-grid { grid-template-columns: minmax(0, .92fr) minmax(0, 1.08fr); }
+/* Al reves de lo que estaba. La de PUJAS Y OFERTAS lleva cinco columnas
+   (futbolista, operacion, importe, queda y simular) y la de ventas cuatro, asi
+   que el ancho de mas le toca a la primera: con el reparto anterior el boton de
+   «Simular» se salia y quedaba cortado. */
+#panel-inicio .market-grid { grid-template-columns: minmax(0, 1.1fr) minmax(0, .9fr); }
 /* Entre 720 y 1100 las dos tablas van justas: se recortan hueco y relleno
    para que quepan enteras sin desplazable. */
 @media (min-width: 721px) and (max-width: 1100px) {
@@ -375,6 +378,29 @@ code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft)
 /* El canal en ambar: el rojo se lo queda «En juego», que es el aviso que tiene
    que cantar. Un dato de consulta y una alerta no pueden ir del mismo color. */
 .round__tv { font-size: .78rem; color: var(--marca); text-align: right; }
+
+/* El canal, con su logo. Sobre chapa clara a proposito: son logos de marca,
+   pensados para fondo blanco, y sobre el fondo oscuro de la web el de Movistar
+   —que es casi todo texto oscuro— no se veria. */
+.canal {
+  display: inline-flex; align-items: center; gap: .28rem;
+  padding: .16rem .38rem;
+  background: #fff; border-radius: 5px;
+  vertical-align: middle;
+}
+.canal__logo {
+  height: 13px; width: auto; max-width: 62px;
+  display: block; object-fit: contain;
+}
+/* El numero de la variante («M+ LaLiga 2»), pegado al logo y en oscuro para
+   que se lea sobre la chapa. */
+.canal__num {
+  font-size: .62rem; font-weight: 800; line-height: 1;
+  color: #111; font-variant-numeric: tabular-nums;
+}
+/* El de LaLiga es apaisado y muy ancho: se le deja algo menos de alto para que
+   no descuadre la fila. */
+.canal--laliga .canal__logo { height: 11px; max-width: 54px; }
 
 /* ---------- Jornada en juego ---------- */
 .round__live {
