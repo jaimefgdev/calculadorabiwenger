@@ -104,7 +104,7 @@ const CDN = 'https://cf.biwenger.com/api/v2';
    navegador normal y las cabeceras que este mandaría. */
 /* Marca de versión: se sube en cada cambio y se consulta con ?version=1.
    Sirve para saber desde fuera si el despliegue ha entrado o no. */
-const VERSION = '2026-08-30 · deno 62';
+const VERSION = '2026-08-31 · deno 63';
 
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ' +
   '(KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36';
@@ -1245,9 +1245,20 @@ async function proximaJornada() {
      Lo que no puede es pisar a la que se está jugando: el 28 de agosto la
      tarjeta anunciaba «Inicio de la Jornada 6» con la 3 empezando esa tarde. */
   const calendario = await seasonRounds().catch(function () { return []; });
-  const enJuego = calendario.filter(function (r) {
+  const candidatas = calendario.filter(function (r) {
     return (r.part || 1) === 1 && r.status === 'active';
-  }).sort(function (a, b) { return (a.number || 0) - (b.number || 0); })[0];
+  }).sort(function (a, b) { return (a.number || 0) - (b.number || 0); });
+
+  /* «Active» no basta: Biwenger las deja así con todos los partidos jugados —la
+     jornada 3 seguía «active» el lunes por la noche— y entonces la tarjeta se
+     quedaba anunciándola en vez de pasar a la siguiente. Solo cuenta como en
+     juego la que de verdad tiene partidos por acabar. */
+  let enJuego = null;
+  for (let i = 0; i < candidatas.length; i++) {
+    const suyo = await roundDetail(candidatas[i].id, null).catch(function () { return null; });
+    if (!suyo) continue;
+    if ((suyo.played || 0) < (suyo.games || 0)) { enJuego = candidatas[i]; break; }
+  }
 
   const url = enJuego
     ? CDN + '/rounds/la-liga/' + encodeURIComponent(enJuego.id) + '?lang=es'
@@ -1329,19 +1340,28 @@ async function jornadaActualEfectiva() {
     .sort(function (a, b) { return (a.number || 0) - (b.number || 0); })
     .slice(0, 4);
 
+  /* De paso se apunta la última que ya tiene TODOS sus partidos jugados. Hace
+     falta porque Biwenger deja jornadas en «active» mucho después de acabarlas:
+     la 3 seguía así con sus diez partidos disputados. Buscando la última
+     «finished» se la saltaba y el selector se quedaba en la 2. */
+  let ultima = null;
   for (let i = 0; i < candidatas.length; i++) {
     const suyo = await roundDetail(candidatas[i].id, null).catch(function () { return null; });
     if (!suyo) continue;
     const jugados = suyo.played || 0;
-    if (jugados > 0 && jugados < (suyo.games || 0)) return candidatas[i].id;
+    const total = suyo.games || 0;
+    if (jugados > 0 && jugados < total) return candidatas[i].id;
+    if (total > 0 && jugados >= total) ultima = candidatas[i];
   }
 
-  /* Sin nada en juego: se sigue viendo la última cerrada hasta que a la
+  /* Sin nada en juego: se sigue viendo la última acabada hasta que a la
      siguiente jornada normal (part 1, nunca un aplazado suelto) le falten
      cinco horas o menos para su primer pitido. */
-  const cerradas = calendario.filter(function (r) { return r.status === 'finished' && (r.part || 1) === 1; })
-    .sort(function (a, b) { return (b.number || 0) - (a.number || 0); });
-  const ultima = cerradas[0] || null;
+  if (!ultima) {
+    const cerradas = calendario.filter(function (r) { return r.status === 'finished' && (r.part || 1) === 1; })
+      .sort(function (a, b) { return (b.number || 0) - (a.number || 0); });
+    ultima = cerradas[0] || null;
+  }
 
   const proxima = await proximaJornada().catch(function () { return null; });
   const siguienteFicha = proxima && proxima.id != null
