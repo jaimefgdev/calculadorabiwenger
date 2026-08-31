@@ -263,11 +263,12 @@ code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft)
   grid-template-columns: repeat(2, minmax(0, 1fr));
   align-items: start;
 }
-/* Al reves de lo que estaba. La de PUJAS Y OFERTAS lleva cinco columnas
-   (futbolista, operacion, importe, queda y simular) y la de ventas cuatro, asi
-   que el ancho de mas le toca a la primera: con el reparto anterior el boton de
-   «Simular» se salia y quedaba cortado. */
-#panel-inicio .market-grid { grid-template-columns: minmax(0, 1.1fr) minmax(0, .9fr); }
+/* Reparto casi a partes iguales, con un pelin mas para la de ventas: su columna
+   de ofertas lleva importe, diferencia e interruptor, y es la mas ancha de las
+   dos tablas. Ya no hay que pelearse por el ancho para salvar el boton —esa
+   columna va fija a la derecha—, asi que aqui solo se busca que haga falta
+   desplazar lo menos posible. */
+#panel-inicio .market-grid { grid-template-columns: minmax(0, .96fr) minmax(0, 1.04fr); }
 /* Entre 720 y 1100 las dos tablas van justas: se recortan hueco y relleno
    para que quepan enteras sin desplazable. */
 @media (min-width: 721px) and (max-width: 1100px) {
@@ -378,29 +379,6 @@ code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft)
 /* El canal en ambar: el rojo se lo queda «En juego», que es el aviso que tiene
    que cantar. Un dato de consulta y una alerta no pueden ir del mismo color. */
 .round__tv { font-size: .78rem; color: var(--marca); text-align: right; }
-
-/* El canal, con su logo. Sobre chapa clara a proposito: son logos de marca,
-   pensados para fondo blanco, y sobre el fondo oscuro de la web el de Movistar
-   —que es casi todo texto oscuro— no se veria. */
-.canal {
-  display: inline-flex; align-items: center; gap: .28rem;
-  padding: .16rem .38rem;
-  background: #fff; border-radius: 5px;
-  vertical-align: middle;
-}
-.canal__logo {
-  height: 13px; width: auto; max-width: 62px;
-  display: block; object-fit: contain;
-}
-/* El numero de la variante («M+ LaLiga 2»), pegado al logo y en oscuro para
-   que se lea sobre la chapa. */
-.canal__num {
-  font-size: .62rem; font-weight: 800; line-height: 1;
-  color: #111; font-variant-numeric: tabular-nums;
-}
-/* El de LaLiga es apaisado y muy ancho: se le deja algo menos de alto para que
-   no descuadre la fila. */
-.canal--laliga .canal__logo { height: 11px; max-width: 54px; }
 
 /* ---------- Jornada en juego ---------- */
 .round__live {
@@ -1778,6 +1756,35 @@ html.con-ficha { scrollbar-gutter: stable; }
 .table--listings .switch span { width: 11px; height: 11px; }
 .table--listings .switch[aria-pressed="true"] span { transform: translateX(13px); }
 .table--offers td[data-label="Operación"] { white-space: normal; }
+
+/* El interruptor de simular NO puede quedarse fuera nunca. Estas dos tablas
+   compiten por el mismo ancho y siempre hay una que no cabe entera: ensanchar
+   una era estrechar la otra, y el boton cortado se iba de un panel al otro.
+   Asi que su columna se queda pegada al borde derecho y se ve aunque la tabla
+   se desplace por debajo. El fondo es el del panel para que no se transparente
+   lo que pasa por detras, y el `:hover` lo repite para que la fila siga
+   iluminandose entera. */
+.table--offers th:last-child,
+.table--offers td:last-child,
+.table--listings th:last-child,
+.table--listings td:last-child {
+  position: sticky; right: 0; z-index: 2;
+  background: var(--bg-elev);
+}
+.table--offers tbody tr:hover td:last-child,
+.table--listings tbody tr:hover td:last-child {
+  background: color-mix(in srgb, var(--accent) 5%, var(--bg-elev));
+}
+/* Una sombrita a la izquierda para que se lea como columna fija y no como si
+   el contenido se cortara sin mas. */
+.table--offers td:last-child::before,
+.table--listings td:last-child::before,
+.table--offers th:last-child::before,
+.table--listings th:last-child::before {
+  content: ''; position: absolute; top: 0; bottom: 0; left: -6px; width: 6px;
+  background: linear-gradient(to right, transparent, rgba(0, 0, 0, .28));
+  pointer-events: none;
+}
 
 /* Estas dos tablas tienen que caber enteras en el móvil. Por debajo de 940 px
    se apilan solas —cada celda con su rótulo—, así que ahí basta con quitar el

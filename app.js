@@ -938,40 +938,6 @@
      entre «M+ LaLiga 2», «DAZN LaLiga 3» y demás variantes numeradas, y tener
      un archivo por cada una sería inmantenible. El número, si lo hay, va al
      lado del logo. */
-  const CANALES = [
-    { marca: 'movistar', logo: 'tv/movistar.svg', nombre: 'Movistar',
-      busca: /^(m\+|movistar)/i },
-    { marca: 'dazn',     logo: 'tv/dazn.svg',     nombre: 'DAZN',
-      busca: /dazn/i },
-    { marca: 'orange',   logo: 'tv/orange.svg',   nombre: 'Orange',
-      busca: /orange/i },
-    { marca: 'laliga',   logo: 'tv/laliga.svg',   nombre: 'LaLiga TV',
-      busca: /^laliga/i }
-  ];
-
-  /**
-   * El canal como logo. Si no se reconoce la marca —«Canal por confirmar» y
-   * cualquiera nuevo— se deja el texto tal cual, que es mejor que nada.
-   *
-   * El logo va sobre una chapa clara a propósito: son logos de marca, pensados
-   * para fondo blanco, y sobre el fondo oscuro de la web varios no se verían.
-   */
-  function canalConLogo(nombre) {
-    const texto = String(nombre || '').trim();
-    if (!texto) return '';
-
-    const cual = CANALES.filter(function (c) { return c.busca.test(texto); })[0];
-    if (!cual) return escapeHtml(texto);
-
-    /* El número de la variante, si lo lleva: «M+ LaLiga 2» -> «2». */
-    const numero = (texto.match(/\b(\d+)\s*$/) || [])[1] || '';
-
-    return '<span class="canal canal--' + cual.marca + '" title="' + escapeHtml(texto) + '">' +
-      '<img class="canal__logo" src="' + cual.logo + '" alt="' + escapeHtml(cual.nombre) + '" loading="lazy">' +
-      (numero ? '<span class="canal__num">' + escapeHtml(numero) + '</span>' : '') +
-    '</span>';
-  }
-
   /** Cómo se llama de verdad: el del índice manda sobre el que traiga el dato. */
   function comoSeLlama(jugador) {
     if (!jugador) return '';
@@ -2145,7 +2111,7 @@
             (vivo && vivo.reloj && !vivo.descanso
               ? ' <strong class="round__minuto">' + escapeHtml(vivo.reloj) + '</strong>' : '') +
             '</span>'
-          : (match.tv ? canalConLogo(match.tv) : '—'));
+          : (match.tv ? escapeHtml(match.tv) : '—'));
 
       return header +
         '<div class="round__game' + (rodando ? ' round__game--live' : '') +
@@ -6389,7 +6355,7 @@
                   escapeHtml(juego.away.name) +
                 '</span>' +
                 /* Y por dónde se ve, a la derecha. */
-                '<span class="partido__tv">' + (juego.tv ? canalConLogo(juego.tv) : '') + '</span>' +
+                '<span class="partido__tv">' + (juego.tv ? escapeHtml(juego.tv) : '') + '</span>' +
               '</button>' +
               (abierto
                 ? '<div class="partido__detalle">' +
