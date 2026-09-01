@@ -98,13 +98,32 @@ const ENTORNO = {
 };
 
 
+/* NINGUNA peticion de salida puede quedarse colgada.
+ *
+ * Es la causa de los 502: cuando Biwenger deja de responder —nos corta por
+ * exceso de consultas, o simplemente tarda—, un `fetch` sin tope se queda
+ * esperando hasta que Deno mata la peticion entera, y el navegador recibe un
+ * 502 en vez de un error que la web sepa contar. Con tope, la llamada falla en
+ * ocho segundos, el codigo de arriba ya sabe seguir sin ella (todo va con
+ * `catch` o con `soft`) y la web enseña lo que tenga guardado.
+ *
+ * Se envuelve el `fetch` global en vez de tocar los quince sitios uno a uno:
+ * asi no se puede olvidar ninguno, ni ahora ni en lo que se añada despues. */
+const TOPE_FETCH_MS = 8000;
+const fetchSinTope = globalThis.fetch;
+globalThis.fetch = function (entrada, opciones) {
+  const opts = Object.assign({}, opciones || {});
+  if (!opts.signal) opts.signal = AbortSignal.timeout(TOPE_FETCH_MS);
+  return fetchSinTope(entrada, opts);
+};
+
 const API = 'https://biwenger.as.com/api/v2';
 const CDN = 'https://cf.biwenger.com/api/v2';
 /* Un identificador propio es lo primero que se limita: se va con el de un
    navegador normal y las cabeceras que este mandaría. */
 /* Marca de versión: se sube en cada cambio y se consulta con ?version=1.
    Sirve para saber desde fuera si el despliegue ha entrado o no. */
-const VERSION = '2026-09-01 · deno 66';
+const VERSION = '2026-09-01 · deno 67';
 
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ' +
   '(KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36';
@@ -875,6 +894,25 @@ async function rawApi(env, path) {
 /** Liga y usuario activos del token. */
 async function account(env) {
   if (cache.account) return cache.account;
+
+  /* Guardada en el KV. La liga y el usuario NO cambian nunca, y sin embargo
+     eran el punto unico de fallo de toda la aplicacion: cada endpoint empieza
+     por aqui, esto llama a `/account`, y `api()` lanza excepcion en cuanto
+     Biwenger nos ha limitado. Esa excepcion subia hasta el `catch` general y
+     devolvia 502 EN TODO —no cargaba ni el mercado, ni la liga, ni nada—, con
+     el agravante de que cada arranque en frio del proxy volvia a preguntarlo.
+     Leyendola de aqui, un corte de Biwenger deja de tumbar la web entera. */
+  if (JORNADAS) {
+    try {
+      const crudo = await JORNADAS.get('cuenta');
+      const guardada = crudo ? JSON.parse(crudo) : null;
+      if (guardada && guardada.leagueId) {
+        cache.account = guardada;
+        return cache.account;
+      }
+    } catch (error) { /* se pregunta abajo */ }
+  }
+
   const data = await api(env, '/account');
   const league = data && (data.league || (data.leagues && data.leagues[0]));
   if (!league || !league.id) throw new Error('La cuenta no tiene ninguna liga activa.');
@@ -890,6 +928,10 @@ async function account(env) {
   }
 
   cache.account = { leagueId: String(league.id), userId: userId };
+  /* Y se guarda, para no volver a depender de esta llamada nunca mas. */
+  if (JORNADAS) {
+    try { await JORNADAS.put('cuenta', JSON.stringify(cache.account)); } catch (error) { /* da igual */ }
+  }
   return cache.account;
 }
 
