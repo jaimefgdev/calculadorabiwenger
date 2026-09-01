@@ -104,7 +104,7 @@ const CDN = 'https://cf.biwenger.com/api/v2';
    navegador normal y las cabeceras que este mandaría. */
 /* Marca de versión: se sube en cada cambio y se consulta con ?version=1.
    Sirve para saber desde fuera si el despliegue ha entrado o no. */
-const VERSION = '2026-09-01 · deno 64';
+const VERSION = '2026-09-01 · deno 65';
 
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ' +
   '(KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36';
@@ -273,9 +273,27 @@ const app = {
         });
       }
 
-      /* ?version=1 dice qué código está desplegado. */
+      /* ?version=1 dice qué código está desplegado y cómo anda el índice de
+         futbolistas, que es de donde salen los nombres, los escudos y los
+         valores. Sin esto no hay forma de saber, desde fuera, si la web se ve
+         mal porque el índice llegó vacío, porque Biwenger nos ha cortado o
+         porque se está sirviendo la copia de seguridad del KV. */
       if (url.searchParams.get('version')) {
-        return new Response(JSON.stringify({ version: VERSION }), {
+        const sistema = await sistemaDeLaLiga(env).catch(function () { return null; });
+        const indice = await players(sistema).catch(function () { return {}; });
+        const cuantos = Object.keys(indice).filter(function (k) { return k.indexOf(':') === -1; }).length;
+        let copia = 0;
+        try {
+          const crudo = JORNADAS ? await JORNADAS.get('indice-' + (sistema || '')) : null;
+          if (crudo) copia = Object.keys(JSON.parse(crudo)).filter(function (k) { return k.indexOf(':') === -1; }).length;
+        } catch (error) { /* da igual */ }
+        return new Response(JSON.stringify({
+          version: VERSION,
+          indice: cuantos,
+          copiaKv: copia,
+          cortado: cdnCortado(),
+          kv: !!JORNADAS
+        }), {
           headers: Object.assign({ 'content-type': 'application/json; charset=utf-8' }, cors(origin))
         });
       }
