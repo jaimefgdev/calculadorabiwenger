@@ -4683,6 +4683,20 @@
     });
     if (faltaAlguno) return false;
 
+    /* Y al revés también: Biwenger deja jornadas en «active» mucho después de
+       acabarlas —la 3 seguía así el martes, con sus diez partidos jugados—, y
+       exigiendo «finished» esa jornada no se le contaba a nadie como ganada.
+
+       Si NADIE está pendiente es que a todos los alineados les ha terminado su
+       partido, o sea que la jornada está jugada del todo. Eso es más fiable que
+       su campo `status`, que ya nos ha mentido en las dos direcciones. Se pide
+       además que haya puntuado alguien, para no dar por cerrada una que ni ha
+       empezado (ahí todos salen pendientes, pero por si acaso). */
+    const hayPuntos = (jornada.standings || []).some(function (fila) {
+      return fila && fila.points != null && fila.points !== 0;
+    });
+    if (hayPuntos) return true;
+
     if (jornada.round.status) return jornada.round.status === 'finished';
     /* Sin estado, se mira si es la que está en juego ahora mismo. */
     return !(state.round && String(state.round.id) === String(jornada.round.id));
