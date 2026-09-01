@@ -5644,12 +5644,11 @@
         cacheGuardar('jugadores', payload);
         renderJugadores();
         /* El índice es lo que trae los nombres, las demarcaciones y los valores
-           que faltan: en cuanto llega hay que volver a pintar lo que se dibujó
-           sin él, o se queda con lo que hubiera entonces —o nada—. En la ficha
-           de un mánager eso se veía clarísimo: «Jugador 897», sin chapa de
-           posición y con el valor de mercado en blanco. */
-        if ($('squads-body') && squadList().length) renderSquads();
-        if (state.tab === 'managers') renderManagers();
+           que faltan: en cuanto llega hay que volver a pintar TODO lo que se
+           dibujó sin él, o se queda con lo que hubiera entonces —o nada—. Se
+           veía clarísimo en Inicio y en la ficha de un mánager: «Jugador 897»,
+           sin escudo, sin chapa de puntos y con el valor en blanco. */
+        render();
       })
       .catch(function () {
         state.jugadoresCargando = false;
@@ -9738,6 +9737,14 @@
   }
 
   function render() {
+    /* El indice de LaLiga hace falta en TODAS partes, no solo donde se listan
+       futbolistas: de el salen el nombre, el escudo, la demarcacion, los puntos,
+       el estado y el valor de mercado con los que se completa lo que la
+       sincronia haya guardado incompleto. En Inicio no se pedia nunca, y por eso
+       ahi salia todo como «Jugador 26930», sin escudo, sin chapa de puntos y sin
+       marca de lesionado, mientras en Liga o Jugadores se veia bien. */
+    ensureJugadores();
+
     const rows = budgetRows();
     state.kpi = kpiValues(rows);   // los usa la pestaña Datos
     renderBudgets(rows);
