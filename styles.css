@@ -1748,15 +1748,23 @@ html.con-ficha { scrollbar-gutter: stable; }
 @media (min-width: 721px) {
   #panel-inicio .table--listings th,
   #panel-inicio .table--listings td { padding-inline: .22rem; }
+  /* Letra algo mas pequena en las DOS tablas, para que sigan siendo identicas
+     y quepa todo en una linea. Encogiendo la letra tambien encoge el nombre,
+     asi que un tope menor sigue dejandolos enteros. */
+  #panel-inicio .table--offers,
+  #panel-inicio .table--listings { font-size: .74rem; }
+  #panel-inicio .table--listings .bid strong { font-size: .76rem; }
+  #panel-inicio .table--listings .switch { width: 26px; height: 15px; }
+  #panel-inicio .table--listings .switch span { width: 9px; height: 9px; }
+  #panel-inicio .table--listings .switch[aria-pressed="true"] span { transform: translateX(11px); }
+
   /* El nombre cede lo que haga falta, con puntos suspensivos: es lo unico que
      puede encoger sin perder informacion, porque los importes y el interruptor
      no se pueden recortar. */
   #panel-inicio .table--listings .player-name {
-    /* 9,5rem: es lo que sobra hasta la columna de «Valor» ahora que la de
-       ofertas mide 66 px menos. Con 7,5 se cortaban nombres que caben de sobra
-       («Roberto Fernández» salia como «Roberto Fernánd…»). Quedan 30 px de
-       holgura, asi que sigue sin haber solape. */
-    display: inline-block; max-width: 9.5rem;
+    /* 8,5rem. Con la letra a .74rem, «Roberto Fernández» mide ~117 px y entra
+       entero de sobra; antes, a .82rem y con tope de 7,5rem, se cortaba. */
+    display: inline-block; max-width: 8.5rem;
     overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
     vertical-align: middle;
   }
@@ -1770,33 +1778,20 @@ html.con-ficha { scrollbar-gutter: stable; }
 .table--offers .tag, .table--listings .tag { font-size: .7rem; }
 /* Todo en una sola línea: importe, diferencia e interruptor. */
 .table--listings td[data-label="Ofertas"] { white-space: nowrap; }
-/* La diferencia, DEBAJO del importe en vez de a su lado.
-   Era lo que hacia la columna imposible: «5.722.000 € ▼ −18.000 € [boton]» son
-   unos 190 px, y con eso la tabla no cabia en su panel. Como esta columna va
-   fija a la derecha y con fondo opaco, ese sobrante se pintaba encima del
-   «Queda» y se comia la «h» de «1d 23h». Apilando la diferencia bajo el importe
-   la columna pasa a medir lo que mida el mas ancho de los dos (~90 px) mas el
-   interruptor: unos 66 px menos, que es de sobra para que quepa. */
+/* Todo en una linea: importe, diferencia e interruptor. Se probo a apilar la
+   diferencia debajo para estrechar la columna, y aunque cabia, la fila crecia
+   de alto y los dos paneles dejaban de cuadrar entre si. El ancho se gana con
+   la letra, no partiendo la fila. */
 .table--listings .bid {
-  display: inline-grid;
-  grid-template-columns: auto auto;
-  align-items: center; justify-content: end;
-  column-gap: .25rem; row-gap: 0;
-  line-height: 1.15;
+  display: inline-flex; align-items: center; flex-wrap: nowrap;
+  gap: .3rem; margin-right: .3rem;
 }
-.table--listings .bid strong { grid-column: 1; grid-row: 1; justify-self: end; }
-.table--listings .bid .delta  { grid-column: 1; grid-row: 2; justify-self: end; }
-/* El interruptor, a la derecha y centrado sobre las dos lineas. */
-.table--listings .bid .switch { grid-column: 2; grid-row: 1 / span 2; }
-/* Con varias ofertas, cada una en su bloque, una debajo de otra. */
-.table--listings td[data-label="Ofertas"] .bid + .bid { margin-top: .2rem; }
-.table--listings .bid { margin-right: .2rem; }
 .table--listings .bid strong { font-size: .82rem; }
 .table--listings .delta { font-size: .68rem; }
 /* Y la celda de ofertas, un pelin mas justa, tambien solo lado a lado. */
 @media (min-width: 721px) {
-  #panel-inicio .table--listings .bid { column-gap: .18rem; margin-right: .1rem; }
-  #panel-inicio .table--listings .delta { font-size: .64rem; }
+  #panel-inicio .table--listings .bid { gap: .18rem; margin-right: .1rem; }
+  #panel-inicio .table--listings .delta { font-size: .58rem; }
 }
 .table--listings .switch { width: 30px; height: 17px; flex: none; }
 .table--listings .switch span { width: 11px; height: 11px; }
