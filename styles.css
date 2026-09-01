@@ -2398,8 +2398,14 @@ main.wrap { padding-top: 1.15rem; padding-bottom: 3.5rem; }
 .table--market thead th:nth-child(3), .table--market thead th:nth-child(4) { text-align: center; }
 .table--squad thead th:nth-child(3), .table--squad td:nth-child(3),
 .table--squad thead th:nth-child(7), .table--squad td:nth-child(7) { text-align: center; }
-.table--offers thead th:nth-child(5), .table--offers td:nth-child(5) { text-align: center; }
-.table--listings thead th:nth-child(4), .table--listings td:nth-child(4) { text-align: center; }
+.table--offers thead th:nth-child(5) { text-align: center; }
+/* Las CELDAS de la ultima columna de estas dos van a la derecha, no centradas:
+   son las que llevan el interruptor de simular, van fijas a ese borde y con
+   fondo opaco, asi que centradas tapaban la columna «Queda» de al lado. Los
+   encabezados se centran mas arriba, con los del resto de la tabla. */
+.table--offers td:nth-child(5),
+.table--listings td:nth-child(4) { text-align: right; }
+.table--listings thead th:nth-child(4) { text-align: center; }
 .table--rounds thead th:nth-child(1), .table--rounds td:nth-child(1) { text-align: center; }
 
 /* «(últimas 3 jornadas)» en pequeño, dentro del propio título. */
