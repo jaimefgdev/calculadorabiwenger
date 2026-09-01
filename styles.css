@@ -1752,7 +1752,11 @@ html.con-ficha { scrollbar-gutter: stable; }
      puede encoger sin perder informacion, porque los importes y el interruptor
      no se pueden recortar. */
   #panel-inicio .table--listings .player-name {
-    display: inline-block; max-width: 7.5rem;
+    /* 9,5rem: es lo que sobra hasta la columna de «Valor» ahora que la de
+       ofertas mide 66 px menos. Con 7,5 se cortaban nombres que caben de sobra
+       («Roberto Fernández» salia como «Roberto Fernánd…»). Quedan 30 px de
+       holgura, asi que sigue sin haber solape. */
+    display: inline-block; max-width: 9.5rem;
     overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
     vertical-align: middle;
   }
