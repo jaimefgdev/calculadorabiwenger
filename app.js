@@ -5624,6 +5624,8 @@
     const config = loadSyncConfig();
     if (!config.url || !config.key) return;
     if (state.jugadores || state.jugadoresCargando) return;
+    /* Tras un fallo, un minuto de espera antes de volver a probar. */
+    if (state.jugadoresFalloAt && Date.now() - state.jugadoresFalloAt < 60 * 1000) return;
 
     /* Lo guardado se enseña ya; lo de ahora llega por detrás. */
     const previo = cacheLeer('jugadores');
@@ -5652,7 +5654,13 @@
       })
       .catch(function () {
         state.jugadoresCargando = false;
-        state.jugadores = [];
+        /* NO se deja una lista vacía: con `[]` el guardián de arriba la daba por
+           cargada y no se reintentaba nunca más en toda la sesión, así que un
+           fallo suelto dejaba la app entera sin nombres, sin escudos y sin
+           valores hasta recargar. Se deja sin cargar y se apunta la hora, para
+           volver a intentarlo al minuto en vez de insistir en bucle. */
+        state.jugadores = null;
+        state.jugadoresFalloAt = Date.now();
         renderJugadores();
       });
   }
