@@ -10017,8 +10017,16 @@
            Al depurar los puntos se perdían horas sin saber cuál de las dos era
            vieja: el proxy sin desplegar, o el navegador sirviendo un app.js
            guardado. Con las dos delante se ve de un vistazo. */
+        /* Y cómo anda el índice de futbolistas, que es lo que decide si la web
+           enseña nombres y valores o «Jugador 19441» a 0 €. Sin verlo aquí no
+           hay forma de saber si el problema es el proxy, Biwenger o la caché. */
+        const estado = !payload || payload.indice == null ? '' :
+          ' · índice ' + payload.indice +
+          (payload.cortado ? ' · BIWENGER CORTADO' : '') +
+          (payload.indice === 0 && payload.copiaKv ? ' · copia KV ' + payload.copiaKv : '') +
+          (payload.kv === false ? ' · SIN KV' : '');
         const rotulo = payload && payload.version
-          ? 'Worker ' + payload.version + ' · web v' + VERSION_WEB
+          ? 'Worker ' + payload.version + ' · web v' + VERSION_WEB + estado
           : (payload && payload.error) || '';
         /* Solo en el panel de conexión: encima del reloj estorbaba. */
         hueco.textContent = rotulo;
