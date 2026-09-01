@@ -5593,10 +5593,13 @@
         state.jugadoresCargando = false;
         cacheGuardar('jugadores', payload);
         renderJugadores();
-        /* El índice es lo que trae las demarcaciones que faltan: en cuanto
-           llega hay que volver a pintar las plantillas, o se quedan con las
-           chapas que había cuando se dibujaron (ninguna, si llegó después). */
+        /* El índice es lo que trae los nombres, las demarcaciones y los valores
+           que faltan: en cuanto llega hay que volver a pintar lo que se dibujó
+           sin él, o se queda con lo que hubiera entonces —o nada—. En la ficha
+           de un mánager eso se veía clarísimo: «Jugador 897», sin chapa de
+           posición y con el valor de mercado en blanco. */
         if ($('squads-body') && squadList().length) renderSquads();
+        if (state.tab === 'managers') renderManagers();
       })
       .catch(function () {
         state.jugadoresCargando = false;
@@ -9639,7 +9642,10 @@
     Array.prototype.forEach.call(document.querySelectorAll('[data-panel]'), function (panel) {
       panel.hidden = panel.getAttribute('data-panel') !== name;
     });
-    if (name === 'managers') { renderManagers(); renderSquads(); renderTandasDeLiga(); }
+    /* `ensureJugadores` porque la ficha de un manager necesita el indice de
+       LaLiga para el nombre, la demarcacion y el valor de mercado de cada
+       futbolista; al llegar, repinta el solo. */
+    if (name === 'managers') { ensureJugadores(); renderManagers(); renderSquads(); renderTandasDeLiga(); }
     /* Los dos últimos faltaban aquí y solo se pintaban desde `render()`, así que
        al entrar en la pestaña salían como dos cuadros grises vacíos y solo se
        llenaban si por casualidad ocurría un repintado completo estando ya
@@ -9692,7 +9698,7 @@
     renderLineup();
     renderPlantilla();
     renderWarnings();
-    if (state.tab === 'managers') { renderManagers(); renderSquads(); renderTandasDeLiga(); }
+    if (state.tab === 'managers') { ensureJugadores(); renderManagers(); renderSquads(); renderTandasDeLiga(); }
     if (state.tab === 'fichajes') { renderDataKpis(); renderKpiCharts(); renderSpending(); pintarFichajes(); renderReventas(); renderMercadeo(); }
     if (state.tab === 'datos') { ensureSquads(); ensureLaLiga(); ensureRecuento(); renderRankings(); renderRankingsTemporada(); }
     if (state.tab === 'mercado') { renderMarket(); renderMovers(); }
