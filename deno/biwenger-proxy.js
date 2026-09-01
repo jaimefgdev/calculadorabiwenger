@@ -104,7 +104,7 @@ const CDN = 'https://cf.biwenger.com/api/v2';
    navegador normal y las cabeceras que este mandaría. */
 /* Marca de versión: se sube en cada cambio y se consulta con ?version=1.
    Sirve para saber desde fuera si el despliegue ha entrado o no. */
-const VERSION = '2026-08-31 · deno 63';
+const VERSION = '2026-09-01 · deno 64';
 
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ' +
   '(KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36';
@@ -2041,7 +2041,7 @@ async function superPicasDeLaTemporada(env, score) {
 
   let consolidada = false;
   for (let i = 0; i < pendientes.length; i++) {
-    if (i) await new Promise(function (listo) { setTimeout(listo, 300); });
+    if (i) await new Promise(function (listo) { setTimeout(listo, 120); });
     const detalle = await roundDetail(pendientes[i].id, score).catch(function () { return null; });
     if (!detalle) continue;
 
@@ -2406,14 +2406,19 @@ async function notasDeLaJornada(env, ids, names, score, numero, cerrada, partido
      jornada no tiene nota, y aun así su ficha se consultó. Sin esta distinción,
      un suplente que no salió dejaba el mapa «incompleto» para siempre. */
   const vistos = [];
-  const TANDA = 6;
+  /* Tandas de 10 y pausa corta. El freno se puso cuando CADA arranque volvia a
+     pedirlo todo; ahora el indice, los precios del dia y las notas de una
+     jornada cerrada viven en el KV, asi que esto solo corre la primera vez y no
+     hace falta ir tan despacio. Ademas, si Biwenger corta, `cdnCortado()` para
+     en seco, que es la proteccion que de verdad importa. */
+  const TANDA = 10;
   for (let i = 0; i < pedibles.length; i += TANDA) {
     /* Un respiro entre tandas. Noventa fichas seguidas a toda velocidad es lo
        que hacía que Biwenger cortara, y cuando corta no falla solo esto: cae
        también la descarga del índice de futbolistas y la web entera se queda
        sin nombres ni precios. Quince tandas a 400 ms son seis segundos, y solo
        la primera vez de cada jornada. */
-    if (i) await new Promise(function (listo) { setTimeout(listo, 400); });
+    if (i) await new Promise(function (listo) { setTimeout(listo, 120); });
     await Promise.all(pedibles.slice(i, i + TANDA).map(async function (id) {
       const quien = names[String(id) + ':slug'] || String(id);
       const respuesta = await fetch(CDN + '/players/la-liga/' + encodeURIComponent(quien) +
@@ -2936,9 +2941,9 @@ async function partidosDeJugador(env, id) {
      corta no falla solo esto: cae también el índice de futbolistas y la web se
      queda sin nombres ni precios. Casi todas salen de la caché, así que en la
      práctica esto no se nota. */
-  const TANDA_JORNADAS = 6;
+  const TANDA_JORNADAS = 10;
   for (let i = 0; i < propias.length; i += TANDA_JORNADAS) {
-    if (i) await new Promise(function (listo) { setTimeout(listo, 250); });
+    if (i) await new Promise(function (listo) { setTimeout(listo, 120); });
     await Promise.all(propias.slice(i, i + TANDA_JORNADAS).map(function (jornada) {
       return roundDetail(jornada.id, score)
         .then(function (d) { detalles[jornada.id] = d; })
@@ -3919,7 +3924,7 @@ async function pricesOnDay(ids, dia, names) {
   };
   const reparto = precioYaGuardado(ids, names);
   await Promise.all(reparto.listos.map(uno));
-  await porTandas(reparto.porPedir, 6, 250, uno);
+  await porTandas(reparto.porPedir, 10, 120, uno);
 
   /* Y se guarda lo aprendido, para no volver a preguntarlo jamas. */
   if (JORNADAS && Object.keys(salida).length) {
@@ -3952,7 +3957,7 @@ async function priceSeries(ids, dias, names) {
   };
   const reparto = precioYaGuardado(ids, names);
   await Promise.all(reparto.listos.map(uno));
-  await porTandas(reparto.porPedir, 6, 250, uno);
+  await porTandas(reparto.porPedir, 10, 120, uno);
   return salida;
 }
 
