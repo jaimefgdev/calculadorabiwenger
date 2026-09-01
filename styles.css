@@ -1740,6 +1740,23 @@ html.con-ficha { scrollbar-gutter: stable; }
    ofertas parta en dos líneas: si no, su ancho fijo obliga a un desplazable. */
 .table--offers th, .table--offers td,
 .table--listings th, .table--listings td { padding-inline: .4rem; }
+/* Solo cuando las dos tablas van LADO A LADO. Apiladas —en el movil— cada una
+   tiene el ancho entero y no falta sitio: ahi ya se ve bien y no hay que tocar
+   nada. Compartiendo ancho, en cambio, esta no cabe por unos pocos pixeles, y
+   como su ultima columna va fija a la derecha con fondo opaco, ese sobrante se
+   comia el «Queda» de al lado: «1d 17h» salia como «1d 17». */
+@media (min-width: 721px) {
+  #panel-inicio .table--listings th,
+  #panel-inicio .table--listings td { padding-inline: .22rem; }
+  /* El nombre cede lo que haga falta, con puntos suspensivos: es lo unico que
+     puede encoger sin perder informacion, porque los importes y el interruptor
+     no se pueden recortar. */
+  #panel-inicio .table--listings .player-name {
+    display: inline-block; max-width: 7.5rem;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    vertical-align: middle;
+  }
+}
 /* Los nombres van enteros: se gana el sitio con la tipografía, no cortándolos. */
 .table--offers { font-size: .78rem; }
 .table--offers th, .table--offers td { padding-inline: .3rem; }
@@ -1752,6 +1769,11 @@ html.con-ficha { scrollbar-gutter: stable; }
 .table--listings .bid { flex-wrap: nowrap; gap: .3rem; margin-right: .3rem; }
 .table--listings .bid strong { font-size: .82rem; }
 .table--listings .delta { font-size: .68rem; }
+/* Y la celda de ofertas, un pelin mas justa, tambien solo lado a lado. */
+@media (min-width: 721px) {
+  #panel-inicio .table--listings .bid { gap: .22rem; margin-right: .15rem; }
+  #panel-inicio .table--listings .delta { font-size: .64rem; }
+}
 .table--listings .switch { width: 30px; height: 17px; flex: none; }
 .table--listings .switch span { width: 11px; height: 11px; }
 .table--listings .switch[aria-pressed="true"] span { transform: translateX(13px); }
