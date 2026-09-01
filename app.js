@@ -1932,8 +1932,23 @@
     if (!list || list.length === 0) { section.hidden = true; return; }
     section.hidden = false;
 
+    /* El valor de mercado DE VERDAD. `listingValue` cae al precio de venta
+       cuando falta, y eso vale para simular pero NO para enseñarlo: la columna
+       «Valor» y la simulación «sin ofertas» son las dos valor de mercado, y con
+       ese apaño pasaban a enseñar lo que has pedido por él haciéndose pasar por
+       lo que vale. Si en la ficha no viene, se busca en el índice; y si tampoco
+       está, se dice que no se sabe en vez de inventarlo. */
+    const valorDeMercado = function (item) {
+      if (item.marketValue != null) return item.marketValue;
+      const ficha = playerInfo(item.playerId) || {};
+      return ficha.marketValue != null ? ficha.marketValue : null;
+    };
+
     $('listings-body').innerHTML = list.map(function (item) {
-      const market = listingValue(item);
+      const valor = valorDeMercado(item);
+      /* Para simular hace falta un importe sí o sí; ahí el precio de venta es
+         el sustituto razonable, y el título del botón ya dice qué es. */
+      const market = valor != null ? valor : listingValue(item);
 
       // Ofertas recibidas por ese jugador, para poder aceptarlas en la simulación.
       const bids = state.offers.filter(function (offer) {
@@ -1946,7 +1961,10 @@
         ? (function () {
             const id = marketSaleId(item);
             const on = !!state.sim[id];
-            return '<span class="bid' + (on ? ' bid--on' : '') + '" title="Sin ofertas: simula venderlo a su valor de mercado">' +
+            return '<span class="bid' + (on ? ' bid--on' : '') + '" title="' +
+              (valor == null
+                ? 'Sin ofertas y sin valor de mercado: simula venderlo al precio que pediste'
+                : 'Sin ofertas: simula venderlo a su valor de mercado') + '">' +
               '<strong class="' + (on ? 'money-pos' : 'money-market') + '">' + money(market) + '</strong> ' +
               simToggle(id, on, 'in') + '</span>';
           })()
@@ -1967,13 +1985,18 @@
       return '<tr>' +
         '<td data-label="Futbolista"><span class="with-crest">' + playerName(item) +
           crestOf(item, 'crest--badge') + '</span></td>' +
-        '<td class="num" data-label="Valor"><strong>' + money(market) + '</strong></td>' +
+        '<td class="num" data-label="Valor"><strong>' +
+          (valor == null ? '<span class="sub">—</span>' : money(valor)) + '</strong></td>' +
         '<td data-label="Queda">' + deadlineCell(item.until) + '</td>' +
         '<td data-label="Ofertas">' + offerCell + '</td>' +
       '</tr>';
     }).join('');
 
-    const total = list.reduce(function (sum, item) { return sum + listingValue(item); }, 0);
+    /* El total dice «de valor de mercado», asi que se suma eso mismo. */
+    const total = list.reduce(function (sum, item) {
+      const v = valorDeMercado(item);
+      return sum + (v != null ? v : listingValue(item));
+    }, 0);
     $('listings-count').textContent = list.length + (list.length === 1 ? ' jugador en venta' : ' jugadores en venta') +
       ' · ' + money(total) + ' de valor de mercado';
   }
@@ -2503,10 +2526,29 @@
 
   function playerById(id) {
     const found = mySquad().filter(function (player) { return player.id === String(id); })[0];
-    if (found) return found;
     const inLineup = ((state.lineup && state.lineup.players) || [])
       .filter(function (player) { return player.id === String(id); })[0];
-    return inLineup || null;
+    const base = found || inLineup;
+    if (!base) return null;
+
+    /* Se completa con el índice lo que le falte. La plantilla que guardó la
+       sincronía puede venir sin equipo, sin puntos y sin estado si en ese
+       momento el índice de futbolistas estaba caído, y entonces en el campo
+       desaparecían el escudo, la chapa de puntos y la marca de lesionado: los
+       tres salen de aquí. El índice los tiene, así que no hay por qué perderlos.
+       Solo se rellenan los huecos; lo que ya venga, manda. */
+    const ficha = playerInfo(id) || {};
+    const completa = function (campo) {
+      return base[campo] != null ? base[campo] : (ficha[campo] != null ? ficha[campo] : null);
+    };
+    return Object.assign({}, base, {
+      team: completa('team'),
+      teamName: base.teamName || ficha.teamName || null,
+      points: completa('points'),
+      status: base.status || ficha.status || null,
+      position: completa('position'),
+      marketValue: completa('marketValue')
+    });
   }
 
   /** Posición de un jugador según su plantilla o su ficha de alineación. */
@@ -3417,11 +3459,19 @@
     if (puesto) { puesto.price = Math.round(orden.price || 0); render(); return; }
 
     const ficha = playerInfo(id) || {};
+
+    /* SIN valor de mercado no se apunta nada. La tabla, cuando falta, cae al
+       precio de venta —`marketValue ?? price`—, y entonces la columna «Valor» y
+       la simulación «sin ofertas» pasaban a enseñar lo que has pedido por él
+       haciéndose pasar por su valor de mercado. Eso es un dato falso; esperar
+       el segundo que tarda la sincronía es mucho mejor. */
+    if (ficha.marketValue == null) return;
+
     state.listings.push({
       playerId: id,
       player: comoSeLlama({ id: id, name: ficha.name }) || ('Jugador ' + id),
       price: Math.round(orden.price || 0),
-      marketValue: ficha.marketValue != null ? ficha.marketValue : null,
+      marketValue: ficha.marketValue,
       /* Sin fecha de caducidad: la pone Biwenger y llega con la sincronía. */
       until: null,
       team: ficha.team != null ? ficha.team : null,

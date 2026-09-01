@@ -275,14 +275,7 @@ code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft)
   #panel-inicio .market-grid { gap: .8rem; }
   #panel-inicio .market-grid .panel { padding: .9rem; }
 }
-/* Una debajo de otra por debajo de 1200. Las dos tablas necesitan unos 530 px
-   cada una, y a dos columnas eso solo sale a partir de ahi.
-
-   Importa MUCHO para la app del movil: la pagina se dibuja a `width=1024` y el
-   navegador la escala, asi que alli se cumplia el «lado a lado» pero con
-   paneles de 475 px, y la tabla de ventas salia apretujada y cortada. Apiladas
-   tienen el ancho entero y se ven igual que en el ordenador. */
-@media (max-width: 1199px) { #panel-inicio .market-grid { grid-template-columns: 1fr; } }
+@media (max-width: 720px) { #panel-inicio .market-grid { grid-template-columns: 1fr; } }
 /* Apiladas solo cuando la pantalla es de verdad estrecha. */
 @media (max-width: 720px) {
   .market-grid { grid-template-columns: 1fr; }
@@ -1752,6 +1745,46 @@ html.con-ficha { scrollbar-gutter: stable; }
    nada. Compartiendo ancho, en cambio, esta no cabe por unos pocos pixeles, y
    como su ultima columna va fija a la derecha con fondo opaco, ese sobrante se
    comia el «Queda» de al lado: «1d 17h» salia como «1d 17». */
+/* Mismo diseno que en el ordenador, con la letra ajustada al hueco.
+   La app del movil se dibuja a `width=1024`, asi que aqui los paneles miden
+   ~475 px en vez de los ~545 del PC y la tabla de ventas (528 px con la letra
+   grande) no cabia. Con .64rem baja a ~461 y entra con 14 px de margen, sin
+   apilar nada ni recortar ningun nombre: al encoger la letra, el nombre encoge
+   con ella —«Roberto Fernandez» pasa de 117 a ~102 px—. */
+@media (min-width: 721px) and (max-width: 1199px) {
+  #panel-inicio .table--offers,
+  #panel-inicio .table--listings { font-size: .64rem; }
+  #panel-inicio .table--offers th,
+  #panel-inicio .table--offers td,
+  #panel-inicio .table--listings th,
+  #panel-inicio .table--listings td { padding-inline: .15rem; }
+
+  /* Altura de fila fija e igual en las dos, como en el PC pero a escala. */
+  #panel-inicio .table--offers thead th,
+  #panel-inicio .table--listings thead th { height: 26px; padding-block: 0; }
+  #panel-inicio .table--offers tbody td,
+  #panel-inicio .table--listings tbody td {
+    height: 34px; padding-block: 0; vertical-align: middle;
+  }
+
+  #panel-inicio .table--listings .bid { gap: .14rem; margin-right: .08rem; }
+  #panel-inicio .table--listings .bid strong { font-size: .66rem; }
+  #panel-inicio .table--listings .delta { font-size: .5rem; }
+  #panel-inicio .table--listings .switch { width: 24px; height: 14px; }
+  #panel-inicio .table--listings .switch span { width: 8px; height: 8px; }
+  #panel-inicio .table--listings .switch[aria-pressed="true"] span { transform: translateX(10px); }
+  #panel-inicio .table--offers .switch { width: 24px; height: 14px; }
+  #panel-inicio .table--offers .switch span { width: 8px; height: 8px; }
+  #panel-inicio .table--offers .switch[aria-pressed="true"] span { transform: translateX(10px); }
+
+  #panel-inicio .table--listings .player-name,
+  #panel-inicio .table--offers .player-name {
+    display: inline-block; max-width: 7rem;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    vertical-align: middle;
+  }
+}
+
 @media (min-width: 1200px) {
   #panel-inicio .table--listings th,
   #panel-inicio .table--listings td { padding-inline: .22rem; }
