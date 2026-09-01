@@ -1753,6 +1753,21 @@ html.con-ficha { scrollbar-gutter: stable; }
      asi que un tope menor sigue dejandolos enteros. */
   #panel-inicio .table--offers,
   #panel-inicio .table--listings { font-size: .74rem; }
+
+  /* Altura de fila FIJA e igual en las dos. El relleno ya era el mismo, pero
+     cada fila crecia hasta lo que midiera su contenido mas alto —la pildora de
+     «Operacion» en una, el bloque de importe e interruptor en la otra— y salian
+     a 40,5 y 42,7 px. Al ir una al lado de la otra esa diferencia se nota: las
+     filas dejan de coincidir y el desfase se acumula hacia abajo. Con alto
+     fijo, mismo numero de filas y misma altura, cuadran siempre.
+     `height` en una celda funciona como minimo, y 40 px dan de sobra para la
+     cara del futbolista (24 px). */
+  #panel-inicio .table--offers thead th,
+  #panel-inicio .table--listings thead th { height: 30px; padding-block: 0; }
+  #panel-inicio .table--offers tbody td,
+  #panel-inicio .table--listings tbody td {
+    height: 40px; padding-block: 0; vertical-align: middle;
+  }
   #panel-inicio .table--listings .bid strong { font-size: .76rem; }
   #panel-inicio .table--listings .switch { width: 26px; height: 15px; }
   #panel-inicio .table--listings .switch span { width: 9px; height: 9px; }
