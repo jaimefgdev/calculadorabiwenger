@@ -1000,6 +1000,11 @@ code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft)
   border-bottom: 1px solid var(--border);
   font-size: clamp(9px, 2.3cqw, 15px);
 }
+/* En los rankings la tira vive en una columna estrecha. Si aun asi no cabe,
+   que baje a otra linea antes que salirse y montarse encima de la lista de al
+   lado, que es lo que hacia. */
+.ranking__ficha .personal { flex-wrap: wrap; justify-content: center; }
+
 .personal__dato {
   /* Rótulo y dato centrados, igual que en los cuadros de estadísticas: si van
      pegados a la izquierda, cada columna empieza en un sitio y la tira se lee

@@ -7323,7 +7323,15 @@
    *
    * De paso se fue la espera: la ficha de LaLiga son 300 KB y cuatro segundos.
    */
-  function tiraPersonal(id) {
+  /**
+   * La tira de datos personales. `sinContrato` la deja fuera.
+   *
+   * En los rankings de Datos, la tira va dentro de una columna estrecha y el
+   * «Contrato hasta 2028» era el dato mas ancho: se salia y se montaba encima
+   * de la lista de al lado. En la ficha del futbolista, que tiene sitio de
+   * sobra, se sigue enseñando.
+   */
+  function tiraPersonal(id, sinContrato) {
     const bio = state.sofa[String(id)];
     if (!bio || bio === 'pidiendo') return '';
     if (!bio.height && !bio.birthDate && !bio.number) return '';
@@ -7366,7 +7374,7 @@
     if (bio.foot) {
       partes.push({ que: 'Pie', valor: PIES[bio.foot] || bio.foot });
     }
-    if (bio.contractUntil) {
+    if (bio.contractUntil && !sinContrato) {
       const c = new Date(bio.contractUntil + 'T00:00:00');
       if (!isNaN(c.getTime())) {
         partes.push({ que: 'Contrato', valor: 'hasta ' + c.getFullYear(),
@@ -9432,7 +9440,7 @@
               '<strong class="ranking__value">' + valor + '</strong>' +
             '</button>' +
             /* Se abre aquí mismo, hacia abajo, y solo con las estadísticas. */
-            (abierto ? '<div class="ranking__ficha">' + tiraPersonal(jugador.id) + estadisticasDeTemporada(jugador.id) + '</div>' : '') +
+            (abierto ? '<div class="ranking__ficha">' + tiraPersonal(jugador.id, true) + estadisticasDeTemporada(jugador.id) + '</div>' : '') +
           '</li>';
         }).join('') + '</ol>' +
         /* Mismo «Ver menos» que en «suben y bajan», y en el mismo sitio: al
