@@ -6844,7 +6844,7 @@
   }
 
   /* #, Jugador, Puntos, Valor equipo, Jug., Saldo, Puja máxima y Última conexión. */
-  const MANAGER_COLUMNS = 8;
+  const MANAGER_COLUMNS = 9;   // con la de «Dif.»
 
   /**
    * Clasificación: por puntos y, a igualdad, por Valor de Equipo + Saldo, que
@@ -6868,7 +6868,16 @@
   function renderManagers() {
     updateSortHeaders('managers', state.sort.managers);
 
-    $('managers-body').innerHTML = managerRows().map(function (row, index) {
+    const filas = managerRows();
+    /* El líder por PUNTOS, no el primero de la tabla: se puede ordenar por
+       saldo o por valor de equipo, y la diferencia siempre es con quien más
+       puntos lleva. */
+    const lider = filas.reduce(function (mejor, f) {
+      if (f.points == null) return mejor;
+      return (mejor == null || f.points > mejor) ? f.points : mejor;
+    }, null);
+
+    $('managers-body').innerHTML = filas.map(function (row, index) {
       const open = state.expandedManager === row.name;
       const abiertoPuntos = state.expandedPoints === row.name;
       return '<tr class="' + (open || abiertoPuntos ? 'row-open' : '') + '">' +
@@ -6886,6 +6895,15 @@
             ' title="Ver los puntos de cada futbolista">' +
             '<strong>' + (row.points == null ? '—' : row.points) + '</strong>' +
           '</button></td>' +
+        /* Cuánto le falta para el primero. Al líder, un guion: decir «0» daría
+           a entender que le faltan puntos para alcanzarse a sí mismo. */
+        '<td class="num" data-label="Dif.">' + (function () {
+          if (row.points == null || lider == null) return '<span class="sub">—</span>';
+          const dif = row.points - lider;
+          return dif === 0
+            ? '<span class="sub">—</span>'
+            : '<span class="dif-lider">' + dif + '</span>';
+        })() + '</td>' +
         '<td class="num" data-label="Valor equipo">' +
           (row.teamValue == null ? '<span class="unknown">—</span>' : money(row.teamValue)) + '</td>' +
         '<td class="num" data-label="Jug.">' + (row.players == null ? '—' : row.players) + '</td>' +
@@ -7324,14 +7342,14 @@
    * De paso se fue la espera: la ficha de LaLiga son 300 KB y cuatro segundos.
    */
   /**
-   * La tira de datos personales. `sinContrato` la deja fuera.
+   * La tira de datos personales. `apretada` deja fuera contrato y dorsal.
    *
-   * En los rankings de Datos, la tira va dentro de una columna estrecha y el
-   * «Contrato hasta 2028» era el dato mas ancho: se salia y se montaba encima
-   * de la lista de al lado. En la ficha del futbolista, que tiene sitio de
-   * sobra, se sigue enseñando.
+   * En los rankings de Datos la tira vive en una columna estrecha, y esos dos
+   * son los que sobran: «Contrato hasta 2028» es el mas ancho, y el dorsal ni
+   * siquiera lo tienen todos, asi que unas fichas caian a dos lineas y otras no.
+   * En la ficha del futbolista, que tiene sitio de sobra, se siguen enseñando.
    */
-  function tiraPersonal(id, sinContrato) {
+  function tiraPersonal(id, apretada) {
     const bio = state.sofa[String(id)];
     if (!bio || bio === 'pidiendo') return '';
     if (!bio.height && !bio.birthDate && !bio.number) return '';
@@ -7374,14 +7392,14 @@
     if (bio.foot) {
       partes.push({ que: 'Pie', valor: PIES[bio.foot] || bio.foot });
     }
-    if (bio.contractUntil && !sinContrato) {
+    if (bio.contractUntil && !apretada) {
       const c = new Date(bio.contractUntil + 'T00:00:00');
       if (!isNaN(c.getTime())) {
         partes.push({ que: 'Contrato', valor: 'hasta ' + c.getFullYear(),
           detalle: 'Termina el ' + soloFecha.format(c) });
       }
     }
-    if (bio.number) partes.push({ que: 'Dorsal', valor: String(bio.number) });
+    if (bio.number && !apretada) partes.push({ que: 'Dorsal', valor: String(bio.number) });
     if (!partes.length) return '';
 
     return '<div class="personal">' +
@@ -7620,7 +7638,13 @@
     const limpiar = function (t) {
       return String(t || '').toLowerCase()
         .normalize('NFD').replace(/[̀-ͯ]/g, '')
-        .replace(/\b(fc|cf|ud|cd|rc|rcd|sd|sad|club|de|futbol|atletico|real)\b/g, '')
+        /* OJO: aqui NO pueden ir «atletico» ni «real». Biwenger llama «Atlético»
+           a secas, y quitando esa palabra la cadena se quedaba VACIA, con lo que
+           la funcion devolvia `false` siempre: ningun futbolista del Atletico
+           podia emparejarse con su ficha de SofaScore, y por eso a esos no les
+           salian ni estatura, ni edad, ni nacionalidad, ni pie. Son parte del
+           nombre, no relleno. */
+        .replace(/\b(fc|cf|ud|cd|rc|rcd|sd|sad|club|de|futbol)\b/g, '')
         .replace(/[^a-z0-9]+/g, '');
     };
     const a = limpiar(uno), b = limpiar(otro);
@@ -7648,11 +7672,17 @@
       if (limpio && intentos.indexOf(limpio) === -1) intentos.push(limpio);
     };
     anadir(nombre);
+    /* Sin acentos: alli escriben «Nico Williams» pero tambien «Inaki» por
+       «Iñaki», y una tilde de mas deja la busqueda sin resultados. */
+    anadir(String(nombre || '').normalize('NFD').replace(/[̀-ͯ]/g, ''));
     const enPalabras = String(slug || '').replace(/-/g, ' ');
     anadir(enPalabras);
     /* El último trozo del slug suele ser el apellido. */
     const trozos = enPalabras.split(/\s+/).filter(Boolean);
     if (trozos.length > 1) anadir(trozos[trozos.length - 1]);
+    /* Y el primero: a algunos los conocen por el nombre de pila («Guridi»,
+       «Brugué»), y a otros el apellido suelto no los encuentra. */
+    if (trozos.length > 1) anadir(trozos[0]);
 
     for (let i = 0; i < intentos.length; i++) {
       const datos = await fetch(SOFA + '/search/all?q=' + encodeURIComponent(intentos[i]))

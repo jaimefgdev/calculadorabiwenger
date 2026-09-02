@@ -928,6 +928,9 @@ code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft)
 /* ---------- Ficha de mánager ---------- */
 .row-open { background: var(--accent-soft) !important; }
 .detail--manager { border-left-color: var(--accent); }
+/* Los puntos que le faltan al primero: en rojo suave, que es una carencia. */
+.dif-lider { color: var(--neg); font-variant-numeric: tabular-nums; }
+
 .bid-amount { color: #a87400; }
 @media (prefers-color-scheme: dark) {
   .bid-amount { color: #ffc233; }
