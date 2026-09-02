@@ -4848,6 +4848,52 @@
      nunca, el ranking salía a cero para siempre. Aquí se piden esas y solo
      esas, una vez por sesión: al llegar, la mezcla las completa y el ranking
      se rehace solo. */
+  /**
+   * Descarga las jornadas ya jugadas que la web no tiene todavia.
+   *
+   * La general de Liga se calcula sumando las jornadas GUARDADAS, y hasta ahora
+   * solo se guardaba una jornada al abrirla en su pestaña. Si nunca habias
+   * mirado, por ejemplo, la 1, sus puntos no estaban en ninguna parte y la
+   * clasificacion salia corta —sin ningun aviso de que faltara nada—.
+   *
+   * Una vez por sesion, en fila y con un respiro entre ellas: casi siempre son
+   * dos o tres, y una jornada cerrada sale del KV del proxy, asi que no cuesta
+   * apenas.
+   */
+  let jugadasPedidas = false;
+
+  function ensureJornadasJugadas() {
+    if (jugadasPedidas) return;
+    const config = loadSyncConfig();
+    if (!config.url || !config.key) return;
+    /* Sin calendario no se sabe cuales hay: llega con la primera jornada. */
+    const calendario = state.jornadas.list || [];
+    if (!calendario.length) return;
+
+    const faltan = calendario.filter(function (r) {
+      if ((r.part || 1) !== 1) return false;
+      if (r.status === 'pending') return false;
+      return !state.jornadas.datos[r.id];
+    });
+    if (!faltan.length) { jugadasPedidas = true; return; }
+    jugadasPedidas = true;
+
+    const siguiente = function (i) {
+      if (i >= faltan.length) return;
+      fetch(config.url.replace(/\/+$/, '') + '/?key=' + encodeURIComponent(config.key) +
+        '&jornada=' + encodeURIComponent(faltan[i].id), { headers: { 'accept': 'application/json' } })
+        .then(function (response) { return response.json(); })
+        .then(function (payload) {
+          if (payload.error || !payload.round) return;
+          mergeJornada(payload, true);
+          renderManagers(); renderJornadas(); renderRankings();
+        })
+        .catch(function () { /* esa se queda sin traer */ })
+        .then(function () { setTimeout(function () { siguiente(i + 1); }, 400); });
+    };
+    siguiente(0);
+  }
+
   let golesPedidos = false;
 
   function ensureGolesDeJornadas() {
@@ -9752,6 +9798,8 @@
        ahi salia todo como «Jugador 26930», sin escudo, sin chapa de puntos y sin
        marca de lesionado, mientras en Liga o Jugadores se veia bien. */
     ensureJugadores();
+    /* Y las jornadas ya jugadas que falten, o la general sale corta. */
+    ensureJornadasJugadas();
 
     const rows = budgetRows();
     state.kpi = kpiValues(rows);   // los usa la pestaña Datos
