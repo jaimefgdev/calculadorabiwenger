@@ -6838,8 +6838,13 @@
 
   function recordCell(label, movement) {
     if (!movement) return '<div class="record"><span class="record__label">' + label + '</span><span class="unknown">—</span></div>';
+    /* Por `comoSeLlama` y no por `movement.player` a pelo: aquí salía «Jugador
+       40070» cuando el que se vendió ya no está en LaLiga y el proxy no le
+       encontró nombre. Si en cualquier otra pantalla sí ha aparecido con el
+       suyo, la web ya lo tiene aprendido y lo pone aquí también. */
+    const como = comoSeLlama({ id: movement.playerId, name: movement.player });
     return '<div class="record"><span class="record__label">' + label + '</span>' +
-      '<span class="record__player">' + escapeHtml(movement.player) + '</span>' +
+      '<span class="record__player">' + escapeHtml(como || movement.player) + '</span>' +
       '<strong class="record__amount">' + money(movement.amount) + '</strong></div>';
   }
 
@@ -9970,6 +9975,49 @@
    * nada: cuadrar los puntos a ciegas costó varias versiones seguidas sin poder
    * saber si un ajuste se estaba aplicando o ni siquiera se llegaba a él.
    */
+  /**
+   * `calcSinNombre()` en la consola: los que salen como «Jugador 40070».
+   *
+   * Sirve para comprobar de un vistazo que no queda ninguno, que es justo lo
+   * que no se puede mirar desde el servidor: el historial de la liga solo se
+   * baja con la clave, y esa vive aquí, en el navegador.
+   *
+   * Si sale alguno, el proxy le preguntará el nombre a Biwenger la próxima vez
+   * y se lo quedará para siempre; con recargar basta. Y si aun así insiste, es
+   * que Biwenger tampoco lo conoce ya.
+   */
+  window.calcSinNombre = function () {
+    const marca = /^Jugador\s+\d+$/;
+    const salida = {};
+    const mirar = function (donde, lista, campo) {
+      (lista || []).forEach(function (fila) {
+        const como = fila && fila[campo];
+        if (!como || !marca.test(String(como))) return;
+        if (!salida[como]) salida[como] = [];
+        if (salida[como].indexOf(donde) === -1) salida[como].push(donde);
+      });
+    };
+
+    mirar('Fichajes', state.movements, 'player');
+    mirar('Mercado', state.offers, 'player');
+    mirar('Mis ventas', state.listings, 'player');
+    mirar('Movimientos de LaLiga', state.laligaMoves, 'player');
+    mirar('Jugadores', state.jugadores, 'name');
+    mirar('Alineación', (state.lineup || {}).players, 'name');
+    (Object.keys((state.jornadas && state.jornadas.datos) || {})).forEach(function (k) {
+      const j = state.jornadas.datos[k] || {};
+      (j.standings || []).forEach(function (fila) {
+        mirar('Jornada ' + ((j.round || {}).number || k), fila.xi, 'name');
+      });
+    });
+
+    const cuantos = Object.keys(salida);
+    if (!cuantos.length) return 'Perfecto: ni un solo futbolista sin nombre.';
+    return 'Sin nombre (' + cuantos.length + '):\n' + cuantos.map(function (quien) {
+      return '  ' + quien + '  ->  ' + salida[quien].join(', ');
+    }).join('\n');
+  };
+
   window.calcDiag = function (cual) {
     const datos = (state.jornadas && state.jornadas.datos) || {};
     const claves = Object.keys(datos);
