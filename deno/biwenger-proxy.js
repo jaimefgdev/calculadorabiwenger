@@ -123,7 +123,7 @@ const CDN = 'https://cf.biwenger.com/api/v2';
    navegador normal y las cabeceras que este mandaría. */
 /* Marca de versión: se sube en cada cambio y se consulta con ?version=1.
    Sirve para saber desde fuera si el despliegue ha entrado o no. */
-const VERSION = '2026-09-02 · deno 68';
+const VERSION = '2026-09-02 · deno 69';
 
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ' +
   '(KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36';
@@ -162,7 +162,15 @@ let cache = { token: null, account: null, players: null, playersAt: 0, prices: {
   primas: null };
 
 const app = {
+  /* Todo lo que sale por aquí pasa antes por `ponerNombresQueFaltan`, que
+     rellena los nombres de los que ya no están en LaLiga. Va envuelto y no
+     dentro de `atender` para que valga por los dos caminos de entrada: el
+     `Deno.serve` del final y el `export default app`. */
   async fetch(request, env) {
+    return await ponerNombresQueFaltan(await app.atender(request, env));
+  },
+
+  async atender(request, env) {
     /* ALLOWED_ORIGIN admite varios dominios separados por comas: la web puede
        servirse desde github.io y desde el dominio propio a la vez. */
     const allowed = String(env.ALLOWED_ORIGIN || '*').split(',')
@@ -4421,6 +4429,129 @@ async function build(env, debug) {
 
 
 /* Deno Deploy atiende cada peticion por aqui. */
+/* ---------- Que no quede ni un «Jugador 40070» -----------------------------
+ *
+ * El índice de futbolistas trae SOLO la plantilla de LaLiga de hoy. En cuanto
+ * uno se va —traspasado fuera de la liga, retirado o dado de baja— desaparece
+ * de él, y con él su nombre: `names[id]` deja de existir y en su sitio salía
+ * «Jugador 40070». Pasaba en los fichajes viejos, en las ventas, en los
+ * informes de jornadas que ese futbolista sí jugó... una docena de sitios.
+ *
+ * Biwenger sí los conserva: `/players/la-liga/40070` sigue contestando
+ * «Manuel Ángel». El id vale como ruta igual que el slug.
+ *
+ * El arreglo se hace UNA vez y aquí, sobre la respuesta ya montada, en vez de
+ * en cada uno de los doce sitios que escriben esa marca: se busca, se
+ * pregunta por los que salgan y se sustituye. Así vale también para los sitios
+ * que se escriban mañana, sin tener que acordarse de nada.
+ *
+ * Lo aprendido se guarda en el KV para siempre: un nombre no cambia, así que
+ * cada futbolista se pregunta una sola vez en la vida del servidor.
+ */
+const CLAVE_IDOS = 'nombres-idos';
+
+async function nombresAprendidos() {
+  if (cache.idos) return cache.idos;
+  cache.idos = {};
+  try {
+    const crudo = await JORNADAS.get(CLAVE_IDOS);
+    if (crudo) cache.idos = JSON.parse(crudo) || {};
+  } catch (error) { /* si no se puede leer, se empieza de cero */ }
+  return cache.idos;
+}
+
+/**
+ * Pregunta a Biwenger por unos cuantos ids y devuelve lo que sepa de ellos.
+ * Lo que no conteste se marca igualmente, para no volver a preguntarlo cada
+ * minuto: un id que Biwenger no reconoce hoy no lo va a reconocer mañana.
+ */
+async function preguntarNombres(ids) {
+  const sabidos = await nombresAprendidos();
+  let nuevos = 0;
+
+  /* De cinco en cinco y con respiro. Una ráfaga hace que Biwenger corte las
+     consultas, y cuando corta no falla solo esto: se cae también la descarga
+     del índice y la web entera se queda sin NINGÚN nombre y a 0 €, que es
+     muchísimo peor que este puñado de ids sueltos. */
+  await porTandas(ids.slice(0, 20), 5, 250, async function (id) {
+    const r = await fetch(CDN + '/players/la-liga/' + encodeURIComponent(id) +
+      '?lang=es&fields=id,name,slug', { headers: NAVEGADOR })
+      .catch(function () { return null; });
+    if (apuntarCorteDelCdn(r)) return;
+    if (!r) return;
+    if (!r.ok) {
+      /* 404: ese id no existe. Se apunta en blanco para no insistir. */
+      if (r.status === 404) { sabidos[id] = ''; nuevos++; }
+      return;
+    }
+    const dato = (await r.json().catch(function () { return {}; })).data;
+    /* OJO CON ESTO: cuando el id no existe, Biwenger NO contesta 404. Contesta
+       200 con OTRO futbolista, el del id más cercano que sí tenga. Pides el
+       40076 y te devuelve el 40070, «Manuel Ángel», tan formal. Sin comprobar
+       que el id que vuelve es el que se pidió, aquí se acabaría escribiendo el
+       nombre de un futbolista distinto en el historial de fichajes: mucho peor
+       que dejar el «Jugador 40076», porque parece bueno y no lo es. */
+    const bueno = dato && dato.name && String(dato.id) === String(id);
+    sabidos[id] = bueno ? dato.name : '';
+    nuevos++;
+  });
+
+  if (nuevos) {
+    try { await JORNADAS.put(CLAVE_IDOS, JSON.stringify(sabidos)); } catch (e) { /* otra vez será */ }
+  }
+  return sabidos;
+}
+
+async function ponerNombresQueFaltan(respuesta) {
+  try {
+    const tipo = respuesta.headers.get('content-type') || '';
+    if (tipo.indexOf('json') === -1) return respuesta;
+
+    const texto = await respuesta.clone().text();
+    /* Comprobación baratísima primero: en el 99,9 % de las respuestas no hay
+       ninguna marca y aquí se acaba, sin recorrer nada ni tocar el KV. */
+    if (texto.indexOf('Jugador ') === -1) return respuesta;
+
+    const marca = /Jugador (\d+)/g;
+    const pendientes = {};
+    let hallazgo;
+    while ((hallazgo = marca.exec(texto)) !== null) pendientes[hallazgo[1]] = true;
+    const ids = Object.keys(pendientes);
+    if (!ids.length) return respuesta;
+
+    let sabidos = await nombresAprendidos();
+    const porPreguntar = ids.filter(function (id) { return sabidos[id] == null; });
+    if (porPreguntar.length && !cdnCortado()) {
+      sabidos = await preguntarNombres(porPreguntar);
+    }
+
+    /* Se sustituye sobre el texto, que es JSON: el nombre va escapado como lo
+       escaparía JSON.stringify, no vaya a ser que uno lleve comillas y rompa
+       la respuesta entera por arreglar una etiqueta. */
+    const arreglado = texto.replace(/Jugador (\d+)/g, function (todo, id) {
+      const nombre = sabidos[id];
+      if (!nombre) return todo;              // desconocido: se deja como estaba
+      return JSON.stringify(nombre).slice(1, -1);
+    });
+    if (arreglado === texto) return respuesta;
+
+    /* Cabeceras copiadas a una lista nueva —las de una Response pueden venir
+       de solo lectura— y sin `content-length`: el texto ya no mide lo mismo, y
+       una longitud que no cuadra corta la respuesta por la mitad. */
+    const cabeceras = new Headers(respuesta.headers);
+    cabeceras.delete('content-length');
+    return new Response(arreglado, {
+      status: respuesta.status,
+      statusText: respuesta.statusText,
+      headers: cabeceras
+    });
+  } catch (error) {
+    /* Esto es un adorno: si falla, se manda la respuesta tal cual. Jamás se
+       tumba una respuesta buena por no poder poner un nombre. */
+    return respuesta;
+  }
+}
+
 Deno.serve(function (request) {
   return app.fetch(request, ENTORNO);
 });
