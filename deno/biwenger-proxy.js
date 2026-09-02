@@ -123,7 +123,7 @@ const CDN = 'https://cf.biwenger.com/api/v2';
    navegador normal y las cabeceras que este mandaría. */
 /* Marca de versión: se sube en cada cambio y se consulta con ?version=1.
    Sirve para saber desde fuera si el despliegue ha entrado o no. */
-const VERSION = '2026-09-01 · deno 67';
+const VERSION = '2026-09-02 · deno 68';
 
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ' +
   '(KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36';
@@ -2078,7 +2078,10 @@ async function matchDay(roundId, score, names, primas) {
  * peticiones que tumbó el índice de futbolistas.
  */
 async function superPicasDeLaTemporada(env, score) {
-  const clave = 'superpicas-v2-' + (score || '');
+  /* v3: la cuenta guardada con la v2 puede tener jornadas contadas a medias
+     —se daban por cerradas al acabar los partidos, y Biwenger publica las Super
+     Picas despues—, asi que se empieza de cero. */
+  const clave = 'superpicas-v3-' + (score || '');
   const calendario = await seasonRounds().catch(function () { return []; });
   const jugadas = calendario.filter(function (r) {
     return (r.part || 1) === 1 && (r.status === 'finished' || r.status === 'active');
@@ -2114,8 +2117,18 @@ async function superPicasDeLaTemporada(env, score) {
     const suyas = Object.keys(detalle.picas || {});
     suyas.forEach(function (quien) { cuenta[quien] = (cuenta[quien] || 0) + 1; });
 
-    const zanjada = (detalle.played || 0) >= (detalle.games || 0) && (detalle.games || 0) > 0;
-    if (!zanjada) continue;
+    /* Se da por contada SOLO cuando ademas estan todas sus Super Picas. Biwenger
+       reparte UNA POR PARTIDO —comprobado en las cuatro rondas de la temporada,
+       10 de 10 en todas—, asi que si hay menos que partidos es que aun le faltan
+       por publicar.
+
+       Sin esto, una jornada se consolidaba en el pitido final, cuando las Super
+       Picas todavia no estaban todas, y como una jornada contada no se vuelve a
+       mirar, se quedaba corta para siempre: a Raphinha le faltaba la de la
+       jornada 3. Mientras falten, se sigue contando en vivo en cada consulta. */
+    const jugados = (detalle.played || 0) >= (detalle.games || 0) && (detalle.games || 0) > 0;
+    const todas = suyas.length >= (detalle.games || 0);
+    if (!jugados || !todas) continue;
     suyas.forEach(function (quien) { caja.cuenta[quien] = (caja.cuenta[quien] || 0) + 1; });
     caja.hechas.push(String(pendientes[i].id));
     consolidada = true;
