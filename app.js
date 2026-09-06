@@ -8832,7 +8832,7 @@
           '</tr>';
         }).join('') + '</tbody></table></div></td></tr>';
 
-      return '<tr class="' + (open ? 'row-open' : '') + '">' +
+      return '<tr class="' + (open ? 'row-open' : '') + claseMia(squad.name) + '">' +
         '<td>' +
           '<button type="button" class="row-toggle" data-squad="' + escapeHtml(squad.id) + '"' +
             ' aria-expanded="' + (open ? 'true' : 'false') + '">' +
@@ -9071,7 +9071,7 @@
         };
         /* Con un solo fichaje en cartera, mejor y peor son el mismo: se dice una vez. */
         const unico = f.mejor && f.peor && f.mejor.name === f.peor.name;
-        return '<tr>' +
+        return '<tr class="' + claseMia(f.name).trim() + '">' +
           '<td data-label="Jugador"><span class="manager">' + avatar(f.name) +
             '<span class="manager__name">' + escapeHtml(f.name) + '</span></span></td>' +
           '<td class="num" data-label="Compra/venta">' + celdaDinero(f.realizado) + '</td>' +
