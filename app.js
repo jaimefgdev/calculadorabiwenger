@@ -1648,7 +1648,7 @@
       const managerCell = movement.manager
         ? '<div class="manager">' + avatar(movement.manager) + '<span>' + escapeHtml(movement.manager) + '</span></div>'
         : '<span class="unknown">Sin identificar</span>';
-      return '<tr>' +
+      return '<tr class="' + claseMia(movement.manager).trim() + '">' +
         /* La demarcación va delante del nombre, como en las demás tablas. */
         '<td data-label="Futbolista"><span class="with-crest">' + playerName(movement) +
           crestOf(movement, 'crest--badge') + '</span></td>' +
@@ -8931,7 +8931,7 @@
         '<th class="num" title="Días que lo tuvo en su plantilla">Días</th>' +
       '</tr></thead><tbody>' +
       todas.map(function (o) {
-        return '<tr>' +
+        return '<tr class="' + claseMia(o.manager).trim() + '">' +
           '<td data-label="Futbolista"><span class="with-crest">' +
             playerName({ playerId: o.playerId, player: o.player, position: o.position }) +
             crestOf(o, 'crest--badge') + '</span></td>' +
