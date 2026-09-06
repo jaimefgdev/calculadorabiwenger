@@ -1556,7 +1556,7 @@
     $('budget-body').innerHTML = rows.map(function (row, index) {
       const negative = row.balance < 0;
       const expanded = state.expanded[row.name] === true;
-      return '<tr class="' + (negative ? 'row-neg' : '') + '">' +
+      return '<tr class="' + (negative ? 'row-neg' : '') + claseMia(row.name) + '">' +
         '<td class="col-rank">' + (index + 1) + '</td>' +
         '<td data-label="Futbolista">' +
           '<button type="button" class="row-toggle" data-manager="' + escapeHtml(row.name) + '"' +
@@ -1681,6 +1681,20 @@
       return state.teams[name] && state.teams[name].id === state.me.id;
     });
     return found[0] || null;
+  }
+
+  /**
+   * ¿Esta fila es la mía? Devuelve la clase que la aclara un punto.
+   *
+   * Se usa en TODAS las clasificaciones para no tener que buscar el propio
+   * nombre entre ocho cada vez. Va por nombre porque es lo único que llevan
+   * todas las tablas; el nombre sale de `myName()`, que lo saca del id del
+   * token con el que sincronizamos, no de una constante escrita a mano.
+   */
+  function claseMia(nombre) {
+    if (!nombre) return '';
+    const yo = myName();
+    return yo && nombre === yo ? ' fila--mia' : '';
   }
 
   /** Saldo si se cerrasen las operaciones marcadas: pujas restan, ventas suman. */
@@ -4996,7 +5010,7 @@
       return '<div class="ranking">' +
         '<h3 class="ranking__title">' + titulo + '</h3>' +
         '<ol class="ranking__list">' + filas.map(function (fila) {
-          return '<li class="ranking__row">' +
+          return '<li class="ranking__row' + claseMia(fila.name) + '">' +
             '<span class="ranking__boton ranking__boton--fijo">' +
               '<span class="ranking__quien"><span class="manager">' + avatar(fila.name) +
                 '<span class="manager__name">' + escapeHtml(fila.name) + '</span></span></span>' +
@@ -5033,7 +5047,7 @@
               return b[x] - a[x];
             });
 
-          return '<li class="ranking__row">' +
+          return '<li class="ranking__row' + claseMia(fila.name) + '">' +
             '<button type="button" class="ranking__boton"' +
               ' data-goles="' + escapeHtml(clave) + '"' +
               ' aria-expanded="' + (abierto ? 'true' : 'false') + '"' +
@@ -6840,7 +6854,7 @@
         '<tr class="detail-row"><td class="detail-cell" colspan="7"><div class="detail">' +
           jornadaDetalle(fila) + '</div></td></tr>';
 
-      return '<tr class="' + (abierta ? 'row-open' : '') + '">' +
+      return '<tr class="' + (abierta ? 'row-open' : '') + claseMia(fila.name) + '">' +
         '<td class="col-rank">' + (indice + 1) + '</td>' +
         '<td>' +
           '<button type="button" class="row-toggle" data-jornada-manager="' + escapeHtml(fila.id) + '"' +
@@ -7051,7 +7065,7 @@
     $('managers-body').innerHTML = filas.map(function (row, index) {
       const open = state.expandedManager === row.name;
       const abiertoPuntos = state.expandedPoints === row.name;
-      return '<tr class="' + (open || abiertoPuntos ? 'row-open' : '') + '">' +
+      return '<tr class="' + (open || abiertoPuntos ? 'row-open' : '') + claseMia(row.name) + '">' +
         '<td class="col-rank">' + (index + 1) + '</td>' +
         '<td data-label="Futbolista">' +
           '<button type="button" class="row-toggle" data-manager-card="' + escapeHtml(row.name) + '"' +
@@ -8997,7 +9011,21 @@
    */
   function tonoDeSaldo(saldo) {
     if (saldo == null) return '';
-    if (saldo < 0) return 'money-neg';
+
+    /* La deuda, por tramos igual que el saldo: el rojo tira más cuanto más
+       debe. Antes todas las deudas iban del mismo rojo, y deber cuatrocientos
+       mil se veía igual de grave que deber cuatro millones. Los cortes son más
+       apretados que los del ámbar porque los números rojos de esta liga son
+       mucho más pequeños que los saldos: van de unos cientos de miles a un par
+       de millones, y con los cortes del saldo caerían todos en el primero. */
+    if (saldo < 0) {
+      const debe = -saldo;
+      if (debe < 500000) return 'deuda deuda--1';
+      if (debe < 1500000) return 'deuda deuda--2';
+      if (debe < 5000000) return 'deuda deuda--3';
+      return 'deuda deuda--4';
+    }
+
     if (saldo < 1000000) return 'saldo saldo--1';        // por debajo del millón
     if (saldo < 5000000) return 'saldo saldo--2';
     if (saldo < 10000000) return 'saldo saldo--3';
@@ -9730,6 +9758,72 @@
     ajustarNombres();
   }
 
+  /** Cuántos salen en «Los más caros de la liga». */
+  const CUANTOS_CAROS = 20;
+
+  /**
+   * Los futbolistas más caros que hay fichados en la liga, con su dueño.
+   *
+   * Sale de las ocho plantillas, no del mercado ni del índice de LaLiga: lo que
+   * interesa es quién TIENE el patrimonio, no cuánto vale el futbolista más
+   * caro que anda libre. Un mismo id no puede estar en dos plantillas, así que
+   * no hay que preocuparse por repetidos.
+   */
+  function renderCaros() {
+    const cuerpo = $('caros-body');
+    if (!cuerpo) return;
+
+    const plantillas = squadList();
+    if (!plantillas.length) {
+      cuerpo.innerHTML = '<tr><td colspan="5" class="empty">' +
+        (state.squads && state.squads.status === 'loading'
+          ? 'Cargando plantillas…' : 'Sincroniza para ver las plantillas.') + '</td></tr>';
+      return;
+    }
+
+    const todos = [];
+    plantillas.forEach(function (plantilla) {
+      (plantilla.players || []).forEach(function (jugador) {
+        /* Sin valor no se puede ordenar, y meterlo como cero lo mandaría al
+           fondo haciéndose pasar por un dato. */
+        if (jugador.marketValue == null) return;
+        todos.push({
+          id: jugador.id,
+          name: comoSeLlama(jugador),
+          position: jugador.position,
+          team: jugador.team,
+          teamName: jugador.teamName,
+          status: jugador.status,
+          valor: jugador.marketValue,
+          hoy: jugador.increment || 0,
+          dueno: plantilla.name
+        });
+      });
+    });
+
+    if (!todos.length) {
+      cuerpo.innerHTML = '<tr><td colspan="5" class="empty">Todavía no hay valores de mercado.</td></tr>';
+      return;
+    }
+
+    const caros = todos.sort(function (a, b) { return b.valor - a.valor; }).slice(0, CUANTOS_CAROS);
+
+    cuerpo.innerHTML = caros.map(function (j, i) {
+      /* Aqui la fila se aclara cuando el futbolista es MIO, que es lo que se
+         mira en esta tabla: no quien puntua, sino quien lo tiene. */
+      return '<tr class="' + claseMia(j.dueno).trim() + '">' +
+        '<td class="col-rank">' + (i + 1) + '</td>' +
+        '<td data-label="Futbolista"><span class="with-crest">' +
+          playerName({ playerId: j.id, player: j.name, position: j.position }) +
+          crestOf(j, 'crest--badge') + '</span></td>' +
+        '<td data-label="Propietario"><span class="manager">' + avatar(j.dueno) +
+          '<span class="manager__name">' + escapeHtml(j.dueno) + '</span></span></td>' +
+        '<td class="num" data-label="Hoy">' + (j.hoy ? celdaDinero(j.hoy) : '<span class="zero">—</span>') + '</td>' +
+        '<td class="num" data-label="Valor"><strong>' + money(j.valor) + '</strong></td>' +
+      '</tr>';
+    }).join('');
+  }
+
   /** De quién es cada futbolista, mirando las ocho plantillas. */
   function duenosDeFutbolistas() {
     const de = {};
@@ -9920,7 +10014,7 @@
               '<td class="detail-date">' + escapeHtml(movement.date || '—') + '</td></tr>';
           }).join('') + '</tbody></table></div></td></tr>';
 
-        return '<tr class="' + (open ? 'row-open' : '') + '">' +
+        return '<tr class="' + (open ? 'row-open' : '') + claseMia(row.name) + '">' +
           '<td class="col-rank">' + (index + 1) + '</td>' +
           '<td data-label="Futbolista">' +
             '<button type="button" class="row-toggle" data-spend="' + escapeHtml(key) + '"' +
@@ -10010,7 +10104,9 @@
     /* `ensureJugadores` porque la ficha de un manager necesita el indice de
        LaLiga para el nombre, la demarcacion y el valor de mercado de cada
        futbolista; al llegar, repinta el solo. */
-    if (name === 'managers') { ensureJugadores(); renderManagers(); renderSquads(); renderTandasDeLiga(); }
+    if (name === 'managers') {
+      ensureJugadores(); renderManagers(); renderSquads(); renderTandasDeLiga(); renderCaros();
+    }
     /* Los dos últimos faltaban aquí y solo se pintaban desde `render()`, así que
        al entrar en la pestaña salían como dos cuadros grises vacíos y solo se
        llenaban si por casualidad ocurría un repintado completo estando ya
@@ -10073,7 +10169,9 @@
     renderLineup();
     renderPlantilla();
     renderWarnings();
-    if (state.tab === 'managers') { ensureJugadores(); renderManagers(); renderSquads(); renderTandasDeLiga(); }
+    if (state.tab === 'managers') {
+      ensureJugadores(); renderManagers(); renderSquads(); renderTandasDeLiga(); renderCaros();
+    }
     if (state.tab === 'fichajes') { renderDataKpis(); renderKpiCharts(); renderSpending(); pintarFichajes(); renderReventas(); renderMercadeo(); }
     if (state.tab === 'datos') { ensureSquads(); ensureLaLiga(); ensureRecuento(); renderRankings(); renderRankingsTemporada(); }
     if (state.tab === 'mercado') { renderMarket(); renderMovers(); }
@@ -11089,7 +11187,7 @@
 
     /* La ficha se abre pulsando el nombre del futbolista, esté donde esté. */
     ['moves-body', 'market-body', 'squads-body', 'listings-body',
-     'movers-up', 'movers-down', 'jugadores-body', 'squad-body'].forEach(function (id) {
+     'movers-up', 'movers-down', 'jugadores-body', 'squad-body', 'caros-body'].forEach(function (id) {
       $(id).addEventListener('click', function (event) { abrirFicha(event.target); });
     });
 

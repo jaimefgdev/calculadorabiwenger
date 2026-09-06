@@ -951,6 +951,31 @@ code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft)
   overflow-x: auto;
 }
 
+/* ---------- Mi fila, en todas las clasificaciones ----------
+   Del mismo color que las demás, solo que un punto más clara. Un velo blanco
+   al 4,5 %, sin tinte: así no compite con el rojo de la marca (que ya significa
+   otra cosa: fila abierta) ni con el verde y el rojo del dinero. Y con `white`
+   sobre fondo oscuro aclara, mientras que en el tema claro el mismo velo casi
+   no se nota, así que ahí se oscurece un pelín en vez de aclarar, que es lo que
+   destaca sobre un fondo claro. */
+.fila--mia > td { background: rgba(255, 255, 255, .045); }
+.fila--mia.ranking__row { background: rgba(255, 255, 255, .045); }
+
+/* En el tema claro, aclarar sobre casi blanco no se ve: se oscurece. */
+@media (prefers-color-scheme: light) {
+  :root:not([data-tema="oscuro"]) .fila--mia > td,
+  :root:not([data-tema="oscuro"]) .fila--mia.ranking__row { background: rgba(0, 0, 0, .05); }
+}
+:root[data-tema="claro"] .fila--mia > td,
+:root[data-tema="claro"] .fila--mia.ranking__row { background: rgba(0, 0, 0, .05); }
+
+/* La fila abierta y el ratón por encima siguen mandando: son estados, y un
+   estado tiene que verse por encima de «esta es la tuya», que es permanente.
+   El fondo va en las celdas, no en la fila, y una celda con color tapa el de su
+   fila: sin esto, mi fila se quedaba igual al abrirla y al pasar por encima. */
+.table tbody tr.row-open.fila--mia > td,
+.table tbody tr.fila--mia:hover > td { background: transparent; }
+
 /* ---------- Desglose del abono de la jornada ----------
    Va debajo del campo y los suplentes, dentro de la ficha del manager. Tres
    columnas: concepto, la cuenta («48 x 10.000 EUR») y el dinero. La del medio
@@ -1327,6 +1352,30 @@ html.con-ficha { scrollbar-gutter: stable; }
 .saldo--3 { color: #e0a935; }
 .saldo--4 { color: #ffc94a; }
 /* En claro los tonos altos se pierden sobre el blanco: se oscurecen todos. */
+/* Y lo mismo con la deuda: cuanto más debe, más intenso el rojo. Aquí la LUZ
+   es la misma en los cuatro y solo sube la SATURACIÓN; copiando la progresión
+   de los ámbares —que van de oscuro a brillante— el último tramo salía rosa, que
+   es lo contrario de «más intenso». Con la luz fija los cuatro se leen igual de
+   bien (contraste 4,5 o más sobre el fondo de las tablas) y lo único que cambia
+   es cuánto tira el color. */
+.deuda { font-weight: 600; }
+.deuda--1 { color: #b56978; }     /* menos de un millón en rojo */
+.deuda--2 { color: #ce5069; }
+.deuda--3 { color: #e6375a; }
+.deuda--4 { color: #ff1f4b; }     /* cinco millones o más */
+
+:root[data-tema="claro"] .deuda--1 { color: #894355; }
+:root[data-tema="claro"] .deuda--2 { color: #9f2d49; }
+:root[data-tema="claro"] .deuda--3 { color: #b6163e; }
+:root[data-tema="claro"] .deuda--4 { color: #cc0033; }
+
+@media (prefers-color-scheme: light) {
+  :root:not([data-tema="oscuro"]) .deuda--1 { color: #894355; }
+  :root:not([data-tema="oscuro"]) .deuda--2 { color: #9f2d49; }
+  :root:not([data-tema="oscuro"]) .deuda--3 { color: #b6163e; }
+  :root:not([data-tema="oscuro"]) .deuda--4 { color: #cc0033; }
+}
+
 :root[data-tema="claro"] .saldo--1 { color: #8a5f1e; }
 :root[data-tema="claro"] .saldo--2 { color: #a2731f; }
 :root[data-tema="claro"] .saldo--3 { color: #b8851f; }
