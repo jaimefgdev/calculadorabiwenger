@@ -4112,20 +4112,16 @@
         price: Math.round((j.marketValue || 0) * factor), rechazar: false };
     }).filter(function (o) { return o.price > 0; });
 
-    const total = ordenes.reduce(function (suma, o) { return suma + o.price; }, 0);
-    const cual = MULTIPLOS_VENTA.filter(function (m) { return m.factor === factor; })[0];
-
-    /* La ventana pasa a contar por dónde va; el precio elegido se queda a la
-       vista, que es lo que uno mira mientras espera. */
+    /* La ventana solo cuenta por dónde va. El resumen de «tantos futbolistas
+       al tanto por ciento, tanto en total» sobraba: el múltiplo lo acabas de
+       elegir tú en la pantalla anterior, y el total en millones no es un dato
+       que sirva para nada aquí —nadie va a comprar la plantilla entera—. */
     abrirOpModal(
       '<div class="op-card__cab">' +
         '<h3 id="op-modal-titulo">Poniendo la plantilla en venta</h3>' +
         '<button type="button" class="btn btn--ghost btn--close" data-op-cerrar' +
           ' title="Cerrar" aria-label="Cerrar">✕</button>' +
       '</div>' +
-      '<p class="op-texto">' + ordenes.length + ' futbolistas a ' +
-        escapeHtml(cual ? cual.rotulo.toLowerCase() : factor + '×') +
-        ', ' + money(total) + ' en total.</p>' +
       '<p class="op-aviso"></p>');
 
     lanzarLote(ordenes, function (n) { return n + ' puestos en venta.'; });
