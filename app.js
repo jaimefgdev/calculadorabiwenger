@@ -5257,7 +5257,10 @@
         xi: fila.xi && fila.xi.length ? fila.xi : (antes.xi || []),
         bench: fila.bench && fila.bench.length ? fila.bench : (antes.bench || []),
         xiValue: fila.xiValue || antes.xiValue || 0,
-        abono: fila.abono || antes.abono || null
+        /* Un abono a cero sin motivo no es «no pagó nada»: es «no se ha podido
+           calcular», y si se guarda encima, el importe bueno de esa jornada se
+           pierde para siempre. Se conserva el de antes. */
+        abono: mejorAbono(fila.abono, antes.abono)
       };
     });
 
@@ -6821,6 +6824,21 @@
    * hasta el día siguiente de cerrarla. Se avisa en el título para que nadie
    * cuente con ese dinero antes de tiempo.
    */
+  /**
+   * De dos abonos de la misma jornada, el que de verdad dice algo.
+   *
+   * El nuevo manda, salvo cuando llega a cero y sin motivo: eso pasa cuando
+   * Biwenger no nos ha dado las primas de la liga, y no significa que la
+   * jornada no pagara nada. El cero con motivo ('negativo') sí es un dato
+   * bueno —empezó en números rojos y no cobró— y ese se respeta.
+   */
+  function mejorAbono(nuevo, viejo) {
+    if (!nuevo) return viejo || null;
+    const vacio = !nuevo.motivo && !nuevo.total && !nuevo.fija && !nuevo.puntos;
+    if (vacio && viejo) return viejo;
+    return nuevo;
+  }
+
   function celdaAbono(fila) {
     const abono = fila.abono;
     if (!abono) return '<span class="sub">—</span>';
