@@ -123,7 +123,7 @@ const CDN = 'https://cf.biwenger.com/api/v2';
    navegador normal y las cabeceras que este mandaría. */
 /* Marca de versión: se sube en cada cambio y se consulta con ?version=1.
    Sirve para saber desde fuera si el despliegue ha entrado o no. */
-const VERSION = '2026-09-02 · deno 73';
+const VERSION = '2026-09-02 · deno 74';
 
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ' +
   '(KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36';
@@ -365,6 +365,24 @@ const app = {
             const cuerpo = JSON.parse(texto);
             prueba.futbolistas = Object.keys((cuerpo.data && cuerpo.data.players) || {}).length;
             prueba.equipos = Object.keys((cuerpo.data && cuerpo.data.teams) || {}).length;
+
+            /* Ya que nos hemos bajado el indice entero, se aprovecha para dejar
+               la copia de seguridad hecha si todavia no existe. La copia solo
+               se escribe al descargar, y el indice se descarga como mucho una
+               vez por hora, asi que podia pasar un buen rato sin red de
+               seguridad justo despues de un despliegue. Solo si NO hay: esto no
+               pisa la copia buena que ya hubiera. */
+            if (JORNADAS && prueba.futbolistas > 0) {
+              const yaHay = await JORNADAS.get('indice-' + sistema).catch(function () { return null; });
+              if (!yaHay) {
+                const guardar = await players(sistema).catch(function () { return null; });
+                if (guardar && Object.keys(guardar).length) {
+                  await JORNADAS.put('indice-' + sistema, JSON.stringify(guardar));
+                  await JORNADAS.put('indice-fecha-' + sistema, String(Date.now()));
+                  prueba.copiaCreada = true;
+                }
+              }
+            }
           } catch (error) {
             prueba.fallo = String((error && error.name) || '') + ': ' + String((error && error.message) || error);
           }
