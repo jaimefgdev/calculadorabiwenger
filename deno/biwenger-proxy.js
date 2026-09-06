@@ -123,7 +123,7 @@ const CDN = 'https://cf.biwenger.com/api/v2';
    navegador normal y las cabeceras que este mandaría. */
 /* Marca de versión: se sube en cada cambio y se consulta con ?version=1.
    Sirve para saber desde fuera si el despliegue ha entrado o no. */
-const VERSION = '2026-09-02 · deno 71';
+const VERSION = '2026-09-02 · deno 73';
 
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ' +
   '(KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36';
@@ -325,18 +325,62 @@ const app = {
         /* La copia del KV solo se mira si el indice esta vacio, que es cuando
            interesa saber si existe. */
         let copia = -1;
-        if (!cuantos && JORNADAS) {
+        if (JORNADAS) {
           try {
             const crudo = await JORNADAS.get('indice-' + (cache.score || ''));
             copia = crudo ? Object.keys(JSON.parse(crudo)).filter(function (k) { return k.indexOf(':') === -1; }).length : 0;
           } catch (error) { copia = 0; }
         }
+        /* Las primas tambien, que es de donde sale el abono de cada jornada.
+           Si aqui salen todas a cero o `null`, el abono sale a cero y ya se
+           sabe por que sin tener que adivinarlo. Pasivo igual: solo lo que
+           haya en memoria o guardado, sin preguntar a Biwenger. */
+        let primas = cache.primas || null;
+        if (!primas && JORNADAS) {
+          try {
+            const crudo = await JORNADAS.get('primas-v3');
+            primas = crudo ? JSON.parse(crudo) : null;
+          } catch (error) { /* nada */ }
+        }
+
+        /* ?version=2 ademas PRUEBA la descarga del indice y cuenta que ha
+           pasado: codigo, tamaño, cuantos futbolistas y cuanto ha tardado. Es
+           la unica forma de distinguir «Biwenger no contesta» de «contesta pero
+           llega vacio» de «tarda mas que el tope y lo cortamos nosotros».
+           Solo cuando se pide: `?version=1` sigue sin pedir nada. */
+        let prueba = null;
+        if (url.searchParams.get('version') === '2') {
+          const t0 = Date.now();
+          const sistema = cache.score || 1;
+          prueba = { sistema: sistema, estado: null, bytes: 0, futbolistas: 0,
+            equipos: 0, ms: 0, fallo: null, tope: TOPE_FETCH_MS };
+          try {
+            /* Sin el tope de 8 s a proposito: si tarda 12, hay que verlo, no
+               que nos lo corte el mismo tope que sospechamos. */
+            const r = await fetchSinTope(CDN + '/competitions/la-liga/data?lang=es&score=' +
+              encodeURIComponent(sistema), { headers: NAVEGADOR, signal: AbortSignal.timeout(25000) });
+            prueba.estado = r.status;
+            const texto = await r.text();
+            prueba.bytes = texto.length;
+            const cuerpo = JSON.parse(texto);
+            prueba.futbolistas = Object.keys((cuerpo.data && cuerpo.data.players) || {}).length;
+            prueba.equipos = Object.keys((cuerpo.data && cuerpo.data.teams) || {}).length;
+          } catch (error) {
+            prueba.fallo = String((error && error.name) || '') + ': ' + String((error && error.message) || error);
+          }
+          prueba.ms = Date.now() - t0;
+        }
+
         return new Response(JSON.stringify({
           version: VERSION,
           indice: cuantos,
           copiaKv: copia,
           cortado: cdnCortado(),
-          kv: !!JORNADAS
+          kv: !!JORNADAS,
+          score: cache.score || null,
+          primas: primas,
+          primasValen: algoQuePagar(primas),
+          prueba: prueba
         }), {
           headers: Object.assign({ 'content-type': 'application/json; charset=utf-8' }, cors(origin))
         });
@@ -1581,9 +1625,13 @@ async function primasDeLaLiga(env) {
      volver a preguntar. */
   if (env.JORNADAS) {
     try {
-      const guardado = await env.JORNADAS.get('primas-v2');
-      if (guardado) {
-        cache.primas = JSON.parse(guardado);
+      const guardado = await env.JORNADAS.get('primas-v3');
+      const leidas = guardado ? JSON.parse(guardado) : null;
+      /* Y se comprueba lo que sale del KV, no solo lo que entra: si ahi dentro
+         quedaron unas primas a cero de antes, hay que tirarlas y volver a
+         preguntar, no servirlas otra vez. */
+      if (algoQuePagar(leidas)) {
+        cache.primas = leidas;
         return cache.primas;
       }
     } catch (error) { /* se pregunta abajo */ }
@@ -1609,11 +1657,45 @@ async function primasDeLaLiga(env) {
          por eso el índice de futbolistas nunca la trae. */
       superPica: s.superPicaExtraPoints === true
     };
+
+    /* NINGUNA liga paga cero por todo. Cuando salen asi es que Biwenger ha
+       contestado sin `settings` —pasa cuando nos tiene cortados—, y guardarlo
+       era catastrofico: esta cache NO CADUCA NUNCA, asi que un solo momento
+       malo dejaba el abono de todas las jornadas a 0 € para siempre, y encima
+       ese cero se copiaba encima del abono bueno ya guardado.
+       Sin primas no se calcula abono, y sin abono calculado la mezcla conserva
+       el que ya hubiera: es la diferencia entre no saber y decir que es cero. */
+    if (!algoQuePagar(cache.primas)) {
+      cache.primas = null;
+      return null;
+    }
+
     if (env.JORNADAS) {
-      try { await env.JORNADAS.put('primas-v2', JSON.stringify(cache.primas)); } catch (e) { /* da igual */ }
+      try { await env.JORNADAS.put('primas-v3', JSON.stringify(cache.primas)); } catch (e) { /* da igual */ }
     }
   } catch (error) { /* sin primas se sigue: la web simplemente no las enseña */ }
   return cache.primas || null;
+}
+
+/**
+ * De dos abonos de la misma jornada, el que de verdad dice algo.
+ *
+ * El nuevo manda, salvo cuando viene a cero sin motivo: eso no es «esta
+ * jornada no pagó nada», es «no hemos podido calcularlo». El cero con motivo
+ * ('negativo') sí es un dato bueno y se respeta.
+ */
+function mejorAbono(nuevo, viejo) {
+  if (!nuevo) return viejo || null;
+  const vacio = !nuevo.motivo && !nuevo.total && !nuevo.fija && !nuevo.puntos;
+  if (vacio && viejo) return viejo;
+  return nuevo;
+}
+
+/** ¿Estas primas pagan algo? Todas a cero es que no las hemos conseguido. */
+function algoQuePagar(primas) {
+  if (!primas) return false;
+  return !!(primas.porPunto || primas.fija || primas.onceIdeal ||
+            primas.mvpPartido || primas.mvpJornada);
 }
 
 /**
@@ -2718,6 +2800,22 @@ async function saltoPorEquipo(numero, score, ronda) {
      1 gol · 2 gol de penalti · 3 asistencia
    Se cuenta aquí y no en la web para no tener que cruzar allí la alineación con
    el parte de cada partido. */
+/**
+ * ¿Tenemos indice de futbolistas?
+ *
+ * Se apunta el que ya se ha comprobado: contar las claves de un objeto de tres
+ * mil entradas por cada futbolista de cada once seria tirar el tiempo, y un
+ * indice no pasa de vacio a lleno sin cambiar de objeto.
+ */
+const indicesBuenos = new WeakSet();
+function hayIndice(names) {
+  if (!names) return false;
+  if (indicesBuenos.has(names)) return true;
+  if (!Object.keys(names).length) return false;
+  indicesBuenos.add(names);
+  return true;
+}
+
 function roundPlayer(entry, names, puntos, partidoDe, enCasa, lances) {
   /* Biwenger manda unas veces el futbolista entero y otras solo su número. */
   const suelto = entry != null && typeof entry !== 'object';
@@ -2735,7 +2833,13 @@ function roundPlayer(entry, names, puntos, partidoDe, enCasa, lances) {
      Antes caía en «sin terminar» y la web le pintaba una interrogación para
      siempre, como si aún fuera a puntuar. Biwenger tampoco lo penaliza: a
      gijonudo le da los mismos 26 puntos que salen de sus otros diez. */
-  const fuera = equipo == null;
+  /* CUIDADO CON ESTO. «No tiene equipo» solo significa «se fue de LaLiga» si el
+     indice ha llegado. Cuando llega vacio, NINGUN futbolista tiene equipo, y
+     entonces los once de todo el mundo se daban por resueltos y sin nota: cero
+     puntos y «11 jugadores» en la tabla de la jornada, con una seguridad
+     absoluta y completamente falsa. Sin indice no se sabe nada, y eso se dice
+     dejandolos pendientes, que es lo que de verdad son. */
+  const fuera = hayIndice(names) && equipo == null;
 
   /* Sin puntuación hay dos casos distintos: su partido ya acabó y no jugó (un
      guion), o todavía no se sabe la nota (una interrogación). */
@@ -2744,7 +2848,7 @@ function roundPlayer(entry, names, puntos, partidoDe, enCasa, lances) {
      llegue (de la alineación, de la ficha o del índice) es la de la jornada
      pasada: Biwenger no la pone a cero ni la publica de verdad hasta el
      pitido final, ni con el partido ya mediado. Se ignora sin más. */
-  const sinTerminar = !fuera && estadoPartido !== 'finished';
+  const sinTerminar = !hayIndice(names) || (!fuera && estadoPartido !== 'finished');
 
   /* Cuando solo llega el número, los puntos salen del índice de futbolistas:
      así van subiendo según acaba cada partido. Al que ya no está se le fuerza
@@ -2874,7 +2978,12 @@ function mezclarJornada(guardado, fresco) {
          once se recalculaba entero cada vez, que son casi cien consultas al
          CDN que ya estaban hechas. */
       xiValueDay: fila.xiValueDay || antes.xiValueDay || null,
-      abono: fila.abono || antes.abono || null
+      /* OJO: un abono a cero NO pisa a uno bueno ya guardado. Cuando Biwenger
+         no nos da las primas, todo sale a cero; si ese cero se guardara encima,
+         el importe bueno de esa jornada se perderia PARA SIEMPRE, porque la
+         jornada ya cerrada no se vuelve a calcular sola. Prefiero conservar el
+         de antes y recalcularlo cuando las primas vuelvan. */
+      abono: mejorAbono(fila.abono, antes.abono)
     };
   });
   return fresco;
