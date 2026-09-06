@@ -931,6 +931,48 @@ code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft)
 /* Los puntos que le faltan al primero: en rojo suave, que es una carencia. */
 .dif-lider { color: var(--neg); font-variant-numeric: tabular-nums; }
 
+/* ---------- Pantalla de arranque ----------
+   Tapa la app mientras llega el primer dato. El escudo va deliberadamente
+   pequeno —110 px— porque el de la portada del sistema sale enorme y era justo
+   lo que chirriaba; y la marca debajo, en Google Sans Bold y con los mismos dos
+   colores que lleva en la cabecera de Inicio. */
+.arranque {
+  position: fixed; inset: 0; z-index: 9000;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 1.1rem;
+  background: var(--bg);
+  /* Que no se quede tapando la app si algo falla y nadie la retira. */
+  animation: arranque-rendirse 0s linear 6s forwards;
+}
+.arranque__escudo { width: 110px; height: auto; display: block; }
+.arranque__marca {
+  margin: 0;
+  font-family: 'GoogleSans', system-ui, sans-serif;
+  font-weight: bold;
+  font-size: 1.35rem;
+  letter-spacing: .01em;
+  color: var(--text);
+}
+.arranque__marca span { color: var(--accent); }
+
+/* Al retirarla se desvanece, en vez de desaparecer de golpe. */
+.arranque--fuera { opacity: 0; pointer-events: none; transition: opacity .28s ease; }
+.arranque--ida { display: none; }
+
+@keyframes arranque-rendirse { to { opacity: 0; visibility: hidden; } }
+
+@media (prefers-reduced-motion: reduce) {
+  .arranque--fuera { transition: none; }
+}
+
+/* El «Reintentar» de cuando Biwenger no contesta. */
+.reintentar {
+  background: none; border: 1px solid var(--border-strong); border-radius: 999px;
+  color: var(--accent); cursor: pointer; font: inherit; font-size: .82rem;
+  padding: .15rem .7rem; margin-left: .35rem;
+}
+.reintentar:hover { border-color: var(--accent); }
+
 .bid-amount { color: #a87400; }
 @media (prefers-color-scheme: dark) {
   .bid-amount { color: #ffc233; }

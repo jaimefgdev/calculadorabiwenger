@@ -12,13 +12,13 @@
   "dir": "ltr",
   "icons": [
     {
-      "src": "biwenger.svg",
+      "src": "icono-app.svg",
       "sizes": "any",
       "type": "image/svg+xml",
       "purpose": "any"
     },
     {
-      "src": "biwenger.svg",
+      "src": "icono-app.svg",
       "sizes": "any",
       "type": "image/svg+xml",
       "purpose": "maskable"

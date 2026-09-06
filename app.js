@@ -9312,7 +9312,12 @@
         recordarPosiciones(state.recuento);
         state.recuento.forEach(function (j) { amarillasDe[String(j.id)] = j.yellow || 0; });
         state.recuentoCargando = false;
-        cacheGuardar('recuento', payload);
+        state.recuentoFallo = false;
+        /* Una lista vacia NO se guarda. Cuando Biwenger nos corta, el proxy se
+           queda sin indice y contesta sin nadie; guardarlo dejaba la pestana de
+           Datos en blanco tambien en la siguiente visita, ya sin red de por
+           medio y sin forma de saber por que. */
+        if (state.recuento.length) cacheGuardar('recuento', payload);
         renderRankingsTemporada();
         /* Las amarillas llegan después de pintar: si alguien está a una de
            sanción, hay que repasar las vistas para que salga su tarjeta. */
@@ -9324,7 +9329,10 @@
       })
       .catch(function () {
         state.recuentoCargando = false;
-        state.recuento = [];
+        /* `null`, no `[]`: vacio significa «no ha jugado nadie» y eso es
+           mentira. Asi se puede decir que ha fallado y volver a intentarlo. */
+        state.recuento = null;
+        state.recuentoFallo = true;
         renderRankingsTemporada();
       });
   }
@@ -9344,11 +9352,13 @@
         if (payload.error) throw new Error(payload.error);
         state.recuentoLiga = payload.players || [];
         state.recuentoLigaCargando = false;
+        state.recuentoLigaFallo = false;
         renderRankingsTemporada();
       })
       .catch(function () {
         state.recuentoLigaCargando = false;
-        state.recuentoLiga = [];
+        state.recuentoLiga = null;
+        state.recuentoLigaFallo = true;
         renderRankingsTemporada();
       });
   }
@@ -9397,8 +9407,17 @@
     if (!todos) {
       /* Un «cargando» y ya: lo de «repasando jornada a jornada» contaba las
          tripas del asunto y encima parecía que se había atascado. */
-      caja.innerHTML = deLaLiga && state.recuentoLigaCargando
-        ? '<p class="muted">Cargando…</p>' : '';
+      if (deLaLiga ? state.recuentoLigaCargando : state.recuentoCargando) {
+        caja.innerHTML = '<p class="muted">Cargando…</p>';
+        return;
+      }
+      /* Y si ha fallado, se dice. Antes salia «todavia no hay jornadas
+         jugadas», que contesta a otra pregunta: no es que no se haya jugado,
+         es que no hemos podido traerlo. */
+      caja.innerHTML = (deLaLiga ? state.recuentoLigaFallo : state.recuentoFallo)
+        ? '<p class="muted">No se han podido traer los datos. ' +
+          '<button type="button" class="reintentar" data-reintentar="rankings">Reintentar</button></p>'
+        : '';
       return;
     }
     if (todos.length === 0) {
@@ -9605,6 +9624,33 @@
     ajustarNombres();
   }
 
+  /**
+   * Le pide al proxy que aprenda cómo se llaman los que ya no están en LaLiga.
+   *
+   * Una vez por sesión y sin prisa: es lo que evita los «Jugador 40070» en los
+   * fichajes viejos. Va en su propia llamada A PROPÓSITO. Estuvo dentro de la
+   * sincronización y fue un desastre: metía consultas de más al mismo servidor
+   * del que sale el índice de futbolistas, Biwenger nos cortaba, y la web se
+   * quedaba sin rankings, sin puntos y sin precios. Aquí, si falla, no se
+   * entera nadie: lo único que pasa es que esos nombres tardan un día más.
+   */
+  function ensureNombresIdos() {
+    if (state.nombresIdosPedido) return;
+    const config = loadSyncConfig();
+    if (!config.url || !config.key) return;
+    state.nombresIdosPedido = true;
+    fetch(config.url.replace(/\/+$/, '') + '/?key=' + encodeURIComponent(config.key) + '&nombres=1',
+      { headers: { 'accept': 'application/json' } })
+      .then(function (response) { return response.json(); })
+      .then(function (hecho) {
+        /* Los nombres se ponen sobre la respuesta al salir del proxy, así que
+           lo que se pida a partir de ahora ya vendrá bien solo. Solo se vuelve
+           a pedir la tabla que ya estuviera pintada. */
+        if (hecho && hecho.aprendidos) ensureLaLiga(true);
+      })
+      .catch(function () { /* un adorno; ni se menciona */ });
+  }
+
   /** Trae la tabla de toda la competición; se guarda mientras dure la sesión. */
   function ensureLaLiga(forzar) {
     const config = loadSyncConfig();
@@ -9630,15 +9676,22 @@
         state.laligaAt = Date.now();
         recordarPosiciones(state.laliga);
         state.laligaCargando = false;
-        cacheGuardar('laliga', payload);
+        /* Igual que en el recuento: una lista vacia no se guarda nunca. */
+        if (state.laliga.length) cacheGuardar('laliga', payload);
         /* Solo si es lo que se está mirando: si no, pisaría la tabla nuestra. */
         if (state.puntosAmbito !== 'liga') renderLaLiga();
       })
       .catch(function () {
         state.laligaCargando = false;
+        /* Sin dejarlo en `[]`: vacio se pinta como «todavia no ha jugado
+           nadie», que no es lo que ha pasado. */
+        state.laliga = null;
         if (state.puntosAmbito === 'liga') return;
         const caja = $('rankings-puntos');
-        if (caja) caja.innerHTML = '<p class="muted">No se han podido traer los datos de la competición.</p>';
+        if (caja) {
+          caja.innerHTML = '<p class="muted">No se han podido traer los datos de la competición. ' +
+            '<button type="button" class="reintentar" data-reintentar="puntos">Reintentar</button></p>';
+        }
       });
   }
 
@@ -10293,6 +10346,13 @@
     if (state.tab === 'mercado') ensureMarket(true);
     render();
 
+    /* Y lo ultimo de todo, con quince segundos de margen: que aprenda como se
+       llaman los que ya no estan en LaLiga. Va detras y solo, porque tira del
+       mismo servidor que el indice de futbolistas y ese SIEMPRE tiene
+       preferencia: sin indice no hay web, y sin estos nombres solo hay un
+       \u00abJugador 40070\u00bb en un fichaje viejo. */
+    if (!state.nombresIdosPedido) setTimeout(ensureNombresIdos, 15000);
+
     return { movements: movements.length, teams: Object.keys(teams).length };
   }
 
@@ -10630,6 +10690,16 @@
     const tandas = $('rankings-temporada');
     if (tandas) {
       tandas.addEventListener('click', function (event) {
+        /* Reintentar: se olvida el fallo y se vuelve a pedir. Sin esto, la
+           unica forma de recuperarse era recargar la pagina entera. */
+        if (event.target.closest('[data-reintentar]')) {
+          state.recuentoFallo = false;
+          state.recuentoLigaFallo = false;
+          ensureRecuento();
+          renderRankingsTemporada();
+          return;
+        }
+
         const mas = event.target.closest('[data-mas]');
         if (mas) {
           /* Mismo botón para abrir y para «Ver menos»: los dos llevan el mismo
@@ -10658,6 +10728,11 @@
 
     ['rankings-puntos', 'ambitos-puntos'].forEach(function (id) {
       $(id).addEventListener('click', function (event) {
+        if (event.target.closest('[data-reintentar]')) {
+          ensureLaLiga(true);
+          return;
+        }
+
         const mando = event.target.closest('[data-ambito], [data-puesto]');
         if (mando) {
           const cual = mando.hasAttribute('data-ambito') ? 'ambito' : 'puesto';
@@ -11165,6 +11240,28 @@
     }
 
     setInterval(tickRound, 1000);   // la cuenta atrás corre sola
+
+    quitarArranque();
+  }
+
+  /**
+   * Retira la portada del arranque.
+   *
+   * En cuanto la app ya tiene algo que enseñar. Espera un fotograma para que
+   * lo de debajo esté pintado: si se quita antes, se ve un parpadeo en blanco
+   * justo en el sitio donde queriamos que no lo hubiera.
+   */
+  function quitarArranque() {
+    const portada = $('arranque');
+    if (!portada) return;
+    requestAnimationFrame(function () {
+      requestAnimationFrame(function () {
+        portada.classList.add('arranque--fuera');
+        /* Y fuera del todo al terminar de desvanecerse, para que no se quede
+           un elemento a pantalla completa comiéndose los clics. */
+        setTimeout(function () { portada.classList.add('arranque--ida'); }, 350);
+      });
+    });
   }
 
   document.addEventListener('DOMContentLoaded', init);

@@ -20,7 +20,7 @@
 <link rel="dns-prefetch" href="https://cdn.biwenger.com">
 <!-- El ?v= se sube en cada publicación: obliga al navegador a bajar el archivo
      nuevo en vez de reutilizar el que tenga en caché. -->
-<link rel="stylesheet" href="styles.css?v=308">
+<link rel="stylesheet" href="styles.css?v=309">
 <!-- La tipografia se pide ya, sin esperar a que el CSS termine de leerse. -->
 <link rel="preload" href="GoogleSans-Regular.woff2" as="font" type="font/woff2" crossorigin>
 <!-- El escudo de Biwenger, el mismo que el del boton de Inicio. -->
@@ -36,6 +36,18 @@
 <meta name="apple-mobile-web-app-title" content="jfgdevcalc">
 </head>
 <body>
+
+<!-- Lo primero que se ve al abrir la app, antes de que haya un solo dato.
+     El escudo mas pequeno que el de la pantalla de arranque del sistema, y
+     debajo la marca con los mismos colores que en Inicio: «jaime» en el color
+     del texto y «fgdev» en el rojo de siempre.
+     Se quita sola en cuanto la web ha pintado; si el JS fallara y no llegara a
+     quitarla, la animacion de mas abajo la esconde igualmente a los seis
+     segundos, para no dejar la app tapada por una portada. -->
+<div class="arranque" id="arranque" aria-hidden="true">
+  <img class="arranque__escudo" src="biwenger.svg" alt="">
+  <p class="arranque__marca">jaime<span>fgdev</span></p>
+</div>
 
 <header class="topbar">
   <div class="wrap topbar__inner">
@@ -636,7 +648,7 @@
 
 </main>
 
-<script src="app.js?v=345"></script>
+<script src="app.js?v=346"></script>
 <script>
   /* El service worker solo cachea los archivos de la app, nunca los datos.
      Se registra al final para que no compita con la primera carga.
