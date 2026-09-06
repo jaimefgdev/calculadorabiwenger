@@ -123,7 +123,7 @@ const CDN = 'https://cf.biwenger.com/api/v2';
    navegador normal y las cabeceras que este mandaría. */
 /* Marca de versión: se sube en cada cambio y se consulta con ?version=1.
    Sirve para saber desde fuera si el despliegue ha entrado o no. */
-const VERSION = '2026-09-02 · deno 69';
+const VERSION = '2026-09-02 · deno 70';
 
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ' +
   '(KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36';
@@ -293,6 +293,17 @@ const app = {
       /* ?ranking=1 devuelve a todos los futbolistas de la competición que ya
          han jugado algo, con sus puntos y sus partidos. Para las tablas de
          quién rinde más y menos en toda LaLiga, no solo entre los ocho. */
+      /* ?nombres=1 aprende los nombres de los que ya no juegan en LaLiga.
+         Va SOLO en su endpoint y nunca dentro de la sincronia: cuesta
+         consultas al mismo servidor del que sale el indice, y una rafaga ahi
+         nos deja sin indice y sin media web. */
+      if (url.searchParams.get('nombres')) {
+        const hecho = await aprenderNombresIdos(env);
+        return new Response(JSON.stringify(hecho), {
+          headers: Object.assign({ 'content-type': 'application/json; charset=utf-8' }, cors(origin))
+        });
+      }
+
       if (url.searchParams.get('ranking')) {
         const data = await globalRanking(env);
         return new Response(JSON.stringify(data), {
@@ -1066,10 +1077,23 @@ async function players(score) {
      la web ciega: sin índice no hay nombres ni precios, y todo sale como
      «Jugador 19441» a 0 €. Los precios de una copia de hace horas no son los de
      hoy, pero se parecen; ningún nombre es infinitamente peor. */
-  if (JORNADAS && Date.now() - (cache.indiceAt || 0) > 6 * 60 * 60 * 1000) {
-    cache.indiceAt = Date.now();
-    JORNADAS.put('indice-' + sistema, JSON.stringify(names))
-      .catch(function () { cache.indiceAt = 0; });   // si falla, se reintenta
+  /* DOS COSAS, y las dos importan:
+     - La fecha de la ultima copia va en el KV, no en memoria. Esta instancia se
+       apaga y arranca a cada rato, y con la fecha en memoria arrancaba siempre
+       en cero: cada arranque en frio se creia que tocaba copia y reescribia
+       121 KiB.
+     - Y se ESPERA a que la escritura termine. Suelta, la instancia se apaga en
+       cuanto contesta y la escritura se queda a medias: la copia no llegaba a
+       existir. Por eso, el dia que Biwenger nos corto, la red de seguridad no
+       estaba puesta y la web se quedo sin nombres, sin precios y sin rankings. */
+  if (JORNADAS) {
+    try {
+      const cuando = await JORNADAS.get('indice-fecha-' + sistema);
+      if (!cuando || Date.now() - Number(cuando) > 6 * 60 * 60 * 1000) {
+        await JORNADAS.put('indice-' + sistema, JSON.stringify(names));
+        await JORNADAS.put('indice-fecha-' + sistema, String(Date.now()));
+      }
+    } catch (error) { /* sin copia esta vez; se reintenta en la siguiente */ }
   }
   return names;
 }
@@ -1450,15 +1474,40 @@ async function jornadaActualEfectiva() {
 }
 
 /** Calendario de la temporada: id, número y estado de cada jornada. */
+const CLAVE_CALENDARIO = 'calendario';
+
 async function seasonRounds() {
   if (cache.calendar && Date.now() - cache.calendarAt < 6 * 60 * 60 * 1000) return cache.calendar;
 
+  /* Si Biwenger no contesta, la copia del KV. El calendario es la lista de las
+     38 jornadas con su estado: sin ella, `recuentoDeLaTemporada` no tiene por
+     donde empezar y devuelve la lista vacia, y la web dice «todavia no hay
+     jornadas jugadas» con media temporada jugada. Eso es exactamente lo que
+     pasaba: era la unica pieza esencial que no tenia copia. */
+  const deReserva = async function () {
+    if (cache.calendar && cache.calendar.length) return cache.calendar;
+    try {
+      const crudo = await JORNADAS.get(CLAVE_CALENDARIO);
+      const guardado = crudo ? JSON.parse(crudo) : null;
+      if (guardado && guardado.length) {
+        cache.calendar = guardado;
+        /* Con la fecha atrasada para volver a intentarlo pronto, en vez de
+           quedarse seis horas con lo viejo. */
+        cache.calendarAt = Date.now() - 6 * 60 * 60 * 1000 + 5 * 60 * 1000;
+        return guardado;
+      }
+    } catch (error) { /* sin copia */ }
+    return cache.calendar || [];
+  };
+
   /* Sin `lang` el CDN responde en el idioma del borde de Cloudflare y las
      jornadas llegan como «Round 1». */
-  const response = await fetch(CDN + '/rounds/la-liga?lang=es', { headers: NAVEGADOR });
-  if (!response.ok) return cache.calendar || [];
+  const response = await fetch(CDN + '/rounds/la-liga?lang=es', { headers: NAVEGADOR })
+    .catch(function () { return null; });
+  apuntarCorteDelCdn(response);
+  if (!response || !response.ok) return await deReserva();
 
-  const data = (await response.json()).data || {};
+  const data = (await response.json().catch(function () { return {}; })).data || {};
   /* Son 38 jornadas: las dos entradas de más son la segunda parte de las que
      se aplazan (misma jornada, partidos jugados otro día). Se marcan con
      `part` para poder dejarlas fuera del selector. */
@@ -1472,8 +1521,16 @@ async function seasonRounds() {
     };
   });
 
+  /* Una respuesta buena pero sin jornadas dentro no vale: es lo que contesta
+     Biwenger cuando corta, y guardarla dejaria la web seis horas sin rankings. */
+  if (!list.length) return await deReserva();
+
   cache.calendar = list;
   cache.calendarAt = Date.now();
+  /* Copia para la proxima vez que Biwenger no conteste. Son 38 lineas: nada.
+     Con `await` para que la escritura llegue antes de que se apague la
+     instancia; suelta, se pierde justo cuando mas falta hace. */
+  try { await JORNADAS.put(CLAVE_CALENDARIO, JSON.stringify(list)); } catch (e) { /* otra vez sera */ }
   return list;
 }
 
@@ -1662,7 +1719,19 @@ async function recuentoDeLaTemporada(env, headers, soloMiLiga) {
 
   const score = await sistemaDeLaLiga(env);
   const names = await players(score);
+  if (!Object.keys(names).length) {
+    throw new Error('No se ha podido traer el indice de futbolistas de Biwenger.');
+  }
+
   const calendario = await seasonRounds().catch(function () { return []; });
+  /* Igual que arriba: sin calendario no se sabe que jornadas se han jugado, y
+     eso NO es lo mismo que «no se ha jugado ninguna». Devolver la lista vacia
+     era justo lo que ponia «todavia no hay jornadas jugadas» en los rankings
+     con la temporada empezada. */
+  if (!calendario.length) {
+    throw new Error('No se ha podido traer el calendario de jornadas de Biwenger.');
+  }
+
   const jugadas = calendario.filter(function (r) {
     return (r.part || 1) === 1 && (r.status === 'finished' || r.status === 'active');
   });
@@ -1840,6 +1909,12 @@ async function todosLosJugadores(env) {
  */
 async function globalRanking(env) {
   const names = await players(await sistemaDeLaLiga(env));
+  /* Sin indice no hay NADA que rankear, y devolver la lista vacia hacia que la
+     web dijera «todavia no ha jugado nadie» en plena temporada y encima se
+     lo guardara. Un fallo tiene que verse como un fallo. */
+  if (!Object.keys(names).length) {
+    throw new Error('No se ha podido traer el indice de futbolistas de Biwenger.');
+  }
   const lista = [];
 
   Object.keys(names).forEach(function (clave) {
@@ -4440,94 +4515,61 @@ async function build(env, debug) {
  * Biwenger sí los conserva: `/players/la-liga/40070` sigue contestando
  * «Manuel Ángel». El id vale como ruta igual que el slug.
  *
- * El arreglo se hace UNA vez y aquí, sobre la respuesta ya montada, en vez de
- * en cada uno de los doce sitios que escriben esa marca: se busca, se
- * pregunta por los que salgan y se sustituye. Así vale también para los sitios
- * que se escriban mañana, sin tener que acordarse de nada.
+ * Va en DOS PIEZAS, y esto es lo importante:
+ *
+ *   - Poner los nombres (`ponerNombresQueFaltan`) es GRATIS: mira lo que ya se
+ *     sabe y sustituye. No pide NADA a nadie. Envuelve todas las respuestas.
+ *
+ *   - Aprenderlos (`?nombres=1`) sí cuesta consultas, y por eso vive en su
+ *     propio endpoint, que la web llama una vez y con calma.
+ *
+ * Estuvieron juntos y fue un error caro: preguntar los nombres dentro de cada
+ * respuesta metía hasta veinte consultas de golpe al MISMO servidor del que
+ * sale el índice. Biwenger corta cuando le llega una ráfaga, y al cortar no se
+ * quedaba coja esta tontería de los nombres: se caía el índice entero y la web
+ * se quedaba sin rankings, sin puntos y sin precios. Un adorno no puede vivir
+ * en el camino de lo que importa.
  *
  * Lo aprendido se guarda en el KV para siempre: un nombre no cambia, así que
- * cada futbolista se pregunta una sola vez en la vida del servidor.
+ * cada futbolista se pregunta una sola vez.
  */
 const CLAVE_IDOS = 'nombres-idos';
 
 async function nombresAprendidos() {
   if (cache.idos) return cache.idos;
-  cache.idos = {};
-  try {
-    const crudo = await JORNADAS.get(CLAVE_IDOS);
-    if (crudo) cache.idos = JSON.parse(crudo) || {};
-  } catch (error) { /* si no se puede leer, se empieza de cero */ }
-  return cache.idos;
+  const leido = await JORNADAS.get(CLAVE_IDOS).catch(function () { return null; });
+  /* Solo se recuerda si se pudo leer de verdad. Si el KV falla y aquí se
+     guardara un {} vacío, esta instancia se pasaría la vida creyendo que no
+     sabe ningún nombre y volviendo a preguntarlos todos. */
+  let sabidos = null;
+  try { sabidos = leido ? JSON.parse(leido) : {}; } catch (error) { sabidos = null; }
+  if (sabidos) cache.idos = sabidos;
+  return sabidos || {};
 }
 
 /**
- * Pregunta a Biwenger por unos cuantos ids y devuelve lo que sepa de ellos.
- * Lo que no conteste se marca igualmente, para no volver a preguntarlo cada
- * minuto: un id que Biwenger no reconoce hoy no lo va a reconocer mañana.
+ * Sustituye las marcas «Jugador 40070» por el nombre, si se sabe.
+ *
+ * PASIVA: no pide nada a Biwenger, no escribe en el KV y, si algo va mal,
+ * devuelve la respuesta tal como venía. No puede romper nada.
  */
-async function preguntarNombres(ids) {
-  const sabidos = await nombresAprendidos();
-  let nuevos = 0;
-
-  /* De cinco en cinco y con respiro. Una ráfaga hace que Biwenger corte las
-     consultas, y cuando corta no falla solo esto: se cae también la descarga
-     del índice y la web entera se queda sin NINGÚN nombre y a 0 €, que es
-     muchísimo peor que este puñado de ids sueltos. */
-  await porTandas(ids.slice(0, 20), 5, 250, async function (id) {
-    const r = await fetch(CDN + '/players/la-liga/' + encodeURIComponent(id) +
-      '?lang=es&fields=id,name,slug', { headers: NAVEGADOR })
-      .catch(function () { return null; });
-    if (apuntarCorteDelCdn(r)) return;
-    if (!r) return;
-    if (!r.ok) {
-      /* 404: ese id no existe. Se apunta en blanco para no insistir. */
-      if (r.status === 404) { sabidos[id] = ''; nuevos++; }
-      return;
-    }
-    const dato = (await r.json().catch(function () { return {}; })).data;
-    /* OJO CON ESTO: cuando el id no existe, Biwenger NO contesta 404. Contesta
-       200 con OTRO futbolista, el del id más cercano que sí tenga. Pides el
-       40076 y te devuelve el 40070, «Manuel Ángel», tan formal. Sin comprobar
-       que el id que vuelve es el que se pidió, aquí se acabaría escribiendo el
-       nombre de un futbolista distinto en el historial de fichajes: mucho peor
-       que dejar el «Jugador 40076», porque parece bueno y no lo es. */
-    const bueno = dato && dato.name && String(dato.id) === String(id);
-    sabidos[id] = bueno ? dato.name : '';
-    nuevos++;
-  });
-
-  if (nuevos) {
-    try { await JORNADAS.put(CLAVE_IDOS, JSON.stringify(sabidos)); } catch (e) { /* otra vez será */ }
-  }
-  return sabidos;
-}
-
 async function ponerNombresQueFaltan(respuesta) {
   try {
+    if (!respuesta) return respuesta;
     const tipo = respuesta.headers.get('content-type') || '';
     if (tipo.indexOf('json') === -1) return respuesta;
 
     const texto = await respuesta.clone().text();
-    /* Comprobación baratísima primero: en el 99,9 % de las respuestas no hay
+    /* Comprobación baratísima primero: en casi todas las respuestas no hay
        ninguna marca y aquí se acaba, sin recorrer nada ni tocar el KV. */
     if (texto.indexOf('Jugador ') === -1) return respuesta;
 
-    const marca = /Jugador (\d+)/g;
-    const pendientes = {};
-    let hallazgo;
-    while ((hallazgo = marca.exec(texto)) !== null) pendientes[hallazgo[1]] = true;
-    const ids = Object.keys(pendientes);
-    if (!ids.length) return respuesta;
+    const sabidos = await nombresAprendidos();
+    if (!Object.keys(sabidos).length) return respuesta;
 
-    let sabidos = await nombresAprendidos();
-    const porPreguntar = ids.filter(function (id) { return sabidos[id] == null; });
-    if (porPreguntar.length && !cdnCortado()) {
-      sabidos = await preguntarNombres(porPreguntar);
-    }
-
-    /* Se sustituye sobre el texto, que es JSON: el nombre va escapado como lo
-       escaparía JSON.stringify, no vaya a ser que uno lleve comillas y rompa
-       la respuesta entera por arreglar una etiqueta. */
+    /* El nombre va escapado como lo escaparía JSON.stringify: si alguno lleva
+       una comilla, meterlo a pelo rompería la respuesta entera por arreglar
+       una etiqueta. */
     const arreglado = texto.replace(/Jugador (\d+)/g, function (todo, id) {
       const nombre = sabidos[id];
       if (!nombre) return todo;              // desconocido: se deja como estaba
@@ -4546,10 +4588,86 @@ async function ponerNombresQueFaltan(respuesta) {
       headers: cabeceras
     });
   } catch (error) {
-    /* Esto es un adorno: si falla, se manda la respuesta tal cual. Jamás se
-       tumba una respuesta buena por no poder poner un nombre. */
+    /* Esto es un adorno: jamás se tumba una respuesta buena por un nombre. */
     return respuesta;
   }
+}
+
+/**
+ * `?nombres=1`: aprende los nombres de los que ya no están en LaLiga.
+ *
+ * Lo llama la web una vez por sesión, y sola: si falla o si Biwenger nos tiene
+ * cortados, no se entera nadie más. Los ids salen del tablón de la liga, que
+ * es donde aparecen los que se fueron.
+ */
+async function aprenderNombresIdos(env) {
+  const sabidos = await nombresAprendidos();
+  const yaSabidos = Object.keys(sabidos).length;
+
+  if (cdnCortado()) {
+    return { aprendidos: 0, sabidos: yaSabidos, nota: 'Biwenger nos tiene cortados ahora mismo.' };
+  }
+
+  /* De dónde salen los ids: del índice, los que NO estén. Se mira el tablón,
+     que es donde aparecen los fichajes y las ventas de toda la liga. */
+  const indice = await players(await sistemaDeLaLiga(env)).catch(function () { return {}; });
+  if (!Object.keys(indice).length) {
+    return { aprendidos: 0, sabidos: yaSabidos, nota: 'Sin índice no se puede saber quién falta.' };
+  }
+
+  const who = await account(env);
+  const cabeceras = { 'x-league': who.leagueId, 'x-user': who.userId, 'x-version': '628' };
+  const tablon = await boardItems(env, cabeceras, who.leagueId).catch(function () { return []; });
+
+  const faltan = {};
+  (tablon || []).forEach(function (post) {
+    ((post && post.content) || []).forEach(function (apunte) {
+      const id = apunte && apunte.player != null ? String(apunte.player) : null;
+      if (!id) return;
+      if (indice[id]) return;                 // sigue en LaLiga: tiene nombre
+      if (sabidos[id] != null) return;        // ya preguntado alguna vez
+      faltan[id] = true;
+    });
+  });
+
+  const ids = Object.keys(faltan);
+  if (!ids.length) return { aprendidos: 0, sabidos: yaSabidos, nota: 'No falta ninguno.' };
+
+  /* Con MUCHA calma: de tres en tres y con medio segundo de respiro. Esto se
+     hace una vez en la vida por futbolista; no hay ninguna prisa, y una ráfaga
+     aquí es lo que nos dejó sin índice. */
+  let nuevos = 0;
+  await porTandas(ids.slice(0, 12), 3, 500, async function (id) {
+    if (cdnCortado()) return;
+    const r = await fetch(CDN + '/players/la-liga/' + encodeURIComponent(id) +
+      '?lang=es&fields=id,name,slug', { headers: NAVEGADOR })
+      .catch(function () { return null; });
+    if (apuntarCorteDelCdn(r) || !r) return;
+    if (!r.ok) { sabidos[id] = ''; nuevos++; return; }
+    const dato = (await r.json().catch(function () { return {}; })).data;
+    /* OJO CON ESTO: cuando el id no existe, Biwenger NO contesta 404. Contesta
+       200 con OTRO futbolista, el del id más cercano que sí tenga. Pides el
+       40076 y te devuelve el 40070, «Manuel Ángel», tan formal. Sin comprobar
+       que el id que vuelve es el que se pidió, aquí se acabaría escribiendo el
+       nombre de un futbolista distinto en el historial de fichajes: mucho peor
+       que dejar el «Jugador 40076», porque parece bueno y no lo es. */
+    const bueno = dato && dato.name && String(dato.id) === String(id);
+    sabidos[id] = bueno ? dato.name : '';
+    nuevos++;
+  });
+
+  if (nuevos) {
+    /* Con `await`: si se deja suelta, la instancia puede apagarse antes de que
+       la escritura llegue y lo aprendido se pierde. */
+    try { await JORNADAS.put(CLAVE_IDOS, JSON.stringify(sabidos)); } catch (e) { /* otra vez será */ }
+  }
+
+  return {
+    aprendidos: nuevos,
+    sabidos: Object.keys(sabidos).length,
+    quedan: Math.max(0, ids.length - 12),
+    nombres: Object.keys(sabidos).filter(function (id) { return sabidos[id]; }).length
+  };
 }
 
 Deno.serve(function (request) {
