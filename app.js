@@ -10295,6 +10295,78 @@
   }
 
   /** Qué código tiene desplegado el Worker; se enseña en el panel de conexión. */
+  /**
+   * Le pregunta al proxy cómo está y lo escribe en cristiano.
+   *
+   * Con `?version=2` el proxy INTENTA bajarse el índice de futbolistas en ese
+   * momento y cuenta qué ha pasado. Es la única forma de distinguir tres cosas
+   * que desde fuera se ven igual (todo a cero): que Biwenger no conteste, que
+   * contesté vacío, o que tarde más de lo que el proxy aguanta.
+   */
+  function comprobarProxy() {
+    const caja = $('diagnostico');
+    if (!caja) return;
+    const config = loadSyncConfig();
+    if (!config.url || !config.key) {
+      caja.hidden = false;
+      caja.textContent = 'Falta la direcci\u00f3n del proxy o la clave, arriba.';
+      return;
+    }
+
+    caja.hidden = false;
+    caja.textContent = 'Comprobando\u2026 (baja el \u00edndice entero, tarda unos segundos)';
+
+    fetch(config.url.replace(/\/+$/, '') + '/?key=' + encodeURIComponent(config.key) + '&version=2',
+      { headers: { 'accept': 'application/json' } })
+      .then(function (response) { return response.json(); })
+      .then(function (d) {
+        const lineas = [];
+        const si = function (b) { return b ? 'S\u00cd' : 'NO'; };
+
+        lineas.push('Worker ' + (d.version || '?') + '   \u00b7   web v' + VERSION_WEB);
+        lineas.push('');
+        lineas.push('\u00cdNDICE DE FUTBOLISTAS  (de aqu\u00ed salen puntos, nombres y precios)');
+        lineas.push('  en memoria ahora ..... ' + (d.indice != null ? d.indice : '?') +
+          (d.indice === 0 ? '   \u2190 VAC\u00cdO: por eso sale todo a cero' : ''));
+        lineas.push('  copia de seguridad ... ' + (d.copiaKv > 0 ? d.copiaKv : (d.copiaKv === 0 ? 'NO HAY' : '?')));
+        lineas.push('  Biwenger cort\u00e1ndonos . ' + si(d.cortado));
+        lineas.push('  almac\u00e9n KV enlazado ... ' + si(d.kv));
+        lineas.push('  sistema de puntos .... ' + (d.score != null ? d.score : '?'));
+
+        if (d.prueba) {
+          const p = d.prueba;
+          lineas.push('');
+          lineas.push('DESCARGA DE PRUEBA  (hecha ahora mismo)');
+          if (p.fallo) {
+            lineas.push('  HA FALLADO: ' + p.fallo);
+            lineas.push('  tard\u00f3 ................ ' + p.ms + ' ms  (el proxy corta a los ' + p.tope + ')');
+          } else {
+            lineas.push('  respuesta ............ HTTP ' + p.estado);
+            lineas.push('  futbolistas .......... ' + p.futbolistas + '   equipos: ' + p.equipos);
+            lineas.push('  tama\u00f1o ............... ' + Math.round(p.bytes / 1024) + ' KB');
+            lineas.push('  tard\u00f3 ................ ' + p.ms + ' ms  (el proxy corta a los ' + p.tope + ')');
+            if (p.ms > p.tope) lineas.push('  \u2190 TARDA M\u00c1S DE LO QUE AGUANTA: por eso se queda sin \u00edndice');
+            if (!p.futbolistas) lineas.push('  \u2190 Biwenger contesta, pero VAC\u00cdO');
+          }
+        }
+
+        lineas.push('');
+        lineas.push('ABONO DE LAS JORNADAS');
+        lineas.push('  primas de la liga .... ' + (d.primasValen ? 'BIEN' : 'MAL (todo a cero o sin traer)'));
+        if (d.primas) {
+          lineas.push('    por punto .......... ' + (d.primas.porPunto || 0));
+          lineas.push('    fija ............... ' + (d.primas.fija || 0));
+          lineas.push('    once ideal ......... ' + (d.primas.onceIdeal || 0));
+          lineas.push('    MVP partido/jornada  ' + (d.primas.mvpPartido || 0) + ' / ' + (d.primas.mvpJornada || 0));
+        }
+
+        caja.textContent = lineas.join('\n');
+      })
+      .catch(function (error) {
+        caja.textContent = 'El proxy no ha contestado: ' + String((error && error.message) || error);
+      });
+  }
+
   function ensureVersionWorker() {
     const hueco = $('worker-version');
     if (!hueco) return;
@@ -10768,6 +10840,9 @@
     /* En las clasificaciones de futbolistas, cada uno abre su gráfico. */
     /* Los rankings de la temporada abren la ficha del futbolista con sus
        estadísticas, sin el gráfico de valor de mercado. */
+    const chivato = $('btn-diagnostico');
+    if (chivato) chivato.addEventListener('click', comprobarProxy);
+
     const pildora = $('rankings-ambito');
     if (pildora) {
       pildora.addEventListener('click', function () {

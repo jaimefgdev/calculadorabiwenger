@@ -20,7 +20,7 @@
 <link rel="dns-prefetch" href="https://cdn.biwenger.com">
 <!-- El ?v= se sube en cada publicación: obliga al navegador a bajar el archivo
      nuevo en vez de reutilizar el que tenga en caché. -->
-<link rel="stylesheet" href="styles.css?v=310">
+<link rel="stylesheet" href="styles.css?v=311">
 <!-- La tipografia se pide ya, sin esperar a que el CSS termine de leerse. -->
 <link rel="preload" href="GoogleSans-Regular.woff2" as="font" type="font/woff2" crossorigin>
 <!-- El escudo de Biwenger, el mismo que el del boton de Inicio. -->
@@ -138,9 +138,15 @@
 
     <div class="input-panel__actions">
       <button id="btn-reset" class="btn btn--ghost btn--sm" type="button">Vaciar todo y volver a 20.000.000 €</button>
+      <!-- Comprueba de verdad si el proxy puede bajarse el índice de futbolistas,
+           que es de donde salen los puntos, los nombres y los precios. Cuando
+           llega vacío, la web enseña ceros con toda la seguridad del mundo y no
+           había forma de verlo sin montar una URL a mano. -->
+      <button id="btn-diagnostico" class="btn btn--ghost btn--sm" type="button">Comprobar el proxy</button>
       <!-- Qué versión del Worker está desplegada, para no tener que pedírsela a mano. -->
       <span id="worker-version" class="muted worker-version"></span>
     </div>
+    <pre id="diagnostico" class="diagnostico" hidden></pre>
   </section>
 
   <!-- ============================================================
@@ -648,7 +654,7 @@
 
 </main>
 
-<script src="app.js?v=349"></script>
+<script src="app.js?v=350"></script>
 <script>
   /* El service worker solo cachea los archivos de la app, nunca los datos.
      Se registra al final para que no compita con la primera carga.
