@@ -4756,6 +4756,12 @@
 
     const ganadas = {};
     const ultimas = {};
+    /* Que jornada ha ganado cada uno, y las que no cuentan todavia con su
+       motivo. Un numero suelto no se puede comprobar: cuando no cuadra con lo
+       que dice Biwenger, no hay forma de saber si sobra una, falta otra o el
+       desempate salio al reves. Con la lista delante se ve en un vistazo. */
+    const cuales = {};
+    const fuera = [];
 
     /* Jornadas ganadas: solo las cerradas. Mientras rueda, el ganador puede
        cambiar con cada partido, así que no se cuenta hasta que Biwenger la
@@ -4773,7 +4779,34 @@
         return (b.points - a.points) || desempateJornada(a, b);
       });
       const campeon = orden[0];
-      if (campeon) ganadas[campeon.name] = (ganadas[campeon.name] || 0) + 1;
+      if (campeon) {
+        ganadas[campeon.name] = (ganadas[campeon.name] || 0) + 1;
+        (cuales[campeon.name] = cuales[campeon.name] || []).push(jornada.round.number);
+      }
+    });
+
+    /* Las que el calendario dice que se han jugado pero no tenemos. Esto es lo
+       que rompia la cuenta sin hacer ruido: una jornada que no se llego a
+       descargar no esta «pendiente» ni «abierta», es que NO ESTA, y al que la
+       gano le faltaba una sin ninguna explicacion. */
+    const traidas = {};
+    jornadasGuardadas().forEach(function (j) { traidas[String(j.round.id)] = true; });
+    const sinTraer = (state.jornadas.list || []).filter(function (r) {
+      if ((r.part || 1) !== 1) return false;
+      if (r.status === 'pending') return false;
+      return !traidas[String(r.id)];
+    }).map(function (r) { return r.number; }).filter(function (n) { return n != null; });
+
+    /* Y las que se quedan fuera, con el porque. */
+    conPuntos.forEach(function (jornada) {
+      if (jornadaCerrada(jornada)) return;
+      const pendientes = (jornada.standings || []).some(function (fila) {
+        return (fila.xi || []).some(function (j) { return j.pending; });
+      });
+      fuera.push({
+        numero: jornada.round.number,
+        motivo: pendientes ? 'con partidos por jugar' : 'sin cerrar'
+      });
     });
 
     /* Racha: los puntos de las tres últimas jornadas, incluida la que está en
@@ -4794,7 +4827,8 @@
       });
     });
 
-    return { jornadas: conPuntos.length, ganadas: ganadas, racha: ultimas };
+    return { jornadas: conPuntos.length, ganadas: ganadas, racha: ultimas,
+      cuales: cuales, fuera: fuera, sinTraer: sinTraer };
   }
 
   /**
@@ -4857,9 +4891,17 @@
    * apenas.
    */
   let jugadasPedidas = false;
+  /* Cuando alguna descarga falla se apunta la hora para volver a intentarlo.
+     Antes se marcaba «ya pedidas» pase lo que pase: si una jornada fallaba
+     —un 502 de Biwenger, que llevamos toda la semana viéndolos— se quedaba sin
+     traer el resto de la sesión. Y sin esa jornada, las «jornadas ganadas»
+     salen mal y NADA lo dice: al que la ganó le falta una y punto. */
+  let jugadasFalloAt = 0;
 
   function ensureJornadasJugadas() {
-    if (jugadasPedidas) return;
+    /* Se reintenta al minuto de un fallo, no en el acto: si Biwenger nos tiene
+       cortados, insistir en bucle es justo lo que alarga el corte. */
+    if (jugadasPedidas && !(jugadasFalloAt && Date.now() - jugadasFalloAt > 60000)) return;
     const config = loadSyncConfig();
     if (!config.url || !config.key) return;
     /* Sin calendario no se sabe cuales hay: llega con la primera jornada. */
@@ -4871,20 +4913,27 @@
       if (r.status === 'pending') return false;
       return !state.jornadas.datos[r.id];
     });
-    if (!faltan.length) { jugadasPedidas = true; return; }
+    if (!faltan.length) { jugadasPedidas = true; jugadasFalloAt = 0; return; }
     jugadasPedidas = true;
+    jugadasFalloAt = 0;
+    let fallos = 0;
 
     const siguiente = function (i) {
-      if (i >= faltan.length) return;
+      if (i >= faltan.length) {
+        /* Si alguna se ha quedado por el camino, se deja la puerta abierta
+           para volver a por ella. */
+        if (fallos) jugadasFalloAt = Date.now();
+        return;
+      }
       fetch(config.url.replace(/\/+$/, '') + '/?key=' + encodeURIComponent(config.key) +
         '&jornada=' + encodeURIComponent(faltan[i].id), { headers: { 'accept': 'application/json' } })
         .then(function (response) { return response.json(); })
         .then(function (payload) {
-          if (payload.error || !payload.round) return;
+          if (payload.error || !payload.round) { fallos++; return; }
           mergeJornada(payload, true);
           renderManagers(); renderJornadas(); renderRankings();
         })
-        .catch(function () { /* esa se queda sin traer */ })
+        .catch(function () { fallos++; })
         .then(function () { setTimeout(function () { siguiente(i + 1); }, 400); });
     };
     siguiente(0);
@@ -4934,7 +4983,7 @@
       return;
     }
 
-    const lista = function (titulo, mapa, sufijo) {
+    const lista = function (titulo, mapa, sufijo, detalle, pie) {
       const filas = MANAGERS.map(function (nombre) {
         return { name: nombre, valor: mapa[nombre] || 0 };
       }).sort(function (a, b) {
@@ -4944,14 +4993,20 @@
       return '<div class="ranking">' +
         '<h3 class="ranking__title">' + titulo + '</h3>' +
         '<ol class="ranking__list">' + filas.map(function (fila) {
+          /* Cuales, al lado del numero: es la diferencia entre «tienes 2» y
+             «tienes la 1 y la 3», que es lo unico que se puede contrastar. */
+          const suyas = (detalle && detalle[fila.name]) || null;
+          const cuales = suyas && suyas.length
+            ? '<span class="ranking__matiz"> J' + suyas.join(', J') + '</span>' : '';
           return '<li class="ranking__row">' +
             '<span class="ranking__boton ranking__boton--fijo">' +
               '<span class="ranking__quien"><span class="manager">' + avatar(fila.name) +
                 '<span class="manager__name">' + escapeHtml(fila.name) + '</span></span></span>' +
-              '<strong class="ranking__value">' + fila.valor + sufijo + '</strong>' +
+              '<strong class="ranking__value">' + fila.valor + sufijo + cuales + '</strong>' +
             '</span>' +
           '</li>';
         }).join('') + '</ol>' +
+        (pie ? '<p class="ranking__pie">' + pie + '</p>' : '') +
       '</div>';
     };
 
@@ -5008,7 +5063,19 @@
     caja.innerHTML =
       conDesglose('Más goles', 'goles', '') +
       conDesglose('Más asistencias', 'asist', '') +
-      lista('Más jornadas ganadas', datos.ganadas, '') +
+      lista('Más jornadas ganadas', datos.ganadas, '', datos.cuales,
+        /* Y las que faltan por cerrar, dichas: si no, un numero que no cuadra
+           con Biwenger parece un error y casi siempre es una jornada con
+           partidos aplazados que aun no se ha decidido. */
+        ((datos.sinTraer || []).length
+          ? '<span class="aviso-falta">Faltan por traer: J' + datos.sinTraer.join(', J') +
+            ' \u2014 hasta que lleguen, esta cuenta no est\u00e1 completa.</span> '
+          : '') +
+        ((datos.fuera || []).length
+          ? 'Sin contar todav\u00eda: ' + datos.fuera.map(function (f) {
+              return 'J' + f.numero + ' (' + f.motivo + ')';
+            }).join(' \u00b7 ')
+          : '')) +
       lista('Mejor racha <span class="ranking__matiz">(últimas 3 jornadas)</span>',
         datos.racha, ' pts');
 
@@ -10347,6 +10414,7 @@
             lineas.push('  tard\u00f3 ................ ' + p.ms + ' ms  (el proxy corta a los ' + p.tope + ')');
             if (p.ms > p.tope) lineas.push('  \u2190 TARDA M\u00c1S DE LO QUE AGUANTA: por eso se queda sin \u00edndice');
             if (!p.futbolistas) lineas.push('  \u2190 Biwenger contesta, pero VAC\u00cdO');
+            if (p.copiaCreada) lineas.push('  ✓ copia de seguridad creada ahora');
           }
         }
 
