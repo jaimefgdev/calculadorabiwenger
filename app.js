@@ -4756,12 +4756,6 @@
 
     const ganadas = {};
     const ultimas = {};
-    /* Que jornada ha ganado cada uno, y las que no cuentan todavia con su
-       motivo. Un numero suelto no se puede comprobar: cuando no cuadra con lo
-       que dice Biwenger, no hay forma de saber si sobra una, falta otra o el
-       desempate salio al reves. Con la lista delante se ve en un vistazo. */
-    const cuales = {};
-    const fuera = [];
 
     /* Jornadas ganadas: solo las cerradas. Mientras rueda, el ganador puede
        cambiar con cada partido, así que no se cuenta hasta que Biwenger la
@@ -4779,10 +4773,7 @@
         return (b.points - a.points) || desempateJornada(a, b);
       });
       const campeon = orden[0];
-      if (campeon) {
-        ganadas[campeon.name] = (ganadas[campeon.name] || 0) + 1;
-        (cuales[campeon.name] = cuales[campeon.name] || []).push(jornada.round.number);
-      }
+      if (campeon) ganadas[campeon.name] = (ganadas[campeon.name] || 0) + 1;
     });
 
     /* Las que el calendario dice que se han jugado pero no tenemos. Esto es lo
@@ -4791,23 +4782,19 @@
        gano le faltaba una sin ninguna explicacion. */
     const traidas = {};
     jornadasGuardadas().forEach(function (j) { traidas[String(j.round.id)] = true; });
+    const conAlgo = {};
+    jornadasGuardadas().forEach(function (j) {
+      if ((j.standings || []).some(function (f) { return (f.points || 0) !== 0; })) {
+        conAlgo[String(j.round.id)] = true;
+      }
+    });
     const sinTraer = (state.jornadas.list || []).filter(function (r) {
       if ((r.part || 1) !== 1) return false;
       if (r.status === 'pending') return false;
-      return !traidas[String(r.id)];
+      /* Tanto la que no está como la que está vacía: para esta cuenta son lo
+         mismo, una jornada jugada que no tenemos. */
+      return !traidas[String(r.id)] || !conAlgo[String(r.id)];
     }).map(function (r) { return r.number; }).filter(function (n) { return n != null; });
-
-    /* Y las que se quedan fuera, con el porque. */
-    conPuntos.forEach(function (jornada) {
-      if (jornadaCerrada(jornada)) return;
-      const pendientes = (jornada.standings || []).some(function (fila) {
-        return (fila.xi || []).some(function (j) { return j.pending; });
-      });
-      fuera.push({
-        numero: jornada.round.number,
-        motivo: pendientes ? 'con partidos por jugar' : 'sin cerrar'
-      });
-    });
 
     /* Racha: los puntos de las tres últimas jornadas, incluida la que está en
        juego con lo que lleve. Al empezar la cuarta, la primera deja de contar.
@@ -4828,7 +4815,7 @@
     });
 
     return { jornadas: conPuntos.length, ganadas: ganadas, racha: ultimas,
-      cuales: cuales, fuera: fuera, sinTraer: sinTraer };
+      sinTraer: sinTraer };
   }
 
   /**
@@ -4908,10 +4895,26 @@
     const calendario = state.jornadas.list || [];
     if (!calendario.length) return;
 
+    /* ¿Esta jornada guardada sirve de algo? Una que se ha jugado SIEMPRE tiene
+       puntos. Si esta guardada y nadie puntúa, lo que hay guardado es basura:
+       paso por aquí mientras el índice de futbolistas llegaba vacío, y entonces
+       todos los futbolistas se daban por idos de LaLiga y la jornada entera se
+       guardó a cero. */
+    const sirve = function (id) {
+      const j = state.jornadas.datos[id];
+      if (!j || !(j.standings || []).length) return false;
+      return j.standings.some(function (fila) { return (fila.points || 0) !== 0; });
+    };
+
     const faltan = calendario.filter(function (r) {
       if ((r.part || 1) !== 1) return false;
       if (r.status === 'pending') return false;
-      return !state.jornadas.datos[r.id];
+      /* Se vuelven a pedir tanto las que no están como las que están vacías.
+         Sin esto, una jornada guardada a cero no se recuperaba NUNCA: como el
+         id ya figuraba, no se volvía a pedir, y como no tenía puntos, no
+         contaba para nada. Desaparecía sin más: ni ganada, ni pendiente, ni
+         «falta por traer». La jornada 3 llevaba así desde el corte de Biwenger. */
+      return !sirve(r.id);
     });
     if (!faltan.length) { jugadasPedidas = true; jugadasFalloAt = 0; return; }
     jugadasPedidas = true;
@@ -4983,7 +4986,7 @@
       return;
     }
 
-    const lista = function (titulo, mapa, sufijo, detalle, pie) {
+    const lista = function (titulo, mapa, sufijo, pie) {
       const filas = MANAGERS.map(function (nombre) {
         return { name: nombre, valor: mapa[nombre] || 0 };
       }).sort(function (a, b) {
@@ -4993,16 +4996,11 @@
       return '<div class="ranking">' +
         '<h3 class="ranking__title">' + titulo + '</h3>' +
         '<ol class="ranking__list">' + filas.map(function (fila) {
-          /* Cuales, al lado del numero: es la diferencia entre «tienes 2» y
-             «tienes la 1 y la 3», que es lo unico que se puede contrastar. */
-          const suyas = (detalle && detalle[fila.name]) || null;
-          const cuales = suyas && suyas.length
-            ? '<span class="ranking__matiz"> J' + suyas.join(', J') + '</span>' : '';
           return '<li class="ranking__row">' +
             '<span class="ranking__boton ranking__boton--fijo">' +
               '<span class="ranking__quien"><span class="manager">' + avatar(fila.name) +
                 '<span class="manager__name">' + escapeHtml(fila.name) + '</span></span></span>' +
-              '<strong class="ranking__value">' + fila.valor + sufijo + cuales + '</strong>' +
+              '<strong class="ranking__value">' + fila.valor + sufijo + '</strong>' +
             '</span>' +
           '</li>';
         }).join('') + '</ol>' +
@@ -5063,19 +5061,15 @@
     caja.innerHTML =
       conDesglose('Más goles', 'goles', '') +
       conDesglose('Más asistencias', 'asist', '') +
-      lista('Más jornadas ganadas', datos.ganadas, '', datos.cuales,
-        /* Y las que faltan por cerrar, dichas: si no, un numero que no cuadra
-           con Biwenger parece un error y casi siempre es una jornada con
-           partidos aplazados que aun no se ha decidido. */
-        ((datos.sinTraer || []).length
+      lista('Más jornadas ganadas', datos.ganadas, '',
+        /* Lo único que se dice aquí es cuando la cuenta está INCOMPLETA: una
+           jornada jugada que no tenemos hace que a quien la ganó le falte una,
+           y sin este aviso eso pasaba en silencio. Las que siguen abiertas no
+           se enumeran: eso no es un problema, es el curso normal. */
+        (datos.sinTraer || []).length
           ? '<span class="aviso-falta">Faltan por traer: J' + datos.sinTraer.join(', J') +
-            ' \u2014 hasta que lleguen, esta cuenta no est\u00e1 completa.</span> '
+            ' \u2014 hasta que lleguen, esta cuenta no est\u00e1 completa.</span>'
           : '') +
-        ((datos.fuera || []).length
-          ? 'Sin contar todav\u00eda: ' + datos.fuera.map(function (f) {
-              return 'J' + f.numero + ' (' + f.motivo + ')';
-            }).join(' \u00b7 ')
-          : '')) +
       lista('Mejor racha <span class="ranking__matiz">(últimas 3 jornadas)</span>',
         datos.racha, ' pts');
 
