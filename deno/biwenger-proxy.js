@@ -123,7 +123,7 @@ const CDN = 'https://cf.biwenger.com/api/v2';
    navegador normal y las cabeceras que este mandaría. */
 /* Marca de versión: se sube en cada cambio y se consulta con ?version=1.
    Sirve para saber desde fuera si el despliegue ha entrado o no. */
-const VERSION = '2026-09-02 · deno 70';
+const VERSION = '2026-09-02 · deno 71';
 
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ' +
   '(KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36';
@@ -3509,7 +3509,7 @@ async function roundBoard(env, headers, jornada, listaNombres) {
          jornada, y con ella se va todo el abono: ni puntos, ni once ideal, ni
          MVP. Confirmado en la jornada 2, con Eneko a 25 puntos y cero euros. */
       if (!fila.counts) {
-        fila.abono = { total: 0, puntos: 0, ideal: 0, mvp: 0, motivo: 'negativo' };
+        fila.abono = { total: 0, fija: 0, puntos: 0, ideal: 0, mvp: 0, motivo: 'negativo' };
         return;
       }
 
@@ -3522,10 +3522,21 @@ async function roundBoard(env, headers, jornada, listaNombres) {
 
       fila.abono = {
         total: primas.fija + porPuntos + porIdeal + porMvp,
+        fija: primas.fija,
         puntos: porPuntos,
         ideal: porIdeal,
         mvp: porMvp,
-        motivo: null
+        motivo: null,
+        /* El desglose, con las CANTIDADES y el PRECIO de cada cosa: sin esto
+           solo se puede enseñar el dinero, y «200.000 € del once ideal» no
+           dice si son dos futbolistas a cien mil o uno a doscientos mil. Con
+           esto la ficha de la jornada puede montar la cuenta entera. */
+        detalle: {
+          puntos: cuentan, porPunto: primas.porPunto,
+          ideales: ideales, porIdeal: primas.onceIdeal,
+          mvpPartido: mejores, porMvpPartido: primas.mvpPartido,
+          mvpJornada: deJornada, porMvpJornada: primas.mvpJornada
+        }
       };
     });
   }
