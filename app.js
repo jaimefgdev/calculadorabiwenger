@@ -5522,7 +5522,10 @@
 
   function jornadaDetalle(fila) {
     if (!fila.xi.length && !fila.bench.length) {
-      return '<p class="muted">De esta jornada no hay alineación guardada. Se guarda sola mientras la jornada está en juego.</p>';
+      /* Sin alineación guardada, el abono se enseña igual: es un dato de la
+         jornada, no del once, y sigue valiendo aunque no se guardara nadie. */
+      return '<p class="muted">De esta jornada no hay alineación guardada. Se guarda sola mientras la jornada está en juego.</p>' +
+        desgloseDelAbono(fila);
     }
 
     const banquillo = fila.bench.length === 0
@@ -5538,6 +5541,94 @@
     return '<div class="lineup-grid">' +
       '<div class="pitch-wrap">' + staticPitch(fila.type, fila.xi) + '</div>' +
       '<div class="lineup-bench"><h3 class="bench__title">Suplentes</h3>' + banquillo + '</div>' +
+    '</div>' + desgloseDelAbono(fila);
+  }
+
+  /**
+   * De dónde sale el dinero de la jornada, línea a línea.
+   *
+   * En la tabla solo cabe el total, y el total no explica nada: «más de un
+   * millón» puede ser mucha puntuación o dos futbolistas en el once ideal. Aquí
+   * se ve la cuenta entera, con cuántos y a cómo, que es lo único que permite
+   * comprobar si Biwenger ha pagado lo que tenía que pagar.
+   */
+  function desgloseDelAbono(fila) {
+    const abono = fila.abono;
+    if (!abono) return '';
+
+    const titulo = '<h3 class="abono__titulo">Abono de la jornada</h3>';
+
+    /* Con saldo negativo al empezar, Biwenger no le cuenta la jornada: no hay
+       nada que desglosar, solo que explicar. */
+    if (abono.motivo === 'negativo') {
+      return '<div class="abono">' + titulo +
+        '<p class="muted">Empezó la jornada con saldo negativo, así que no le cuenta: ' +
+        'ni puntos ni abono.</p></div>';
+    }
+
+    const d = abono.detalle || null;
+    const filas = [];
+
+    /* «Cuantos» solo se pone cuando dice algo: la prima fija no se multiplica
+       por nada, y una cuenta de «1 ×» ahí solo estorba. */
+    const linea = function (que, cuantos, cuanto) {
+      return '<div class="abono__fila">' +
+        '<span class="abono__que">' + que + '</span>' +
+        '<span class="abono__cuenta">' + (cuantos == null ? '' : escapeHtml(cuantos)) + '</span>' +
+        '<span class="abono__cuanto' + (cuanto < 0 ? ' money-neg' : '') + '">' +
+          money(cuanto) + '</span>' +
+      '</div>';
+    };
+
+    if (abono.fija) filas.push(linea('Fija', null, abono.fija));
+
+    if (d) {
+      /* Con el desglose completo se dice cuántos y a cómo. */
+      if (abono.puntos || d.puntos) {
+        filas.push(linea('Puntos', d.puntos + ' × ' + money(d.porPunto), abono.puntos));
+      }
+      if (d.ideales) {
+        filas.push(linea('Once ideal',
+          d.ideales + (d.ideales === 1 ? ' futbolista × ' : ' futbolistas × ') + money(d.porIdeal),
+          d.ideales * d.porIdeal));
+      }
+      if (d.mvpPartido) {
+        filas.push(linea('MVP del partido',
+          d.mvpPartido + ' × ' + money(d.porMvpPartido), d.mvpPartido * d.porMvpPartido));
+      }
+      if (d.mvpJornada) {
+        filas.push(linea('MVP de la jornada',
+          d.mvpJornada + ' × ' + money(d.porMvpJornada), d.mvpJornada * d.porMvpJornada));
+      }
+    } else {
+      /* Jornada guardada antes de que el desglose existiera: se enseña lo que
+         hay, que es el dinero de cada concepto sin el «cuántos». */
+      if (abono.puntos) filas.push(linea('Puntos', null, abono.puntos));
+      if (abono.ideal) filas.push(linea('Once ideal', null, abono.ideal));
+      if (abono.mvp) filas.push(linea('MVP', null, abono.mvp));
+    }
+
+    if (!filas.length) {
+      return '<div class="abono">' + titulo +
+        '<p class="muted">Esta jornada no ha dado nada.</p></div>';
+    }
+
+    /* Cerrada quiere decir pagada. Mientras siga abierta esto es una
+       previsión, y hay que decirlo: Biwenger no abona hasta el día siguiente. */
+    const cerrada = fila.pointsOfficial != null;
+
+    return '<div class="abono">' + titulo +
+      '<div class="abono__lista">' + filas.join('') +
+        '<div class="abono__fila abono__fila--total">' +
+          '<span class="abono__que">Total</span>' +
+          '<span class="abono__cuenta"></span>' +
+          '<span class="abono__cuanto ' + (abono.total < 0 ? 'money-neg' : 'money-pos') + '">' +
+            (abono.total > 0 ? '+' : '') + money(abono.total) + '</span>' +
+        '</div>' +
+      '</div>' +
+      '<p class="abono__nota">' + (cerrada
+        ? 'Jornada cerrada: es lo que ha pagado.'
+        : 'Previsión: la jornada todavía no ha cerrado.') + '</p>' +
     '</div>';
   }
 
