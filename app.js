@@ -1741,6 +1741,18 @@
    * todas las tablas; el nombre sale de `myName()`, que lo saca del id del
    * token con el que sincronizamos, no de una constante escrita a mano.
    */
+  /**
+   * El color del puesto: ámbar el primero, rojo los tres últimos.
+   *
+   * Se pinta SOLO el número, no la fila. Con menos de cinco no hay «tres
+   * últimos» que valgan —serían casi todos—; el primero sí, siempre.
+   */
+  function claseDePuesto(indice, total) {
+    if (indice === 0) return ' col-rank--primero';
+    if (total >= 5 && indice >= total - 3) return ' col-rank--cola';
+    return '';
+  }
+
   function claseMia(nombre) {
     if (!nombre) return '';
     const yo = myName();
@@ -7277,17 +7289,6 @@
       return;
     }
 
-    /* El puesto de la jornada, con color: el primero en ámbar y los tres
-       últimos en rojo. Solo el número; la fila se queda como está. */
-    const puesto = function (indice) {
-      const total = filas.length;
-      if (indice === 0) return ' col-rank--primero';
-      /* Con menos de cinco no hay «tres últimos» que valgan: serían casi todos.
-         Y el primero manda siempre, aunque la tabla sea corta. */
-      if (total >= 5 && indice >= total - 3) return ' col-rank--cola';
-      return '';
-    };
-
     cuerpo.innerHTML = filas.map(function (fila, indice) {
       const abierta = state.jornadaAbierta === fila.id;
       const detalle = !abierta ? '' :
@@ -7295,7 +7296,8 @@
           jornadaDetalle(fila) + '</div></td></tr>';
 
       return '<tr class="' + (abierta ? 'row-open' : '') + claseMia(fila.name) + '">' +
-        '<td class="col-rank' + puesto(indice) + '">' + (indice + 1) + '</td>' +
+        '<td class="col-rank' + claseDePuesto(indice, filas.length) + '">' +
+          (indice + 1) + '</td>' +
         '<td>' +
           '<button type="button" class="row-toggle" data-jornada-manager="' + escapeHtml(fila.id) + '"' +
             ' aria-expanded="' + (abierta ? 'true' : 'false') + '">' +
@@ -7505,7 +7507,8 @@
       const open = state.expandedManager === row.name;
       const abiertoPuntos = state.expandedPoints === row.name;
       return '<tr class="' + (open || abiertoPuntos ? 'row-open' : '') + claseMia(row.name) + '">' +
-        '<td class="col-rank">' + (index + 1) + '</td>' +
+        '<td class="col-rank' + claseDePuesto(index, filas.length) + '">' +
+          (index + 1) + '</td>' +
         '<td data-label="Futbolista">' +
           '<button type="button" class="row-toggle" data-manager-card="' + escapeHtml(row.name) + '"' +
             ' aria-expanded="' + (open ? 'true' : 'false') + '">' +
