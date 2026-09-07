@@ -8602,14 +8602,8 @@
     });
     const visibles = filas.filter(function (f) { return !f.atras || hayAtras; });
 
-    const cabecera = function (ficha, id) {
-      return '<div class="versus__quien">' + faceOf(id, 'ficha__face') +
-        '<strong>' + escapeHtml(ficha.name || '') + '</strong>' +
-        '<span class="sub">' + escapeHtml(ficha.teamName || '') + '</span></div>';
-    };
-
     return '<div class="versus">' +
-      '<div class="versus__cab">' + cabecera(uno, unoId) + cabecera(otro, otroId) + '</div>' +
+      /* Sin cabecera: las caras y los nombres ya van arriba, grandes. */
       '<div class="versus__filas">' + visibles.map(function (fila) {
         const a = fila.valor(datosUno, uno);
         const b = fila.valor(datosOtro, otro);
@@ -8722,13 +8716,8 @@
       '</span>';
     };
 
-    const cabecera = function (ficha, id) {
-      return '<div class="versus__quien">' + faceOf(id, 'ficha__face') +
-        '<strong>' + escapeHtml(ficha.name || '') + '</strong></div>';
-    };
-
     return '<div class="versus">' +
-      '<div class="versus__cab">' + cabecera(uno, unoId) + cabecera(otro, otroId) + '</div>' +
+      /* Sin cabecera: las caras y los nombres ya van arriba, grandes. */
       '<div class="versus-part">' + jornadas.map(function (n) {
         return '<div class="versus-part__fila">' +
           lado(a[n]) +
@@ -8782,6 +8771,27 @@
       });
   }
 
+  /** Un retrato grande con sus chapas y su escudo. */
+  function retratoDeFicha(id, ficha) {
+    return '<span class="ficha__uno">' +
+      faceOf(id, 'ficha__face ficha__face--grande') +
+      /* Las demarcaciones van en la esquina CONTRARIA al escudo: las dos en el
+         mismo lado se pisaban, y el que juega en dos puestos lleva dos chapas. */
+      '<span class="ficha__puestos">' +
+        chapaDePuesto(ficha.position, '', otrosPuestosDe(ficha, id)) +
+      '</span>' +
+      crestOf(ficha, 'crest--badge ficha__escudo') +
+    '</span>';
+  }
+
+  /** Su nombre y su club, para poner debajo de cada cara. */
+  function nombreDeFicha(nombre, club) {
+    return '<span class="ficha__quien">' +
+      '<strong>' + escapeHtml(nombre || '') + '</strong>' +
+      (club ? '<span class="sub">' + escapeHtml(club) + '</span>' : '') +
+    '</span>';
+  }
+
   function renderPriceModal() {
     const caja = $('price-modal');
     const abierto = state.priceModal;
@@ -8819,6 +8829,9 @@
 
 
     const ficha = playerInfo(abierto.id);
+    /* Con quien se compara, si es que se compara. Se saca aquí porque hace
+       falta en tres sitios: los dos retratos, los dos nombres y el resto. */
+    const rival = abierto.comparar ? playerInfo(abierto.comparar) : null;
     const sube2 = ficha.increment > 0;
 
     /* El precio y su variación ya los cuenta el gráfico: aquí sobran. */
@@ -8843,15 +8856,12 @@
          encima de su borde. Aquí queda flotando y la tarjeta arranca a media
          altura de él. */
       '<div class="ficha__wrap">' +
-      '<span class="ficha__retrato">' +
-        faceOf(abierto.id, 'ficha__face ficha__face--grande') +
-        /* Las demarcaciones van en la esquina CONTRARIA al escudo: las dos en
-           el mismo lado se pisaban, y el que juega en dos puestos lleva dos
-           chapas. */
-        '<span class="ficha__puestos">' +
-          chapaDePuesto(ficha.position, '', otrosPuestosDe(ficha, abierto.id)) +
-        '</span>' +
-        crestOf(ficha, 'crest--badge ficha__escudo') +
+      /* Comparando, DOS retratos grandes uno al lado del otro. Antes salía uno
+         grande arriba —solo el primero— y más abajo los dos en pequeño, así que
+         una cara se repetía y la del rival no se veía hasta bajar. */
+      '<span class="ficha__retrato' + (rival ? ' ficha__retrato--dos' : '') + '">' +
+        retratoDeFicha(abierto.id, ficha) +
+        (rival ? retratoDeFicha(abierto.comparar, rival) : '') +
       '</span>' +
       '<div class="picker__card modal__card ficha__card" role="dialog" aria-modal="true" aria-label="Ficha de ' +
         escapeHtml(abierto.name) + '">' +
@@ -8865,8 +8875,11 @@
           /* Sin el circulito de estado: justo debajo va el parte de Biwenger
              («Lesion en el biceps femoral...»), que lo dice con todas las
              letras. El icono solo repetia lo mismo peor. */
-          '<span class="ficha__nombre">' +
-            '<strong>' + escapeHtml(abierto.name) + '</strong>' +
+          '<span class="ficha__nombre' + (rival ? ' ficha__nombre--dos' : '') + '">' +
+            (rival
+              ? nombreDeFicha(abierto.name, ficha.teamName) +
+                nombreDeFicha(rival.name, rival.teamName)
+              : '<strong>' + escapeHtml(abierto.name) + '</strong>') +
           '</span>' +
           /* Mientras se elige rival, la pastilla estorba: su sitio lo ocupa el
              aspa que hay junto al buscador. */
@@ -8891,11 +8904,20 @@
                   v.rotulo + '</button>';
               }).join('') +
             '</span>' +
-            '<button type="button" class="ambito ficha__comparar" data-comparar>' +
-              (abierto.comparar ? 'Quitar comparación' : 'Comparar') + '</button>' +
+            /* Comparar SOLO en Estadísticas: es lo único que se compara de
+               verdad —los números y el gráfico—. En Partidos y en Ficha no
+               tenía nada que hacer y solo ensuciaba la fila.
+               Con la comparación puesta se sigue viendo, que si no no habría
+               forma de quitarla. */
+            (vistaDeFicha(abierto) === 'stats' || abierto.comparar
+              ? '<button type="button" class="ambito ficha__comparar" data-comparar>' +
+                  (abierto.comparar ? 'Quitar comparación' : 'Comparar') + '</button>'
+              : '') +
             '</span>') +
         '</div>' +
-        '<p class="muted ficha__datos">' + datos + '</p>' +
+        /* «MED · Barcelona · 52 puntos · Libre» es de UNO solo: comparando
+           confunde, y sus datos ya salen en la tabla y bajo su cara. */
+        (rival ? '' : '<p class="muted ficha__datos">' + datos + '</p>') +
         /* Lesionado o sancionado: el parte de Biwenger («Retorno estimado:
            mediados de enero», «Roja directa»...) debajo del nombre y en rojo,
            que es el dato que de verdad decide si lo alineas. */

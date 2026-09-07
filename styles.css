@@ -1233,6 +1233,8 @@ code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft)
    sobra, que es lo que le permite desplazarse por dentro. */
 .ficha__retrato {
   position: relative; z-index: 2; flex: none;
+  /* En fila: comparando van dos retratos, uno por futbolista. */
+  display: flex; gap: 1.4rem;
   /* `line-height: 0` es lo que quita el hueco de linea que todo `inline-block`
      arrastra debajo: con el, la caja del retrato era mas alta que la foto y las
      chapas, ancladas abajo, caian fuera del circulo y pisaban el nombre. */
@@ -1240,6 +1242,26 @@ code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft)
   /* La tarjeta arranca a media foto: se le come la mitad de abajo. */
   margin-bottom: -85px;
 }
+/* Cada retrato es su propia caja: las chapas y el escudo van `absolute` y
+   necesitan un ancla POR FUTBOLISTA. Con las dos caras colgando del mismo
+   ancla, las chapas de los dos se apilaban sobre la primera. */
+.ficha__uno { position: relative; display: inline-block; line-height: 0; }
+
+/* Los nombres, cada uno bajo su cara: las mismas columnas y el mismo hueco que
+   los retratos, para que caigan justo debajo. */
+/* Doble clase a proposito: `.ficha__nombre` esta MAS ABAJO en el archivo y, con
+   la misma especificidad, ganaba su `display: flex`; los dos nombres se
+   quedaban centrados en medio en vez de uno bajo cada cara. */
+.ficha__nombre.ficha__nombre--dos {
+  display: grid; grid-template-columns: 170px 170px;
+  gap: 1.4rem; justify-content: center; align-items: start;
+}
+.ficha__quien {
+  display: flex; flex-direction: column; align-items: center; gap: .1rem;
+  min-width: 0; text-align: center; line-height: 1.2;
+}
+.ficha__quien .sub { font-size: .8rem; }
+
 /* Las tres clases van a proposito: mas abajo hay un `.pic-player.ficha__face`
    a 40 px que empata en especificidad y, por ir despues, ganaba; la foto salia
    diminuta y el escudo la tapaba entera. Con la tercera clase esta gana siempre,
