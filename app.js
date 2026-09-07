@@ -3424,8 +3424,7 @@
             (sube ? '\u25b2' : '\u25bc') + '</span>' : '') + '</td>' +
         '<td class="num" data-label="Precio"><strong>' + money(venta.price || 0) + '</strong></td>' +
         '<td class="spark-cell" data-label="Evolución">' +
-          sparkline(ultimos(state.priceSeries[venta.playerId], 45), venta.playerId, venta.player,
-            venta.increment) + '</td>' +
+          sparkline(ultimos(state.priceSeries[venta.playerId], 45), venta.playerId, venta.player) + '</td>' +
         '<td data-label="Queda">' + deadlineCell(venta.until) + '</td>' +
         /* Lo que vendes tú no se puja; en el resto, si ya has pujado, se ve por
            cuánto y el botón sirve para cambiarla. */
@@ -7452,21 +7451,20 @@
   /**
    * Lo que ha subido o bajado hoy.
    *
-   * `hoy` lo pasa quien dibuja la fila, porque ya lo tiene en la mano. NO se
-   * busca aquí: se hacía con `playerInfo`, que recorre las ocho plantillas, el
-   * mercado, el tablón y los 541 futbolistas, y salía UNA de esas por FILA. En
-   * Jugadores son cientos por repintado y la pestaña se quedaba pensando.
-   * Si no llega, se saca de los dos últimos días de la serie, que es lo mismo.
+   * Sale de los dos últimos días de su propia serie, que es exactamente lo que
+   * ha hecho hoy. Se calculó un tiempo con `playerInfo`, y eso recorre las ocho
+   * plantillas, el mercado, el tablón y los 541 futbolistas: una búsqueda de
+   * esas POR FILA, cientos por repintado en Jugadores. Aquí no hace falta nada
+   * de eso, el dato ya está en la serie que se está dibujando.
    */
-  function cambioDeHoy(hoy, valores) {
-    if (hoy != null && hoy !== 0) return hoy;
+  function cambioDeHoy(valores) {
     if (valores && valores.length >= 2) {
       return valores[valores.length - 1] - valores[valores.length - 2];
     }
     return 0;
   }
 
-  function sparkline(serie, id, nombre, hoy) {
+  function sparkline(serie, id, nombre) {
     if (!serie || serie.length < 2) return '<span class="sub">—</span>';
 
     const W = 76, H = 22, pad = 2;
@@ -7482,7 +7480,7 @@
     });
 
     const diferencia = valores[valores.length - 1] - valores[0];
-    const cambio = cambioDeHoy(hoy, valores);
+    const cambio = cambioDeHoy(valores);
     const color = colorDeEvolucion(cambio);
 
     return '<button type="button" class="spark" data-spark="' + escapeHtml(String(id || '')) + '"' +
@@ -7505,14 +7503,6 @@
   }
 
   /** Pide la evolución de precio de una lista de futbolistas, por tandas. */
-  /* Quien está esperando a que lleguen unas series que YA se habían pedido.
-     Sin esto, el segundo que las pide se quedaba sin aviso: la ficha se abría
-     mientras la tabla del mercado aún las estaba trayendo, veía que ya estaban
-     pedidas, se iba, y cuando llegaban solo se enteraba la tabla. La ficha se
-     quedaba con la evolución vacía para siempre diciendo que Biwenger no la
-     publica, cuando la línea se estaba pintando ahí al lado. */
-  let esperandoSeries = [];
-
   function ensurePriceSeries(ids, alTerminar) {
     const config = loadSyncConfig();
     if (!config.url || !config.key) return;
@@ -7520,16 +7510,7 @@
     const faltan = (ids || []).filter(function (id) {
       return id && state.priceSeries[id] === undefined;
     });
-
-    if (faltan.length === 0) {
-      /* `null` quiere decir «pedida y en camino». Si alguna de las que se
-         preguntan está así, hay que avisar a quien pregunta cuando llegue. */
-      const enCamino = (ids || []).some(function (id) {
-        return id && state.priceSeries[id] === null;
-      });
-      if (enCamino && alTerminar) esperandoSeries.push(alTerminar);
-      return;
-    }
+    if (faltan.length === 0) return;
     faltan.forEach(function (id) { state.priceSeries[id] = null; });
 
     /* El Worker atiende 30 por consulta: el mercado entero va en dos o tres. */
@@ -7543,30 +7524,9 @@
         .then(function (payload) {
           if (!payload || payload.error) return;
           Object.keys(payload).forEach(function (id) { state.priceSeries[id] = payload[id]; });
-          /* Y a los que se pidieron y NO vienen en la respuesta se les pone la
-             lista vacía. Si se quedan en `null` —que significa «en camino»— su
-             ficha se queda en «Cargando la evolución…» para siempre esperando
-             algo que ya ha llegado y no los traía. */
-          tanda.forEach(function (id) {
-            if (state.priceSeries[id] == null) state.priceSeries[id] = [];
-          });
           if (alTerminar) alTerminar();
-          /* Y a los que se quedaron esperando estas mismas series. */
-          const avisar = esperandoSeries;
-          esperandoSeries = [];
-          avisar.forEach(function (fn) { try { fn(); } catch (e) { /* que no corte a los demás */ } });
         })
-        .catch(function () {
-          /* Si la consulta falla, tampoco pueden quedarse en «en camino»: se
-             marcan como sin datos y se despierta a los que esperaban, que si no
-             se quedan mirando un «cargando» eterno. */
-          tanda.forEach(function (id) {
-            if (state.priceSeries[id] == null) state.priceSeries[id] = [];
-          });
-          const avisar = esperandoSeries;
-          esperandoSeries = [];
-          avisar.forEach(function (fn) { try { fn(); } catch (e) { /* nada */ } });
-        });
+        .catch(function () { /* sin evolución */ });
     }
   }
 
@@ -7966,57 +7926,21 @@
    * Abre la ficha del futbolista al que pertenece lo que se ha pulsado. Dice si
    * la ha abierto, para que quien llame pueda parar ahí.
    */
-  /**
-   * Busca a un futbolista por su nombre, para cuando la fila no trae el número.
-   *
-   * Se mira en la lista de LaLiga, en el mercado y en las ocho plantillas: en
-   * alguna de las tres está casi siempre. Es una red de seguridad, no el camino
-   * normal: lo normal es que la fila traiga su identificador.
-   */
-  function idPorNombre(nombre) {
-    const busca = String(nombre || '').trim().toLowerCase();
-    if (!busca) return null;
-
-    const enLista = (state.jugadores || []).filter(function (j) {
-      return String(j.name || '').trim().toLowerCase() === busca;
-    })[0];
-    if (enLista && enLista.id != null) return String(enLista.id);
-
-    const enMercado = (state.market || []).filter(function (v) {
-      return String(v.player || '').trim().toLowerCase() === busca;
-    })[0];
-    if (enMercado && enMercado.playerId != null) return String(enMercado.playerId);
-
-    let hallado = null;
-    squadList().forEach(function (plantilla) {
-      (plantilla.players || []).forEach(function (j) {
-        if (!hallado && String(j.name || '').trim().toLowerCase() === busca && j.id != null) {
-          hallado = String(j.id);
-        }
-      });
-    });
-    return hallado;
-  }
-
   function abrirFicha(donde) {
     const quien = donde && donde.closest && donde.closest('[data-player-id]');
-    if (!quien) return false;
+    if (!quien || !quien.getAttribute('data-player-id')) return false;
 
     const nombre = quien.querySelector('.player-name');
-    const comoSeLlamaba = nombre ? nombre.textContent : '';
-
-    /* El número de la fila; y si viniera vacío —ha pasado en el mercado, cuando
-       Biwenger manda la venta sin él—, se busca por el nombre antes que dejar
-       que pulsar no haga absolutamente nada, que es lo peor de todo. */
-    const id = quien.getAttribute('data-player-id') || idPorNombre(comoSeLlamaba);
-    if (!id) return false;
-
-    state.priceModal = { id: String(id), name: comoSeLlamaba };
+    state.priceModal = {
+      id: quien.getAttribute('data-player-id'),
+      name: nombre ? nombre.textContent : ''
+    };
     ensurePriceSeries([state.priceModal.id], renderPriceModal);
     ensureEstadisticas(state.priceModal.id);
     renderPriceModal();
     return true;
   }
+
 
   /** Los puntos jornada a jornada del futbolista, en el mismo gráfico de barras. */
   function rachaDeTemporada(id) {
@@ -8987,10 +8911,7 @@
               /* Recién llegado al mercado: un solo día no dibuja una línea. */
               ? 'Apareció en el mercado el ' + escapeHtml(diaLargo(puntos[0].day)) +
                 ': aún no hay evolución que enseñar.'
-              /* `null` es «pedida y en camino»; que no diga que no existe. */
-              : (serie === null
-                  ? 'Cargando la evolución…'
-                  : 'Biwenger no publica la evolución de este futbolista.')) + '</p>'
+              : 'Biwenger no publica la evolución de este futbolista.') + '</p>'
           : '<div class="viz-hover">' +
               lineChart(puntos, 'price', colorDeEvolucion(ficha.increment), 'Valor de mercado',
                 { height: 260, ticks: 7, fullTicks: true, padX: 96, hover: true,
@@ -9124,8 +9045,7 @@
             })() + '</td>' +
             '<td class="num"><strong>' + (player.marketValue == null ? '—' : money(player.marketValue)) + '</strong></td>' +
             '<td class="spark-cell">' +
-              sparkline(ultimos(state.priceSeries[player.id], 45), player.id, player.name,
-                player.increment) + '</td>' +
+              sparkline(ultimos(state.priceSeries[player.id], 45), player.id, player.name) + '</td>' +
             '<td class="num">' + (diff == null ? '<span class="sub">—</span>' : (diff === 0
               /* Sin cambio no hay flecha ni verde: un guion y el número normal. */
               ? '<span class="delta delta--igual">– ' + money(0) + '</span>'
@@ -11553,28 +11473,10 @@
       });
     });
 
-    /* La ficha se abre pulsando el futbolista, esté donde esté.
-       Y vale TODA LA FILA, no solo el nombre: la zona del nombre es estrecha y
-       pulsar dos centímetros al lado no hacía absolutamente nada, que se lee
-       como que la ficha está rota. Los botones de la fila —pujar, renovar,
-       quitar— se respetan: esos hacen lo suyo y no abren nada. */
+    /* La ficha se abre pulsando el nombre del futbolista, esté donde esté. */
     ['moves-body', 'market-body', 'squads-body', 'listings-body',
      'movers-up', 'movers-down', 'jugadores-body', 'squad-body', 'caros-body'].forEach(function (id) {
-      $(id).addEventListener('click', function (event) {
-        const control = event.target.closest &&
-          event.target.closest('button, a, input, select, [data-pujar], [data-renueva],' +
-            ' [data-renovar], [data-retirar], [data-quitar], [data-vender], [data-sim]');
-        /* Un control hace lo suyo, salvo que el control SEA el futbolista, como
-           en Plantillas, donde la fila entera es un botón. */
-        if (control && !control.closest('[data-player-id]')) return;
-
-        if (abrirFicha(event.target)) return;
-        /* Si se ha pulsado fuera del nombre, se busca al futbolista de esa
-           fila: es el que se quería abrir. */
-        const fila = event.target.closest && event.target.closest('tr, .mover, li');
-        const quien = fila && fila.querySelector('[data-player-id]');
-        if (quien) abrirFicha(quien);
-      });
+      $(id).addEventListener('click', function (event) { abrirFicha(event.target); });
     });
 
     $('op-modal').addEventListener('input', function (event) {
