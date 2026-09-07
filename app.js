@@ -2487,7 +2487,12 @@
 
   /** Alineación cambiada por ti: se sella con la hora y se comparte. */
   function guardarXiMia() {
-    if (state.xi) state.xi.savedAt = new Date().toISOString();
+    if (state.xi) {
+      state.xi.savedAt = new Date().toISOString();
+      /* Deja de ser «la que había en Biwenger» para pasar a ser la tuya. A
+         partir de aquí no la pisa nada que venga de allí. */
+      state.xi.deBiwenger = false;
+    }
     persistXi();
 
     const config = loadSyncConfig();
@@ -2517,13 +2522,15 @@
         if (!fuera || !fuera.slots || !fuera.savedAt) return;
 
         const mia = state.xi;
-        if (mia && mia.savedAt && mia.savedAt >= fuera.savedAt) return;
+        /* Entre los dos aparatos manda la más reciente. Pero si lo que hay
+           aquí es la de Biwenger —sembrada al abrir, no puesta por ti— la
+           compartida gana siempre, por vieja que sea: en cuanto arranca la
+           jornada Biwenger borra el once y pone uno aleatorio con la fecha de
+           hoy, y esa fecha ganaba a la tuya de ayer. */
+        if (mia && !mia.deBiwenger && mia.savedAt && mia.savedAt >= fuera.savedAt) return;
 
-        /* Ni pisa a la que tengas puesta en Biwenger si esa es posterior. */
-        const oficial = alineacionOficial();
-        if (oficial && oficial.date && oficial.date > fuera.savedAt) return;
-
-        state.xi = { type: fuera.type || '4-4-2', slots: fuera.slots, savedAt: fuera.savedAt };
+        state.xi = { type: fuera.type || '4-4-2', slots: fuera.slots,
+          savedAt: fuera.savedAt, deBiwenger: false };
         ensureXi();          // quita a los que ya no estén en tu plantilla
         persistXi();
         renderLineup();
@@ -2536,7 +2543,8 @@
       const raw = localStorage.getItem(XI_KEY);
       const data = raw ? JSON.parse(raw) : null;
       if (data && data.slots) {
-        state.xi = { type: data.type || '4-4-2', slots: data.slots, savedAt: data.savedAt || null };
+        state.xi = { type: data.type || '4-4-2', slots: data.slots,
+          savedAt: data.savedAt || null, deBiwenger: !!data.deBiwenger };
       }
     } catch (error) { /* se empieza con la de Biwenger */ }
   }
@@ -2580,12 +2588,14 @@
   }
 
   function ensureXi() {
-    /* Si en Biwenger la has cambiado después de lo que hay guardado aquí, manda
-       Biwenger: es la de verdad, y además ya no tiene a los que vendiste. */
-    const oficial = alineacionOficial();
-    if (state.xi && oficial && oficial.date && state.xi.savedAt && oficial.date > state.xi.savedAt) {
-      state.xi = null;
-    }
+    /* AQUÍ NO SE PISA LA TUYA. Antes, si en Biwenger la alineación era más
+       reciente, se tiraba la de aquí y se rehacía con la suya. Y en cuanto
+       arranca la jornada Biwenger borra el once y pone uno aleatorio —gratis,
+       porque los créditos se gastan al ponerla, no al quitarla—, así que ese
+       aleatorio era siempre lo más reciente y se comía el tuyo cada jornada.
+       Lo de allí solo sirve de punto de partida cuando aquí no hay nada; a
+       partir de ahí manda la tuya hasta que tú la cambies, y a Biwenger solo
+       va cuando le das a guardar. */
 
     /* Lo guardado manda, pero se limpian los que ya no estén en la plantilla
        (vendidos desde la última vez). */
@@ -2628,9 +2638,11 @@
         }
       });
     }
-    /* Se sella con la fecha en que la guardaste en Biwenger: así, si allí la
-       has tocado después, gana sobre la del otro aparato. */
-    state.xi = { type: type, slots: slots, savedAt: (lineup && lineup.date) || null };
+    /* Y se deja dicho que esta no la has puesto tú: viene de Biwenger, solo
+       para no empezar con el campo vacío. Así la del otro aparato la sustituye
+       en cuanto llega, y en cuanto toques algo pasa a ser tuya. */
+    state.xi = { type: type, slots: slots,
+      savedAt: (lineup && lineup.date) || null, deBiwenger: true };
     persistXi();
   }
 
