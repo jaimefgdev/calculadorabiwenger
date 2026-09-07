@@ -2763,7 +2763,14 @@
     const marca = STATUS_MARKS[estado || 'ok'] || null;
     const titulo = marca ? marca.label : 'No disponible';
 
-    return '<p class="ficha__parte">' +
+    /* Y del color de lo que dice: verde si está disponible, ámbar si es duda,
+       rojo si es lesión, sanción o descarte. Iba todo en rojo, así que
+       «Disponible · Pequeñas molestias» parecía una mala noticia cuando es
+       justo lo contrario: cuenta con él. */
+    const tono = !estado ? ' ficha__parte--bien'
+      : (estado === 'doubt' ? ' ficha__parte--duda' : '');
+
+    return '<p class="ficha__parte' + tono + '">' +
       (marca ? '<span class="ficha__parte-icono" aria-hidden="true">' + marca.icon + '</span>' : '') +
       '<strong>' + escapeHtml(titulo) + '</strong>' +
       (parte ? ' · ' + escapeHtml(parte) : '') +

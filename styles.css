@@ -2409,13 +2409,17 @@ input[type="search"]::-webkit-search-cancel-button:hover { opacity: .75; }
    nunca el sitio del botón. */
 .vistas { display: flex; justify-content: flex-end; margin-bottom: .4rem; }
 
-/* El parte de la lesión o la sanción, bajo el nombre de la ficha. En rojo,
-   que es el aviso de «con este no cuentes». */
+/* El parte de la lesión o la sanción, bajo el nombre de la ficha. Rojo por
+   defecto, que es el aviso de «con este no cuentes». */
 .ficha__parte {
   display: flex; align-items: baseline; gap: .35rem;
   margin: -.2rem 0 .7rem;
   color: var(--neg); font-size: .82rem; line-height: 1.35;
 }
+/* Pero el rojo es para lo malo. Disponible es una buena noticia —aunque venga
+   con una nota de molestias— y una duda no es una baja: ni verde ni roja. */
+.ficha__parte--bien { color: var(--pos); }
+.ficha__parte--duda { color: var(--marca, #ffc233); }
 .ficha__parte-icono { font-weight: 700; }
 
 /* En la vista de campo los lances van debajo del nombre, en su propia línea:
