@@ -913,9 +913,9 @@
          desplazamientos que llevan cada columna a su sitio, en % del ancho de
          una casilla, simétricos: +32/+37/+39 y sus negativos. */
       const desx = [32, 37, 39, -39, -37, -32];
-      return orden.map(function (cual, i) {
+      return conTecho(orden.map(function (cual, i) {
         return { jugador: linea[cual], rango: rangos[i], desx: desx[i] };
-      });
+      }));
     }
 
     const huecos = new Array(n);
@@ -932,11 +932,39 @@
       else huecos[derecha++] = linea[i];
     }
 
-    return huecos.map(function (jugador, i) {
+    return conTecho(huecos.map(function (jugador, i) {
       /* Distancia al centro de la línea. Con `floor` sale entera también en las
          líneas pares, donde las dos casillas de dentro valen lo mismo. */
       return { jugador: jugador, rango: Math.floor(Math.abs(i - (n - 1) / 2)), desx: 0 };
-    });
+    }));
+  }
+
+  /* Lo que sube cada escalón, en % de la casilla. Tiene que ser el mismo número
+     que hay en el `transform` de `.pitch__slot`. */
+  const ESCALON = 42;
+  /* Y lo más que se permite subir a nadie. Media casilla deja la cara entera
+     dentro del césped con el aire de arriba que hay. */
+  const TECHO = 50;
+
+  /**
+   * Baja la línea entera si su más adelantado se sale por arriba.
+   *
+   * Con cinco delanteros los dos de las puntas suben dos escalones (84 % de la
+   * casilla) y la cara se comía el borde del campo; con seis, el del centro sube
+   * 2,4 escalones y aún más. Se baja la línea COMPLETA lo justo para que el más
+   * alto se quede en media casilla, así que el escalonado entre ellos no cambia:
+   * solo se desliza hacia abajo en bloque.
+   *
+   * Con cuatro o menos nadie pasa de un escalón, sale cero y no se toca nada:
+   * las alineaciones que ya se veían bien se quedan exactamente igual.
+   */
+  function conTecho(puestos) {
+    const masAlto = puestos.reduce(function (top, p) {
+      return Math.max(top, p.rango || 0);
+    }, 0);
+    const baja = Math.max(0, masAlto * ESCALON - TECHO);
+    if (!baja) return puestos;
+    return puestos.map(function (p) { return Object.assign({}, p, { baja: baja }); });
   }
 
   /* Cada marca con su logo. Uno por MARCA, no por canal: los partidos saltan
@@ -2773,14 +2801,15 @@
     });
   }
 
-  function pitchSlot(key, position, rango, desx) {
+  function pitchSlot(key, position, rango, desx, baja) {
     const id = state.xi.slots[key];
     const player = id ? playerById(id) : null;
     const face = player
       ? faceOf(player.id, 'pitch__face')
       : '<span class="pic-player pitch__face pitch__face--empty"></span>';
 
-    return '<div class="pitch__slot" style="--rango:' + (rango || 0) + ';--desx:' + (desx || 0) + '"' +
+    return '<div class="pitch__slot" style="--rango:' + (rango || 0) + ';--desx:' + (desx || 0) +
+      ';--baja:' + (baja || 0) + '"' +
       ' data-hueco="' + key + '" data-puesto="' + position + '"' +
       (id ? ' data-lleva="' + escapeHtml(String(id)) + '"' : '') + '>' +
       crestOf(player, 'crest--ghost') +
@@ -3105,7 +3134,7 @@
         for (let i = 0; i < row.count; i++) claves.push(row.position + '-' + i);
         return '<div class="pitch__line">' +
           comoBiwenger(claves).map(function (puesto) {
-            return pitchSlot(puesto.jugador, row.position, puesto.rango, puesto.desx);
+            return pitchSlot(puesto.jugador, row.position, puesto.rango, puesto.desx, puesto.baja);
           }).join('') + '</div>';
       }).join('');
 
@@ -5595,7 +5624,8 @@
     const filas = [4, 3, 2, 1].map(function (pos) {
       const huecos = comoBiwenger(porLinea[pos]).map(function (puesto) {
         const jugador = puesto.jugador;
-        return '<div class="pitch__slot" style="--rango:' + puesto.rango + ';--desx:' + (puesto.desx || 0) + '">' +
+        return '<div class="pitch__slot" style="--rango:' + puesto.rango + ';--desx:' + (puesto.desx || 0) +
+            ';--baja:' + (puesto.baja || 0) + '">' +
           crestOf(jugador, 'crest--ghost') +
           caraDeAlineacion(jugador, 'pitch__face', conDueno) +
           '<span class="pitch__name">' + escapeHtml(comoSeLlama(jugador)) + '</span>' +
@@ -6599,7 +6629,8 @@
 
     const hueco = function (puesto) {
       const jugador = puesto.jugador;
-      return '<div class="pitch__slot" style="--rango:' + puesto.rango + ';--desx:' + (puesto.desx || 0) + '">' +
+      return '<div class="pitch__slot" style="--rango:' + puesto.rango + ';--desx:' + (puesto.desx || 0) +
+            ';--baja:' + (puesto.baja || 0) + '">' +
         caraDeAlineacion(jugador, 'pitch__face', true) +
         '<span class="pitch__name">' + escapeHtml(comoSeLlama(jugador)) + '</span>' +
         (jugador.events && jugador.events.length
@@ -11674,11 +11705,22 @@
     const portada = $('arranque');
     if (!portada) return;
 
+    /* Los tres segundos son para ABRIR la app o entrar en la web. Al RECARGAR
+       no: ahí ya sabes lo que hay y lo que quieres es que vuelva cuanto antes,
+       así que la portada se quita en cuanto está lista, como antes.
+
+       `navigation.type` lo dice: 'reload' es F5 o el botón de recargar;
+       'navigate' es abrir la app o teclear la dirección. Si el navegador no lo
+       dice —los viejos— se hace la espera, que es el caso normal. */
+    const nav = (window.performance && performance.getEntriesByType
+      && performance.getEntriesByType('navigation')[0]) || null;
+    const recarga = nav ? nav.type === 'reload' : false;
+
     /* Se cuenta desde que empezó a cargarse la página, no desde aquí: si la
        carga ya se ha comido dos segundos, la portada solo espera uno más. Lo
        que se garantiza son tres segundos DE PORTADA, no tres de más. */
     const desde = (window.performance && performance.now && performance.now()) || 0;
-    const espera = Math.max(0, ARRANQUE_MINIMO - desde);
+    const espera = recarga ? 0 : Math.max(0, ARRANQUE_MINIMO - desde);
 
     setTimeout(function () {
       requestAnimationFrame(function () {
