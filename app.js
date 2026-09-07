@@ -2485,6 +2485,55 @@
 
   let envioXi = null;
 
+  /**
+   * ¿Esta alineación de Biwenger la ha puesto él solo?
+   *
+   * Al arrancar la jornada, Biwenger borra el once que tenías y pone uno
+   * cualquiera —gratis, porque los créditos se gastan al guardar, no al
+   * quitar—. Esa es la única que no hay que hacer caso: la que guardes tú
+   * allí vale igual que si la guardaras aquí.
+   *
+   * Se reconoce por la hora: la automática llega con el primer partido de la
+   * jornada, y tú no guardas nunca en ese minuto exacto.
+   */
+  const MARGEN_ARRANQUE = 20 * 60 * 1000;
+
+  function alineacionDeArranque(lineup) {
+    if (!lineup || !lineup.date || !state.round) return false;
+    const arranque = arranqueDeJornada(state.round);
+    if (!arranque) return false;
+    const cuando = Date.parse(lineup.date);
+    const empieza = Date.parse(arranque);
+    if (isNaN(cuando) || isNaN(empieza)) return false;
+    return cuando >= empieza - 60 * 1000 && cuando <= empieza + MARGEN_ARRANQUE;
+  }
+
+  /**
+   * La has guardado tú en Biwenger y aquí todavía no se sabe.
+   *
+   * Cuenta como si la hubieras guardado desde aquí: se adopta y se pasa al
+   * otro aparato. Lo único que no cuenta es la que Biwenger pone solo.
+   */
+  function guardadaEnBiwenger(oficial) {
+    if (!oficial || !oficial.date) return false;
+    if (alineacionDeArranque(oficial)) return false;
+    const mia = state.xi;
+    if (!mia) return true;
+    if (mia.deBiwenger) return true;
+    return !mia.savedAt || oficial.date > mia.savedAt;
+  }
+
+  /** Manda al almacén lo que hay, sin cambiarle la hora. */
+  function compartirXi() {
+    const config = loadSyncConfig();
+    if (!config.url || !config.key || !state.xi || !state.xi.savedAt) return;
+    fetch(config.url.replace(/\/+$/, '') + '/?key=' + encodeURIComponent(config.key) + '&alineacion=1', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(state.xi)
+    }).catch(function () { /* ya subirá al próximo cambio */ });
+  }
+
   /** Alineación cambiada por ti: se sella con la hora y se comparte. */
   function guardarXiMia() {
     if (state.xi) {
@@ -2528,6 +2577,12 @@
            jornada Biwenger borra el once y pone uno aleatorio con la fecha de
            hoy, y esa fecha ganaba a la tuya de ayer. */
         if (mia && !mia.deBiwenger && mia.savedAt && mia.savedAt >= fuera.savedAt) return;
+
+        /* Ni pisa a la que guardaste en Biwenger después. La que pone él solo
+           al arrancar la jornada no cuenta: esa no la has guardado tú. */
+        const oficial = alineacionOficial();
+        if (oficial && oficial.date && oficial.date > fuera.savedAt &&
+            !alineacionDeArranque(oficial)) return;
 
         state.xi = { type: fuera.type || '4-4-2', slots: fuera.slots,
           savedAt: fuera.savedAt, deBiwenger: false };
@@ -2588,14 +2643,13 @@
   }
 
   function ensureXi() {
-    /* AQUÍ NO SE PISA LA TUYA. Antes, si en Biwenger la alineación era más
-       reciente, se tiraba la de aquí y se rehacía con la suya. Y en cuanto
-       arranca la jornada Biwenger borra el once y pone uno aleatorio —gratis,
-       porque los créditos se gastan al ponerla, no al quitarla—, así que ese
-       aleatorio era siempre lo más reciente y se comía el tuyo cada jornada.
-       Lo de allí solo sirve de punto de partida cuando aquí no hay nada; a
-       partir de ahí manda la tuya hasta que tú la cambies, y a Biwenger solo
-       va cuando le das a guardar. */
+    /* Si la guardaste en Biwenger, vale igual que si la hubieras guardado
+       aquí: se tira la de aquí y se rehace con la suya. La ÚNICA que no cuenta
+       es la que Biwenger pone él solo al arrancar la jornada —borra tu once y
+       mete uno cualquiera, gratis, porque los créditos se gastan al guardar y
+       no al quitar—: esa se ignora y se queda la tuya hasta que la cambies. */
+    const oficial = alineacionOficial();
+    if (state.xi && guardadaEnBiwenger(oficial)) state.xi = null;
 
     /* Lo guardado manda, pero se limpian los que ya no estén en la plantilla
        (vendidos desde la última vez). */
@@ -2638,12 +2692,15 @@
         }
       });
     }
-    /* Y se deja dicho que esta no la has puesto tú: viene de Biwenger, solo
-       para no empezar con el campo vacío. Así la del otro aparato la sustituye
-       en cuanto llega, y en cuanto toques algo pasa a ser tuya. */
+    /* Si la guardaste tú allí, es tuya y se pasa al otro aparato. Si es la que
+       Biwenger puso solo —o no hay fecha—, se marca como suya: sirve para no
+       empezar con el campo vacío, pero la del otro aparato la sustituye en
+       cuanto llega y en cuanto toques algo pasa a ser tuya. */
+    const tuya = guardadaEnBiwenger(lineup);
     state.xi = { type: type, slots: slots,
-      savedAt: (lineup && lineup.date) || null, deBiwenger: true };
+      savedAt: (lineup && lineup.date) || null, deBiwenger: !tuya };
     persistXi();
+    if (tuya) compartirXi();
   }
 
   function playerById(id) {
