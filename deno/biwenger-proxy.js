@@ -132,7 +132,7 @@ const CDN = 'https://cf.biwenger.com/api/v2';
    navegador normal y las cabeceras que este mandaría. */
 /* Marca de versión: se sube en cada cambio y se consulta con ?version=1.
    Sirve para saber desde fuera si el despliegue ha entrado o no. */
-const VERSION = '2026-09-07 · deno 91';
+const VERSION = '2026-09-07 · deno 92';
 
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ' +
   '(KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36';
@@ -331,15 +331,30 @@ const app = {
            enseñar: se llama en cada carga de pagina. */
         const enMemoria = cache.players || {};
         const cuantos = Object.keys(enMemoria).filter(function (k) { return k.indexOf(':') === -1; }).length;
-        /* La copia del KV solo se mira si el indice esta vacio, que es cuando
-           interesa saber si existe. */
-        let copia = -1;
-        if (JORNADAS) {
+        /* El sistema de puntuacion, que es parte de la clave de la copia. En
+           un arranque en frio `cache.score` todavia no esta puesto, y sin esto
+           se preguntaba por la clave «indice-» a secas: no existe, asi que la
+           copia salia SIEMPRE a cero y parecia que no habia red de seguridad
+           cuando si la hay. Del KV, que no cuesta una llamada a Biwenger. */
+        let sistema = cache.score || null;
+        if (!sistema && JORNADAS) {
           try {
-            const crudo = await JORNADAS.get('indice-' + (cache.score || ''));
+            const guardado = await JORNADAS.get('sistema-puntuacion');
+            sistema = Number(guardado) || null;
+          } catch (error) { /* se queda sin saberlo */ }
+        }
+        let copia = -1;
+        if (JORNADAS && sistema) {
+          try {
+            const crudo = await JORNADAS.get('indice-' + sistema);
             copia = crudo ? Object.keys(JSON.parse(crudo)).filter(function (k) { return k.indexOf(':') === -1; }).length : 0;
           } catch (error) { copia = 0; }
         }
+        /* Y se dice si esto es un arranque en frio: con la memoria vacia, un
+           cero en `indice` no significa que Biwenger haya fallado, solo que
+           esta instancia todavia no ha servido nada. Sin decirlo, el chivato
+           daba una alarma que no era. */
+        const enFrio = !cache.players;
         /* Las primas tambien, que es de donde sale el abono de cada jornada.
            Si aqui salen todas a cero o `null`, el abono sale a cero y ya se
            sabe por que sin tener que adivinarlo. Pasivo igual: solo lo que
@@ -401,10 +416,11 @@ const app = {
         return new Response(JSON.stringify({
           version: VERSION,
           indice: cuantos,
+          enFrio: enFrio,
           copiaKv: copia,
           cortado: cdnCortado(),
           kv: !!JORNADAS,
-          score: cache.score || null,
+          score: sistema,
           primas: primas,
           primasValen: algoQuePagar(primas),
           /* Cómo se llaman de verdad los ajustes de cesión en esta liga. */
