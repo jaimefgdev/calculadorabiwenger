@@ -132,7 +132,7 @@ const CDN = 'https://cf.biwenger.com/api/v2';
    navegador normal y las cabeceras que este mandaría. */
 /* Marca de versión: se sube en cada cambio y se consulta con ?version=1.
    Sirve para saber desde fuera si el despliegue ha entrado o no. */
-const VERSION = '2026-09-07 · deno 92';
+const VERSION = '2026-09-07 · deno 93';
 
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ' +
   '(KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36';
@@ -3013,6 +3013,20 @@ function roundPlayer(entry, names, puntos, partidoDe, enCasa, lances, conNota) {
      sabe por su nota: si la tiene, jugó y está resuelto. */
   const dudoso = fuera || sinClub;
 
+  /* ¿Ha acabado ya TODA la jornada? Hace falta para el que no tiene club: sin
+     nota, mientras quede algún partido puede ser que todavía vaya a jugar,
+     pero con la jornada entera acabada es que no jugó, y entonces su chapa es
+     un guión y no una interrogación.
+
+     Importa mucho más de lo que parece: una jornada con alguien pendiente no
+     se da por cerrada, y sin cerrar no se le cuenta a nadie como ganada. Estos
+     son seis (Oso, Konaré, Boiro, Kambwala, Etienne Eto'o, Carles Pérez) y
+     entre los tres primeras jornadas dejaban a Maccabi sin sus tres victorias. */
+  const equipos = Object.keys(partidoDe || {});
+  const todoAcabado = equipos.length > 0 && equipos.every(function (clave) {
+    return partidoDe[clave] === 'finished';
+  });
+
   /* La nota que trae la alineación, que es de ESTA jornada. */
   const deLaAlineacion = !suelto && entry && entry.points != null ? entry.points : null;
   /* Y si no viene, la del índice de futbolistas, que va subiendo según acaba
@@ -3040,7 +3054,9 @@ function roundPlayer(entry, names, puntos, partidoDe, enCasa, lances, conNota) {
     : ((conNota && conNota[id] != null && marcador[id] != null) ? marcador[id] : null);
 
   const sinTerminar = !hayIndice(names) ||
-    (dudoso ? (sinClub && soloDeEstaJornada == null) : estadoPartido !== 'finished');
+    (dudoso
+      ? (sinClub && soloDeEstaJornada == null && !todoAcabado)
+      : estadoPartido !== 'finished');
 
   const puntuacion = sinTerminar ? null
     : (dudoso ? soloDeEstaJornada
