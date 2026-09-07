@@ -9308,7 +9308,11 @@
     return '<ol class="ranking__list">' + lista.map(function (jugador) {
       const clave = prefijo + ':' + jugador.id;
       const abierto = state.puntosDetalle === clave;
-      return '<li class="ranking__row' + (abierto ? ' ranking__row--abierta' : '') + '">' +
+      /* Aquí las filas son futbolistas, no mánagers: se aclara la de los que
+         son MÍOS, que es lo que se busca en esta tabla. El dueño va debajo del
+         nombre, así que el dato ya está a mano. */
+      return '<li class="ranking__row' + (abierto ? ' ranking__row--abierta' : '') +
+          claseMia(jugador.owner) + '">' +
         '<button type="button" class="ranking__boton" data-puntos="' + escapeHtml(clave) + '"' +
           ' aria-expanded="' + (abierto ? 'true' : 'false') + '">' +
           /* Cerrada: cara, escudo y nombre, que puede salir cortado. Abierta:
@@ -9619,6 +9623,10 @@
       return;
     }
 
+    /* De quién es cada futbolista, para aclarar los míos. Se pide UNA vez y no
+       por fila: son ocho plantillas y estas tarjetas pintan cientos de filas. */
+    const duenoDe = duenosDeFutbolistas();
+
     const tarjetas = {};
     RANKINGS.forEach(function (ranking) {
       /* Solo los porteros en lo que solo les toca a ellos, y solo quien ha
@@ -9672,7 +9680,8 @@
               : (jugador[ranking.campo] || 0));
           const clave = ranking.campo + ':' + jugador.id;
           const abierto = state.datosDetalle === clave;
-          return '<li class="ranking__row' + (abierto ? ' ranking__row--abierta' : '') + '">' +
+          return '<li class="ranking__row' + (abierto ? ' ranking__row--abierta' : '') +
+              claseMia(duenoDe[String(jugador.id)]) + '">' +
             '<button type="button" class="ranking__boton" data-ficha="' +
               escapeHtml(clave) + '" aria-expanded="' + (abierto ? 'true' : 'false') + '">' +
               (abierto

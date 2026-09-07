@@ -50,6 +50,11 @@
   --accent:        #ff0033;
   --accent-rgb:    255, 0, 51;
   --accent-soft:   rgba(255, 0, 51, .1);
+  /* El velo de MI fila en las clasificaciones: el mismo color, un punto más
+     claro. Sobre fondo oscuro se aclara; en el tema claro se oscurece, que es
+     lo que destaca ahí. Vive aquí, y no repetido en cada regla, para que
+     cambiarlo lo cambie en toda la app de una vez. */
+  --fila-mia:      rgba(255, 255, 255, .045);
 
   --pos:           #00d68f;
   --pos-soft:      rgba(0, 214, 143, .12);
@@ -80,6 +85,7 @@
     --text-faint:    #555555;
 
     --accent-soft:   rgba(255, 0, 51, .08);
+    --fila-mia:      rgba(0, 0, 0, .05);
 
     --pos:           #0a8f56;
     --pos-soft:      rgba(10, 143, 86, .1);
@@ -111,6 +117,7 @@
   --accent:        #ff0033;
   --accent-rgb:    255, 0, 51;
   --accent-soft:   rgba(255, 0, 51, .08);
+  --fila-mia:      rgba(0, 0, 0, .05);
 
   --pos:           #0a8f56;
   --pos-soft:      rgba(10, 143, 86, .1);
@@ -153,6 +160,7 @@
   --accent:        #ff0033;
   --accent-rgb:    255, 0, 51;
   --accent-soft:   rgba(255, 0, 51, .1);
+  --fila-mia:      rgba(255, 255, 255, .045);
 
   --pos:           #00d68f;
   --pos-soft:      rgba(0, 214, 143, .12);
@@ -958,23 +966,19 @@ code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft)
    sobre fondo oscuro aclara, mientras que en el tema claro el mismo velo casi
    no se nota, así que ahí se oscurece un pelín en vez de aclarar, que es lo que
    destaca sobre un fondo claro. */
-.fila--mia > td { background: rgba(255, 255, 255, .045); }
-.fila--mia.ranking__row { background: rgba(255, 255, 255, .045); }
-
-/* En el tema claro, aclarar sobre casi blanco no se ve: se oscurece. */
-@media (prefers-color-scheme: light) {
-  :root:not([data-tema="oscuro"]) .fila--mia > td,
-  :root:not([data-tema="oscuro"]) .fila--mia.ranking__row { background: rgba(0, 0, 0, .05); }
-}
-:root[data-tema="claro"] .fila--mia > td,
-:root[data-tema="claro"] .fila--mia.ranking__row { background: rgba(0, 0, 0, .05); }
+.fila--mia > td,
+.row-mine > td,
+.fila--mia.ranking__row { background: var(--fila-mia); }
 
 /* La fila abierta y el ratón por encima siguen mandando: son estados, y un
    estado tiene que verse por encima de «esta es la tuya», que es permanente.
    El fondo va en las celdas, no en la fila, y una celda con color tapa el de su
    fila: sin esto, mi fila se quedaba igual al abrirla y al pasar por encima. */
 .table tbody tr.row-open.fila--mia > td,
-.table tbody tr.fila--mia:hover > td { background: transparent; }
+.table tbody tr.fila--mia:hover > td,
+.table tbody tr.row-mine:hover > td { background: transparent; }
+/* Lo mismo en las listas: la fila desplegada manda sobre «es la tuya». */
+.ranking__row--abierta.fila--mia { background: var(--bg-surface); }
 
 /* ---------- Desglose del abono de la jornada ----------
    Va debajo del campo y los suplentes, dentro de la ficha del manager. Tres
@@ -2532,7 +2536,8 @@ main.wrap { padding-top: 1.15rem; padding-bottom: 3.5rem; }
 }
 
 /* ---------- Mercado ---------- */
-.row-mine { background: var(--accent-soft); }
+/* Mis filas del mercado usan el mismo velo que el resto: la regla está arriba,
+   con las de las demás clasificaciones. */
 /* Los nombres de mánager van enteros; el sitio se gana con la tipografía. */
 .table--market .manager__name { white-space: nowrap; }
 .mark--row { position: static; display: inline-grid; width: 15px; height: 15px; font-size: .58rem; margin-left: .2rem; }
