@@ -694,6 +694,9 @@
     rankingsAmbito: 'laliga',
     /* «Los más caros»: de toda LaLiga o solo los fichados aquí, y si está
        desplegado hasta cincuenta. */
+    /* Lo que paga la liga por punto, por once ideal, etc. Llega con cada
+       jornada; de aquí sale también el tope de jornadas de una cesión. */
+    primas: null,
     carosAmbito: 'laliga',
     carosAbierto: false,
     puntosAmbito: 'laliga',  // el mismo cambio, en la tabla de Puntos
@@ -2406,6 +2409,12 @@
 
   const squadList = () => (state.squads && state.squads.list) || [];
 
+  /** ¿Este futbolista es de los míos? */
+  function esMio(id) {
+    const clave = String(id);
+    return mySquad().some(function (j) { return String(j.id) === clave; });
+  }
+
   /** Mi plantilla completa, sacada de las plantillas de la liga. */
   function mySquad() {
     const id = state.me && state.me.id;
@@ -3888,6 +3897,87 @@
     if (campo) { campo.focus(); campo.select(); }
   }
 
+  /* Cuántas jornadas admite una cesión. Lo dice la liga; si no lo dijera, cinco,
+     que es lo que ofrece Biwenger por defecto. */
+  function topeDeCesion() {
+    const max = state.primas && state.primas.cesionMax;
+    return max > 0 ? max : 5;
+  }
+
+  /**
+   * Ceder uno de los tuyos a otro mánager.
+   *
+   * Se elige a quién, por cuántas jornadas y por cuánto. El futbolista vuelve
+   * solo al acabar el plazo; mientras, puntúa para el otro.
+   */
+  function abrirCesion(playerId) {
+    const mio = miJugador(playerId);
+    if (!mio) return;
+
+    const tope = topeDeCesion();
+    const ficha = playerInfo(playerId) || {};
+    const valor = ficha.marketValue || mio.marketValue || 0;
+    /* A quién se le cede: todos menos yo. */
+    const yo = myName();
+    const otros = MANAGERS.filter(function (n) { return n !== yo; });
+
+    abrirOpModal(
+      '<div class="op-card__cab">' +
+        '<h3 id="op-modal-titulo">Ceder a ' + escapeHtml(comoSeLlama(mio)) + '</h3>' +
+        '<button type="button" class="btn btn--ghost btn--close" data-op-cerrar' +
+          ' title="Cerrar" aria-label="Cerrar">\u2715</button>' +
+      '</div>' +
+      '<dl class="op-datos">' +
+        '<div><dt>Valor de mercado</dt><dd>' + money(valor) + '</dd></div>' +
+        '<div><dt>Jornadas como mucho</dt><dd>' + tope + '</dd></div>' +
+      '</dl>' +
+      '<label class="op-importe"><span>A qui\u00e9n</span>' +
+        '<select id="op-cesion-quien">' +
+          otros.map(function (n) {
+            return '<option value="' + escapeHtml(n) + '">' + escapeHtml(n) + '</option>';
+          }).join('') +
+        '</select></label>' +
+      '<label class="op-importe"><span>Jornadas (1\u2013' + tope + ')</span>' +
+        '<input type="number" id="op-cesion-jornadas" inputmode="numeric"' +
+          ' min="1" max="' + tope + '" step="1" value="1"></label>' +
+      '<label class="op-importe"><span>Importe</span>' +
+        '<input type="number" id="op-cesion-importe" inputmode="numeric"' +
+          ' step="100000" min="0" value="' + valor + '"></label>' +
+      '<p class="op-aviso"></p>' +
+      '<div class="op-botones">' +
+        '<button type="button" class="btn btn--primary" data-op-ceder="' +
+          escapeHtml(String(playerId)) + '">Ceder</button>' +
+      '</div>');
+
+    const campo = $('op-cesion-jornadas');
+    if (campo) { campo.focus(); campo.select(); }
+  }
+
+  /** Comprueba lo escrito y manda la cesión. */
+  function confirmarCesion(playerId) {
+    const tope = topeDeCesion();
+    const jornadas = Math.round(Number(($('op-cesion-jornadas') || {}).value));
+    const importe = Math.round(Number(($('op-cesion-importe') || {}).value));
+    const quien = ($('op-cesion-quien') || {}).value || '';
+    const aviso = document.querySelector('#op-modal .op-aviso');
+
+    const decir = function (texto) {
+      if (aviso) { aviso.textContent = texto; aviso.classList.add('op-aviso--mal'); }
+    };
+    if (!(jornadas >= 1 && jornadas <= tope)) {
+      return decir('Las jornadas van de 1 a ' + tope + '.');
+    }
+    if (!(importe > 0)) return decir('Pon un importe.');
+
+    const equipo = state.teams[quien];
+    if (!equipo || equipo.id == null) return decir('No s\u00e9 qui\u00e9n es ' + quien + '.');
+
+    lanzarOperacion(
+      { accion: 'ceder', player: String(playerId), price: importe,
+        rounds: jornadas, to: equipo.id },
+      'Cesi\u00f3n ofrecida a ' + quien + '.');
+  }
+
   function confirmarPuja(playerId) {
     const venta = ventaDe(playerId);
     const campo = $('op-importe');
@@ -4689,6 +4779,8 @@
 
       const puja = event.target.closest('[data-op-pujar]');
       if (puja) { confirmarPuja(puja.getAttribute('data-op-pujar')); return; }
+      const cede = event.target.closest('[data-op-ceder]');
+      if (cede) { confirmarCesion(cede.getAttribute('data-op-ceder')); return; }
 
       const retirar = event.target.closest('[data-op-quitar]');
       if (retirar) {
@@ -4849,18 +4941,14 @@
        gano le faltaba una sin ninguna explicacion. */
     const traidas = {};
     jornadasGuardadas().forEach(function (j) { traidas[String(j.round.id)] = true; });
-    const conAlgo = {};
-    jornadasGuardadas().forEach(function (j) {
-      if ((j.standings || []).some(function (f) { return (f.points || 0) !== 0; })) {
-        conAlgo[String(j.round.id)] = true;
-      }
-    });
+    /* Solo las que NO se han descargado. Aquí contaba también las descargadas
+       que salen a cero, y eso avisaba de que «faltaban» la J4 y la J6 cuando
+       estaban perfectamente traídas: en una jornada con casi todos los partidos
+       aplazados, cero es el resultado correcto, no un fallo. */
     const sinTraer = (state.jornadas.list || []).filter(function (r) {
       if ((r.part || 1) !== 1) return false;
       if (r.status === 'pending') return false;
-      /* Tanto la que no está como la que está vacía: para esta cuenta son lo
-         mismo, una jornada jugada que no tenemos. */
-      return !traidas[String(r.id)] || !conAlgo[String(r.id)];
+      return !traidas[String(r.id)];
     }).map(function (r) { return r.number; }).filter(function (n) { return n != null; });
 
     /* Racha: los puntos de las tres últimas jornadas, incluida la que está en
@@ -4967,15 +5055,12 @@
        paso por aquí mientras el índice de futbolistas llegaba vacío, y entonces
        todos los futbolistas se daban por idos de LaLiga y la jornada entera se
        guardó a cero. */
+    /* Guardada con clasificación es guardada, aunque salga a cero: una jornada
+       con los partidos aplazados vale cero y está bien traída. Pedírsela otra
+       vez no cambiaba el resultado y sí gastaba consultas. */
     const sirve = function (r) {
       const j = state.jornadas.datos[r.id];
-      if (!j || !(j.standings || []).length) return false;
-      if (j.standings.some(function (fila) { return (fila.points || 0) !== 0; })) return true;
-      /* Guardada y sin puntos. Solo es «basura que hay que rebajar» si esa
-         jornada se ha jugado de verdad; si el calendario no la da por
-         terminada, es que sencillamente no se ha jugado y volver a pedirla no
-         iba a traer nada. Antes se repetía en cada sesión por cada una. */
-      return r.status !== 'finished';
+      return !!(j && (j.standings || []).length);
     };
 
     const faltan = calendario.filter(function (r) {
@@ -5401,6 +5486,11 @@
    * refrescar por detrás una jornada que no se está mirando.
    */
   function mergeJornada(payload, callado) {
+    /* Los importes que paga la liga vienen con cada jornada: se guardan para
+       poder explicarlos en la web sin repetirlos aquí, y de ahí sale también el
+       tope de jornadas de una cesión. */
+    if (payload.primas) state.primas = payload.primas;
+
     const id = payload.round && payload.round.id;
     if (id == null) return null;
 
@@ -8939,6 +9029,13 @@
               ? '<button type="button" class="ambito ficha__comparar" data-comparar>' +
                   (abierto.comparar ? 'Quitar comparación' : 'Comparar') + '</button>'
               : '') +
+            /* Ceder: solo en las estadísticas de UNO, y solo si es tuyo. No se
+               puede ceder al rival de una comparación ni a alguien que no
+               tienes, así que ahí la píldora sobra. */
+            (vistaDeFicha(abierto) === 'stats' && !abierto.comparar && esMio(abierto.id)
+              ? '<button type="button" class="ambito ficha__ceder" data-ceder="' +
+                  escapeHtml(String(abierto.id)) + '">Cesión</button>'
+              : '') +
             '</span>') +
         '</div>' +
         /* «MED · Barcelona · 52 puntos · Libre» es de UNO solo: comparando
@@ -11712,6 +11809,9 @@
         renderPriceModal();
         return;
       }
+
+      const cesion = event.target.closest('[data-ceder]');
+      if (cesion) { abrirCesion(cesion.getAttribute('data-ceder')); return; }
 
       if (event.target.closest('[data-comparar]')) {
         /* Si ya hay comparación, la pastilla la quita; si no, abre la lista. */
