@@ -7522,11 +7522,25 @@
         { headers: { 'accept': 'application/json' } })
         .then(function (response) { return response.json(); })
         .then(function (payload) {
-          if (!payload || payload.error) return;
-          Object.keys(payload).forEach(function (id) { state.priceSeries[id] = payload[id]; });
+          if (payload && !payload.error) {
+            Object.keys(payload).forEach(function (id) { state.priceSeries[id] = payload[id]; });
+          }
+          /* Y los que se pidieron y no han venido, a `undefined`.
+             `null` significa «pedida y en camino», y ahí se quedaban PARA SIEMPRE
+             si la respuesta fallaba o no los traía: como ya no estaban
+             `undefined`, no se volívan a pedir nunca, y su ficha decía «Biwenger
+             no publica la evolución» aunque Biwenger tuviera 366 días de precios.
+             Devolviéndolos a `undefined` se vuelven a pedir la próxima vez. */
+          tanda.forEach(function (id) {
+            if (state.priceSeries[id] === null) delete state.priceSeries[id];
+          });
           if (alTerminar) alTerminar();
         })
-        .catch(function () { /* sin evolución */ });
+        .catch(function () {
+          tanda.forEach(function (id) {
+            if (state.priceSeries[id] === null) delete state.priceSeries[id];
+          });
+        });
     }
   }
 
@@ -11473,10 +11487,25 @@
       });
     });
 
-    /* La ficha se abre pulsando el nombre del futbolista, esté donde esté. */
+    /* La ficha se abre pulsando el futbolista, esté donde esté. */
     ['moves-body', 'market-body', 'squads-body', 'listings-body',
      'movers-up', 'movers-down', 'jugadores-body', 'squad-body', 'caros-body'].forEach(function (id) {
-      $(id).addEventListener('click', function (event) { abrirFicha(event.target); });
+      $(id).addEventListener('click', function (event) {
+        /* Primero, lo de siempre: pulsar encima del futbolista. */
+        if (abrirFicha(event.target)) return;
+
+        /* Y si no, el futbolista de esa fila. La zona del nombre es estrecha
+           —en el mercado son cuatro palabras en una columna— y pulsar un poco al
+           lado no hacía absolutamente nada, que se lee como que está roto.
+           Los botones de la fila se respetan: pujar, renovar o quitar hacen lo
+           suyo y no abren la ficha. */
+        if (!event.target.closest) return;
+        if (event.target.closest('button, a, input, select, textarea')) return;
+
+        const fila = event.target.closest('tr, .mover, li');
+        const quien = fila && fila.querySelector('[data-player-id]');
+        if (quien && quien.getAttribute('data-player-id')) abrirFicha(quien);
+      });
     });
 
     $('op-modal').addEventListener('input', function (event) {
