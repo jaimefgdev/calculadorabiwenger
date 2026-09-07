@@ -132,7 +132,7 @@ const CDN = 'https://cf.biwenger.com/api/v2';
    navegador normal y las cabeceras que este mandaría. */
 /* Marca de versión: se sube en cada cambio y se consulta con ?version=1.
    Sirve para saber desde fuera si el despliegue ha entrado o no. */
-const VERSION = '2026-09-07 · deno 81';
+const VERSION = '2026-09-07 · deno 82';
 
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ' +
   '(KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36';
@@ -501,7 +501,10 @@ const app = {
            futbolista apareció en el mercado. Si no, el tope que se pida. */
         const pedido = url.searchParams.get('dias');
         const dias = pedido === 'todo' ? Infinity : Math.min(Number(pedido) || 45, 2000);
-        const data = await priceSeries(historial.split(',').slice(0, 30), dias, await players());
+        /* Con el sistema de la liga: sin él se baja OTRO índice —el del 1— solo
+           para esto, 220 KB de más en cada consulta en frío. */
+        const data = await priceSeries(historial.split(',').slice(0, 30), dias,
+          await players(await sistemaDeLaLiga(env)));
         return new Response(JSON.stringify(data), {
           headers: Object.assign({ 'content-type': 'application/json; charset=utf-8' }, cors(origin))
         });
@@ -4139,15 +4142,28 @@ async function marketBoard(env, headers, myId, names) {
 const ymd = (day) => Number(day.slice(2, 4) + day.slice(5, 7) + day.slice(8, 10));
 const isoDay = (time) => new Date(time).toISOString().slice(0, 10);
 
-async function playerPrices(slug) {
-  if (cache.prices[slug]) return cache.prices[slug];
-  const response = await fetch(CDN + '/players/la-liga/' + slug + '?fields=*,prices', {
-    headers: NAVEGADOR
-  });
-  if (!response.ok) return null;
-  const body = await response.json();
-  const prices = (body.data && body.data.prices) || [];
-  cache.prices[slug] = prices;
+async function playerPrices(slug, id) {
+  if (cache.prices[slug] && cache.prices[slug].length) return cache.prices[slug];
+
+  /* Se prueba por slug y, si no sale, por el número. El id SIEMPRE vale como
+     ruta —igual que en la ficha del futbolista— y hay slugs que no: el que
+     tenemos guardado puede estar viejo, o Biwenger haberlo renombrado. Sin este
+     respaldo esos futbolistas se quedaban sin evolución para siempre. */
+  const pedir = async function (quien) {
+    if (!quien) return null;
+    const r = await fetch(CDN + '/players/la-liga/' + encodeURIComponent(quien) +
+      '?fields=*,prices', { headers: NAVEGADOR }).catch(function () { return null; });
+    if (!r || !r.ok) return null;
+    const cuerpo = await r.json().catch(function () { return {}; });
+    const lista = (cuerpo.data && cuerpo.data.prices) || [];
+    return lista.length ? lista : null;
+  };
+
+  const prices = (await pedir(slug)) ||
+    (id && String(id) !== String(slug) ? await pedir(id) : null);
+  /* Solo se guarda lo que trae datos: una lista vacía guardada deja a ese
+     futbolista sin gráfico hasta que se reinicie el servidor. */
+  if (prices && prices.length) cache.prices[slug] = prices;
   return prices;
 }
 
@@ -4258,7 +4274,7 @@ async function pricesOnDay(ids, dia, names) {
     if (!clave) return;
     const slug = names[clave + ':slug'] || clave;
     try {
-      const prices = await playerPrices(slug);
+      const prices = await playerPrices(slug, clave);
       const valor = prices ? priceOn(prices, stamp) : null;
       if (valor != null) salida[clave] = Math.round(valor);
     } catch (error) { /* ese jugador se queda sin dato */ }
@@ -4287,7 +4303,7 @@ async function priceSeries(ids, dias, names) {
     if (!clave) return;
     const slug = names[clave + ':slug'] || clave;
     try {
-      const prices = await playerPrices(slug);
+      const prices = await playerPrices(slug, clave);
       if (!prices || !prices.length) return;
       /* `Infinity` deja la serie entera; `slice(-Infinity)` no vale. */
       const trozo = dias === Infinity ? prices : prices.slice(-dias);
@@ -4471,7 +4487,7 @@ async function teamValueHistory(env, headers, userId, names) {
   const list = Object.keys(ids);
   for (let i = 0; i < list.length; i++) {
     const slug = names[list[i] + ':slug'];
-    prices[list[i]] = slug ? await playerPrices(slug) : null;
+    prices[list[i]] = await playerPrices(slug || list[i], list[i]);
   }
 
   return {
