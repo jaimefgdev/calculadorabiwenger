@@ -7534,7 +7534,12 @@
           tanda.forEach(function (id) {
             if (state.priceSeries[id] === null) delete state.priceSeries[id];
           });
-          if (alTerminar) alTerminar();
+          /* El repintado va FUERA de la cadena de la consulta. Dentro, el
+             `catch` de abajo —que es para los fallos de red— se tragaba también
+             cualquier error al pintar: la ficha se quedaba con lo que hubiera y
+             no aparecía ni un aviso por ningún lado. Así, si algo falla al
+             pintar, sale en la consola como lo que es. */
+          if (alTerminar) setTimeout(alTerminar, 0);
         })
         .catch(function () {
           tanda.forEach(function (id) {
@@ -8788,6 +8793,14 @@
     const puntos = (serie || []).map(function (par) {
       return { day: stampToDay(par[0]), price: par[1] };
     });
+
+    /* El último valor de la serie: es lo que se enseña como «Valor de mercado»
+       encima del gráfico. Se quedó sin declarar al cambiar los colores de la
+       evolución, y desde entonces la ficha reventaba justo al llegar los datos:
+       el error se lo comía el `catch` de la consulta, así que la tarjeta se
+       quedaba con el «Biwenger no publica la evolución» del primer pintado y no
+       se veía ni un aviso por ningún lado. */
+    const ultimo = puntos.length ? puntos[puntos.length - 1].price : 0;
 
     const llegada = acquisitionOf(abierto.id);
     const diaLlegada = llegada && llegada.since;
