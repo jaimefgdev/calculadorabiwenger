@@ -11755,8 +11755,6 @@
     }
 
     setInterval(tickRound, 1000);   // la cuenta atrás corre sola
-
-    quitarArranque();
   }
 
   /**
@@ -11766,40 +11764,5 @@
    * lo de debajo esté pintado: si se quita antes, se ve un parpadeo en blanco
    * justo en el sitio donde queriamos que no lo hubiera.
    */
-  /* Lo que se ve la portada como mínimo. La app suele estar lista en menos, y
-     sin esto pasaba tan deprisa que ni se leía la marca. */
-  const ARRANQUE_MINIMO = 3000;
-
-  function quitarArranque() {
-    const portada = $('arranque');
-    if (!portada) return;
-
-    /* Los tres segundos son para ABRIR la app o entrar en la web. Al RECARGAR
-       no: ahí ya sabes lo que hay y lo que quieres es que vuelva cuanto antes,
-       así que la portada se quita en cuanto está lista, como antes.
-
-       `navigation.type` lo dice: 'reload' es F5 o el botón de recargar;
-       'navigate' es abrir la app o teclear la dirección. Si el navegador no lo
-       dice —los viejos— se hace la espera, que es el caso normal. */
-    const nav = (window.performance && performance.getEntriesByType
-      && performance.getEntriesByType('navigation')[0]) || null;
-    const recarga = nav ? nav.type === 'reload' : false;
-
-    /* Se cuenta desde que empezó a cargarse la página, no desde aquí: si la
-       carga ya se ha comido dos segundos, la portada solo espera uno más. Lo
-       que se garantiza son tres segundos DE PORTADA, no tres de más. */
-    const desde = (window.performance && performance.now && performance.now()) || 0;
-    const espera = recarga ? 0 : Math.max(0, ARRANQUE_MINIMO - desde);
-
-    setTimeout(function () {
-      requestAnimationFrame(function () {
-        portada.classList.add('arranque--fuera');
-        /* Y fuera del todo al terminar de desvanecerse, para que no se quede
-           un elemento a pantalla completa comiéndose los clics. */
-        setTimeout(function () { portada.classList.add('arranque--ida'); }, 350);
-      });
-    }, espera);
-  }
-
   document.addEventListener('DOMContentLoaded', init);
 })();
