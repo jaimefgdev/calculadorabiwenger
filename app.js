@@ -7543,6 +7543,13 @@
         .then(function (payload) {
           if (!payload || payload.error) return;
           Object.keys(payload).forEach(function (id) { state.priceSeries[id] = payload[id]; });
+          /* Y a los que se pidieron y NO vienen en la respuesta se les pone la
+             lista vacía. Si se quedan en `null` —que significa «en camino»— su
+             ficha se queda en «Cargando la evolución…» para siempre esperando
+             algo que ya ha llegado y no los traía. */
+          tanda.forEach(function (id) {
+            if (state.priceSeries[id] == null) state.priceSeries[id] = [];
+          });
           if (alTerminar) alTerminar();
           /* Y a los que se quedaron esperando estas mismas series. */
           const avisar = esperandoSeries;
@@ -7550,8 +7557,12 @@
           avisar.forEach(function (fn) { try { fn(); } catch (e) { /* que no corte a los demás */ } });
         })
         .catch(function () {
-          /* Si no llegan, se despierta igual a los que esperaban: mejor que se
-             queden mirando un «cargando» eterno. */
+          /* Si la consulta falla, tampoco pueden quedarse en «en camino»: se
+             marcan como sin datos y se despierta a los que esperaban, que si no
+             se quedan mirando un «cargando» eterno. */
+          tanda.forEach(function (id) {
+            if (state.priceSeries[id] == null) state.priceSeries[id] = [];
+          });
           const avisar = esperandoSeries;
           esperandoSeries = [];
           avisar.forEach(function (fn) { try { fn(); } catch (e) { /* nada */ } });
@@ -7626,6 +7637,11 @@
       ficha.teamName = ficha.teamName || enLista.teamName;
       ficha.marketValue = ficha.marketValue != null ? ficha.marketValue : enLista.marketValue;
       ficha.points = ficha.points != null ? ficha.points : enLista.points;
+      /* Lo que sube o baja hoy. Sin esto, un futbolista que no está en ninguna
+         plantilla ni en el mercado —los de «los que más se mueven», por
+         ejemplo— salía en su ficha con «Hoy −0 €» mientras la lista de al lado
+         decía −320.000 €. */
+      if (!ficha.increment) ficha.increment = enLista.increment || 0;
     }
 
     ficha.moves = enTablon.slice().sort(function (a, b) { return (b.timestamp || 0) - (a.timestamp || 0); });
