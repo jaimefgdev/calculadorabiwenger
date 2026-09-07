@@ -11553,10 +11553,28 @@
       });
     });
 
-    /* La ficha se abre pulsando el nombre del futbolista, esté donde esté. */
+    /* La ficha se abre pulsando el futbolista, esté donde esté.
+       Y vale TODA LA FILA, no solo el nombre: la zona del nombre es estrecha y
+       pulsar dos centímetros al lado no hacía absolutamente nada, que se lee
+       como que la ficha está rota. Los botones de la fila —pujar, renovar,
+       quitar— se respetan: esos hacen lo suyo y no abren nada. */
     ['moves-body', 'market-body', 'squads-body', 'listings-body',
      'movers-up', 'movers-down', 'jugadores-body', 'squad-body', 'caros-body'].forEach(function (id) {
-      $(id).addEventListener('click', function (event) { abrirFicha(event.target); });
+      $(id).addEventListener('click', function (event) {
+        const control = event.target.closest &&
+          event.target.closest('button, a, input, select, [data-pujar], [data-renueva],' +
+            ' [data-renovar], [data-retirar], [data-quitar], [data-vender], [data-sim]');
+        /* Un control hace lo suyo, salvo que el control SEA el futbolista, como
+           en Plantillas, donde la fila entera es un botón. */
+        if (control && !control.closest('[data-player-id]')) return;
+
+        if (abrirFicha(event.target)) return;
+        /* Si se ha pulsado fuera del nombre, se busca al futbolista de esa
+           fila: es el que se quería abrir. */
+        const fila = event.target.closest && event.target.closest('tr, .mover, li');
+        const quien = fila && fila.querySelector('[data-player-id]');
+        if (quien) abrirFicha(quien);
+      });
     });
 
     $('op-modal').addEventListener('input', function (event) {
