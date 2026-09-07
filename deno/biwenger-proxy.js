@@ -132,7 +132,7 @@ const CDN = 'https://cf.biwenger.com/api/v2';
    navegador normal y las cabeceras que este mandaría. */
 /* Marca de versión: se sube en cada cambio y se consulta con ?version=1.
    Sirve para saber desde fuera si el despliegue ha entrado o no. */
-const VERSION = '2026-09-07 · deno 88';
+const VERSION = '2026-09-07 · deno 89';
 
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ' +
   '(KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36';
@@ -2421,8 +2421,10 @@ async function superPicasDeLaTemporada(env, score) {
 }
 
 async function playerStats(id, names, score, env) {
-  const slug = names[String(id) + ':slug'];
-  if (!slug) return null;
+  /* El id SIEMPRE vale como ruta, igual que el slug. Aquí se exigía slug y se
+     devolvía nada sin él: con el índice a medias, la ficha de ese futbolista
+     llegaba vacía y en la comparación salían todos sus números a cero. */
+  const slug = names[String(id) + ':slug'] || String(id);
 
   const sistema = String(score || 1);
 
@@ -2437,9 +2439,17 @@ async function playerStats(id, names, score, env) {
      partido eran ni qué hizo el futbolista en él. */
   const campos = 'fields=*,reports(*,points,rawStats,' +
     'match(*,round(*),home(*),away(*)),events(*))';
-  const response = await fetch(CDN + '/players/la-liga/' + encodeURIComponent(slug) +
-    '?lang=es&' + campos + '&score=' + encodeURIComponent(sistema), { headers: NAVEGADOR });
-  if (!response.ok) return null;
+  /* Y si el slug guardado ya no vale —Biwenger los renombra—, se reintenta por
+     el número antes de rendirse. */
+  const pedir = async function (quien) {
+    const r = await fetch(CDN + '/players/la-liga/' + encodeURIComponent(quien) +
+      '?lang=es&' + campos + '&score=' + encodeURIComponent(sistema),
+      { headers: NAVEGADOR }).catch(function () { return null; });
+    return r && r.ok ? r : null;
+  };
+  const response = (await pedir(slug)) ||
+    (String(slug) !== String(id) ? await pedir(id) : null);
+  if (!response) return null;
 
   const data = (await response.json()).data || {};
   const informes = data.reports || [];
