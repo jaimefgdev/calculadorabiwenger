@@ -7966,15 +7966,52 @@
    * Abre la ficha del futbolista al que pertenece lo que se ha pulsado. Dice si
    * la ha abierto, para que quien llame pueda parar ahí.
    */
+  /**
+   * Busca a un futbolista por su nombre, para cuando la fila no trae el número.
+   *
+   * Se mira en la lista de LaLiga, en el mercado y en las ocho plantillas: en
+   * alguna de las tres está casi siempre. Es una red de seguridad, no el camino
+   * normal: lo normal es que la fila traiga su identificador.
+   */
+  function idPorNombre(nombre) {
+    const busca = String(nombre || '').trim().toLowerCase();
+    if (!busca) return null;
+
+    const enLista = (state.jugadores || []).filter(function (j) {
+      return String(j.name || '').trim().toLowerCase() === busca;
+    })[0];
+    if (enLista && enLista.id != null) return String(enLista.id);
+
+    const enMercado = (state.market || []).filter(function (v) {
+      return String(v.player || '').trim().toLowerCase() === busca;
+    })[0];
+    if (enMercado && enMercado.playerId != null) return String(enMercado.playerId);
+
+    let hallado = null;
+    squadList().forEach(function (plantilla) {
+      (plantilla.players || []).forEach(function (j) {
+        if (!hallado && String(j.name || '').trim().toLowerCase() === busca && j.id != null) {
+          hallado = String(j.id);
+        }
+      });
+    });
+    return hallado;
+  }
+
   function abrirFicha(donde) {
     const quien = donde && donde.closest && donde.closest('[data-player-id]');
-    if (!quien || !quien.getAttribute('data-player-id')) return false;
+    if (!quien) return false;
 
     const nombre = quien.querySelector('.player-name');
-    state.priceModal = {
-      id: quien.getAttribute('data-player-id'),
-      name: nombre ? nombre.textContent : ''
-    };
+    const comoSeLlamaba = nombre ? nombre.textContent : '';
+
+    /* El número de la fila; y si viniera vacío —ha pasado en el mercado, cuando
+       Biwenger manda la venta sin él—, se busca por el nombre antes que dejar
+       que pulsar no haga absolutamente nada, que es lo peor de todo. */
+    const id = quien.getAttribute('data-player-id') || idPorNombre(comoSeLlamaba);
+    if (!id) return false;
+
+    state.priceModal = { id: String(id), name: comoSeLlamaba };
     ensurePriceSeries([state.priceModal.id], renderPriceModal);
     ensureEstadisticas(state.priceModal.id);
     renderPriceModal();
