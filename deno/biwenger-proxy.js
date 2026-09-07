@@ -132,7 +132,7 @@ const CDN = 'https://cf.biwenger.com/api/v2';
    navegador normal y las cabeceras que este mandaría. */
 /* Marca de versión: se sube en cada cambio y se consulta con ?version=1.
    Sirve para saber desde fuera si el despliegue ha entrado o no. */
-const VERSION = '2026-09-07 · deno 83';
+const VERSION = '2026-09-07 · deno 85';
 
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ' +
   '(KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36';
@@ -1993,6 +1993,10 @@ async function todosLosJugadores(env) {
       /* El parte de la lesión o la sanción, para la ficha. */
       statusInfo: names[id + ':statusInfo'] || null,
       marketValue: names[id + ':price'] != null ? Math.round(names[id + ':price']) : null,
+      /* Lo que ha subido o bajado hoy. Faltaba, y por eso la columna «Hoy» de
+         «Los más caros» salía vacía para todo el que no estuviera fichado por
+         alguien: ese dato solo llegaba con las plantillas y el mercado. */
+      increment: names[id + ':inc'] || 0,
       points: names[id + ':pts'] != null ? names[id + ':pts'] : 0,
       played: names[id + ':jug'] || 0
     });
@@ -2274,6 +2278,26 @@ async function superPicasDeLaTemporada(env, score) {
      —se daban por cerradas al acabar los partidos, y Biwenger publica las Super
      Picas despues—, asi que se empieza de cero. */
   const clave = 'superpicas-v3-' + (score || '');
+
+  /* LO QUE SE DEVUELVE se guarda unos minutos. Esto lo llama la ficha de CADA
+     futbolista, y lo que hay debajo recorre las jornadas sin consolidar con una
+     pausa de 120 ms entre cada una: con tres jornadas abiertas son casi cuatro
+     segundos, POR FICHA, esperando a un dato de adorno. Y el resultado es el
+     mismo para todos: no depende del futbolista que se pida.
+     Dos minutos: dentro de una jornada en vivo las Super Picas apenas se
+     mueven, y en cuanto pasan se vuelve a contar. */
+  if (cache.picasListas && cache.picasListas.clave === clave &&
+      Date.now() - cache.picasListas.at < 2 * 60 * 1000) {
+    return cache.picasListas.cuenta;
+  }
+  /* Y si ya hay una cuenta en marcha, se espera a ESA en vez de lanzar otra:
+     al abrir una ficha se piden estadisticas y partidos casi a la vez, y las
+     dos entraban aqui a la vez a hacer el mismo trabajo. */
+  if (cache.picasEnMarcha && cache.picasEnMarcha.clave === clave) {
+    return await cache.picasEnMarcha.promesa;
+  }
+
+  const promesa = (async function () {
   const calendario = await seasonRounds().catch(function () { return []; });
   const jugadas = calendario.filter(function (r) {
     return (r.part || 1) === 1 && (r.status === 'finished' || r.status === 'active');
@@ -2334,6 +2358,18 @@ async function superPicasDeLaTemporada(env, score) {
     } catch (error) { /* da igual, se recalcula */ }
   }
   return cuenta;
+  })();
+
+  cache.picasEnMarcha = { clave: clave, promesa: promesa };
+  try {
+    const cuenta = await promesa;
+    cache.picasListas = { clave: clave, at: Date.now(), cuenta: cuenta };
+    return cuenta;
+  } finally {
+    /* Se suelta pase lo que pase: si falla y se queda puesta, todas las fichas
+       siguientes se colgarian esperando a una promesa ya rota. */
+    cache.picasEnMarcha = null;
+  }
 }
 
 async function playerStats(id, names, score, env) {
