@@ -491,6 +491,12 @@ code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft)
 }
 /* Dentro del cuadro no hace falta el aire de arriba que lleva suelto. */
 .seccion__titulo--dentro { margin: 0; }
+/* La cesión pedida: «Cambiar» y el aspa de anular, pegados como una sola
+   pieza para que se lean juntos y no como dos píldoras sueltas. */
+.ficha__cesion-puesta { display: inline-flex; align-items: center; gap: .25rem; }
+.ficha__cesion-x { padding-left: .5rem; padding-right: .5rem; color: var(--neg); }
+.ficha__cesion-x:hover { border-color: var(--neg); }
+
 /* «Los más caros» es un título que ADEMÁS despliega, así que es un botón: se le
    quita la pinta de botón y se le deja la del título de al lado, con la flecha
    que gira igual que en «los que más se mueven». */

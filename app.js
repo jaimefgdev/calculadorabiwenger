@@ -3641,6 +3641,11 @@
     return o.direction === 'out' && String(o.playerId) === String(id);
   })[0];
 
+  /** La cesión que ya le has pedido por él, si la hay. */
+  const miCesionPor = (id) => (state.offers || []).filter(function (o) {
+    return o.direction === 'out' && o.tipo === 'loan' && String(o.playerId) === String(id);
+  })[0];
+
   /**
    * Lo que te queda de puja máxima. Las pujas que ya has enviado están
    * comprometidas: si ganas dos, pagas las dos, así que se descuentan. La del
@@ -3925,10 +3930,15 @@
     const ficha = playerInfo(playerId) || {};
     const valor = ficha.marketValue || 0;
     const saldo = (state.me && state.me.balance != null) ? state.me.balance : null;
+    /* Si ya se la pediste, se parte de lo que pusiste: cambiar dos números es
+       lo normal, volver a escribirlos desde cero no. */
+    const pedida = miCesionPor(playerId);
+    const jornadasIni = pedida && pedida.rounds ? pedida.rounds : 1;
+    const importeIni = pedida ? pedida.amount : valor;
 
     abrirOpModal(
       '<div class="op-card__cab">' +
-        '<h3 id="op-modal-titulo">Pedir cedido a ' +
+        '<h3 id="op-modal-titulo">' + (pedida ? 'Cambiar la cesión de ' : 'Pedir cedido a ') +
           escapeHtml(comoSeLlama({ id: playerId, name: ficha.name })) + '</h3>' +
         '<button type="button" class="btn btn--ghost btn--close" data-op-cerrar' +
           ' title="Cerrar" aria-label="Cerrar">\u2715</button>' +
@@ -3938,17 +3948,22 @@
         '<div><dt>Valor de mercado</dt><dd>' + money(valor) + '</dd></div>' +
         (saldo != null ? '<div><dt>Tu saldo</dt><dd>' + money(saldo) + '</dd></div>' : '') +
         '<div><dt>Jornadas como mucho</dt><dd>' + tope + '</dd></div>' +
+        (pedida
+          ? '<div><dt>Lo que pediste</dt><dd><strong>' + money(pedida.amount || 0) +
+            (pedida.rounds ? ' · ' + pedida.rounds +
+              (pedida.rounds === 1 ? ' jornada' : ' jornadas') : '') + '</strong></dd></div>'
+          : '') +
       '</dl>' +
       '<label class="op-importe"><span>Jornadas (1\u2013' + tope + ')</span>' +
         '<input type="number" id="op-cesion-jornadas" inputmode="numeric"' +
-          ' min="1" max="' + tope + '" step="1" value="1"></label>' +
+          ' min="1" max="' + tope + '" step="1" value="' + jornadasIni + '"></label>' +
       '<label class="op-importe"><span>Cu\u00e1nto le ofreces</span>' +
         '<input type="number" id="op-cesion-importe" inputmode="numeric"' +
-          ' step="100000" min="0" value="' + valor + '"></label>' +
+          ' step="100000" min="0" value="' + importeIni + '"></label>' +
       '<p class="op-aviso"></p>' +
       '<div class="op-botones">' +
         '<button type="button" class="btn btn--primary" data-op-ceder="' +
-          escapeHtml(String(playerId)) + '">Pedir cedido</button>' +
+          escapeHtml(String(playerId)) + '">' + (pedida ? 'Cambiar' : 'Pedir cedido') + '</button>' +
       '</div>');
 
     const campo = $('op-cesion-jornadas');
@@ -3975,10 +3990,13 @@
     const equipo = state.teams[quien];
     if (!equipo || equipo.id == null) return decir('No s\u00e9 qui\u00e9n es ' + quien + '.');
 
+    /* Con `id`, el proxy edita la que ya hay en vez de mandar otra: si no, se
+       acumularían dos cesiones pedidas por el mismo futbolista. */
+    const pedida = miCesionPor(playerId);
     lanzarOperacion(
       { accion: 'ceder', player: String(playerId), price: importe,
-        rounds: jornadas, to: equipo.id },
-      'Cesi\u00f3n pedida a ' + quien + '.');
+        rounds: jornadas, to: equipo.id, id: pedida ? pedida.id : null },
+      (pedida ? 'Cesi\u00f3n cambiada' : 'Cesi\u00f3n pedida') + ' a ' + quien + '.');
   }
 
   function confirmarPuja(playerId) {
@@ -9034,10 +9052,28 @@
               : '') +
             /* Pedir cedido: solo en las estadísticas de UNO y solo si el
                futbolista es de OTRO mánager. Una cesión se le PIDE a su dueño,
-               así que en los tuyos y en los libres la píldora no pinta nada. */
+               así que en los tuyos y en los libres la píldora no pinta nada.
+               Y si ya se la has pedido, cambia: «Cambiar» para tocar jornadas o
+               importe, y un aspa al lado para anularla sin abrir nada. */
             (vistaDeFicha(abierto) === 'stats' && !abierto.comparar && otroDuenoDe(abierto.id)
-              ? '<button type="button" class="ambito ficha__ceder" data-ceder="' +
-                  escapeHtml(String(abierto.id)) + '">Cesión</button>'
+              ? (function () {
+                  const pedida = miCesionPor(abierto.id);
+                  if (!pedida) {
+                    return '<button type="button" class="ambito ficha__ceder" data-ceder="' +
+                      escapeHtml(String(abierto.id)) + '">Cesión</button>';
+                  }
+                  return '<span class="ficha__cesion-puesta">' +
+                    '<button type="button" class="ambito ficha__ceder ambito--on" data-ceder="' +
+                      escapeHtml(String(abierto.id)) + '" title="Cesión pedida por ' +
+                      escapeHtml(money(pedida.amount || 0)) +
+                      (pedida.rounds ? ', ' + pedida.rounds +
+                        (pedida.rounds === 1 ? ' jornada' : ' jornadas') : '') +
+                      '">Cambiar</button>' +
+                    '<button type="button" class="ambito ficha__cesion-x"' +
+                      ' data-cesion-anular="' + escapeHtml(String(pedida.id)) + '"' +
+                      ' title="Anular la cesión" aria-label="Anular la cesión">✕</button>' +
+                  '</span>';
+                })()
               : '') +
             '</span>') +
         '</div>' +
@@ -11810,6 +11846,15 @@
           if (state.priceModal.comparar) ensurePartidosDe(state.priceModal.comparar);
         }
         renderPriceModal();
+        return;
+      }
+
+      /* El aspa anula la cesión pedida. Va antes que la píldora porque las dos
+         están dentro del mismo grupo. */
+      const anula = event.target.closest('[data-cesion-anular]');
+      if (anula) {
+        lanzarOperacion({ accion: 'retirar', id: anula.getAttribute('data-cesion-anular') },
+          'Cesión anulada.');
         return;
       }
 
