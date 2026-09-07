@@ -13,15 +13,21 @@
   "icons": [
     {
       "src": "icono-app.svg",
-      "sizes": "any",
+      "sizes": "192x192",
       "type": "image/svg+xml",
       "purpose": "any"
     },
     {
       "src": "icono-app.svg",
-      "sizes": "any",
+      "sizes": "192x192",
       "type": "image/svg+xml",
       "purpose": "maskable"
+    },
+    {
+      "src": "icono-splash.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
     }
   ]
 }

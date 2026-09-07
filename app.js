@@ -442,10 +442,14 @@
         return String(f.id) === String(equipo.id);
       })[0];
       if (!fila) return;
-      /* El mánager que empezó la jornada con saldo negativo no puntúa esa
-         jornada: ni suma ni resta. La jornada cuenta igual (por eso `alguna`),
-         pero él aporta cero. */
-      if (fila.counts !== false) total += fila.points || 0;
+      /* OJO: empezar la jornada en números rojos le cuesta el ABONO, no los
+         PUNTOS. Aquí se descartaban también los puntos —una suposición mía al
+         ver que Biwenger no le pagaba— y por eso a Eneko le faltaba una jornada
+         entera en la general, tanto en la clasificación de Liga como en la
+         columna General de Jornadas: las dos salen de esta misma suma.
+         El `counts: false` sigue usándose donde toca: el abono de esa jornada es
+         cero, y no puede ganarla. */
+      total += fila.points || 0;
       alguna = true;
     });
 
@@ -5438,9 +5442,16 @@
         const id = mergeJornada(payload);
         state.jornadaEstado = '';
         /* Solo se cambia de vista si es la que se pidió: si el Worker
-           contestara con otra, quedarse mirando esa despistaba. */
-        if (id != null && (String(cual) === 'actual' || String(cual) === String(id))) {
-          state.jornadaVista = id;
+           contestara con otra, quedarse mirando esa despistaba.
+
+           Y OJO con «actual»: cada sincronización pide la jornada en curso, y
+           esa respuesta te devolvía a ella aunque acabaras de elegir otra a
+           mano. Pasaba una sola vez —la de la sincronización que estuviera en
+           vuelo— y había que volver a elegir. Ahora «actual» solo coloca la
+           vista si todavía no has elegido ninguna. */
+        if (id != null) {
+          if (String(cual) === String(id)) state.jornadaVista = id;
+          else if (String(cual) === 'actual' && state.jornadaVista == null) state.jornadaVista = id;
         }
         renderJornadas();
         /* La jornada llega después de la sincronización, y con ella los puntos
@@ -5598,6 +5609,42 @@
       filas + '</div>';
   }
 
+  /**
+   * Los suplentes que tenía ESA jornada, no los de hoy.
+   *
+   * Biwenger manda como banquillo lo que le sobra de la plantilla AHORA, así
+   * que un futbolista fichado a mitad de jornada aparecía de suplente en una
+   * jornada que empezó sin él. Y no es un suplente: es que ese día no estaba en
+   * el equipo. Se quitan los que llegaron después de que arrancara.
+   *
+   * Solo se filtra si sabemos cuándo empezó la jornada y tenemos el tablón; si
+   * falta cualquiera de las dos cosas se deja la lista tal cual, que quitar de
+   * menos es mejor que quitar a quien sí estaba.
+   */
+  function suplentesDeLaJornada(fila) {
+    const lista = fila.bench || [];
+    if (!lista.length) return lista;
+
+    const jornada = jornadaActiva();
+    const arranque = jornada && jornada.round ? Date.parse(arranqueDeJornada(jornada.round)) : NaN;
+    if (isNaN(arranque)) return lista;
+
+    /* Cuándo compró este mánager a cada uno. Si lo compró varias veces vale la
+       última, que es la que dice desde cuándo lo tiene ahora. */
+    const compradoEl = {};
+    (state.movements || []).forEach(function (m) {
+      if (!m || m.type !== 'buy' || !m.timestamp) return;
+      if (m.manager !== fila.name) return;
+      const id = String(m.playerId);
+      if (!compradoEl[id] || m.timestamp > compradoEl[id]) compradoEl[id] = m.timestamp;
+    });
+
+    return lista.filter(function (jugador) {
+      const cuando = compradoEl[String(jugador.id)];
+      return cuando == null || cuando <= arranque;
+    });
+  }
+
   function jornadaDetalle(fila) {
     if (!fila.xi.length && !fila.bench.length) {
       /* Sin alineación guardada, el abono se enseña igual: es un dato de la
@@ -5606,9 +5653,10 @@
         desgloseDelAbono(fila);
     }
 
-    const banquillo = fila.bench.length === 0
+    const suplentes = suplentesDeLaJornada(fila);
+    const banquillo = suplentes.length === 0
       ? '<p class="muted">Sin suplentes guardados.</p>'
-      : '<div class="bench">' + fila.bench.map(function (jugador) {
+      : '<div class="bench">' + suplentes.map(function (jugador) {
           return '<div class="bench__player">' +
             crestOf(jugador, 'crest--ghost') +
             caraDeAlineacion(jugador, 'bench__face') +
@@ -5616,10 +5664,15 @@
           '</div>';
         }).join('') + '</div>';
 
+    /* El abono va DENTRO de la columna de la derecha, debajo de los suplentes:
+       ahí queda pegado a lo que acompaña y aprovecha el hueco que dejaba el
+       banquillo al lado del campo. Suelto debajo de la rejilla se leía como si
+       colgara del campo, que no es de donde sale. */
     return '<div class="lineup-grid">' +
       '<div class="pitch-wrap">' + staticPitch(fila.type, fila.xi) + '</div>' +
-      '<div class="lineup-bench"><h3 class="bench__title">Suplentes</h3>' + banquillo + '</div>' +
-    '</div>' + desgloseDelAbono(fila);
+      '<div class="lineup-bench"><h3 class="bench__title">Suplentes</h3>' + banquillo +
+        desgloseDelAbono(fila) + '</div>' +
+    '</div>';
   }
 
   /**
@@ -5639,9 +5692,12 @@
     /* Con saldo negativo al empezar, Biwenger no le cuenta la jornada: no hay
        nada que desglosar, solo que explicar. */
     if (abono.motivo === 'negativo') {
-      return '<div class="abono">' + titulo +
-        '<p class="muted">Empezó la jornada con saldo negativo, así que no le cuenta: ' +
-        'ni puntos ni abono.</p></div>';
+      /* En rojo: no es un matiz, es que esa jornada no le ha contado y no ha
+         cobrado nada teniendo puntos. Se ve de un vistazo por qué su abono
+         está vacío sin tener que leerlo. */
+      return '<div class="abono abono--negativo">' + titulo +
+        '<p class="abono__aviso">Empezó la jornada con saldo negativo, así que no le ' +
+        'cuenta: ni puntos ni abono.</p></div>';
     }
 
     const d = abono.detalle || null;
@@ -5691,10 +5747,6 @@
         '<p class="muted">Esta jornada no ha dado nada.</p></div>';
     }
 
-    /* Cerrada quiere decir pagada. Mientras siga abierta esto es una
-       previsión, y hay que decirlo: Biwenger no abona hasta el día siguiente. */
-    const cerrada = fila.pointsOfficial != null;
-
     return '<div class="abono">' + titulo +
       '<div class="abono__lista">' + filas.join('') +
         '<div class="abono__fila abono__fila--total">' +
@@ -5704,9 +5756,6 @@
             (abono.total > 0 ? '+' : '') + money(abono.total) + '</span>' +
         '</div>' +
       '</div>' +
-      '<p class="abono__nota">' + (cerrada
-        ? 'Jornada cerrada: es lo que ha pagado.'
-        : 'Previsión: la jornada todavía no ha cerrado.') + '</p>' +
     '</div>';
   }
 
@@ -5959,7 +6008,9 @@
       (fila.xi || []).forEach(function (jugador) {
         if (jugador && jugador.id != null) once[String(jugador.id)] = fila.name;
       });
-      (fila.bench || []).forEach(function (jugador) {
+      /* Mismo filtro que en la ficha: el que llegó después de arrancar la
+         jornada no era suyo ESE día, y no debe salir con su icono. */
+      suplentesDeLaJornada(fila).forEach(function (jugador) {
         if (jugador && jugador.id != null) banco[String(jugador.id)] = fila.name;
       });
     });
@@ -6927,12 +6978,11 @@
     if (abono.puntos) partes.push(money(abono.puntos) + ' por puntos');
     if (abono.ideal) partes.push(money(abono.ideal) + ' del once ideal');
     if (abono.mvp) partes.push(money(abono.mvp) + ' por MVP');
-    const cerrada = fila.pointsOfficial != null;
 
+    /* Solo el desglose: lo de «jornada cerrada / previsión» se ha quitado también
+       de aquí, para que el globo diga lo mismo que la ficha de más abajo. */
     return '<span class="' + (abono.total < 0 ? 'money-neg' : 'money-pos') +
-      '" title="' + escapeHtml((partes.join(' + ') || 'Sin abono') + '. ' +
-        (cerrada ? 'Jornada cerrada: es lo que ha pagado.'
-                 : 'Previsión: la jornada aún no ha cerrado.')) + '">' +
+      '" title="' + escapeHtml(partes.join(' + ') || 'Sin abono') + '">' +
       (abono.total > 0 ? '+' : '') + money(abono.total) + '</span>';
   }
 
