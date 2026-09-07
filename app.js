@@ -10700,16 +10700,45 @@
             String(nuestros == null ? '?' : nuestros).padStart(4) +
             (suyos != null && nuestros != null && suyos !== nuestros ? '   \u2190 NO CUADRA' : ''));
         });
-        /* Y qué jornadas tenemos, que es de dónde sale la resta. */
-        const jornadas = Object.keys(state.jornadas.datos)
-          .map(function (id) { return state.jornadas.datos[id]; })
-          .filter(function (j) { return j && j.round; })
-          .map(function (j) { return 'J' + (j.round.number == null ? '?' : j.round.number) +
-            (j.round.part && j.round.part !== 1 ? 'b' : ''); });
-        lineas.push('  jornadas cargadas: ' + (jornadas.length ? jornadas.sort().join(' ') : 'ninguna'));
         const vista = jornadaActiva();
         lineas.push('  mirando ahora: ' +
           (vista && vista.round ? 'J' + vista.round.number : 'ninguna'));
+
+        /* Y el desglose jornada a jornada. Cuando el total no cuadra con
+           Biwenger, esto dice EN CUÁL está la diferencia, que es lo único que no
+           se puede deducir mirando el total. */
+        const suyas = Object.keys(state.jornadas.datos)
+          .map(function (id) { return state.jornadas.datos[id]; })
+          .filter(function (j) { return j && j.round && esJornadaPropia(j.round); })
+          .sort(function (a, b) { return (a.round.number || 0) - (b.round.number || 0); });
+
+        if (suyas.length) {
+          lineas.push('');
+          lineas.push('PUNTOS POR JORNADA  (lo que tenemos guardado)');
+          lineas.push('  ' + ' '.repeat(24) +
+            suyas.map(function (j) { return ('J' + j.round.number).padStart(5); }).join('') +
+            '  suma');
+          MANAGERS.forEach(function (nombre) {
+            const equipo = state.teams[nombre];
+            if (!equipo) return;
+            let suma = 0;
+            const celdas = suyas.map(function (j) {
+              const fila = (j.standings || []).filter(function (f) {
+                return String(f.id) === String(equipo.id);
+              })[0];
+              if (!fila || fila.points == null) return '    -';
+              /* En rojo si esa jornada no le cuenta (empezó en negativo): se
+                 marca con un asterisco, porque no suma aunque tenga puntos. */
+              if (fila.counts === false) return (fila.points + '*').padStart(5);
+              suma += fila.points;
+              return String(fila.points).padStart(5);
+            });
+            const corto = nombre.length > 22 ? nombre.slice(0, 21) + '\u2026' : nombre;
+            lineas.push('  ' + corto + ' '.repeat(Math.max(1, 24 - corto.length)) +
+              celdas.join('') + String(suma).padStart(6));
+          });
+          lineas.push('  (* esa jornada no le cuenta: empez\u00f3 en negativo)');
+        }
 
         lineas.push('');
         lineas.push('ABONO DE LAS JORNADAS');
