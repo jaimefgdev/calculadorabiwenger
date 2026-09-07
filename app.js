@@ -2409,10 +2409,17 @@
 
   const squadList = () => (state.squads && state.squads.list) || [];
 
-  /** ¿Este futbolista es de los míos? */
-  function esMio(id) {
-    const clave = String(id);
-    return mySquad().some(function (j) { return String(j.id) === clave; });
+  /**
+   * De qué OTRO mánager es este futbolista.
+   *
+   * Devuelve su nombre, o nada si es tuyo, si está libre o si no se sabe. Se
+   * usa para las cesiones: solo se le puede pedir cedido a quien lo tiene.
+   * Se apoya en `duenoDe`, que ya sabe de quién es cada uno; aquí solo se
+   * descarta el caso de que seas tú.
+   */
+  function otroDuenoDe(id) {
+    const quien = duenoDe(id);
+    return quien && quien !== myName() ? quien : null;
   }
 
   /** Mi plantilla completa, sacada de las plantillas de la liga. */
@@ -3905,48 +3912,43 @@
   }
 
   /**
-   * Ceder uno de los tuyos a otro mánager.
+   * Pedirle cedido a otro mánager uno de sus futbolistas.
    *
-   * Se elige a quién, por cuántas jornadas y por cuánto. El futbolista vuelve
-   * solo al acabar el plazo; mientras, puntúa para el otro.
+   * Se elige por cuántas jornadas y por cuánto. Si acepta, lo tienes ese plazo
+   * —puntúa para ti— y al acabar vuelve solo con él.
    */
   function abrirCesion(playerId) {
-    const mio = miJugador(playerId);
-    if (!mio) return;
+    const quien = otroDuenoDe(playerId);
+    if (!quien) return;
 
     const tope = topeDeCesion();
     const ficha = playerInfo(playerId) || {};
-    const valor = ficha.marketValue || mio.marketValue || 0;
-    /* A quién se le cede: todos menos yo. */
-    const yo = myName();
-    const otros = MANAGERS.filter(function (n) { return n !== yo; });
+    const valor = ficha.marketValue || 0;
+    const saldo = (state.me && state.me.balance != null) ? state.me.balance : null;
 
     abrirOpModal(
       '<div class="op-card__cab">' +
-        '<h3 id="op-modal-titulo">Ceder a ' + escapeHtml(comoSeLlama(mio)) + '</h3>' +
+        '<h3 id="op-modal-titulo">Pedir cedido a ' +
+          escapeHtml(comoSeLlama({ id: playerId, name: ficha.name })) + '</h3>' +
         '<button type="button" class="btn btn--ghost btn--close" data-op-cerrar' +
           ' title="Cerrar" aria-label="Cerrar">\u2715</button>' +
       '</div>' +
       '<dl class="op-datos">' +
+        '<div><dt>Es de</dt><dd>' + escapeHtml(quien) + '</dd></div>' +
         '<div><dt>Valor de mercado</dt><dd>' + money(valor) + '</dd></div>' +
+        (saldo != null ? '<div><dt>Tu saldo</dt><dd>' + money(saldo) + '</dd></div>' : '') +
         '<div><dt>Jornadas como mucho</dt><dd>' + tope + '</dd></div>' +
       '</dl>' +
-      '<label class="op-importe"><span>A qui\u00e9n</span>' +
-        '<select id="op-cesion-quien">' +
-          otros.map(function (n) {
-            return '<option value="' + escapeHtml(n) + '">' + escapeHtml(n) + '</option>';
-          }).join('') +
-        '</select></label>' +
       '<label class="op-importe"><span>Jornadas (1\u2013' + tope + ')</span>' +
         '<input type="number" id="op-cesion-jornadas" inputmode="numeric"' +
           ' min="1" max="' + tope + '" step="1" value="1"></label>' +
-      '<label class="op-importe"><span>Importe</span>' +
+      '<label class="op-importe"><span>Cu\u00e1nto le ofreces</span>' +
         '<input type="number" id="op-cesion-importe" inputmode="numeric"' +
           ' step="100000" min="0" value="' + valor + '"></label>' +
       '<p class="op-aviso"></p>' +
       '<div class="op-botones">' +
         '<button type="button" class="btn btn--primary" data-op-ceder="' +
-          escapeHtml(String(playerId)) + '">Ceder</button>' +
+          escapeHtml(String(playerId)) + '">Pedir cedido</button>' +
       '</div>');
 
     const campo = $('op-cesion-jornadas');
@@ -3958,7 +3960,8 @@
     const tope = topeDeCesion();
     const jornadas = Math.round(Number(($('op-cesion-jornadas') || {}).value));
     const importe = Math.round(Number(($('op-cesion-importe') || {}).value));
-    const quien = ($('op-cesion-quien') || {}).value || '';
+    /* A su dueño: no se elige, es de quien sea. */
+    const quien = otroDuenoDe(playerId) || '';
     const aviso = document.querySelector('#op-modal .op-aviso');
 
     const decir = function (texto) {
@@ -3975,7 +3978,7 @@
     lanzarOperacion(
       { accion: 'ceder', player: String(playerId), price: importe,
         rounds: jornadas, to: equipo.id },
-      'Cesi\u00f3n ofrecida a ' + quien + '.');
+      'Cesi\u00f3n pedida a ' + quien + '.');
   }
 
   function confirmarPuja(playerId) {
@@ -9029,10 +9032,10 @@
               ? '<button type="button" class="ambito ficha__comparar" data-comparar>' +
                   (abierto.comparar ? 'Quitar comparación' : 'Comparar') + '</button>'
               : '') +
-            /* Ceder: solo en las estadísticas de UNO, y solo si es tuyo. No se
-               puede ceder al rival de una comparación ni a alguien que no
-               tienes, así que ahí la píldora sobra. */
-            (vistaDeFicha(abierto) === 'stats' && !abierto.comparar && esMio(abierto.id)
+            /* Pedir cedido: solo en las estadísticas de UNO y solo si el
+               futbolista es de OTRO mánager. Una cesión se le PIDE a su dueño,
+               así que en los tuyos y en los libres la píldora no pinta nada. */
+            (vistaDeFicha(abierto) === 'stats' && !abierto.comparar && otroDuenoDe(abierto.id)
               ? '<button type="button" class="ambito ficha__ceder" data-ceder="' +
                   escapeHtml(String(abierto.id)) + '">Cesión</button>'
               : '') +
