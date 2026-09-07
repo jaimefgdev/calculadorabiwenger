@@ -7331,6 +7331,21 @@
 
   /* Minigráfica de la evolución del precio, sin ejes ni números: solo la
      forma, en verde si acaba por encima de como empezó y en rojo si no. */
+  /**
+   * El color de una evolución de precio: verde si sube, rojo si baja, y el color
+   * del texto si se queda igual.
+   *
+   * Antes esto era `ultimo >= primero`, y el `>=` metía lo plano en el verde: un
+   * futbolista que llevaba una semana clavado se pintaba como si estuviera
+   * subiendo. Y lo plano no es ni bueno ni malo, así que va del color del texto
+   * —blanco en oscuro, casi negro en claro— y no compite con los otros dos.
+   */
+  function colorDeEvolucion(desde, hasta) {
+    if (hasta > desde) return 'var(--pos)';
+    if (hasta < desde) return 'var(--neg)';
+    return 'var(--text)';
+  }
+
   function sparkline(serie, id, nombre) {
     if (!serie || serie.length < 2) return '<span class="sub">—</span>';
 
@@ -7346,14 +7361,14 @@
       return x.toFixed(1) + ' ' + y.toFixed(1);
     });
 
-    const sube = valores[valores.length - 1] >= valores[0];
-    const color = sube ? 'var(--pos)' : 'var(--neg)';
     const diferencia = valores[valores.length - 1] - valores[0];
+    const color = colorDeEvolucion(valores[0], valores[valores.length - 1]);
 
     return '<button type="button" class="spark" data-spark="' + escapeHtml(String(id || '')) + '"' +
       ' data-spark-name="' + escapeHtml(nombre || '') + '"' +
       ' title="' + serie.length + ' días · ' +
-      (diferencia >= 0 ? '+' : '−') + money(Math.abs(diferencia)) + ' · pulsa para ampliar">' +
+      (diferencia === 0 ? 'igual' : (diferencia > 0 ? '+' : '−') + money(Math.abs(diferencia))) +
+      ' · pulsa para ampliar">' +
       '<svg viewBox="0 0 ' + W + ' ' + H + '" width="' + W + '" height="' + H + '" aria-hidden="true">' +
       '<polyline points="' + puntos.join(' ') + '" fill="none" stroke="' + color +
       '" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"' +
@@ -8618,7 +8633,6 @@
 
     const primero = puntos.length ? puntos[0].price : 0;
     const ultimo = puntos.length ? puntos[puntos.length - 1].price : 0;
-    const sube = ultimo >= primero;
 
     const ficha = playerInfo(abierto.id);
     const sube2 = ficha.increment > 0;
@@ -8747,7 +8761,7 @@
                 ': aún no hay evolución que enseñar.'
               : 'Biwenger no publica la evolución de este futbolista.') + '</p>'
           : '<div class="viz-hover">' +
-              lineChart(puntos, 'price', sube ? 'var(--pos)' : 'var(--neg)', 'Valor de mercado',
+              lineChart(puntos, 'price', colorDeEvolucion(primero, ultimo), 'Valor de mercado',
                 { height: 260, ticks: 7, fullTicks: true, padX: 96, hover: true,
                   mark: diaLlegada
                     ? { day: diaLlegada, label: llegada.paid == null ? 'reparto' : 'fichaje',
