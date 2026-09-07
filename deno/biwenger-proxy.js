@@ -123,7 +123,7 @@ const CDN = 'https://cf.biwenger.com/api/v2';
    navegador normal y las cabeceras que este mandaría. */
 /* Marca de versión: se sube en cada cambio y se consulta con ?version=1.
    Sirve para saber desde fuera si el despliegue ha entrado o no. */
-const VERSION = '2026-09-07 · deno 75';
+const VERSION = '2026-09-07 · deno 76';
 
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ' +
   '(KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36';
@@ -2874,24 +2874,22 @@ function roundPlayer(entry, names, puntos, partidoDe, enCasa, lances) {
      que llegó a jugar. */
   const suya = !suelto && entry && entry.points != null ? entry.points
     : (player.points != null ? player.points : null);
-  /* MANDA NUESTRA NOTA, no la que trae la alineación.
-     `marcador` sale de la ficha del futbolista, del sistema de puntuación de
-     ESTA liga (el 5). Lo que viene dentro de la alineación no siempre está en
-     ese sistema, y cuando no lo está se cuela una nota de otro baremo: Moi
-     Gómez en la jornada 4 sale a 6 en la alineación de Jordaan y su ficha dice
-     5 en el sistema 5 (y 6 en el 3, en el 6 y en el 8). Biwenger enseña 5.
-     Es el mismo motivo por el que ya se dejó de usar el `points` del feed de la
-     jornada, que para él daba 3: de las tres cifras que da Biwenger, la buena
-     es la de la ficha. La de la alineación se queda de respaldo, para cuando no
-     hemos podido leer la ficha. */
-  const puntuacion = (sinTerminar || fuera) ? null
-    : (marcador[id] != null ? marcador[id] : (suya != null ? suya : null));
+  /* Manda la nota que trae la alineación de Biwenger, y la de la ficha del
+     futbolista queda de respaldo.
 
-  /* ¿La nota la hemos calculado nosotros? Importa para recolocar el gol del que
-     está alineado fuera de su puesto: la nuestra viene SIN ese ajuste y hay que
-     aplicárselo; la de Biwenger ya lo trae hecho y volver a aplicarlo la
-     estropearía. */
-  const nuestra = !(sinTerminar || fuera) && marcador[id] != null;
+     Se probó al revés —ficha primero— para arreglar un caso suelto (Moi Gómez,
+     jornada 4: la alineación decía 6 y su ficha 5 en el sistema de la liga) y
+     descuadró los totales de otros mánagers. El caso suelto sigue sin explicar,
+     pero cambiar de dónde salen TODAS las notas para arreglar una es cambiar lo
+     que funciona por lo que no se entiende. Vuelve como estaba hasta saber por
+     qué esa alineación trae ese número. */
+  const puntuacion = (sinTerminar || fuera) ? null
+    : (suya != null ? suya : (marcador[id] != null ? marcador[id] : null));
+
+  /* ¿La nota la ha puesto Biwenger o la hemos calculado nosotros? Importa para
+     recolocar el gol del que está alineado fuera de su puesto: la de Biwenger
+     YA viene con ese ajuste hecho, y volver a aplicárselo la dejaría mal. */
+  const nuestra = !(sinTerminar || fuera) && suya == null && marcador[id] != null;
 
   const pendiente = sinTerminar;
   /* Si jugaba en casa o fuera esa jornada: rinden distinto y se compara. */
