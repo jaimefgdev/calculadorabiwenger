@@ -5270,8 +5270,34 @@
   /* Lo pedido: los rankings de Datos despliegan hasta setenta y cinco. */
   const RANKING_LARGO = 75;
 
+  /**
+   * Los que más suben y bajan hoy.
+   *
+   * Se calculan AQUÍ, con la lista de futbolistas que la web ya tiene bajada.
+   * Dependían de que el proxy los mandara en la sincronización, y cuando esa
+   * lista llegaba vacía —por lo que fuera— los dos cuadros decían «sin cambios
+   * todavía» teniendo Biwenger casi cuatrocientos futbolistas moviéndose. El
+   * dato está en la misma lista que llena la pestaña Jugadores, así que sacarlo
+   * de ahí quita una dependencia entera.
+   *
+   * Si esa lista todavía no ha llegado, se usa la del proxy como respaldo.
+   */
+  function calcularMovers() {
+    const lista = (state.jugadores || []).filter(function (j) {
+      return j && j.increment;
+    });
+    if (!lista.length) return null;
+
+    const porCambio = lista.slice().sort(function (a, b) { return b.increment - a.increment; });
+    return {
+      up: porCambio.filter(function (j) { return j.increment > 0; }),
+      /* Los que más bajan, del que más cae al que menos. */
+      down: porCambio.filter(function (j) { return j.increment < 0; }).reverse()
+    };
+  }
+
   function renderMovers() {
-    const datos = state.movers || { up: [], down: [] };
+    const datos = calcularMovers() || state.movers || { up: [], down: [] };
 
     const pinta = function (id, lista) {
       const abierto = !!state.moversAbiertos[id];
@@ -5279,8 +5305,12 @@
       const hayMas = lista.length > MOVERS_CORTO;
 
       /* Se despliega pulsando el título; abajo solo queda el «Ver menos». */
+      /* Y se distingue «todavía no ha llegado nada» de «nadie se ha movido»: los
+         dos salían igual y no había forma de saber si faltaba el dato. */
       $(id).innerHTML = lista.length === 0
-        ? '<p class="muted">Sin cambios todavía.</p>'
+        ? '<p class="muted">' + (state.jugadores && state.jugadores.length
+            ? 'Sin cambios todavía.'
+            : 'Cargando los precios de hoy…') + '</p>'
         : lista.slice(0, tope).map(moverRow).join('') +
           (abierto && hayMas
             ? '<button type="button" class="btn btn--ghost btn--sm movers__mas" data-movers="' + id + '">' +
@@ -10314,7 +10344,9 @@
       renderReventas(); renderMercadeo();
     }
     if (name === 'datos') { ensureSquads(); ensureLaLiga(); ensureRecuento(); renderRankings(); renderRankingsTemporada(); }
-    if (name === 'mercado') { ensureMarket(); renderMarket(); renderMovers(); }
+    /* `ensureJugadores` porque de esa lista salen ahora los que más se mueven:
+       sin ella los dos cuadros saldrían vacíos hasta el siguiente repintado. */
+    if (name === 'mercado') { ensureJugadores(); ensureMarket(); renderMarket(); renderMovers(); }
     if (name === 'jugadores') { ensureJugadores(); renderJugadores(); }
     if (name === 'jornadas') { ensureJornada(state.jornadaVista || 'actual'); renderJornadas(); }
   }
