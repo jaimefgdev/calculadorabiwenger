@@ -132,7 +132,7 @@ const CDN = 'https://cf.biwenger.com/api/v2';
    navegador normal y las cabeceras que este mandaría. */
 /* Marca de versión: se sube en cada cambio y se consulta con ?version=1.
    Sirve para saber desde fuera si el despliegue ha entrado o no. */
-const VERSION = '2026-09-07 · deno 85';
+const VERSION = '2026-09-07 · deno 86';
 
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ' +
   '(KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36';
@@ -407,6 +407,9 @@ const app = {
           score: cache.score || null,
           primas: primas,
           primasValen: algoQuePagar(primas),
+          /* Cómo se llaman de verdad los ajustes de cesión en esta liga. */
+          cesion: primas ? { permitidas: primas.cesiones, maximo: primas.cesionMax,
+                             ajustes: primas.ajustesCesion } : null,
           prueba: prueba
         }), {
           headers: Object.assign({ 'content-type': 'application/json; charset=utf-8' }, cors(origin))
@@ -918,6 +921,29 @@ async function operarEnBiwenger(env, orden) {
       ? await apiEscribe(env, 'PUT', '/offers/' + encodeURIComponent(orden.id), cuerpo)
       : await apiEscribe(env, 'POST', '/offers', cuerpo);
     return { hecho: true, accion: accion, amount: importe, estado: respuesta && respuesta.status };
+  }
+
+  if (accion === 'ceder') {
+    /* Una cesión es una oferta como las demás, con dos datos más: a quién se le
+       cede y por cuántas jornadas. Va por el mismo `/offers` que las pujas
+       —mismo cuerpo, otro `type`—, que es como Biwenger tiene montado esto.
+       Si el nombre de algún campo no fuera ese, su respuesta lo dirá: el error
+       llega entero a la web en vez de tragarse. */
+    const importe = Math.round(Number(orden.price));
+    const jornadas = Math.round(Number(orden.rounds));
+    if (!orden.player) return { hecho: false, error: 'Falta el futbolista.' };
+    if (!(jornadas > 0)) return { hecho: false, error: 'Faltan las jornadas.' };
+    if (!(importe > 0)) return { hecho: false, error: 'Falta el importe.' };
+
+    const respuesta = await apiEscribe(env, 'POST', '/offers', {
+      type: 'loan',
+      amount: importe,
+      rounds: jornadas,
+      to: orden.to != null && orden.to !== '' ? Number(orden.to) : null,
+      requestedPlayers: [Number(orden.player)]
+    });
+    return { hecho: true, accion: accion, price: importe, rounds: jornadas,
+      estado: respuesta && respuesta.status };
   }
 
   if (accion === 'retirar') {
@@ -1682,7 +1708,23 @@ async function primasDeLaLiga(env) {
       /* Y con esto, la nota de quien se lleva la Súper Pica se recalcula con
          ella dentro. Es un ajuste de la liga, no del sistema de puntuación,
          por eso el índice de futbolistas nunca la trae. */
-      superPica: s.superPicaExtraPoints === true
+      superPica: s.superPicaExtraPoints === true,
+      /* Las cesiones: si la liga las permite y cuántas jornadas admite como
+         mucho. El nombre del ajuste no está documentado, así que se prueban los
+         que usa Biwenger para cosas parecidas y se coge el primero que venga;
+         así el máximo sale de TU liga y no de un número inventado aquí. */
+      cesiones: s.loansEnabled !== false && s.loans !== false,
+      cesionMax: num(s.loanMaxRounds) || num(s.maxLoanRounds) ||
+                 num(s.loanRounds) || num(s.loanMaxWeeks) || 0,
+      /* Y los ajustes en crudo, para poder mirar en el diagnóstico cómo se
+         llaman de verdad los de cesión en esta liga. */
+      ajustesCesion: (function () {
+        const suyos = {};
+        Object.keys(s).forEach(function (k) {
+          if (/loan|cesion|cesión/i.test(k)) suyos[k] = s[k];
+        });
+        return suyos;
+      })()
     };
 
     /* NINGUNA liga paga cero por todo. Cuando salen asi es que Biwenger ha
@@ -2938,9 +2980,15 @@ function roundPlayer(entry, names, puntos, partidoDe, enCasa, lances, deEstaJorn
      la cuela en todas las jornadas siguientes. Gustavo Puerta arrastraba así
      sus 7 de la jornada 3 a la 4 y a la 6, y le subía 14 puntos a Eneko.
      Los que SIGUEN en LaLiga van como siempre: manda la alineación. */
+  /* La regla estricta SOLO cuando hemos podido leer las fichas. Si esa lectura
+     falla —Biwenger corta, o tarda— el mapa llega vacío, y entonces dejaba sin
+     nota a TODOS los idos de golpe: la jornada 4 y la 6 se iban a cero enteras.
+     Sin fichas no se sabe si jugó o no, y no saberlo no es motivo para borrarle
+     los puntos: se hace lo de siempre. */
+  const hayFichas = deEstaJornada && Object.keys(deEstaJornada).length > 0;
   const suyaDeHoy = (deEstaJornada || {})[id];
   const puntuacion = sinTerminar ? null
-    : (fuera
+    : (fuera && hayFichas
         ? (suyaDeHoy != null ? suyaDeHoy : null)
         : (suya != null ? suya : (marcador[id] != null ? marcador[id] : null)));
 
@@ -2948,7 +2996,7 @@ function roundPlayer(entry, names, puntos, partidoDe, enCasa, lances, deEstaJorn
      recolocar el gol del que está alineado fuera de su puesto: la de Biwenger
      YA viene con ese ajuste hecho, y volver a aplicárselo la dejaría mal. */
   const nuestra = !sinTerminar &&
-    (fuera ? suyaDeHoy != null : (suya == null && marcador[id] != null));
+    (fuera && hayFichas ? suyaDeHoy != null : (suya == null && marcador[id] != null));
 
   const pendiente = sinTerminar;
   /* Si jugaba en casa o fuera esa jornada: rinden distinto y se compara. */
