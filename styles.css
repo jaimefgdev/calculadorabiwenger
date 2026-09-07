@@ -1047,24 +1047,31 @@ code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft)
 }
 
 /* ---------- Pantalla de arranque ----------
-   Tapa la app mientras llega el primer dato. El escudo va deliberadamente
-   pequeno —110 px— porque el de la portada del sistema sale enorme y era justo
-   lo que chirriaba; y la marca debajo, en Google Sans Bold y con los mismos dos
-   colores que lleva en la cabecera de Inicio. */
+   Lo primero que se ve al abrir. Escudo grande y la marca debajo, en Google
+   Sans Bold y con los mismos dos colores que en la cabecera de Inicio.
+   Se ve tres segundos al ABRIR la app (no al recargar, ahí se quita en cuanto
+   está lista) y su fondo es el mismo `background_color` del manifiesto, para
+   que al pasar de la portada del sistema a esta no haya un salto de color. */
 .arranque {
   position: fixed; inset: 0; z-index: 9000;
   display: flex; flex-direction: column; align-items: center; justify-content: center;
-  gap: 1.1rem;
+  gap: min(3.5vw, 2.6vh);
   background: var(--bg);
   /* Que no se quede tapando la app si algo falla y nadie la retira. */
   animation: arranque-rendirse 0s linear 6s forwards;
 }
-.arranque__escudo { width: 110px; height: auto; display: block; }
+/* OJO CON EL TAMAÑO: en el móvil la app fuerza un viewport de 1024, así que un
+   tope EN PÍXELES engaña. 200 px de 1024 son el 20 % de la pantalla, o sea que
+   lo que aquí parecía mediano en el móvil salía pequeño.
+   Con `vw` y `vh` —sin píxeles de por medio— ocupa la misma proporción de
+   pantalla en los dos sitios: el ancho manda en el móvil (alto y estrecho) y el
+   alto manda en el escritorio (ancho y bajo), y cada uno frena al otro. */
+.arranque__escudo { width: min(46vw, 34vh); height: auto; display: block; }
 .arranque__marca {
   margin: 0;
   font-family: 'GoogleSans', system-ui, sans-serif;
   font-weight: bold;
-  font-size: 1.35rem;
+  font-size: min(7vw, 5vh);
   letter-spacing: .01em;
   color: var(--text);
 }
