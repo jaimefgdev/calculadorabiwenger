@@ -4802,8 +4802,33 @@
     const caja = $('op-modal');
     if (!caja) return;
 
+    /* De dónde salió el clic. Si empieza dentro del diálogo y acaba fuera
+       —arrastrando para seleccionar lo escrito en un campo, que es lo normal al
+       cambiar un importe— el navegador lo cuenta como un clic en el fondo, y el
+       diálogo se cerraba con lo escrito a medias. */
+    let empezoEnElFondo = false;
+    caja.addEventListener('mousedown', function (event) {
+      empezoEnElFondo = event.target === caja;
+    });
+    caja.addEventListener('touchstart', function (event) {
+      empezoEnElFondo = event.target === caja;
+    }, { passive: true });
+
     caja.addEventListener('click', function (event) {
-      if (event.target === caja) { cerrarOpModal(); return; }
+      if (event.target === caja) {
+        if (!empezoEnElFondo) return;
+        /* Y si hay algo que rellenar, tocar el fondo NO cierra: solo quita el
+           foco (en el móvil, baja el teclado). Para cerrar están el aspa y la
+           tecla de escape. Se perdía lo escrito por buscar dónde tocar. */
+        if (caja.querySelector('.op-card input, .op-card select, .op-card textarea')) {
+          if (document.activeElement && caja.contains(document.activeElement)) {
+            document.activeElement.blur();
+          }
+          return;
+        }
+        cerrarOpModal();
+        return;
+      }
       if (event.target.closest('[data-op-cerrar]')) { cerrarOpModal(); return; }
 
       /* Vender en bloque: primero se elige el múltiplo y luego se confirma.
