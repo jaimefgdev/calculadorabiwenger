@@ -8947,7 +8947,16 @@
                 ': aún no hay evolución que enseñar.'
               : 'Biwenger no publica la evolución de este futbolista.') + '</p>'
           : '<div class="viz-hover">' +
-              lineChart(puntos, 'price', colorDeEvolucion(ficha.increment), 'Valor de mercado',
+              /* La MISMA regla que los grafiquitos de las tablas: manda el
+                 cambio que publica Biwenger y, si no lo trae, los dos ultimos
+                 dias de la serie. Aqui se miraba solo `ficha.increment`, y al
+                 que no esta en ninguna plantilla ni en el mercado le sale
+                 vacio: su grafico se pintaba blanco aunque debajo pusiera
+                 «1D +160k». */
+              lineChart(puntos, 'price',
+                colorDeEvolucion(cambioDeHoy(ficha.increment,
+                  puntos.map(function (p) { return p.price; }))),
+                'Valor de mercado',
                 { height: 260, ticks: 7, fullTicks: true, padX: 96, hover: true,
                   mark: diaLlegada
                     ? { day: diaLlegada, label: llegada.paid == null ? 'reparto' : 'fichaje',
