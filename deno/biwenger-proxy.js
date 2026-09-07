@@ -132,7 +132,7 @@ const CDN = 'https://cf.biwenger.com/api/v2';
    navegador normal y las cabeceras que este mandaría. */
 /* Marca de versión: se sube en cada cambio y se consulta con ?version=1.
    Sirve para saber desde fuera si el despliegue ha entrado o no. */
-const VERSION = '2026-09-07 · deno 79';
+const VERSION = '2026-09-07 · deno 80';
 
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ' +
   '(KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36';
@@ -4090,7 +4090,14 @@ async function marketBoard(env, headers, myId, names) {
   });
 
   const ventas = ((market && market.sales) || []).filter(Boolean).map(function (item) {
-    const id = item.player && item.player.id != null ? String(item.player.id) : null;
+    /* Biwenger manda unas veces el futbolista entero y otras solo su numero,
+       igual que en las alineaciones. Aqui solo se contemplaba el objeto, asi
+       que con el numero pelado la venta se quedaba SIN identificador: el nombre
+       salia bien (viene aparte) pero al pulsarla no se abria su ficha, porque
+       el enlace se queda vacio y no hay a quien abrir. */
+    const suelto = item.player != null && typeof item.player !== 'object';
+    const id = suelto ? String(item.player)
+      : (item.player && item.player.id != null ? String(item.player.id) : null);
     const vendedor = item.user && item.user.id != null ? String(item.user.id) : null;
     return {
       playerId: id,
