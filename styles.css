@@ -972,7 +972,13 @@ code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft)
    destaca sobre un fondo claro. */
 .fila--mia > td,
 .row-mine > td,
-.fila--mia.ranking__row { background: var(--fila-mia); }
+.fila--mia.ranking__row,
+/* «Los que más se mueven» no son filas de tabla sino rejillas, y necesitan su
+   propia regla. Como no tienen margen lateral, el velo llega hasta el borde:
+   se le da un respiro con `padding` en TODAS las filas —no solo en las mías—
+   para que la columna no se descoloque en unas sí y en otras no. */
+.mover.fila--mia { background: var(--fila-mia); }
+.mover { padding-left: .4rem; padding-right: .4rem; border-radius: 4px; }
 
 /* La fila abierta y el ratón por encima siguen mandando: son estados, y un
    estado tiene que verse por encima de «esta es la tuya», que es permanente.

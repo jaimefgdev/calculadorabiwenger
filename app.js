@@ -442,14 +442,15 @@
         return String(f.id) === String(equipo.id);
       })[0];
       if (!fila) return;
-      /* OJO: empezar la jornada en números rojos le cuesta el ABONO, no los
-         PUNTOS. Aquí se descartaban también los puntos —una suposición mía al
-         ver que Biwenger no le pagaba— y por eso a Eneko le faltaba una jornada
-         entera en la general, tanto en la clasificación de Liga como en la
-         columna General de Jornadas: las dos salen de esta misma suma.
-         El `counts: false` sigue usándose donde toca: el abono de esa jornada es
-         cero, y no puede ganarla. */
-      total += fila.points || 0;
+      /* El mánager que empezó la jornada con saldo negativo no puntúa esa
+         jornada: ni suma ni resta. La jornada cuenta igual (por eso `alguna`),
+         pero él aporta cero.
+
+         Se probó a contarle esos puntos —porque a Eneko le faltaban— y entonces
+         a Maccabi le sobraban. O sea que Biwenger SÍ los descarta y lo de Eneko
+         era otra cosa: la jornada 3, que estaba guardada entera a cero y no se
+         volvía a pedir. Eso ya está arreglado aparte. */
+      if (fila.counts !== false) total += fila.points || 0;
       alguna = true;
     });
 
@@ -5199,8 +5200,9 @@
   function moverRow(player) {
     const sube = player.increment > 0;
     const dueño = ownerOf(player.id);
-    /* Mismo formato que el resto de tablas: foto, nombre y escudo detrás. */
-    return '<div class="mover">' +
+    /* Mismo formato que el resto de tablas: foto, nombre y escudo detrás, y
+       la fila aclarada si el futbolista es mío, como en todas las demás. */
+    return '<div class="mover' + claseMia(dueño) + '">' +
       '<span class="with-crest">' +
         playerName({ playerId: player.id, player: player.name,
           position: player.position, altPositions: player.altPositions }) +
@@ -11664,17 +11666,28 @@
    * lo de debajo esté pintado: si se quita antes, se ve un parpadeo en blanco
    * justo en el sitio donde queriamos que no lo hubiera.
    */
+  /* Lo que se ve la portada como mínimo. La app suele estar lista en menos, y
+     sin esto pasaba tan deprisa que ni se leía la marca. */
+  const ARRANQUE_MINIMO = 3000;
+
   function quitarArranque() {
     const portada = $('arranque');
     if (!portada) return;
-    requestAnimationFrame(function () {
+
+    /* Se cuenta desde que empezó a cargarse la página, no desde aquí: si la
+       carga ya se ha comido dos segundos, la portada solo espera uno más. Lo
+       que se garantiza son tres segundos DE PORTADA, no tres de más. */
+    const desde = (window.performance && performance.now && performance.now()) || 0;
+    const espera = Math.max(0, ARRANQUE_MINIMO - desde);
+
+    setTimeout(function () {
       requestAnimationFrame(function () {
         portada.classList.add('arranque--fuera');
         /* Y fuera del todo al terminar de desvanecerse, para que no se quede
            un elemento a pantalla completa comiéndose los clics. */
         setTimeout(function () { portada.classList.add('arranque--ida'); }, 350);
       });
-    });
+    }, espera);
   }
 
   document.addEventListener('DOMContentLoaded', init);
