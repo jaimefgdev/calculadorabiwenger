@@ -458,15 +458,18 @@
   }
 
   /**
-   * Los puntos que van en la clasificación de Liga.
+   * Los puntos que van en la clasificación de Liga: la suma de las jornadas.
    *
-   * El número de Biwenger manda y ya trae la jornada en curso; sumar las
-   * nuestras encima era lo que descuadraba a Eneko y a Maccabi. Solo se calcula
-   * a mano cuando él no ha dado ninguno.
+   * OJO, que aquí ya me equivoqué una vez. El total que manda Biwenger en su
+   * clasificación NO incluye la jornada en curso: con la 4 a medias, su API daba
+   * 98 para José Mário y su propia pantalla de jornada decía 164. Usándolo dejé
+   * a los ocho cortos una jornada entera.
+   * Sumando cuadra al punto con su pantalla en siete de los ocho. `base` es su
+   * número, y solo entra si no tenemos ninguna jornada descargada.
    */
   function conJornadaEnJuego(equipo, base) {
-    if (base != null) return base;
-    return puntosSumados(equipo, null);
+    const total = puntosSumados(equipo, null);
+    return total != null ? total : base;
   }
 
   function computeBudgets(movements, teams) {
@@ -4955,10 +4958,15 @@
        paso por aquí mientras el índice de futbolistas llegaba vacío, y entonces
        todos los futbolistas se daban por idos de LaLiga y la jornada entera se
        guardó a cero. */
-    const sirve = function (id) {
-      const j = state.jornadas.datos[id];
+    const sirve = function (r) {
+      const j = state.jornadas.datos[r.id];
       if (!j || !(j.standings || []).length) return false;
-      return j.standings.some(function (fila) { return (fila.points || 0) !== 0; });
+      if (j.standings.some(function (fila) { return (fila.points || 0) !== 0; })) return true;
+      /* Guardada y sin puntos. Solo es «basura que hay que rebajar» si esa
+         jornada se ha jugado de verdad; si el calendario no la da por
+         terminada, es que sencillamente no se ha jugado y volver a pedirla no
+         iba a traer nada. Antes se repetía en cada sesión por cada una. */
+      return r.status !== 'finished';
     };
 
     const faltan = calendario.filter(function (r) {
@@ -4969,7 +4977,7 @@
          id ya figuraba, no se volvía a pedir, y como no tenía puntos, no
          contaba para nada. Desaparecía sin más: ni ganada, ni pendiente, ni
          «falta por traer». La jornada 3 llevaba así desde el corte de Biwenger. */
-      return !sirve(r.id);
+      return !sirve(r);
     });
     if (!faltan.length) { jugadasPedidas = true; jugadasFalloAt = 0; return; }
     jugadasPedidas = true;
@@ -5518,6 +5526,16 @@
 
     jornadasGuardadas()
       .filter(function (jornada) { return !jornadaCerrada(jornada); })
+      /* Y que HAYA EMPEZADO. Una jornada sin un solo punto no es que esté
+         abierta: es que no se ha jugado, y volver a pedirla en cada
+         sincronización no puede traer nada nuevo. Con la J5, la J7 y un par de
+         rondas raras del calendario a cero, eran cuatro consultas de más cada
+         vez, contra el mismo servidor que nos corta cuando le llega tralla. */
+      .filter(function (jornada) {
+        return (jornada.standings || []).some(function (fila) {
+          return (fila.points || 0) !== 0;
+        });
+      })
       .forEach(function (jornada) {
         const id = jornada.round.id;
         /* La que se está mirando ya la pide ensureJornada, con su aviso de
@@ -5556,50 +5574,19 @@
    * jornada elegida no dice nada.
    */
   /**
-   * Los puntos generales, ANCLADOS a los de Biwenger.
+   * Los puntos generales hasta la jornada que se está mirando.
    *
-   * Antes se sumaban nuestras jornadas una a una, y eso se despegaba de él. Con
-   * los números de la jornada 4 delante: a Eneko, Biwenger le da 65 y sumando
-   * jornadas salían 56, porque había recalculado alguna anterior y nosotros
-   * seguíamos con la vieja. Y a Maccabi, al revés: su jornada va en rojo (empezó
-   * en negativo, no le cuenta) y sumándola le sobraban 34.
-   *
-   * Su total ya viene en la clasificación de la liga y ya incluye la jornada en
-   * curso —comprobado en los ocho mánagers—, así que se usa tal cual. Nuestras
-   * jornadas solo sirven para RESTAR las posteriores a la que se está mirando,
-   * que es lo único que su número no sabe hacer.
+   * Por el mismo motivo que en `conJornadaEnJuego`: el total de Biwenger se
+   * queda una jornada atrás mientras la actual sigue en juego, así que se suman
+   * las nuestras. El suyo solo entra si no hay ninguna descargada.
    */
   function puntosGenerales(nombre) {
     const equipo = state.teams[nombre];
     if (!equipo) return null;
-
     const vista = jornadaActiva();
     const hasta = vista && vista.round && vista.round.number != null ? vista.round.number : null;
-
-    /* Sin su número —no ha llegado la sincronización— se calcula como antes. */
-    if (equipo.points == null) return puntosSumados(equipo, hasta);
-    if (hasta == null) return equipo.points;
-
-    return equipo.points - puntosDespuesDe(equipo, hasta);
-  }
-
-  /** Lo que ha sumado en las jornadas POSTERIORES a la que se está mirando. */
-  function puntosDespuesDe(equipo, hasta) {
-    let despues = 0;
-    Object.keys(state.jornadas.datos).forEach(function (id) {
-      const jornada = state.jornadas.datos[id];
-      const round = jornada && jornada.round;
-      if (!esJornadaPropia(round)) return;
-      if ((round.number || 0) <= hasta) return;
-      const fila = (jornada.standings || []).filter(function (f) {
-        return String(f.id) === String(equipo.id);
-      })[0];
-      /* El que empezó esa jornada en negativo no sumó nada, así que tampoco hay
-         nada que descontarle por ella. */
-      if (!fila || fila.counts === false) return;
-      despues += fila.points || 0;
-    });
-    return despues;
+    const total = puntosSumados(equipo, hasta);
+    return total != null ? total : (equipo.points != null ? equipo.points : null);
   }
 
   const ROUND_VALUES = {
