@@ -29,7 +29,16 @@ const almacen = await Deno.openKv();
    sincronización pasa de 80 KB. Los valores grandes se guardan
    partidos en trozos y se recomponen al leerlos, así que quien
    llama no se entera de nada. */
-const TROZO = 40 * 1024;
+/* OJO: el tope de Deno KV son 65.536 BYTES, y esto corta por CARACTERES. El
+   indice de futbolistas va lleno de acentos y eñes, que ocupan dos bytes cada
+   uno, asi que un trozo de 40.960 caracteres podia pesar 80 KB y la escritura
+   fallaba con «Value too large». Y fallaba SIEMPRE: la copia de seguridad del
+   indice no se llegó a escribir ni una vez, que es justo la red que evita que un
+   corte de Biwenger deje la web sin nombres ni precios.
+   Con 16 K caracteres, ni en el peor caso (tres bytes por caracter) se llega a
+   los 48 KB. Son unos cuantos trozos más por escritura y da igual: se escribe
+   una vez cada seis horas. */
+const TROZO = 16 * 1024;
 
 const JORNADAS = {
   async get(clave) {
@@ -123,7 +132,7 @@ const CDN = 'https://cf.biwenger.com/api/v2';
    navegador normal y las cabeceras que este mandaría. */
 /* Marca de versión: se sube en cada cambio y se consulta con ?version=1.
    Sirve para saber desde fuera si el despliegue ha entrado o no. */
-const VERSION = '2026-09-02 · deno 73';
+const VERSION = '2026-09-07 · deno 90';
 
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ' +
   '(KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36';
@@ -365,6 +374,24 @@ const app = {
             const cuerpo = JSON.parse(texto);
             prueba.futbolistas = Object.keys((cuerpo.data && cuerpo.data.players) || {}).length;
             prueba.equipos = Object.keys((cuerpo.data && cuerpo.data.teams) || {}).length;
+
+            /* Ya que nos hemos bajado el indice entero, se aprovecha para dejar
+               la copia de seguridad hecha si todavia no existe. La copia solo
+               se escribe al descargar, y el indice se descarga como mucho una
+               vez por hora, asi que podia pasar un buen rato sin red de
+               seguridad justo despues de un despliegue. Solo si NO hay: esto no
+               pisa la copia buena que ya hubiera. */
+            if (JORNADAS && prueba.futbolistas > 0) {
+              const yaHay = await JORNADAS.get('indice-' + sistema).catch(function () { return null; });
+              if (!yaHay) {
+                const guardar = await players(sistema).catch(function () { return null; });
+                if (guardar && Object.keys(guardar).length) {
+                  await JORNADAS.put('indice-' + sistema, JSON.stringify(guardar));
+                  await JORNADAS.put('indice-fecha-' + sistema, String(Date.now()));
+                  prueba.copiaCreada = true;
+                }
+              }
+            }
           } catch (error) {
             prueba.fallo = String((error && error.name) || '') + ': ' + String((error && error.message) || error);
           }
@@ -380,6 +407,9 @@ const app = {
           score: cache.score || null,
           primas: primas,
           primasValen: algoQuePagar(primas),
+          /* Cómo se llaman de verdad los ajustes de cesión en esta liga. */
+          cesion: primas ? { permitidas: primas.cesiones, maximo: primas.cesionMax,
+                             ajustes: primas.ajustesCesion } : null,
           prueba: prueba
         }), {
           headers: Object.assign({ 'content-type': 'application/json; charset=utf-8' }, cors(origin))
@@ -891,6 +921,35 @@ async function operarEnBiwenger(env, orden) {
       ? await apiEscribe(env, 'PUT', '/offers/' + encodeURIComponent(orden.id), cuerpo)
       : await apiEscribe(env, 'POST', '/offers', cuerpo);
     return { hecho: true, accion: accion, amount: importe, estado: respuesta && respuesta.status };
+  }
+
+  if (accion === 'ceder') {
+    /* Una cesión es una oferta como las demás, con dos datos más: a quién se le
+       cede y por cuántas jornadas. Va por el mismo `/offers` que las pujas
+       —mismo cuerpo, otro `type`—, que es como Biwenger tiene montado esto.
+       Si el nombre de algún campo no fuera ese, su respuesta lo dirá: el error
+       llega entero a la web en vez de tragarse. */
+    const importe = Math.round(Number(orden.price));
+    const jornadas = Math.round(Number(orden.rounds));
+    if (!orden.player) return { hecho: false, error: 'Falta el futbolista.' };
+    if (!(jornadas > 0)) return { hecho: false, error: 'Faltan las jornadas.' };
+    if (!(importe > 0)) return { hecho: false, error: 'Falta el importe.' };
+
+    const cuerpo = {
+      type: 'loan',
+      amount: importe,
+      rounds: jornadas,
+      to: orden.to != null && orden.to !== '' ? Number(orden.to) : null,
+      requestedPlayers: [Number(orden.player)]
+    };
+    /* Con `id` se cambia la que ya hay, igual que al editar una puja: mismo
+       cuerpo, por PUT. Sin esto, tocar las jornadas o el importe dejaba DOS
+       cesiones pedidas por el mismo futbolista. */
+    const respuesta = orden.id
+      ? await apiEscribe(env, 'PUT', '/offers/' + encodeURIComponent(orden.id), cuerpo)
+      : await apiEscribe(env, 'POST', '/offers', cuerpo);
+    return { hecho: true, accion: accion, price: importe, rounds: jornadas,
+      estado: respuesta && respuesta.status };
   }
 
   if (accion === 'retirar') {
@@ -1655,7 +1714,23 @@ async function primasDeLaLiga(env) {
       /* Y con esto, la nota de quien se lleva la Súper Pica se recalcula con
          ella dentro. Es un ajuste de la liga, no del sistema de puntuación,
          por eso el índice de futbolistas nunca la trae. */
-      superPica: s.superPicaExtraPoints === true
+      superPica: s.superPicaExtraPoints === true,
+      /* Las cesiones: si la liga las permite y cuántas jornadas admite como
+         mucho. El nombre del ajuste no está documentado, así que se prueban los
+         que usa Biwenger para cosas parecidas y se coge el primero que venga;
+         así el máximo sale de TU liga y no de un número inventado aquí. */
+      cesiones: s.loansEnabled !== false && s.loans !== false,
+      cesionMax: num(s.loanMaxRounds) || num(s.maxLoanRounds) ||
+                 num(s.loanRounds) || num(s.loanMaxWeeks) || 0,
+      /* Y los ajustes en crudo, para poder mirar en el diagnóstico cómo se
+         llaman de verdad los de cesión en esta liga. */
+      ajustesCesion: (function () {
+        const suyos = {};
+        Object.keys(s).forEach(function (k) {
+          if (/loan|cesion|cesión/i.test(k)) suyos[k] = s[k];
+        });
+        return suyos;
+      })()
     };
 
     /* NINGUNA liga paga cero por todo. Cuando salen asi es que Biwenger ha
@@ -1966,6 +2041,10 @@ async function todosLosJugadores(env) {
       /* El parte de la lesión o la sanción, para la ficha. */
       statusInfo: names[id + ':statusInfo'] || null,
       marketValue: names[id + ':price'] != null ? Math.round(names[id + ':price']) : null,
+      /* Lo que ha subido o bajado hoy. Faltaba, y por eso la columna «Hoy» de
+         «Los más caros» salía vacía para todo el que no estuviera fichado por
+         alguien: ese dato solo llegaba con las plantillas y el mercado. */
+      increment: names[id + ':inc'] || 0,
       points: names[id + ':pts'] != null ? names[id + ':pts'] : 0,
       played: names[id + ':jug'] || 0
     });
@@ -2247,6 +2326,26 @@ async function superPicasDeLaTemporada(env, score) {
      —se daban por cerradas al acabar los partidos, y Biwenger publica las Super
      Picas despues—, asi que se empieza de cero. */
   const clave = 'superpicas-v3-' + (score || '');
+
+  /* LO QUE SE DEVUELVE se guarda unos minutos. Esto lo llama la ficha de CADA
+     futbolista, y lo que hay debajo recorre las jornadas sin consolidar con una
+     pausa de 120 ms entre cada una: con tres jornadas abiertas son casi cuatro
+     segundos, POR FICHA, esperando a un dato de adorno. Y el resultado es el
+     mismo para todos: no depende del futbolista que se pida.
+     Dos minutos: dentro de una jornada en vivo las Super Picas apenas se
+     mueven, y en cuanto pasan se vuelve a contar. */
+  if (cache.picasListas && cache.picasListas.clave === clave &&
+      Date.now() - cache.picasListas.at < 2 * 60 * 1000) {
+    return cache.picasListas.cuenta;
+  }
+  /* Y si ya hay una cuenta en marcha, se espera a ESA en vez de lanzar otra:
+     al abrir una ficha se piden estadisticas y partidos casi a la vez, y las
+     dos entraban aqui a la vez a hacer el mismo trabajo. */
+  if (cache.picasEnMarcha && cache.picasEnMarcha.clave === clave) {
+    return await cache.picasEnMarcha.promesa;
+  }
+
+  const promesa = (async function () {
   const calendario = await seasonRounds().catch(function () { return []; });
   const jugadas = calendario.filter(function (r) {
     return (r.part || 1) === 1 && (r.status === 'finished' || r.status === 'active');
@@ -2307,11 +2406,25 @@ async function superPicasDeLaTemporada(env, score) {
     } catch (error) { /* da igual, se recalcula */ }
   }
   return cuenta;
+  })();
+
+  cache.picasEnMarcha = { clave: clave, promesa: promesa };
+  try {
+    const cuenta = await promesa;
+    cache.picasListas = { clave: clave, at: Date.now(), cuenta: cuenta };
+    return cuenta;
+  } finally {
+    /* Se suelta pase lo que pase: si falla y se queda puesta, todas las fichas
+       siguientes se colgarian esperando a una promesa ya rota. */
+    cache.picasEnMarcha = null;
+  }
 }
 
 async function playerStats(id, names, score, env) {
-  const slug = names[String(id) + ':slug'];
-  if (!slug) return null;
+  /* El id SIEMPRE vale como ruta, igual que el slug. Aquí se exigía slug y se
+     devolvía nada sin él: con el índice a medias, la ficha de ese futbolista
+     llegaba vacía y en la comparación salían todos sus números a cero. */
+  const slug = names[String(id) + ':slug'] || String(id);
 
   const sistema = String(score || 1);
 
@@ -2326,9 +2439,17 @@ async function playerStats(id, names, score, env) {
      partido eran ni qué hizo el futbolista en él. */
   const campos = 'fields=*,reports(*,points,rawStats,' +
     'match(*,round(*),home(*),away(*)),events(*))';
-  const response = await fetch(CDN + '/players/la-liga/' + encodeURIComponent(slug) +
-    '?lang=es&' + campos + '&score=' + encodeURIComponent(sistema), { headers: NAVEGADOR });
-  if (!response.ok) return null;
+  /* Y si el slug guardado ya no vale —Biwenger los renombra—, se reintenta por
+     el número antes de rendirse. */
+  const pedir = async function (quien) {
+    const r = await fetch(CDN + '/players/la-liga/' + encodeURIComponent(quien) +
+      '?lang=es&' + campos + '&score=' + encodeURIComponent(sistema),
+      { headers: NAVEGADOR }).catch(function () { return null; });
+    return r && r.ok ? r : null;
+  };
+  const response = (await pedir(slug)) ||
+    (String(slug) !== String(id) ? await pedir(id) : null);
+  if (!response) return null;
 
   const data = (await response.json()).data || {};
   const informes = data.reports || [];
@@ -2608,6 +2729,13 @@ async function notasDeLaJornada(env, ids, names, score, numero, cerrada, partido
      guarda en el KV y no se vuelve a pedir nunca. */
   const pedibles = ids.map(String).filter(function (id) {
     if (!partidoDe) return true;                  // sin saberlo, se piden todas
+    /* Con la jornada CERRADA ya han acabado todos los partidos, así que no hay
+       nada que filtrar. Importa para el que se fue de LaLiga: no tiene equipo
+       en el índice, caía por el `equipo != null` y su ficha no se leía nunca,
+       así que su nota de esa jornada —que la tuvo— no aparecía por ninguna
+       parte. Y aquí no hay riesgo de avalancha: una jornada cerrada se lee una
+       vez y se guarda en el KV para siempre. */
+    if (cerrada) return true;
     const equipo = names[id + ':team'];
     return equipo != null && partidoDe[equipo] === 'finished';
   });
@@ -2816,7 +2944,7 @@ function hayIndice(names) {
   return true;
 }
 
-function roundPlayer(entry, names, puntos, partidoDe, enCasa, lances) {
+function roundPlayer(entry, names, puntos, partidoDe, enCasa, lances, conNota) {
   /* Biwenger manda unas veces el futbolista entero y otras solo su número. */
   const suelto = entry != null && typeof entry !== 'object';
   const player = suelto ? { id: entry } : ((entry && entry.player) || entry);
@@ -2850,19 +2978,41 @@ function roundPlayer(entry, names, puntos, partidoDe, enCasa, lances) {
      pitido final, ni con el partido ya mediado. Se ignora sin más. */
   const sinTerminar = !hayIndice(names) || (!fuera && estadoPartido !== 'finished');
 
-  /* Cuando solo llega el número, los puntos salen del índice de futbolistas:
-     así van subiendo según acaba cada partido. Al que ya no está se le fuerza
-     el vacío: si no, se le colaría por el índice la nota de la última jornada
-     que llegó a jugar. */
-  const suya = !suelto && entry && entry.points != null ? entry.points
-    : (player.points != null ? player.points : null);
-  const puntuacion = (sinTerminar || fuera) ? null
-    : (suya != null ? suya : (marcador[id] != null ? marcador[id] : null));
+  /* La nota que trae la alineación, que es de ESTA jornada. */
+  const deLaAlineacion = !suelto && entry && entry.points != null ? entry.points : null;
+  /* Y si no viene, la del índice de futbolistas, que va subiendo según acaba
+     cada partido. Esa NO vale para el que ya se fue de LaLiga: en el índice ese
+     campo es su total, y se le colaría entero como si fuera de la jornada. */
+  const suya = deLaAlineacion != null ? deLaAlineacion
+    : (!fuera && player.points != null ? player.points : null);
+  /* Manda la nota que trae la alineación de Biwenger, y la de la ficha del
+     futbolista queda de respaldo.
+
+     Y al que se fue de LaLiga se le deja SIN nota. Se probó a dársela —para
+     recuperar unos puntos de Eneko en la 1 y la 3— de dos maneras, y las dos
+     salieron peor: aceptando la del índice, se le colaba su última nota
+     conocida en TODAS las jornadas siguientes; y exigiendo la de su ficha, en
+     cuanto esa lectura fallaba se caían jornadas enteras a cero.
+     Un puntito de menos en dos jornadas viejas es mucho menos malo que eso. */
+  /* Al que se fue sí se le da nota, pero SOLO si es de esta jornada y la ha
+     publicado Biwenger: la que trae su línea de la alineación de esta ronda,
+     o la que pone su propia ficha en el informe de esta jornada (`conNota`).
+     Nunca la del índice, que es su último total conocido y es justo la que se
+     le colaba en todas las jornadas siguientes. Y si no hay ninguna de las
+     dos, se queda sin nota como hasta ahora: así una lectura fallida no tumba
+     la jornada entera, que fue el otro intento que salió mal. */
+  const suyaDeFuera = deLaAlineacion != null ? deLaAlineacion
+    : ((conNota && conNota[id] && marcador[id] != null) ? marcador[id] : null);
+
+  const puntuacion = sinTerminar ? null
+    : (fuera ? suyaDeFuera
+      : (suya != null ? suya : (marcador[id] != null ? marcador[id] : null)));
 
   /* ¿La nota la ha puesto Biwenger o la hemos calculado nosotros? Importa para
      recolocar el gol del que está alineado fuera de su puesto: la de Biwenger
      YA viene con ese ajuste hecho, y volver a aplicárselo la dejaría mal. */
-  const nuestra = !(sinTerminar || fuera) && suya == null && marcador[id] != null;
+  const nuestra = !sinTerminar && suya == null && marcador[id] != null &&
+    (!fuera || suyaDeFuera != null);
 
   const pendiente = sinTerminar;
   /* Si jugaba en casa o fuera esa jornada: rinden distinto y se compara. */
@@ -3440,6 +3590,9 @@ async function roundBoard(env, headers, jornada, listaNombres) {
   if (buenas && buenas.notas) {
     Object.keys(buenas.notas).forEach(function (id) { base[id] = buenas.notas[id]; });
   }
+  /* Quiénes tienen una nota leída de su ficha PARA ESTA JORNADA. Solo esos y
+     los que la traen en la alineación puntúan si ya se fueron de LaLiga. */
+  const conNota = (buenas && buenas.notas) || {};
 
   /* En qué puesto jugó cada uno de verdad. De la ficha si la hemos leído; si
      no, su demarcación de siempre, que es la que acierta casi siempre. */
@@ -3470,13 +3623,13 @@ async function roundBoard(env, headers, jornada, listaNombres) {
        goles: hasta que no está puesto no se sabe de qué juega cada uno aquí. */
     const once = recolocarGoles(colocarEnSistema(
       ((lineup && lineup.players) || []).map(function (entry) { return roundPlayer(entry, names, marcador, partidoDe, enCasa,
-        (detalle && detalle.lances) || []); }).filter(Boolean),
+        (detalle && detalle.lances) || [], conNota); }).filter(Boolean),
       lineup && lineup.type), golesDe, posReales);
     /* Biwenger llama «discarded» a los que se quedaron fuera: el banquillo. */
     const banquillo = ((lineup && (lineup.discarded || lineup.bench)) || [])
       .map(function (entry) {
         return roundPlayer(entry, names, marcador, partidoDe, enCasa,
-          (detalle && detalle.lances) || []);
+          (detalle && detalle.lances) || [], conNota);
       }).filter(Boolean);
 
     /* Biwenger deja la clasificación de la jornada a cero hasta que la cierra,
@@ -3996,6 +4149,15 @@ function normalizeOffers(offers, names, myId) {
         playerId: id != null ? String(id) : null,
         player: (id != null && names[String(id)]) || ('Jugador ' + id),
         amount: Math.round(offer.amount || 0),
+        /* De qué va la oferta: una puja normal o una cesión. Sin esto no había
+           forma de saber si lo que tienes pedido por un futbolista es una cosa
+           u otra, y una cesión pedida se veía igual que una puja. */
+        tipo: offer.type || null,
+        /* Y por cuántas jornadas, si es cesión. Biwenger no lo llama igual en
+           todas partes, así que se cogen los nombres que usa. */
+        rounds: offer.rounds != null ? offer.rounds
+          : (offer.loanRounds != null ? offer.loanRounds
+            : (offer.weeks != null ? offer.weeks : null)),
         direction: outgoing ? 'out' : 'in',
         other: other,
         until: offer.until ? new Date(offer.until * 1000).toISOString() : null,
@@ -4042,7 +4204,14 @@ async function marketBoard(env, headers, myId, names) {
   });
 
   const ventas = ((market && market.sales) || []).filter(Boolean).map(function (item) {
-    const id = item.player && item.player.id != null ? String(item.player.id) : null;
+    /* Biwenger manda unas veces el futbolista entero y otras solo su numero,
+       igual que en las alineaciones. Aqui solo se contemplaba el objeto, asi
+       que con el numero pelado la venta se quedaba SIN identificador: el nombre
+       salia bien (viene aparte) pero al pulsarla no se abria su ficha, porque
+       el enlace se queda vacio y no hay a quien abrir. */
+    const suelto = item.player != null && typeof item.player !== 'object';
+    const id = suelto ? String(item.player)
+      : (item.player && item.player.id != null ? String(item.player.id) : null);
     const vendedor = item.user && item.user.id != null ? String(item.user.id) : null;
     return {
       playerId: id,
@@ -4080,15 +4249,28 @@ async function marketBoard(env, headers, myId, names) {
 const ymd = (day) => Number(day.slice(2, 4) + day.slice(5, 7) + day.slice(8, 10));
 const isoDay = (time) => new Date(time).toISOString().slice(0, 10);
 
-async function playerPrices(slug) {
-  if (cache.prices[slug]) return cache.prices[slug];
-  const response = await fetch(CDN + '/players/la-liga/' + slug + '?fields=*,prices', {
-    headers: NAVEGADOR
-  });
-  if (!response.ok) return null;
-  const body = await response.json();
-  const prices = (body.data && body.data.prices) || [];
-  cache.prices[slug] = prices;
+async function playerPrices(slug, id) {
+  if (cache.prices[slug] && cache.prices[slug].length) return cache.prices[slug];
+
+  /* Se prueba por slug y, si no sale, por el número. El id SIEMPRE vale como
+     ruta —igual que en la ficha del futbolista— y hay slugs que no: el que
+     tenemos guardado puede estar viejo, o Biwenger haberlo renombrado. Sin este
+     respaldo esos futbolistas se quedaban sin evolución para siempre. */
+  const pedir = async function (quien) {
+    if (!quien) return null;
+    const r = await fetch(CDN + '/players/la-liga/' + encodeURIComponent(quien) +
+      '?fields=*,prices', { headers: NAVEGADOR }).catch(function () { return null; });
+    if (!r || !r.ok) return null;
+    const cuerpo = await r.json().catch(function () { return {}; });
+    const lista = (cuerpo.data && cuerpo.data.prices) || [];
+    return lista.length ? lista : null;
+  };
+
+  const prices = (await pedir(slug)) ||
+    (id && String(id) !== String(slug) ? await pedir(id) : null);
+  /* Solo se guarda lo que trae datos: una lista vacía guardada deja a ese
+     futbolista sin gráfico hasta que se reinicie el servidor. */
+  if (prices && prices.length) cache.prices[slug] = prices;
   return prices;
 }
 
@@ -4199,7 +4381,7 @@ async function pricesOnDay(ids, dia, names) {
     if (!clave) return;
     const slug = names[clave + ':slug'] || clave;
     try {
-      const prices = await playerPrices(slug);
+      const prices = await playerPrices(slug, clave);
       const valor = prices ? priceOn(prices, stamp) : null;
       if (valor != null) salida[clave] = Math.round(valor);
     } catch (error) { /* ese jugador se queda sin dato */ }
@@ -4228,7 +4410,7 @@ async function priceSeries(ids, dias, names) {
     if (!clave) return;
     const slug = names[clave + ':slug'] || clave;
     try {
-      const prices = await playerPrices(slug);
+      const prices = await playerPrices(slug, clave);
       if (!prices || !prices.length) return;
       /* `Infinity` deja la serie entera; `slice(-Infinity)` no vale. */
       const trozo = dias === Infinity ? prices : prices.slice(-dias);
@@ -4412,7 +4594,7 @@ async function teamValueHistory(env, headers, userId, names) {
   const list = Object.keys(ids);
   for (let i = 0; i < list.length; i++) {
     const slug = names[list[i] + ':slug'];
-    prices[list[i]] = slug ? await playerPrices(slug) : null;
+    prices[list[i]] = await playerPrices(slug || list[i], list[i]);
   }
 
   return {
