@@ -10685,6 +10685,32 @@
           }
         }
 
+        /* Los puntos de cada mánager, lado a lado: lo que manda Biwenger y lo
+           que acaba pintando la app. Si no cuadran, se ve en qué lado está el
+           problema sin tener que adivinarlo desde fuera. */
+        lineas.push('');
+        lineas.push('PUNTOS  (los manda Biwenger / los pinta la app)');
+        MANAGERS.forEach(function (nombre) {
+          const equipo = state.teams[nombre];
+          const suyos = equipo && equipo.points != null ? equipo.points : null;
+          const nuestros = puntosGenerales(nombre);
+          const corto = nombre.length > 22 ? nombre.slice(0, 21) + '\u2026' : nombre;
+          lineas.push('  ' + corto + ' '.repeat(Math.max(1, 24 - corto.length)) +
+            String(suyos == null ? '?' : suyos).padStart(4) + ' / ' +
+            String(nuestros == null ? '?' : nuestros).padStart(4) +
+            (suyos != null && nuestros != null && suyos !== nuestros ? '   \u2190 NO CUADRA' : ''));
+        });
+        /* Y qué jornadas tenemos, que es de dónde sale la resta. */
+        const jornadas = Object.keys(state.jornadas.datos)
+          .map(function (id) { return state.jornadas.datos[id]; })
+          .filter(function (j) { return j && j.round; })
+          .map(function (j) { return 'J' + (j.round.number == null ? '?' : j.round.number) +
+            (j.round.part && j.round.part !== 1 ? 'b' : ''); });
+        lineas.push('  jornadas cargadas: ' + (jornadas.length ? jornadas.sort().join(' ') : 'ninguna'));
+        const vista = jornadaActiva();
+        lineas.push('  mirando ahora: ' +
+          (vista && vista.round ? 'J' + vista.round.number : 'ninguna'));
+
         lineas.push('');
         lineas.push('ABONO DE LAS JORNADAS');
         lineas.push('  primas de la liga .... ' + (d.primasValen ? 'BIEN' : 'MAL (todo a cero o sin traer)'));
