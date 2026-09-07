@@ -2883,7 +2883,13 @@ main.wrap { padding-top: 1.15rem; padding-bottom: 3.5rem; }
 .table td.col-pujar, .table th.col-pujar { text-align: center; }
 .table td.col-pujar > * { vertical-align: middle; }
 .table td.col-pujar .btn + .btn { margin-left: .25rem; }
-.ambito--pujar { padding: .18rem .7rem; font-size: .72rem; }
+/* Pujar es la acción de la fila: el reborde en rojo la señala entre tanta
+   píldora gris. Las letras se quedan como estaban. */
+.ambito--pujar {
+  padding: .18rem .7rem; font-size: .72rem;
+  border-color: var(--neg);
+}
+.ambito--pujar:hover { border-color: var(--neg); }
 
 .op-modal {
   position: fixed; inset: 0; z-index: 80;

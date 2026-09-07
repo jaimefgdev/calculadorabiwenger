@@ -4903,18 +4903,12 @@
     }, { passive: true });
 
     caja.addEventListener('click', function (event) {
+      /* Tocar FUERA del cuadro cierra, tenga campos o no. Lo único que no
+         cuenta es el clic que empezó dentro: al arrastrar para seleccionar lo
+         escrito en un campo se suelta fuera, y el navegador lo da por un clic
+         en el fondo. Eso cerraba el diálogo con el importe a medias. */
       if (event.target === caja) {
-        if (!empezoEnElFondo) return;
-        /* Y si hay algo que rellenar, tocar el fondo NO cierra: solo quita el
-           foco (en el móvil, baja el teclado). Para cerrar están el aspa y la
-           tecla de escape. Se perdía lo escrito por buscar dónde tocar. */
-        if (caja.querySelector('.op-card input, .op-card select, .op-card textarea')) {
-          if (document.activeElement && caja.contains(document.activeElement)) {
-            document.activeElement.blur();
-          }
-          return;
-        }
-        cerrarOpModal();
+        if (empezoEnElFondo) cerrarOpModal();
         return;
       }
       if (event.target.closest('[data-op-cerrar]')) { cerrarOpModal(); return; }
