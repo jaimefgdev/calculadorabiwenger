@@ -1276,6 +1276,7 @@ code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft)
   position: relative; z-index: 2; flex: none;
   /* En fila: comparando van dos retratos, uno por futbolista. */
   display: flex; gap: 2.6rem;
+  justify-content: center;
   /* `line-height: 0` es lo que quita el hueco de linea que todo `inline-block`
      arrastra debajo: con el, la caja del retrato era mas alta que la foto y las
      chapas, ancladas abajo, caian fuera del circulo y pisaban el nombre. */
@@ -1283,6 +1284,15 @@ code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft)
   /* La tarjeta arranca a media foto: se le come la mitad de abajo. */
   margin-bottom: -85px;
 }
+/* Comparando, cada cara va centrada sobre SU columna de números. La tabla de
+   abajo es una rejilla de tres (dato · rótulo · dato), así que las dos mitades
+   caen al 25 % y al 75 % del ancho; con un hueco fijo entre las caras se
+   quedaban las dos apelotonadas en medio y ninguna encima de sus cifras. */
+.ficha__retrato--dos {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 0;
+  justify-items: center; width: 100%;
+}
+
 /* Cada retrato es su propia caja: las chapas y el escudo van `absolute` y
    necesitan un ancla POR FUTBOLISTA. Con las dos caras colgando del mismo
    ancla, las chapas de los dos se apilaban sobre la primera. */
@@ -1294,8 +1304,14 @@ code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft)
    la misma especificidad, ganaba su `display: flex`; los dos nombres se
    quedaban centrados en medio en vez de uno bajo cada cara. */
 .ficha__nombre.ficha__nombre--dos {
-  display: grid; grid-template-columns: 170px 170px;
-  gap: 2.6rem; justify-content: center; align-items: start;
+  /* Las mismas dos mitades que los retratos y que la tabla: así el nombre cae
+     justo bajo su cara y las dos cosas, sobre sus números. */
+  display: grid; grid-template-columns: 1fr 1fr; gap: 0;
+  justify-items: center; align-items: start;
+  /* Ancho de la TARJETA, no del hueco de la cabecera: los retratos cuelgan
+     fuera de la tarjeta y se reparten su ancho entero, así que sin descontar
+     este acolchado el nombre quedaba unos píxeles hacia dentro de su cara. */
+  width: calc(100% + 1.6rem); margin-inline: -.8rem;   /* el acolchado de .picker__card */
 }
 .ficha__quien {
   display: flex; flex-direction: column; align-items: center; gap: .1rem;
@@ -1650,6 +1666,10 @@ html.con-ficha { scrollbar-gutter: stable; }
 .table tbody tr:last-child td { border-bottom: 0; }
 .table .num { text-align: right; font-variant-numeric: tabular-nums; }
 .col-rank { width: 2.5rem; color: var(--text-faint); }
+/* En la tabla de la jornada, el puesto se lee de un vistazo: el primero en
+   ámbar y los tres últimos en rojo. Solo el número, sin tocar la fila. */
+.col-rank--primero { color: var(--marca, #ffc233); font-weight: 700; }
+.col-rank--cola { color: var(--neg); font-weight: 700; }
 
 /* ---------- Cabeceras ordenables ---------- */
 .table th.sortable {

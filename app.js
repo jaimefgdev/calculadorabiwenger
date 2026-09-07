@@ -7277,6 +7277,17 @@
       return;
     }
 
+    /* El puesto de la jornada, con color: el primero en ámbar y los tres
+       últimos en rojo. Solo el número; la fila se queda como está. */
+    const puesto = function (indice) {
+      const total = filas.length;
+      if (indice === 0) return ' col-rank--primero';
+      /* Con menos de cinco no hay «tres últimos» que valgan: serían casi todos.
+         Y el primero manda siempre, aunque la tabla sea corta. */
+      if (total >= 5 && indice >= total - 3) return ' col-rank--cola';
+      return '';
+    };
+
     cuerpo.innerHTML = filas.map(function (fila, indice) {
       const abierta = state.jornadaAbierta === fila.id;
       const detalle = !abierta ? '' :
@@ -7284,7 +7295,7 @@
           jornadaDetalle(fila) + '</div></td></tr>';
 
       return '<tr class="' + (abierta ? 'row-open' : '') + claseMia(fila.name) + '">' +
-        '<td class="col-rank">' + (indice + 1) + '</td>' +
+        '<td class="col-rank' + puesto(indice) + '">' + (indice + 1) + '</td>' +
         '<td>' +
           '<button type="button" class="row-toggle" data-jornada-manager="' + escapeHtml(fila.id) + '"' +
             ' aria-expanded="' + (abierta ? 'true' : 'false') + '">' +
@@ -9363,7 +9374,10 @@
 
     /* Corto y al grano: qué día llegó, por cuánto y cuánto valía entonces.
        El valor de mercado de ese día va en amarillo, como la marca. */
-    const textoLlegada = !llegada ? null
+    /* Sin fecha no hay rótulo: `shortDay(null)` reventaba, y como esto corre
+       al pintar la ficha, un fichaje sin día dejaba la tarjeta entera sin
+       abrirse. Hay movimientos así (un reparto viejo, un traspaso a medias). */
+    const textoLlegada = !llegada || !diaLlegada ? null
       : (llegada.paid == null
           ? 'en reparto ' + escapeHtml(shortDay(diaLlegada))
           : 'fichado ' + escapeHtml(shortDay(diaLlegada)) + ' por ' + money(llegada.paid)) +
