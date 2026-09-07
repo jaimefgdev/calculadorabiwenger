@@ -1824,6 +1824,24 @@
       (checked ? 'true' : 'false') + '" title="Simular que se cierra"><span></span></button>';
   }
 
+  /**
+   * ¿Esto es una cesión?
+   *
+   * Biwenger manda el tipo en la propia operación. Una cesión no es una compra
+   * ni una venta —el futbolista vuelve solo al acabar el plazo—, así que se
+   * dice tal cual en vez de llamarla puja u oferta.
+   */
+  function esCesion(operacion) {
+    return !!operacion && operacion.tipo === 'loan';
+  }
+
+  /** Por cuántas jornadas, escrito. Vacío si no se sabe. */
+  function jornadasDeCesion(operacion) {
+    const cuantas = operacion && operacion.rounds;
+    if (!(cuantas > 0)) return '';
+    return cuantas + (cuantas === 1 ? ' jornada' : ' jornadas');
+  }
+
   /** Pujas enviadas y ofertas recibidas que siguen sin resolverse. */
   function renderOffers() {
     const section = $('offers-panel');
@@ -1841,9 +1859,15 @@
       return '<tr class="' + (on ? 'row-sim' : '') + '">' +
         '<td data-label="Futbolista"><span class="with-crest">' + playerName(offer) +
           crestOf(offer, 'crest--badge') + '</span></td>' +
+        /* La flecha y el color no cambian —sale dinero en rojo, entra en
+           verde—; lo que cambia es cómo se llama, porque una cesión no es una
+           puja ni una oferta. Y al lado, por cuántas jornadas. */
         '<td data-label="Operación"><span class="tag ' + (out ? 'tag--buy' : 'tag--sell') + '">' +
-          (out ? '↗ Puja' : '↘ Oferta') + '</span> ' +
-          '<span class="sub">' + escapeHtml(offer.other || 'Mercado') + '</span></td>' +
+          (out ? '↗ ' : '↘ ') +
+          (esCesion(offer) ? 'Cesión' : (out ? 'Puja' : 'Oferta')) + '</span> ' +
+          '<span class="sub">' + escapeHtml(offer.other || 'Mercado') +
+            (esCesion(offer) && jornadasDeCesion(offer)
+              ? ' · ' + jornadasDeCesion(offer) : '') + '</span></td>' +
         '<td class="num" data-label="Importe"><strong class="' + (out ? 'money-neg' : 'money-pos') + '">' +
           (out ? '−' : '+') + money(offer.amount) + '</strong></td>' +
         '<td data-label="Queda">' + deadlineCell(offer.until) + '</td>' +
@@ -1852,13 +1876,22 @@
     }).join('');
 
     const outgoing = list.filter(function (offer) { return offer.direction === 'out'; });
-    const incoming = list.length - outgoing.length;
+    const entrantes = list.filter(function (offer) { return offer.direction !== 'out'; });
 
-    const parts = [];
-    if (outgoing.length) {
-      parts.push(outgoing.length + (outgoing.length === 1 ? ' puja enviada' : ' pujas enviadas'));
-    }
-    if (incoming) parts.push(incoming + (incoming === 1 ? ' oferta recibida' : ' ofertas recibidas'));
+    /* Y las cesiones se cuentan aparte: mezclarlas con las pujas diría que
+       tienes tres pujas puestas cuando una es un préstamo. */
+    const cuenta = function (lista, singular, plural) {
+      return lista.length
+        ? lista.length + (lista.length === 1 ? singular : plural) : null;
+    };
+    const parts = [
+      cuenta(outgoing.filter(function (o) { return !esCesion(o); }),
+        ' puja enviada', ' pujas enviadas'),
+      cuenta(outgoing.filter(esCesion), ' cesión pedida', ' cesiones pedidas'),
+      cuenta(entrantes.filter(function (o) { return !esCesion(o); }),
+        ' oferta recibida', ' ofertas recibidas'),
+      cuenta(entrantes.filter(esCesion), ' cesión recibida', ' cesiones recibidas')
+    ].filter(Boolean);
     $('offers-count').textContent = parts.join(' · ');
 
     renderSimulation();
@@ -4452,6 +4485,12 @@
       return '<div class="op-oferta">' +
         '<div class="op-oferta__quien">' +
           '<span class="with-crest">' + playerName(oferta) + crestOf(oferta, 'crest--badge') + '</span>' +
+          /* Aceptar una cesión no es aceptar una venta: te lo quedas tú unas
+             jornadas y vuelve. Se dice antes de que nadie pulse nada. */
+          (esCesion(oferta)
+            ? '<span class="sub"><span class="tag tag--sell">↘ Cesión</span>' +
+              (jornadasDeCesion(oferta) ? ' ' + jornadasDeCesion(oferta) : '') + '</span>'
+            : '') +
           '<span class="sub">de ' + escapeHtml(oferta.other || 'Mercado') + '</span>' +
           /* Cuánto le queda a la oferta antes de caducar. Si ya venció, se
              dice tal cual en vez de «caduca en vencida». */
@@ -4532,10 +4571,16 @@
       ? (suya ? suya.price : oferta.amount)
       : oferta.amount;
 
-    const texto = guion.texto
+    /* Y si es una cesión se llama por su nombre: «aceptar la oferta» suena a
+       vender a alguien que en realidad vuelve dentro de tres jornadas. */
+    const plazo = jornadasDeCesion(oferta);
+    const texto = (esCesion(oferta)
+        ? guion.texto.replace('la oferta', 'la cesión').replace('tu puja', 'tu cesión')
+        : guion.texto)
       .replace('%quien%', oferta.other || 'Mercado')
       .replace('%jugador%', oferta.player || 'ese futbolista')
-      .replace('%importe%', money(importe || 0));
+      .replace('%importe%', money(importe || 0) + (esCesion(oferta) && plazo
+        ? ' por ' + plazo : ''));
 
     abrirOpModal(
       '<div class="op-card__cab">' +
