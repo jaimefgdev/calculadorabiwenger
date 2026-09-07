@@ -7505,6 +7505,14 @@
   }
 
   /** Pide la evolución de precio de una lista de futbolistas, por tandas. */
+  /* Quien está esperando a que lleguen unas series que YA se habían pedido.
+     Sin esto, el segundo que las pide se quedaba sin aviso: la ficha se abría
+     mientras la tabla del mercado aún las estaba trayendo, veía que ya estaban
+     pedidas, se iba, y cuando llegaban solo se enteraba la tabla. La ficha se
+     quedaba con la evolución vacía para siempre diciendo que Biwenger no la
+     publica, cuando la línea se estaba pintando ahí al lado. */
+  let esperandoSeries = [];
+
   function ensurePriceSeries(ids, alTerminar) {
     const config = loadSyncConfig();
     if (!config.url || !config.key) return;
@@ -7512,7 +7520,16 @@
     const faltan = (ids || []).filter(function (id) {
       return id && state.priceSeries[id] === undefined;
     });
-    if (faltan.length === 0) return;
+
+    if (faltan.length === 0) {
+      /* `null` quiere decir «pedida y en camino». Si alguna de las que se
+         preguntan está así, hay que avisar a quien pregunta cuando llegue. */
+      const enCamino = (ids || []).some(function (id) {
+        return id && state.priceSeries[id] === null;
+      });
+      if (enCamino && alTerminar) esperandoSeries.push(alTerminar);
+      return;
+    }
     faltan.forEach(function (id) { state.priceSeries[id] = null; });
 
     /* El Worker atiende 30 por consulta: el mercado entero va en dos o tres. */
@@ -7527,8 +7544,18 @@
           if (!payload || payload.error) return;
           Object.keys(payload).forEach(function (id) { state.priceSeries[id] = payload[id]; });
           if (alTerminar) alTerminar();
+          /* Y a los que se quedaron esperando estas mismas series. */
+          const avisar = esperandoSeries;
+          esperandoSeries = [];
+          avisar.forEach(function (fn) { try { fn(); } catch (e) { /* que no corte a los demás */ } });
         })
-        .catch(function () { /* sin evolución */ });
+        .catch(function () {
+          /* Si no llegan, se despierta igual a los que esperaban: mejor que se
+             queden mirando un «cargando» eterno. */
+          const avisar = esperandoSeries;
+          esperandoSeries = [];
+          avisar.forEach(function (fn) { try { fn(); } catch (e) { /* nada */ } });
+        });
     }
   }
 
@@ -8907,7 +8934,10 @@
               /* Recién llegado al mercado: un solo día no dibuja una línea. */
               ? 'Apareció en el mercado el ' + escapeHtml(diaLargo(puntos[0].day)) +
                 ': aún no hay evolución que enseñar.'
-              : 'Biwenger no publica la evolución de este futbolista.') + '</p>'
+              /* `null` es «pedida y en camino»; que no diga que no existe. */
+              : (serie === null
+                  ? 'Cargando la evolución…'
+                  : 'Biwenger no publica la evolución de este futbolista.')) + '</p>'
           : '<div class="viz-hover">' +
               lineChart(puntos, 'price', colorDeEvolucion(ficha.increment), 'Valor de mercado',
                 { height: 260, ticks: 7, fullTicks: true, padX: 96, hover: true,
