@@ -692,6 +692,10 @@
     syncPorCambioAt: 0,      // cuándo se sincronizó por un cambio en el campo
     recuentoLiga: null,     // el mismo recuento, pero solo de lo hecho alineado
     rankingsAmbito: 'laliga',
+    /* «Los más caros»: de toda LaLiga o solo los fichados aquí, y si está
+       desplegado hasta cincuenta. */
+    carosAmbito: 'laliga',
+    carosAbierto: false,
     puntosAmbito: 'laliga',  // el mismo cambio, en la tabla de Puntos
     pujasDe: {},             // cuántas pujas lleva cada futbolista, ya preguntadas
     rankingsAbiertos: {},   // que rankings se han desplegado, uno por campo
@@ -10055,70 +10059,114 @@
     ajustarNombres();
   }
 
-  /** Cuántos salen en «Los más caros de la liga». */
-  const CUANTOS_CAROS = 20;
+  /* De veinte en veinte no: veinte de entrada y cincuenta al desplegar, igual
+     que «los que más se mueven» pero con sus propios topes. */
+  const CAROS_CORTO = 20;
+  const CAROS_LARGO = 50;
 
   /**
-   * Los futbolistas más caros que hay fichados en la liga, con su dueño.
+   * Los futbolistas de más valor.
    *
-   * Sale de las ocho plantillas, no del mercado ni del índice de LaLiga: lo que
-   * interesa es quién TIENE el patrimonio, no cuánto vale el futbolista más
-   * caro que anda libre. Un mismo id no puede estar en dos plantillas, así que
-   * no hay que preocuparse por repetidos.
+   * La píldora cambia entre TODA LALIGA —los 578 del índice, tenga dueño o no— y
+   * MI LIGA —solo los que alguien tiene fichado—. Es la misma pareja que en
+   * Rankings y en Puntos, y aquí dice cosas distintas: en LaLiga, quién vale
+   * más; en mi liga, quién tiene el patrimonio.
    */
   function renderCaros() {
     const cuerpo = $('caros-body');
     if (!cuerpo) return;
 
-    const plantillas = squadList();
-    if (!plantillas.length) {
-      cuerpo.innerHTML = '<tr><td colspan="5" class="empty">' +
-        (state.squads && state.squads.status === 'loading'
-          ? 'Cargando plantillas…' : 'Sincroniza para ver las plantillas.') + '</td></tr>';
-      return;
+    const deLaLiga = state.carosAmbito === 'liga';
+    const boton = $('caros-ambito');
+    if (boton) {
+      boton.textContent = deLaLiga ? 'Mi liga' : 'LaLiga';
+      boton.setAttribute('aria-pressed', deLaLiga ? 'true' : 'false');
+      boton.classList.toggle('ambito--on', deLaLiga);
     }
 
-    const todos = [];
-    plantillas.forEach(function (plantilla) {
-      (plantilla.players || []).forEach(function (jugador) {
-        /* Sin valor no se puede ordenar, y meterlo como cero lo mandaría al
-           fondo haciéndose pasar por un dato. */
-        if (jugador.marketValue == null) return;
-        todos.push({
-          id: jugador.id,
-          name: comoSeLlama(jugador),
-          position: jugador.position,
-          team: jugador.team,
-          teamName: jugador.teamName,
-          status: jugador.status,
-          valor: jugador.marketValue,
-          hoy: jugador.increment || 0,
-          dueno: plantilla.name
+    /* De quién es cada uno: hace falta en los dos ámbitos, para la columna
+       Propietario y para aclarar los míos. */
+    const dueno = duenosDeFutbolistas();
+
+    let todos = [];
+    if (deLaLiga) {
+      squadList().forEach(function (plantilla) {
+        (plantilla.players || []).forEach(function (jugador) {
+          /* Sin valor no se puede ordenar, y meterlo como cero lo mandaría al
+             fondo haciéndose pasar por un dato. */
+          if (jugador.marketValue == null) return;
+          todos.push({
+            id: jugador.id, name: comoSeLlama(jugador), position: jugador.position,
+            team: jugador.team, teamName: jugador.teamName, status: jugador.status,
+            valor: jugador.marketValue, hoy: jugador.increment || 0,
+            dueno: plantilla.name
+          });
         });
       });
-    });
+    } else {
+      (state.jugadores || []).forEach(function (jugador) {
+        if (!jugador || jugador.marketValue == null) return;
+        todos.push({
+          id: jugador.id, name: comoSeLlama(jugador), position: jugador.position,
+          team: jugador.team, teamName: jugador.teamName, status: jugador.status,
+          valor: jugador.marketValue, hoy: jugador.increment || 0,
+          dueno: dueno[String(jugador.id)] || null
+        });
+      });
+    }
 
     if (!todos.length) {
-      cuerpo.innerHTML = '<tr><td colspan="5" class="empty">Todavía no hay valores de mercado.</td></tr>';
+      cuerpo.innerHTML = '<tr><td colspan="5" class="empty">' +
+        (deLaLiga
+          ? (state.squads && state.squads.status === 'loading'
+              ? 'Cargando plantillas…' : 'Sincroniza para ver las plantillas.')
+          : 'Cargando los futbolistas de LaLiga…') + '</td></tr>';
+      pintarPieDeCaros(0, 0);
       return;
     }
 
-    const caros = todos.sort(function (a, b) { return b.valor - a.valor; }).slice(0, CUANTOS_CAROS);
+    todos.sort(function (a, b) { return b.valor - a.valor; });
 
-    cuerpo.innerHTML = caros.map(function (j, i) {
-      /* Aqui la fila se aclara cuando el futbolista es MIO, que es lo que se
-         mira en esta tabla: no quien puntua, sino quien lo tiene. */
+    const abierto = !!state.carosAbierto;
+    const tope = abierto ? CAROS_LARGO : CAROS_CORTO;
+    const vistos = todos.slice(0, tope);
+
+    cuerpo.innerHTML = vistos.map(function (j, i) {
+      /* Aquí la fila se aclara cuando el futbolista es MÍO, que es lo que se
+         mira en esta tabla: no quién puntúa, sino quién lo tiene. */
       return '<tr class="' + claseMia(j.dueno).trim() + '">' +
         '<td class="col-rank">' + (i + 1) + '</td>' +
         '<td data-label="Futbolista"><span class="with-crest">' +
           playerName({ playerId: j.id, player: j.name, position: j.position }) +
           crestOf(j, 'crest--badge') + '</span></td>' +
-        '<td data-label="Propietario"><span class="manager">' + avatar(j.dueno) +
-          '<span class="manager__name">' + escapeHtml(j.dueno) + '</span></span></td>' +
-        '<td class="num" data-label="Hoy">' + (j.hoy ? celdaDinero(j.hoy) : '<span class="zero">—</span>') + '</td>' +
+        '<td data-label="Propietario">' + (j.dueno
+          ? '<span class="manager">' + avatar(j.dueno) +
+            '<span class="manager__name">' + escapeHtml(j.dueno) + '</span></span>'
+          : '<span class="tag tag--free">Libre</span>') + '</td>' +
+        '<td class="num" data-label="Hoy">' +
+          (j.hoy ? celdaDinero(j.hoy) : '<span class="zero">—</span>') + '</td>' +
         '<td class="num" data-label="Valor"><strong>' + money(j.valor) + '</strong></td>' +
       '</tr>';
     }).join('');
+
+    pintarPieDeCaros(todos.length, tope);
+  }
+
+  /** El «Ver menos» y la marca de desplegado, como en los demás apartados. */
+  function pintarPieDeCaros(cuantos, tope) {
+    const abierto = !!state.carosAbierto;
+    const titulo = $('caros-mas');
+    if (titulo) {
+      titulo.setAttribute('aria-expanded', abierto ? 'true' : 'false');
+      /* Sin nada más que enseñar, el título no despliega nada. */
+      titulo.disabled = cuantos <= CAROS_CORTO && !abierto;
+    }
+    const pie = $('caros-pie');
+    if (!pie) return;
+    pie.innerHTML = abierto && cuantos > CAROS_CORTO
+      ? '<button type="button" class="btn btn--ghost btn--sm movers__mas" data-caros-mas>' +
+        'Ver menos</button>'
+      : '';
   }
 
   /** De quién es cada futbolista, mirando las ocho plantillas. */
@@ -10402,7 +10450,7 @@
        LaLiga para el nombre, la demarcacion y el valor de mercado de cada
        futbolista; al llegar, repinta el solo. */
     if (name === 'managers') {
-      ensureJugadores(); renderManagers(); renderSquads(); renderTandasDeLiga(); renderCaros();
+      ensureJugadores(); renderManagers(); renderSquads(); renderTandasDeLiga();
     }
     /* Los dos últimos faltaban aquí y solo se pintaban desde `render()`, así que
        al entrar en la pestaña salían como dos cuadros grises vacíos y solo se
@@ -10416,7 +10464,10 @@
       renderDataKpis(); renderKpiCharts(); renderSpending(); pintarFichajes();
       renderReventas(); renderMercadeo();
     }
-    if (name === 'datos') { ensureSquads(); ensureLaLiga(); ensureRecuento(); renderRankings(); renderRankingsTemporada(); }
+    if (name === 'datos') {
+      ensureSquads(); ensureLaLiga(); ensureRecuento(); ensureJugadores();
+      renderRankings(); renderRankingsTemporada(); renderCaros();
+    }
     /* `ensureJugadores` porque de esa lista salen ahora los que más se mueven:
        sin ella los dos cuadros saldrían vacíos hasta el siguiente repintado. */
     if (name === 'mercado') { ensureJugadores(); ensureMarket(); renderMarket(); renderMovers(); }
@@ -10469,10 +10520,13 @@
     renderPlantilla();
     renderWarnings();
     if (state.tab === 'managers') {
-      ensureJugadores(); renderManagers(); renderSquads(); renderTandasDeLiga(); renderCaros();
+      ensureJugadores(); renderManagers(); renderSquads(); renderTandasDeLiga();
     }
     if (state.tab === 'fichajes') { renderDataKpis(); renderKpiCharts(); renderSpending(); pintarFichajes(); renderReventas(); renderMercadeo(); }
-    if (state.tab === 'datos') { ensureSquads(); ensureLaLiga(); ensureRecuento(); renderRankings(); renderRankingsTemporada(); }
+    if (state.tab === 'datos') {
+      ensureSquads(); ensureLaLiga(); ensureRecuento(); ensureJugadores();
+      renderRankings(); renderRankingsTemporada(); renderCaros();
+    }
     if (state.tab === 'mercado') { renderMarket(); renderMovers(); }
     if (state.tab === 'jugadores') { ensureJugadores(); renderJugadores(); }
   }
@@ -11367,6 +11421,38 @@
         state.datosDetalle = null;
         ensureRecuento();
         renderRankingsTemporada();
+      });
+    }
+
+    const pildoraCaros = $('caros-ambito');
+    if (pildoraCaros) {
+      pildoraCaros.addEventListener('click', function () {
+        state.carosAmbito = state.carosAmbito === 'liga' ? 'laliga' : 'liga';
+        /* En LaLiga hace falta la lista entera de futbolistas; en mi liga, las
+           plantillas. Se piden las dos y ya se repinta solo al llegar. */
+        ensureJugadores();
+        ensureSquads();
+        renderCaros();
+      });
+    }
+
+    const carosMas = $('caros-mas');
+    if (carosMas) {
+      carosMas.addEventListener('click', function () {
+        state.carosAbierto = !state.carosAbierto;
+        renderCaros();
+      });
+    }
+
+    const carosPie = $('caros-pie');
+    if (carosPie) {
+      carosPie.addEventListener('click', function (event) {
+        if (!event.target.closest('[data-caros-mas]')) return;
+        state.carosAbierto = false;
+        renderCaros();
+        /* Al plegar, la tabla encoge y su principio puede quedarse por encima
+           de lo que se ve: se sube a él, como en los demás apartados. */
+        subirA($('caros-mas'));
       });
     }
 

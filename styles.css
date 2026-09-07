@@ -491,6 +491,21 @@ code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft)
 }
 /* Dentro del cuadro no hace falta el aire de arriba que lleva suelto. */
 .seccion__titulo--dentro { margin: 0; }
+/* «Los más caros» es un título que ADEMÁS despliega, así que es un botón: se le
+   quita la pinta de botón y se le deja la del título de al lado, con la flecha
+   que gira igual que en «los que más se mueven». */
+.caros__titulo {
+  display: inline-flex; align-items: center; gap: .35rem;
+  background: none; border: 0; padding: 0;
+  font: inherit; color: inherit; cursor: pointer; text-align: left;
+}
+.caros__titulo .round__caret { transition: transform .15s; font-size: .8em; }
+.caros__titulo[aria-expanded="true"] .round__caret { transform: rotate(90deg); }
+/* Sin nada más que enseñar no despliega: ni flecha ni mano. */
+.caros__titulo:disabled { cursor: default; }
+.caros__titulo:disabled .round__caret { visibility: hidden; }
+#caros-pie:empty { display: none; }
+#caros-pie { display: flex; justify-content: center; margin-top: .6rem; }
 
 /* ---------- Quién puntúa en la liga ---------- */
 /* Las cuatro siempre en una fila, también en móvil: ahí la página se ve con
@@ -1234,7 +1249,7 @@ code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft)
 .ficha__retrato {
   position: relative; z-index: 2; flex: none;
   /* En fila: comparando van dos retratos, uno por futbolista. */
-  display: flex; gap: 1.4rem;
+  display: flex; gap: 2.6rem;
   /* `line-height: 0` es lo que quita el hueco de linea que todo `inline-block`
      arrastra debajo: con el, la caja del retrato era mas alta que la foto y las
      chapas, ancladas abajo, caian fuera del circulo y pisaban el nombre. */
@@ -1254,7 +1269,7 @@ code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft)
    quedaban centrados en medio en vez de uno bajo cada cara. */
 .ficha__nombre.ficha__nombre--dos {
   display: grid; grid-template-columns: 170px 170px;
-  gap: 1.4rem; justify-content: center; align-items: start;
+  gap: 2.6rem; justify-content: center; align-items: start;
 }
 .ficha__quien {
   display: flex; flex-direction: column; align-items: center; gap: .1rem;
