@@ -132,7 +132,7 @@ const CDN = 'https://cf.biwenger.com/api/v2';
    navegador normal y las cabeceras que este mandaría. */
 /* Marca de versión: se sube en cada cambio y se consulta con ?version=1.
    Sirve para saber desde fuera si el despliegue ha entrado o no. */
-const VERSION = '2026-09-07 · deno 87';
+const VERSION = '2026-09-07 · deno 88';
 
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ' +
   '(KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36';
@@ -935,13 +935,19 @@ async function operarEnBiwenger(env, orden) {
     if (!(jornadas > 0)) return { hecho: false, error: 'Faltan las jornadas.' };
     if (!(importe > 0)) return { hecho: false, error: 'Falta el importe.' };
 
-    const respuesta = await apiEscribe(env, 'POST', '/offers', {
+    const cuerpo = {
       type: 'loan',
       amount: importe,
       rounds: jornadas,
       to: orden.to != null && orden.to !== '' ? Number(orden.to) : null,
       requestedPlayers: [Number(orden.player)]
-    });
+    };
+    /* Con `id` se cambia la que ya hay, igual que al editar una puja: mismo
+       cuerpo, por PUT. Sin esto, tocar las jornadas o el importe dejaba DOS
+       cesiones pedidas por el mismo futbolista. */
+    const respuesta = orden.id
+      ? await apiEscribe(env, 'PUT', '/offers/' + encodeURIComponent(orden.id), cuerpo)
+      : await apiEscribe(env, 'POST', '/offers', cuerpo);
     return { hecho: true, accion: accion, price: importe, rounds: jornadas,
       estado: respuesta && respuesta.status };
   }
@@ -4111,6 +4117,15 @@ function normalizeOffers(offers, names, myId) {
         playerId: id != null ? String(id) : null,
         player: (id != null && names[String(id)]) || ('Jugador ' + id),
         amount: Math.round(offer.amount || 0),
+        /* De qué va la oferta: una puja normal o una cesión. Sin esto no había
+           forma de saber si lo que tienes pedido por un futbolista es una cosa
+           u otra, y una cesión pedida se veía igual que una puja. */
+        tipo: offer.type || null,
+        /* Y por cuántas jornadas, si es cesión. Biwenger no lo llama igual en
+           todas partes, así que se cogen los nombres que usa. */
+        rounds: offer.rounds != null ? offer.rounds
+          : (offer.loanRounds != null ? offer.loanRounds
+            : (offer.weeks != null ? offer.weeks : null)),
         direction: outgoing ? 'out' : 'in',
         other: other,
         until: offer.until ? new Date(offer.until * 1000).toISOString() : null,
