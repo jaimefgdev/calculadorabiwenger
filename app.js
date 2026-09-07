@@ -3424,7 +3424,8 @@
             (sube ? '\u25b2' : '\u25bc') + '</span>' : '') + '</td>' +
         '<td class="num" data-label="Precio"><strong>' + money(venta.price || 0) + '</strong></td>' +
         '<td class="spark-cell" data-label="Evolución">' +
-          sparkline(ultimos(state.priceSeries[venta.playerId], 45), venta.playerId, venta.player) + '</td>' +
+          sparkline(ultimos(state.priceSeries[venta.playerId], 45), venta.playerId, venta.player,
+            venta.increment) + '</td>' +
         '<td data-label="Queda">' + deadlineCell(venta.until) + '</td>' +
         /* Lo que vendes tú no se puja; en el resto, si ya has pujado, se ve por
            cuánto y el botón sirve para cambiarla. */
@@ -7451,20 +7452,26 @@
   /**
    * Lo que ha subido o bajado hoy.
    *
-   * Sale de los dos últimos días de su propia serie, que es exactamente lo que
-   * ha hecho hoy. Se calculó un tiempo con `playerInfo`, y eso recorre las ocho
-   * plantillas, el mercado, el tablón y los 541 futbolistas: una búsqueda de
-   * esas POR FILA, cientos por repintado en Jugadores. Aquí no hace falta nada
-   * de eso, el dato ya está en la serie que se está dibujando.
+   * Manda `hoy`, que es el `priceIncrement` que publica Biwenger y lo trae ya
+   * la propia fila que se está pintando —es el mismo número de la columna
+   * «Hoy» y de sus flechas—. NO se busca aquí: hacerlo con `playerInfo` recorre
+   * las ocho plantillas, el mercado, el tablón y los 541 futbolistas, y sería
+   * una búsqueda de esas POR FILA.
+   *
+   * Los dos últimos días de la serie quedan de respaldo. Suelen dar lo mismo
+   * —comprobado: Pablo García, +340.000 por los dos caminos—, pero no siempre:
+   * hay series que no llegan al día de hoy, y entonces se comparaban dos días
+   * viejos, salía cero y el gráfico se pintaba blanco sin estar parado.
    */
-  function cambioDeHoy(valores) {
+  function cambioDeHoy(hoy, valores) {
+    if (hoy != null && hoy !== 0) return hoy;
     if (valores && valores.length >= 2) {
       return valores[valores.length - 1] - valores[valores.length - 2];
     }
     return 0;
   }
 
-  function sparkline(serie, id, nombre) {
+  function sparkline(serie, id, nombre, hoy) {
     if (!serie || serie.length < 2) return '<span class="sub">—</span>';
 
     const W = 76, H = 22, pad = 2;
@@ -7480,7 +7487,7 @@
     });
 
     const diferencia = valores[valores.length - 1] - valores[0];
-    const cambio = cambioDeHoy(valores);
+    const cambio = cambioDeHoy(hoy, valores);
     const color = colorDeEvolucion(cambio);
 
     return '<button type="button" class="spark" data-spark="' + escapeHtml(String(id || '')) + '"' +
@@ -9072,7 +9079,8 @@
             })() + '</td>' +
             '<td class="num"><strong>' + (player.marketValue == null ? '—' : money(player.marketValue)) + '</strong></td>' +
             '<td class="spark-cell">' +
-              sparkline(ultimos(state.priceSeries[player.id], 45), player.id, player.name) + '</td>' +
+              sparkline(ultimos(state.priceSeries[player.id], 45), player.id, player.name,
+                player.increment) + '</td>' +
             '<td class="num">' + (diff == null ? '<span class="sub">—</span>' : (diff === 0
               /* Sin cambio no hay flecha ni verde: un guion y el número normal. */
               ? '<span class="delta delta--igual">– ' + money(0) + '</span>'
