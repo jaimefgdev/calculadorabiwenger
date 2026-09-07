@@ -29,7 +29,16 @@ const almacen = await Deno.openKv();
    sincronización pasa de 80 KB. Los valores grandes se guardan
    partidos en trozos y se recomponen al leerlos, así que quien
    llama no se entera de nada. */
-const TROZO = 40 * 1024;
+/* OJO: el tope de Deno KV son 65.536 BYTES, y esto corta por CARACTERES. El
+   indice de futbolistas va lleno de acentos y eñes, que ocupan dos bytes cada
+   uno, asi que un trozo de 40.960 caracteres podia pesar 80 KB y la escritura
+   fallaba con «Value too large». Y fallaba SIEMPRE: la copia de seguridad del
+   indice no se llegó a escribir ni una vez, que es justo la red que evita que un
+   corte de Biwenger deje la web sin nombres ni precios.
+   Con 16 K caracteres, ni en el peor caso (tres bytes por caracter) se llega a
+   los 48 KB. Son unos cuantos trozos más por escritura y da igual: se escribe
+   una vez cada seis horas. */
+const TROZO = 16 * 1024;
 
 const JORNADAS = {
   async get(clave) {
@@ -123,7 +132,7 @@ const CDN = 'https://cf.biwenger.com/api/v2';
    navegador normal y las cabeceras que este mandaría. */
 /* Marca de versión: se sube en cada cambio y se consulta con ?version=1.
    Sirve para saber desde fuera si el despliegue ha entrado o no. */
-const VERSION = '2026-09-07 · deno 76';
+const VERSION = '2026-09-07 · deno 77';
 
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ' +
   '(KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36';
