@@ -5297,7 +5297,11 @@
   }
 
   function renderMovers() {
-    const datos = calcularMovers() || state.movers || { up: [], down: [] };
+    /* Primero lo que trajo la sincronización, que ya está en memoria y se pinta
+       al instante. Calcularlo aquí obliga a esperar a la lista de futbolistas,
+       que es otra descarga, y los dos cuadros tardaban en aparecer. */
+    const delProxy = state.movers && (state.movers.up || []).length ? state.movers : null;
+    const datos = delProxy || calcularMovers() || { up: [], down: [] };
 
     const pinta = function (id, lista) {
       const abierto = !!state.moversAbiertos[id];
@@ -8290,19 +8294,32 @@
   }
 
   /**
-   * Deja la ficha centrada en lo que se est\u00e1 viendo.
+   * Coloca la ficha en lo que se ve de verdad. SOLO EN MÓVIL.
    *
-   * En el m\u00f3vil la p\u00e1gina se dibuja a 1024 px y el navegador la escala, as\u00ed que
-   * una ventana `fixed` se centra respecto a esa p\u00e1gina entera y aparece a
-   * media altura, lejos del futbolista que se ha pulsado. Con `visualViewport`
-   * se sabe qu\u00e9 trozo se ve de verdad y la ficha se coloca justo ah\u00ed.
+   * En el móvil la página se dibuja a 1024 px y el navegador la escala, así que
+   * una ventana `fixed` se centra respecto a esa página entera y aparece a
+   * media altura, lejos de donde estás mirando. Con `visualViewport` se sabe
+   * qué trozo se ve y la ficha se pone justo ahí.
+   *
+   * En el ORDENADOR no se toca. Esto se hacía siempre y ahí sobra: `fixed` con
+   * `inset: 0` ya la centra solo. Y no solo sobraba, estorbaba: con el zoom del
+   * navegador, `visualViewport` y el diseño dejan de coincidir, se mezclaban dos
+   * sistemas de medida y la ficha se iba fuera de la pantalla.
+   *
+   * El móvil se reconoce por lo mismo que fuerza el ancho en el index: la
+   * etiqueta del viewport puesta a 1024.
    */
+  function enMovil() {
+    const meta = document.querySelector('meta[name="viewport"]');
+    return !!meta && String(meta.getAttribute('content')).indexOf('1024') !== -1;
+  }
+
   function ajustarFichaALaVista() {
     const caja = $('price-modal');
-    if (!caja || caja.hidden) return;
+    if (!caja) return;
 
-    /* Se limpia SIEMPRE lo puesto la vez anterior. Sin esto, una medida vieja
-       se quedaba pegada y la ficha se abría donde estuvo la última vez. */
+    /* Se borra siempre lo de la vez anterior: si no, una medida vieja se queda
+       pegada y la ficha se abre donde estuvo la última vez. */
     caja.style.top = '';
     caja.style.left = '';
     caja.style.width = '';
@@ -8311,18 +8328,7 @@
     caja.style.bottom = '';
 
     const vista = window.visualViewport;
-    if (!vista) return;                    // sin soporte, el centrado normal vale
-
-    /* Y SOLO se coloca a mano cuando la vista no coincide con el diseño: con el
-       teclado del móvil abierto, o con la página pellizcada.
-       Esto lo hacía siempre, y con la página con zoom o desplazada a lo ancho
-       mezclaba dos sistemas de coordenadas —`position: fixed` mide contra la
-       ventana y `visualViewport` contra el diseño— y mandaba la ficha fuera de
-       la pantalla: se abría «en algún sitio que no se veía». Cuando las dos
-       coinciden, que es lo normal, el centrado de siempre ya lo hace bien. */
-    const desplazada = vista.offsetTop > 1 || vista.offsetLeft > 1;
-    const encogida = Math.abs(vista.height - window.innerHeight) > 1;
-    if (!desplazada && !encogida) return;
+    if (!vista || !enMovil()) return;
 
     caja.style.top = vista.offsetTop + 'px';
     caja.style.left = vista.offsetLeft + 'px';
@@ -8788,10 +8794,10 @@
         escapeHtml(ficha.owner ? ficha.owner : 'Libre') + '</strong>'
     ].filter(Boolean).join(' · ');
 
-    /* Se monta el contenido ANTES de destapar. Al revés —destapar y luego
-       montar— cualquier fallo por el camino dejaba una capa transparente a
-       pantalla completa: la ficha no se veía y encima bloqueaba la página,
-       porque tapa todo y congela el desplazamiento del fondo. */
+    /* El contenido se monta en una variable y se vuelca de una vez. Así, si algo
+       fallara por el camino, no queda una capa transparente a pantalla completa
+       tapando la página; y en cuanto hay contenido se destapa, ANTES de medir
+       nada, porque medir una tarjeta oculta da todo ceros. */
     caja.innerHTML =
       '<div class="picker__backdrop" data-price-close></div>' +
       /* La foto va FUERA de la tarjeta, no dentro: la tarjeta lleva scroll y
@@ -8947,6 +8953,11 @@
         })() +
       '</div></div>';
 
+    /* Con el contenido puesto, se destapa. Lo que viene después —medir rótulos,
+       enganchar el gráfico— necesita la tarjeta visible para medir bien. */
+    caja.hidden = false;
+    ajustarFichaALaVista();
+
     /* Los rótulos largos de las estadísticas encogen hasta verse enteros. */
     ajustarNombres();
 
@@ -8962,13 +8973,6 @@
 
     bindChartHover(caja.querySelector('.viz-hover'), puntos,
       diaLlegada ? { day: diaLlegada, texto: textoLlegada } : null);
-
-    /* Y AHORA se destapa, con todo montado. Si algo hubiera fallado por el
-       camino, la ficha simplemente no se abre; nunca deja una capa invisible
-       tapando la página. `ajustarFichaALaVista` va aquí porque necesita medir, y
-       para medir tiene que estar visible. */
-    caja.hidden = false;
-    ajustarFichaALaVista();
   }
 
   function renderSquads() {
