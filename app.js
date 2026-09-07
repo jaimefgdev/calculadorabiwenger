@@ -3424,7 +3424,8 @@
             (sube ? '\u25b2' : '\u25bc') + '</span>' : '') + '</td>' +
         '<td class="num" data-label="Precio"><strong>' + money(venta.price || 0) + '</strong></td>' +
         '<td class="spark-cell" data-label="Evolución">' +
-          sparkline(ultimos(state.priceSeries[venta.playerId], 45), venta.playerId, venta.player) + '</td>' +
+          sparkline(ultimos(state.priceSeries[venta.playerId], 45), venta.playerId, venta.player,
+            venta.increment) + '</td>' +
         '<td data-label="Queda">' + deadlineCell(venta.until) + '</td>' +
         /* Lo que vendes tú no se puja; en el resto, si ya has pujado, se ve por
            cuánto y el botón sirve para cambiarla. */
@@ -7417,21 +7418,21 @@
   /**
    * Lo que ha subido o bajado hoy.
    *
-   * Del índice de futbolistas, que es de donde sale la columna «Hoy» y por tanto
-   * el mismo número. Si ese futbolista no está en el índice —se fue de LaLiga,
-   * o el índice no ha llegado— se saca de los dos últimos días de su serie, que
-   * es lo mismo calculado a mano.
+   * `hoy` lo pasa quien dibuja la fila, porque ya lo tiene en la mano. NO se
+   * busca aquí: se hacía con `playerInfo`, que recorre las ocho plantillas, el
+   * mercado, el tablón y los 541 futbolistas, y salía UNA de esas por FILA. En
+   * Jugadores son cientos por repintado y la pestaña se quedaba pensando.
+   * Si no llega, se saca de los dos últimos días de la serie, que es lo mismo.
    */
-  function cambioDeHoy(id, valores) {
-    const ficha = playerInfo(id);
-    if (ficha && ficha.increment) return ficha.increment;
+  function cambioDeHoy(hoy, valores) {
+    if (hoy != null && hoy !== 0) return hoy;
     if (valores && valores.length >= 2) {
       return valores[valores.length - 1] - valores[valores.length - 2];
     }
     return 0;
   }
 
-  function sparkline(serie, id, nombre) {
+  function sparkline(serie, id, nombre, hoy) {
     if (!serie || serie.length < 2) return '<span class="sub">—</span>';
 
     const W = 76, H = 22, pad = 2;
@@ -7447,8 +7448,8 @@
     });
 
     const diferencia = valores[valores.length - 1] - valores[0];
-    const hoy = cambioDeHoy(id, valores);
-    const color = colorDeEvolucion(hoy);
+    const cambio = cambioDeHoy(hoy, valores);
+    const color = colorDeEvolucion(cambio);
 
     return '<button type="button" class="spark" data-spark="' + escapeHtml(String(id || '')) + '"' +
       ' data-spark-name="' + escapeHtml(nombre || '') + '"' +
@@ -7458,7 +7459,7 @@
       ' title="' + serie.length + ' días · ' +
       (diferencia === 0 ? 'igual' : (diferencia > 0 ? '+' : '−') + money(Math.abs(diferencia))) +
       ' · hoy ' +
-      (hoy === 0 ? 'igual' : (hoy > 0 ? '+' : '−') + money(Math.abs(hoy))) +
+      (cambio === 0 ? 'igual' : (cambio > 0 ? '+' : '−') + money(Math.abs(cambio))) +
       ' · pulsa para ampliar">' +
       '<svg viewBox="0 0 ' + W + ' ' + H + '" width="' + W + '" height="' + H + '" aria-hidden="true">' +
       '<polyline points="' + puntos.join(' ') + '" fill="none" stroke="' + color +
@@ -8270,8 +8271,28 @@
     const caja = $('price-modal');
     if (!caja || caja.hidden) return;
 
+    /* Se limpia SIEMPRE lo puesto la vez anterior. Sin esto, una medida vieja
+       se quedaba pegada y la ficha se abría donde estuvo la última vez. */
+    caja.style.top = '';
+    caja.style.left = '';
+    caja.style.width = '';
+    caja.style.height = '';
+    caja.style.right = '';
+    caja.style.bottom = '';
+
     const vista = window.visualViewport;
     if (!vista) return;                    // sin soporte, el centrado normal vale
+
+    /* Y SOLO se coloca a mano cuando la vista no coincide con el diseño: con el
+       teclado del móvil abierto, o con la página pellizcada.
+       Esto lo hacía siempre, y con la página con zoom o desplazada a lo ancho
+       mezclaba dos sistemas de coordenadas —`position: fixed` mide contra la
+       ventana y `visualViewport` contra el diseño— y mandaba la ficha fuera de
+       la pantalla: se abría «en algún sitio que no se veía». Cuando las dos
+       coinciden, que es lo normal, el centrado de siempre ya lo hace bien. */
+    const desplazada = vista.offsetTop > 1 || vista.offsetLeft > 1;
+    const encogida = Math.abs(vista.height - window.innerHeight) > 1;
+    if (!desplazada && !encogida) return;
 
     caja.style.top = vista.offsetTop + 'px';
     caja.style.left = vista.offsetLeft + 'px';
@@ -8737,8 +8758,10 @@
         escapeHtml(ficha.owner ? ficha.owner : 'Libre') + '</strong>'
     ].filter(Boolean).join(' · ');
 
-    caja.hidden = false;
-    ajustarFichaALaVista();
+    /* Se monta el contenido ANTES de destapar. Al revés —destapar y luego
+       montar— cualquier fallo por el camino dejaba una capa transparente a
+       pantalla completa: la ficha no se veía y encima bloqueaba la página,
+       porque tapa todo y congela el desplazamiento del fondo. */
     caja.innerHTML =
       '<div class="picker__backdrop" data-price-close></div>' +
       /* La foto va FUERA de la tarjeta, no dentro: la tarjeta lleva scroll y
@@ -8909,6 +8932,13 @@
 
     bindChartHover(caja.querySelector('.viz-hover'), puntos,
       diaLlegada ? { day: diaLlegada, texto: textoLlegada } : null);
+
+    /* Y AHORA se destapa, con todo montado. Si algo hubiera fallado por el
+       camino, la ficha simplemente no se abre; nunca deja una capa invisible
+       tapando la página. `ajustarFichaALaVista` va aquí porque necesita medir, y
+       para medir tiene que estar visible. */
+    caja.hidden = false;
+    ajustarFichaALaVista();
   }
 
   function renderSquads() {
@@ -8976,7 +9006,9 @@
               return '<span class="sub">compra</span> ' + money(player.paid);
             })() + '</td>' +
             '<td class="num"><strong>' + (player.marketValue == null ? '—' : money(player.marketValue)) + '</strong></td>' +
-            '<td class="spark-cell">' + sparkline(ultimos(state.priceSeries[player.id], 45), player.id, player.name) + '</td>' +
+            '<td class="spark-cell">' +
+              sparkline(ultimos(state.priceSeries[player.id], 45), player.id, player.name,
+                player.increment) + '</td>' +
             '<td class="num">' + (diff == null ? '<span class="sub">—</span>' : (diff === 0
               /* Sin cambio no hay flecha ni verde: un guion y el número normal. */
               ? '<span class="delta delta--igual">– ' + money(0) + '</span>'
