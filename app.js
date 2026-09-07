@@ -457,9 +457,16 @@
     return alguna ? total : null;
   }
 
+  /**
+   * Los puntos que van en la clasificación de Liga.
+   *
+   * El número de Biwenger manda y ya trae la jornada en curso; sumar las
+   * nuestras encima era lo que descuadraba a Eneko y a Maccabi. Solo se calcula
+   * a mano cuando él no ha dado ninguno.
+   */
   function conJornadaEnJuego(equipo, base) {
-    const total = puntosSumados(equipo, null);
-    return total != null ? total : base;
+    if (base != null) return base;
+    return puntosSumados(equipo, null);
   }
 
   function computeBudgets(movements, teams) {
@@ -5548,13 +5555,51 @@
    * columna de la tabla de jornadas, y ahí una general que no avanza con la
    * jornada elegida no dice nada.
    */
+  /**
+   * Los puntos generales, ANCLADOS a los de Biwenger.
+   *
+   * Antes se sumaban nuestras jornadas una a una, y eso se despegaba de él. Con
+   * los números de la jornada 4 delante: a Eneko, Biwenger le da 65 y sumando
+   * jornadas salían 56, porque había recalculado alguna anterior y nosotros
+   * seguíamos con la vieja. Y a Maccabi, al revés: su jornada va en rojo (empezó
+   * en negativo, no le cuenta) y sumándola le sobraban 34.
+   *
+   * Su total ya viene en la clasificación de la liga y ya incluye la jornada en
+   * curso —comprobado en los ocho mánagers—, así que se usa tal cual. Nuestras
+   * jornadas solo sirven para RESTAR las posteriores a la que se está mirando,
+   * que es lo único que su número no sabe hacer.
+   */
   function puntosGenerales(nombre) {
     const equipo = state.teams[nombre];
     if (!equipo) return null;
+
     const vista = jornadaActiva();
     const hasta = vista && vista.round && vista.round.number != null ? vista.round.number : null;
-    const total = puntosSumados(equipo, hasta);
-    return total != null ? total : (equipo.points != null ? equipo.points : null);
+
+    /* Sin su número —no ha llegado la sincronización— se calcula como antes. */
+    if (equipo.points == null) return puntosSumados(equipo, hasta);
+    if (hasta == null) return equipo.points;
+
+    return equipo.points - puntosDespuesDe(equipo, hasta);
+  }
+
+  /** Lo que ha sumado en las jornadas POSTERIORES a la que se está mirando. */
+  function puntosDespuesDe(equipo, hasta) {
+    let despues = 0;
+    Object.keys(state.jornadas.datos).forEach(function (id) {
+      const jornada = state.jornadas.datos[id];
+      const round = jornada && jornada.round;
+      if (!esJornadaPropia(round)) return;
+      if ((round.number || 0) <= hasta) return;
+      const fila = (jornada.standings || []).filter(function (f) {
+        return String(f.id) === String(equipo.id);
+      })[0];
+      /* El que empezó esa jornada en negativo no sumó nada, así que tampoco hay
+         nada que descontarle por ella. */
+      if (!fila || fila.counts === false) return;
+      despues += fila.points || 0;
+    });
+    return despues;
   }
 
   const ROUND_VALUES = {
@@ -7365,18 +7410,38 @@
   /* Minigráfica de la evolución del precio, sin ejes ni números: solo la
      forma, en verde si acaba por encima de como empezó y en rojo si no. */
   /**
-   * El color de una evolución de precio: verde si sube, rojo si baja, y el color
-   * del texto si se queda igual.
+   * El color de una evolución de precio, según lo que ha hecho HOY.
    *
-   * Antes esto era `ultimo >= primero`, y el `>=` metía lo plano en el verde: un
-   * futbolista que llevaba una semana clavado se pintaba como si estuviera
-   * subiendo. Y lo plano no es ni bueno ni malo, así que va del color del texto
-   * —blanco en oscuro, casi negro en claro— y no compite con los otros dos.
+   * Verde si hoy sube, rojo si hoy baja, y el color del texto si se ha quedado
+   * igual —blanco en oscuro, casi negro en claro—, porque lo plano no es ni
+   * bueno ni malo y no tiene por qué competir con los otros dos.
+   *
+   * Se probó comparando el primer día del gráfico con el último, y aunque el
+   * color casaba siempre con la forma dibujada, chocaba con lo que enseña
+   * Biwenger: un futbolista que lleva un mes subiendo pero hoy ha bajado sale
+   * en rojo en su mercado y aquí salía verde. Manda el día, como allí.
    */
-  function colorDeEvolucion(desde, hasta) {
-    if (hasta > desde) return 'var(--pos)';
-    if (hasta < desde) return 'var(--neg)';
+  function colorDeEvolucion(cambio) {
+    if (cambio > 0) return 'var(--pos)';
+    if (cambio < 0) return 'var(--neg)';
     return 'var(--text)';
+  }
+
+  /**
+   * Lo que ha subido o bajado hoy.
+   *
+   * Del índice de futbolistas, que es de donde sale la columna «Hoy» y por tanto
+   * el mismo número. Si ese futbolista no está en el índice —se fue de LaLiga,
+   * o el índice no ha llegado— se saca de los dos últimos días de su serie, que
+   * es lo mismo calculado a mano.
+   */
+  function cambioDeHoy(id, valores) {
+    const ficha = playerInfo(id);
+    if (ficha && ficha.increment) return ficha.increment;
+    if (valores && valores.length >= 2) {
+      return valores[valores.length - 1] - valores[valores.length - 2];
+    }
+    return 0;
   }
 
   function sparkline(serie, id, nombre) {
@@ -7395,12 +7460,18 @@
     });
 
     const diferencia = valores[valores.length - 1] - valores[0];
-    const color = colorDeEvolucion(valores[0], valores[valores.length - 1]);
+    const hoy = cambioDeHoy(id, valores);
+    const color = colorDeEvolucion(hoy);
 
     return '<button type="button" class="spark" data-spark="' + escapeHtml(String(id || '')) + '"' +
       ' data-spark-name="' + escapeHtml(nombre || '') + '"' +
+      /* En el globo van los dos números: el del gráfico (lo que dibuja) y el de
+         hoy (lo que pinta el color). Con uno solo, ver una línea que sube en
+         rojo no tenía explicación a la vista. */
       ' title="' + serie.length + ' días · ' +
       (diferencia === 0 ? 'igual' : (diferencia > 0 ? '+' : '−') + money(Math.abs(diferencia))) +
+      ' · hoy ' +
+      (hoy === 0 ? 'igual' : (hoy > 0 ? '+' : '−') + money(Math.abs(hoy))) +
       ' · pulsa para ampliar">' +
       '<svg viewBox="0 0 ' + W + ' ' + H + '" width="' + W + '" height="' + H + '" aria-hidden="true">' +
       '<polyline points="' + puntos.join(' ') + '" fill="none" stroke="' + color +
@@ -8664,8 +8735,6 @@
       return punto ? punto.price : null;
     })();
 
-    const primero = puntos.length ? puntos[0].price : 0;
-    const ultimo = puntos.length ? puntos[puntos.length - 1].price : 0;
 
     const ficha = playerInfo(abierto.id);
     const sube2 = ficha.increment > 0;
@@ -8794,7 +8863,7 @@
                 ': aún no hay evolución que enseñar.'
               : 'Biwenger no publica la evolución de este futbolista.') + '</p>'
           : '<div class="viz-hover">' +
-              lineChart(puntos, 'price', colorDeEvolucion(primero, ultimo), 'Valor de mercado',
+              lineChart(puntos, 'price', colorDeEvolucion(ficha.increment), 'Valor de mercado',
                 { height: 260, ticks: 7, fullTicks: true, padX: 96, hover: true,
                   mark: diaLlegada
                     ? { day: diaLlegada, label: llegada.paid == null ? 'reparto' : 'fichaje',
