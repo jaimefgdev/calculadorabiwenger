@@ -132,7 +132,7 @@ const CDN = 'https://cf.biwenger.com/api/v2';
    navegador normal y las cabeceras que este mandaría. */
 /* Marca de versión: se sube en cada cambio y se consulta con ?version=1.
    Sirve para saber desde fuera si el despliegue ha entrado o no. */
-const VERSION = '2026-09-07 · deno 80';
+const VERSION = '2026-09-07 · deno 81';
 
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ' +
   '(KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36';
@@ -2843,7 +2843,7 @@ function hayIndice(names) {
   return true;
 }
 
-function roundPlayer(entry, names, puntos, partidoDe, enCasa, lances) {
+function roundPlayer(entry, names, puntos, partidoDe, enCasa, lances, deEstaJornada) {
   /* Biwenger manda unas veces el futbolista entero y otras solo su número. */
   const suelto = entry != null && typeof entry !== 'object';
   const player = suelto ? { id: entry } : ((entry && entry.player) || entry);
@@ -2893,24 +2893,26 @@ function roundPlayer(entry, names, puntos, partidoDe, enCasa, lances) {
      pero cambiar de dónde salen TODAS las notas para arreglar una es cambiar lo
      que funciona por lo que no se entiende. Vuelve como estaba hasta saber por
      qué esa alineación trae ese número. */
-  /* EL QUE SE FUE DE LALIGA: solo `marcador`, y nada más.
-     `marcador` sale de SU FICHA, que lista un informe por jornada jugada. Si
-     hay informe de esta, la jugó y su nota vale aunque luego se marchara —irse
-     no borra lo que hizo—. Si no lo hay, no la jugó y se queda sin nota.
-     Lo que NO se le puede aceptar es lo que venga de la alineación ni del
-     índice: ahí Biwenger arrastra su último número conocido y se cuela como si
-     fuera de esta jornada. Gustavo Puerta salía con 7 en la jornada 6 —sus 7 de
-     la 3— cuando Biwenger le pinta una equis: no va a jugarla.
+  /* EL QUE SE FUE DE LALIGA: solo la nota que SEGURO es de esta jornada.
+     `deEstaJornada` sale de SU FICHA, que lista un informe por jornada jugada:
+     si hay informe de esta, la jugó y su nota vale aunque luego se marchara
+     —irse no borra lo que hizo—, y si no lo hay, no la jugó.
+     NO vale `marcador` a secas: ahí dentro también está el historial del índice,
+     que para el que ya no está se queda CLAVADO en su última nota conocida y se
+     la cuela en todas las jornadas siguientes. Gustavo Puerta arrastraba así
+     sus 7 de la jornada 3 a la 4 y a la 6, y le subía 14 puntos a Eneko.
      Los que SIGUEN en LaLiga van como siempre: manda la alineación. */
+  const suyaDeHoy = (deEstaJornada || {})[id];
   const puntuacion = sinTerminar ? null
     : (fuera
-        ? (marcador[id] != null ? marcador[id] : null)
+        ? (suyaDeHoy != null ? suyaDeHoy : null)
         : (suya != null ? suya : (marcador[id] != null ? marcador[id] : null)));
 
   /* ¿La nota la ha puesto Biwenger o la hemos calculado nosotros? Importa para
      recolocar el gol del que está alineado fuera de su puesto: la de Biwenger
      YA viene con ese ajuste hecho, y volver a aplicárselo la dejaría mal. */
-  const nuestra = !sinTerminar && (fuera || suya == null) && marcador[id] != null;
+  const nuestra = !sinTerminar &&
+    (fuera ? suyaDeHoy != null : (suya == null && marcador[id] != null));
 
   const pendiente = sinTerminar;
   /* Si jugaba en casa o fuera esa jornada: rinden distinto y se compara. */
@@ -3485,9 +3487,11 @@ async function roundBoard(env, headers, jornada, listaNombres) {
     !!detalle && (detalle.played || 0) >= (detalle.games || 0) && (detalle.games || 0) > 0;
   const buenas = await notasDeLaJornada(env, Object.keys(alineados), names, score,
     numeroJornada, cerrada, partidoDe).catch(function () { return null; });
-  if (buenas && buenas.notas) {
-    Object.keys(buenas.notas).forEach(function (id) { base[id] = buenas.notas[id]; });
-  }
+  /* Las notas de la ficha de cada futbolista: estas SI son de esta jornada y
+     solo existen si la jugó. Se guardan aparte porque para el que ya no está en
+     LaLiga son las únicas de fiar. */
+  const notasDeHoy = (buenas && buenas.notas) || {};
+  Object.keys(notasDeHoy).forEach(function (id) { base[id] = notasDeHoy[id]; });
 
   /* En qué puesto jugó cada uno de verdad. De la ficha si la hemos leído; si
      no, su demarcación de siempre, que es la que acierta casi siempre. */
@@ -3518,13 +3522,13 @@ async function roundBoard(env, headers, jornada, listaNombres) {
        goles: hasta que no está puesto no se sabe de qué juega cada uno aquí. */
     const once = recolocarGoles(colocarEnSistema(
       ((lineup && lineup.players) || []).map(function (entry) { return roundPlayer(entry, names, marcador, partidoDe, enCasa,
-        (detalle && detalle.lances) || []); }).filter(Boolean),
+        (detalle && detalle.lances) || [], notasDeHoy); }).filter(Boolean),
       lineup && lineup.type), golesDe, posReales);
     /* Biwenger llama «discarded» a los que se quedaron fuera: el banquillo. */
     const banquillo = ((lineup && (lineup.discarded || lineup.bench)) || [])
       .map(function (entry) {
         return roundPlayer(entry, names, marcador, partidoDe, enCasa,
-          (detalle && detalle.lances) || []);
+          (detalle && detalle.lances) || [], notasDeHoy);
       }).filter(Boolean);
 
     /* Biwenger deja la clasificación de la jornada a cero hasta que la cierra,
