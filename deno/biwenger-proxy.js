@@ -132,7 +132,7 @@ const CDN = 'https://cf.biwenger.com/api/v2';
    navegador normal y las cabeceras que este mandaría. */
 /* Marca de versión: se sube en cada cambio y se consulta con ?version=1.
    Sirve para saber desde fuera si el despliegue ha entrado o no. */
-const VERSION = '2026-09-07 · deno 82';
+const VERSION = '2026-09-07 · deno 83';
 
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ' +
   '(KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36';
@@ -501,10 +501,7 @@ const app = {
            futbolista apareció en el mercado. Si no, el tope que se pida. */
         const pedido = url.searchParams.get('dias');
         const dias = pedido === 'todo' ? Infinity : Math.min(Number(pedido) || 45, 2000);
-        /* Con el sistema de la liga: sin él se baja OTRO índice —el del 1— solo
-           para esto, 220 KB de más en cada consulta en frío. */
-        const data = await priceSeries(historial.split(',').slice(0, 30), dias,
-          await players(await sistemaDeLaLiga(env)));
+        const data = await priceSeries(historial.split(',').slice(0, 30), dias, await players());
         return new Response(JSON.stringify(data), {
           headers: Object.assign({ 'content-type': 'application/json; charset=utf-8' }, cors(origin))
         });
