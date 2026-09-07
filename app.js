@@ -3997,6 +3997,19 @@
       { accion: 'ceder', player: String(playerId), price: importe,
         rounds: jornadas, to: equipo.id, id: pedida ? pedida.id : null },
       (pedida ? 'Cesi\u00f3n cambiada' : 'Cesi\u00f3n pedida') + ' a ' + quien + '.');
+
+    /* Y se apunta ya, sin esperar a la sincronización: así la ficha enseña los
+       números nuevos en cuanto se cierra el diálogo. Lo que diga Biwenger manda
+       igual: la sincronización de después lo corrige si no cuadra. */
+    if (pedida) {
+      pedida.amount = importe;
+      pedida.rounds = jornadas;
+    } else {
+      state.offers = (state.offers || []).concat([{
+        id: 'nueva-' + playerId, playerId: String(playerId), tipo: 'loan',
+        amount: importe, rounds: jornadas, direction: 'out', other: quien
+      }]);
+    }
   }
 
   function confirmarPuja(playerId) {
@@ -8678,6 +8691,16 @@
     if (sinLlegar(datosUno) || sinLlegar(datosOtro)) {
       return '<p class="muted">Cargando\u2026</p>';
     }
+    /* `null` es «se pidió y no vino». Sin esto se pintaba la tabla entera con
+       ceros, que parece un dato y no lo es: ese futbolista no tiene un cero en
+       todo, es que no hemos podido traer sus números. */
+    if (datosUno === null || datosOtro === null) {
+      const quien = datosUno === null ? uno : otro;
+      return '<p class="muted">No se han podido traer los n\u00fameros de ' +
+        escapeHtml(quien.name || 'ese futbolista') + '. ' +
+        '<button type="button" class="reintentar" data-reintentar-stats="' +
+        escapeHtml(String(datosUno === null ? unoId : otroId)) + '">Reintentar</button></p>';
+    }
 
     /* Todo lo que da la ficha, no solo cuatro cosas. `menor` marca las que se
        ganan por lo bajo (encajar menos, costar menos); `texto` las que no son
@@ -11853,8 +11876,25 @@
          están dentro del mismo grupo. */
       const anula = event.target.closest('[data-cesion-anular]');
       if (anula) {
-        lanzarOperacion({ accion: 'retirar', id: anula.getAttribute('data-cesion-anular') },
-          'Cesión anulada.');
+        const cual = anula.getAttribute('data-cesion-anular');
+        /* Se quita de la lista en cuanto se manda, sin esperar a la siguiente
+           sincronización: si no, la ficha seguía diciendo «Cambiar» con su aspa
+           hasta cerrarla y volver a abrirla. Si la operación fallara, la
+           sincronización de después la devuelve a su sitio. */
+        state.offers = (state.offers || []).filter(function (o) {
+          return String(o.id) !== String(cual);
+        });
+        lanzarOperacion({ accion: 'retirar', id: cual }, 'Cesión anulada.');
+        renderPriceModal();
+        return;
+      }
+
+      const otraVez = event.target.closest('[data-reintentar-stats]');
+      if (otraVez) {
+        /* Se olvida el fallo para que se vuelva a pedir. */
+        delete state.estadisticas[String(otraVez.getAttribute('data-reintentar-stats'))];
+        ensureEstadisticas(otraVez.getAttribute('data-reintentar-stats'));
+        renderPriceModal();
         return;
       }
 

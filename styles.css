@@ -494,8 +494,13 @@ code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft)
 /* La cesión pedida: «Cambiar» y el aspa de anular, pegados como una sola
    pieza para que se lean juntos y no como dos píldoras sueltas. */
 .ficha__cesion-puesta { display: inline-flex; align-items: center; gap: .25rem; }
-.ficha__cesion-x { padding-left: .5rem; padding-right: .5rem; color: var(--neg); }
-.ficha__cesion-x:hover { border-color: var(--neg); }
+/* Doble clase a proposito: `.ambito` esta MAS ABAJO en el archivo y, con la
+   misma fuerza, ganaba su color gris; el aspa salia como las demas pildoras. */
+.ambito.ficha__cesion-x {
+  padding-left: .5rem; padding-right: .5rem;
+  color: var(--neg); border-color: var(--neg);
+}
+.ambito.ficha__cesion-x:hover { background: var(--neg); color: #fff; }
 
 /* «Los más caros» es un título que ADEMÁS despliega, así que es un botón: se le
    quita la pinta de botón y se le deja la del título de al lado, con la flecha
