@@ -218,8 +218,12 @@ code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft)
 /* El escudo de Biwenger, en vez del balón. Se deja respirar dentro del
    cuadrado y manda su propia proporción (es más alto que ancho). */
 .brand__escudo { height: 47px; width: auto; display: block; }
-/* El de la pestaña solo se usa ahí; en la cabecera manda el original. */
-.brand__escudo--morado { display: none; }
+/* En la cabecera va el MORADO, el mismo que en la pestaña del navegador, en el
+   icono del escritorio y en la portada al abrir la app: así el escudo es el
+   mismo en todas partes. El rojo original de AS sigue en el HTML, oculto, por
+   si alguna vez hay que volver a él. */
+.brand__logo > svg.brand__escudo { display: none; }
+.brand__escudo--morado { display: block; }
 
 /* Mientras dejas pulsado el escudo, se va rellenando por debajo: diez
    segundos sin ninguna señal parecerían que no hace nada. */
