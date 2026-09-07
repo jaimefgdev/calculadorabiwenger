@@ -1148,7 +1148,22 @@ code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft)
 /* En los rankings la tira vive en una columna estrecha. Si aun asi no cabe,
    que baje a otra linea antes que salirse y montarse encima de la lista de al
    lado, que es lo que hacia. */
-.ranking__ficha .personal { flex-wrap: wrap; justify-content: center; }
+/* En los rankings, la ficha va dentro de una columna estrecha —tres por fila—
+   y aquí le puse `wrap`: la tira partía en dos y el último dato («Pie») caía
+   suelto en su propia línea. Vuelve a UNA sola línea, y como el tamaño se mide
+   contra el ancho del contenedor (`cqw`), la letra encoge sola hasta que caben
+   todos. El suelo baja a 7 px —en vez de 9— porque aquí hay la mitad de sitio
+   que en la ficha grande. */
+.ranking__ficha .personal {
+  flex-wrap: nowrap; justify-content: space-between;
+  gap: .2rem .35rem;
+  font-size: clamp(7px, 2.05cqw, 13px);
+}
+/* Y que ningún dato se parta por dentro: si uno hace dos líneas, la tira
+   entera crece y deja de ser una fila. */
+.ranking__ficha .personal__dato,
+.ranking__ficha .personal__dato strong,
+.ranking__ficha .personal__label { white-space: nowrap; }
 
 .personal__dato {
   /* Rótulo y dato centrados, igual que en los cuadros de estadísticas: si van

@@ -2707,7 +2707,11 @@
     });
 
     if (!estado && !parte) return '';
-    const marca = STATUS_MARKS[estado] || null;
+    /* Sin estado malo pero CON parte, está disponible y con una nota: Camello
+       salía como «No disponible · Pequeñas molestias» cuando Biwenger lo da en
+       forma con esa misma nota. «No disponible» solo cuando de verdad hay un
+       estado que no reconocemos, que es para lo que estaba pensado. */
+    const marca = STATUS_MARKS[estado || 'ok'] || null;
     const titulo = marca ? marca.label : 'No disponible';
 
     return '<p class="ficha__parte">' +
@@ -8568,6 +8572,14 @@
        ganan por lo bajo (encajar menos, costar menos); `texto` las que no son
        una carrera y no se pintan en verde. */
     const num = function (v) { return v == null ? 0 : v; };
+
+    /* Comparando dos porteros hay filas que cambian de sentido. Se mira antes
+       de armarlas porque alguna se define según esto. */
+    const puestoDe = function (ficha, id) {
+      return ficha && ficha.position != null ? ficha.position : posicionConocida[String(id)];
+    };
+    const puestos = [puestoDe(uno, unoId), puestoDe(otro, otroId)];
+    const sonPorteros = puestos.every(function (p) { return p === 1; });
     const filas = [
       { rotulo: 'Puntos', valor: function (d, f) { return d ? num(d.points) : (f.points || 0); } },
       { rotulo: 'Media', valor: function (d) { return d && d.played ? (d.points / d.played).toFixed(1).replace('.', ',') : '0,0'; } },
@@ -8575,8 +8587,19 @@
       { rotulo: 'Minutos', valor: function (d) { return d ? num(d.minutes) : 0; } },
       { rotulo: 'Goles', valor: function (d) { return d ? num(d.goals) : 0; } },
       { rotulo: 'Asistencias', valor: function (d) { return d ? num(d.assists) : 0; } },
-      { rotulo: 'Goles por partido', valor: function (d) {
-          return d ? (num(d.goalsPerGame)).toFixed(2).replace('.', ',') : '0,00'; } },
+      /* Entre porteros, «goles por partido» es cero contra cero y no dice nada;
+         lo que los separa es cuántos les meten. La fila cambia de significado,
+         así que cambia también el rótulo y quién gana: ahí manda el que MENOS
+         encaja. */
+      { rotulo: function () { return sonPorteros ? 'Goles encajados por partido' : 'Goles por partido'; },
+        menor: function () { return sonPorteros; },
+        valor: function (d) {
+          if (!d) return '0,00';
+          const valor = sonPorteros
+            ? (num(d.played) ? num(d.conceded) / num(d.played) : 0)
+            : num(d.goalsPerGame);
+          return valor.toFixed(2).replace('.', ',');
+        } },
       { rotulo: 'Partidos ganados', valor: function (d) { return d ? num(d.wins) : 0; } },
       /* Dejar la portería a cero solo puntúa a porteros y defensas: en un
          medio o un delantero es un dato que no dice nada. */
@@ -8598,12 +8621,7 @@
 
     /* Las de portería solo si alguno de los dos juega atrás (portero o
        defensa); si los dos son medios o delanteros, no pintan nada. */
-    const puestoDe = function (ficha, id) {
-      return ficha && ficha.position != null ? ficha.position : posicionConocida[String(id)];
-    };
-    const hayAtras = [puestoDe(uno, unoId), puestoDe(otro, otroId)].some(function (p) {
-      return p === 1 || p === 2;
-    });
+    const hayAtras = puestos.some(function (p) { return p === 1 || p === 2; });
     const visibles = filas.filter(function (f) { return !f.atras || hayAtras; });
 
     return '<div class="versus">' +
@@ -8613,11 +8631,15 @@
         const b = fila.valor(datosOtro, otro);
         const bruto = fila.texto ? 0
           : (Number(String(a).replace(',', '.')) - Number(String(b).replace(',', '.')));
-        /* Donde gana el que menos tiene (tarjetas, encajados), al revés. */
-        const gana = fila.menor ? -bruto : bruto;
+        /* Donde gana el que menos tiene (tarjetas, encajados), al revés. Y hay
+           filas que solo ganan por lo bajo SEGÚN quién se compare, así que
+           `menor` y `rotulo` admiten también una función. */
+        const porLoBajo = typeof fila.menor === 'function' ? fila.menor() : fila.menor;
+        const gana = porLoBajo ? -bruto : bruto;
+        const rotulo = typeof fila.rotulo === 'function' ? fila.rotulo() : fila.rotulo;
         return '<div class="versus__fila">' +
           '<span class="versus__dato' + (gana > 0 ? ' versus__dato--mejor' : '') + '">' + a + '</span>' +
-          '<span class="versus__label">' + fila.rotulo + '</span>' +
+          '<span class="versus__label">' + rotulo + '</span>' +
           '<span class="versus__dato' + (gana < 0 ? ' versus__dato--mejor' : '') + '">' + b + '</span>' +
         '</div>';
       }).join('') + '</div>' +
