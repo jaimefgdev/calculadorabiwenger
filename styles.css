@@ -1082,7 +1082,7 @@ code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft)
   content: '';
   width: 40cqw; aspect-ratio: 350.6 / 392;
   transform: translate(-50%, calc(-50% - 5cqw));
-  background: url('biwenger.svg') center / contain no-repeat;
+  background: url('biwenger.svg?v=411') center / contain no-repeat;
   opacity: .2;
 }
 /* Y el nombre, justo debajo del escudo. Aquí sí vale la tipografía de la web
@@ -1936,7 +1936,7 @@ html.con-ficha { scrollbar-gutter: stable; }
   content: '';
   width: 26cqw; aspect-ratio: 350.6 / 392;
   transform: translate(-50%, calc(-50% - 3cqw));
-  background: url('biwenger.svg') center / contain no-repeat;
+  background: url('biwenger.svg?v=411') center / contain no-repeat;
   opacity: .05;
 }
 #budget-panel::after {

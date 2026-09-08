@@ -132,7 +132,7 @@ const CDN = 'https://cf.biwenger.com/api/v2';
    navegador normal y las cabeceras que este mandaría. */
 /* Marca de versión: se sube en cada cambio y se consulta con ?version=1.
    Sirve para saber desde fuera si el despliegue ha entrado o no. */
-const VERSION = '2026-09-08 · deno 122';
+const VERSION = '2026-09-08 · deno 123';
 
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ' +
   '(KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36';
@@ -2311,11 +2311,14 @@ async function matchDay(roundId, score, names, primas) {
   const detalle = await roundDetail(roundId, score);
   if (!detalle) return null;
 
-  const response = await fetch(fresco(CDN + '/rounds/la-liga/' + encodeURIComponent(roundId) +
-    '?lang=es' + (score ? '&score=' + encodeURIComponent(score) : '')),
-    { headers: NAVEGADOR, cf: SIN_CACHE });
-  if (!response.ok) return null;
-  const data = (await response.json()).data || {};
+  /* Los informes crudos ya vienen dentro del detalle: son EXACTAMENTE la misma
+     descarga que acaba de hacer roundDetail, misma URL y mismo segundo. Pedirla
+     otra vez no traía un dato nuevo, solo un 429 —Biwenger corta la repetición
+     de una URL idéntica, y como `fresco()` le pone rompecachés, cada intento
+     llegaba al origen—. Así se caía la pestaña de partidos con un «no se ha
+     podido leer esa jornada» en siete décimas, con el índice y el detalle ya
+     en memoria: no era falta de red, era la segunda descarga. */
+  const data = { games: detalle.crudo || [] };
 
   /* Los puntos del informe del partido bailan entre peticiones: para el mismo
      futbolista y el mismo partido ya terminado devolvían 6, 8 o 4 según la
@@ -3506,6 +3509,9 @@ async function roundDetail(roundId, score) {
     picas: picas,
     lances: lances,
     matches: partidos,
+    /* Los informes tal cual llegan, para que matchDay arme los onces y los
+       banquillos sin volver a bajarse la jornada entera. */
+    crudo: data.games || [],
     played: jugados,
     games: partidos.length,
     live: empezados > 0 && jugados < partidos.length,

@@ -5864,7 +5864,8 @@
         /* Un abono a cero sin motivo no es «no pagó nada»: es «no se ha podido
            calcular», y si se guarda encima, el importe bueno de esa jornada se
            pierde para siempre. Se conserva el de antes. */
-        abono: mejorAbono(fila.abono, antes.abono)
+        abono: mejorAbono(fila.abono, antes.abono,
+          fila.points != null ? fila.points : antes.points)
       };
     });
 
@@ -7572,7 +7573,13 @@
    * jornada no pagara nada. El cero con motivo ('negativo') sí es un dato
    * bueno —empezó en números rojos y no cobró— y ese se respeta.
    */
-  function mejorAbono(nuevo, viejo) {
+  function mejorAbono(nuevo, viejo, puntos) {
+    /* Con cero puntos NO hay nada que conservar: el abono de esta liga sale de
+       los puntos, así que a cero puntos le toca cero. Sin esta salida, la
+       jornada 6 enseñaba 350.000 € a quien había hecho 0 —el importe era de
+       cuando la jornada se calculó mal, y se quedaba pegado para siempre
+       porque lo nuevo llegaba vacío y lo vacío nunca pisa lo guardado. */
+    if (puntos === 0) return nuevo || null;
     if (!nuevo) return viejo || null;
     const vacio = !nuevo.motivo && !nuevo.total && !nuevo.fija && !nuevo.puntos;
     if (vacio && viejo) return viejo;
