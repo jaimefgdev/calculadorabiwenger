@@ -12073,8 +12073,31 @@
       }
     });
 
+    /* De dónde salió el clic: si empieza DENTRO de la tarjeta y acaba fuera
+       —arrastrando para seleccionar un nombre o una cifra— el navegador lo
+       cuenta como un clic fuera, y la ficha se cerraba sola. */
+    let fichaDesdeFuera = false;
+    const marcarFicha = function (event) {
+      const dentro = event.target.closest &&
+        event.target.closest('.ficha__card, .picker__card');
+      fichaDesdeFuera = !dentro;
+    };
+    $('price-modal').addEventListener('mousedown', marcarFicha);
+    $('price-modal').addEventListener('touchstart', marcarFicha, { passive: true });
+
     $('price-modal').addEventListener('click', function (event) {
       if (!state.priceModal) return;
+
+      /* Pinchar FUERA de la ficha la cierra. El fondo oscuro ya lo hacía, pero
+         el envoltorio —640 px de ancho y toda la altura, porque lleva la foto
+         y la tarjeta juntas— se comía los clics de alrededor: por encima de la
+         cara, por debajo de la tarjeta y por los lados no cerraba nada. */
+      const fuera = event.target === this ||
+        (event.target.classList && event.target.classList.contains('ficha__wrap'));
+      if (fuera) {
+        if (fichaDesdeFuera) { state.priceModal = null; renderPriceModal(); }
+        return;
+      }
 
       /* Atributo propio: `data-vista` ya lo usa la pastilla tabla/campo de los
          partidos, que se pinta dentro de esta misma ventana. */
