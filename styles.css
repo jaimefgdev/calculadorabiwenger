@@ -760,6 +760,119 @@ code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft)
 /* Hueco para que la barra no tape el final de la página. */
 .modo-app main { padding-bottom: calc(64px + env(safe-area-inset-bottom)); }
 
+/* ---------- Las tablas, tablas ----------
+   La vista apilada —una fila por dato— gasta media pantalla en ocho cifras: en
+   la tabla del presupuesto son DIEZ líneas por mánager. La app de Biwenger no
+   hace eso: mantiene la tabla y la desliza de lado. Se hace igual.
+
+   Esto deshace, solo en modo app, el apilado que la hoja aplica por debajo de
+   940 px. Va con `!important` porque aquella regla vive en una `@media` y no
+   hay forma de ganarle por especificidad desde fuera. */
+.modo-app .table,
+.modo-app .table thead,
+.modo-app .table tbody,
+.modo-app .table tfoot,
+.modo-app .table tr,
+.modo-app .table th,
+.modo-app .table td { display: revert !important; }
+.modo-app .table { display: table !important; width: max-content; min-width: 100%; }
+.modo-app .table thead { display: table-header-group !important; }
+.modo-app .table tbody { display: table-row-group !important; }
+.modo-app .table tfoot { display: table-footer-group !important; }
+.modo-app .table tr { display: table-row !important; border: 0 !important; margin: 0 !important; padding: 0 !important; }
+.modo-app .table th,
+.modo-app .table td {
+  display: table-cell !important;
+  white-space: nowrap; vertical-align: middle;
+  padding: .5rem .55rem !important;
+}
+/* Y sin el rótulo de cada celda: la cabecera vuelve a decirlo una sola vez. */
+.modo-app .table td::before { content: none !important; }
+.modo-app .table td.col-rank { display: table-cell !important; }
+
+/* El deslizamiento lateral, con inercia. */
+.modo-app .table-scroll {
+  overflow-x: auto !important; overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-x: contain;
+}
+
+/* Y el nombre siempre a la vista: sin esto, al deslizar no sabes de quién es
+   la cifra que estás leyendo. */
+.modo-app .table th:nth-child(2),
+.modo-app .table td:nth-child(2) {
+  position: sticky; left: 0; z-index: 2;
+  background: var(--bg-elev);
+  box-shadow: 1px 0 0 var(--border);
+}
+.modo-app .table thead th:nth-child(2) { z-index: 3; }
+.modo-app .table td.col-rank,
+.modo-app .table th.col-rank {
+  position: sticky; left: 0; z-index: 2;
+  width: 1.6rem; padding-left: .35rem !important; padding-right: .15rem !important;
+  background: var(--bg-elev);
+}
+.modo-app .table th:nth-child(2),
+.modo-app .table td:nth-child(2) { left: 1.9rem; }
+/* La fila abierta y la mía pintan su color también en la columna fija, que si
+   no se queda un cuadrado de otro color pegado a la izquierda. */
+.modo-app .fila--mia > td:nth-child(2),
+.modo-app .fila--mia > td.col-rank { background: color-mix(in srgb, var(--fila-mia), var(--bg-elev)); }
+.modo-app .row-venta > td:nth-child(2),
+.modo-app .row-venta > td.col-rank { background: color-mix(in srgb, var(--fila-venta), var(--bg-elev)); }
+
+/* ---------- Lo que no cabe en una columna de teléfono ----------
+   Todo lo que está pensado en dos o más columnas se pone en una. Y lo que no
+   tiene sentido en una —los rankings, los que suben y bajan, las dos
+   alineaciones de un partido— se desliza de lado, como las tablas: así se ve
+   entero sin encogerlo hasta lo ilegible. */
+.modo-app .market-grid,
+.modo-app .lineup-grid,
+.modo-app .sources,
+.modo-app .sync-fields,
+.modo-app .rankings--dos,
+.modo-app .onces { grid-template-columns: minmax(0, 1fr) !important; }
+
+/* En fila y deslizables. `grid-auto-flow: column` los pone uno tras otro y
+   `scroll-snap` hace que se paren en su sitio, como el carrusel de la app de
+   Biwenger. */
+.modo-app .rankings-fila,
+.modo-app .movers,
+.modo-app .alineaciones {
+  display: grid !important;
+  grid-auto-flow: column;
+  grid-template-columns: none !important;
+  grid-auto-columns: minmax(15rem, 78%);
+  overflow-x: auto; overscroll-behavior-x: contain;
+  scroll-snap-type: x mandatory;
+  -webkit-overflow-scrolling: touch;
+  padding-bottom: .4rem;
+}
+.modo-app .rankings-fila > *,
+.modo-app .movers > *,
+.modo-app .alineaciones > * { scroll-snap-align: start; }
+
+/* Las ocho pastillas del gráfico de puntos, en una fila, dejan celdas de
+   treinta píxeles. Dos filas de cuatro. */
+.modo-app .viz-block .chips { grid-template-columns: repeat(4, minmax(0, 1fr)) !important; }
+
+/* Los cuatro rankings de «Datos», uno debajo de otro; y la fila de tarjetas de
+   la liga (jornadas ganadas, racha, mejor y peor jornada), deslizable. */
+.modo-app .rankings { grid-template-columns: minmax(0, 1fr) !important; }
+.modo-app .rankings-fila {
+  grid-template-columns: none !important;
+  grid-auto-columns: minmax(15rem, 78%);
+}
+.modo-app .rankings-fila > .ranking,
+.modo-app .rankings-fila--2 > .ranking:first-child { grid-column: auto !important; }
+
+/* El campo, a lo ancho de la pantalla: en el móvil no hay nada a su lado. */
+.modo-app .pitch-wrap { width: 100%; }
+
+/* La ficha de un futbolista ocupa casi toda la pantalla, como en Biwenger. */
+.modo-app .picker--modal .picker__card { max-height: 82vh; }
+.modo-app .ficha__wrap { width: 100%; }
+
 /* Todo lo que se pulsa, del tamaño de un dedo. */
 .modo-app .btn,
 .modo-app .ambito,
