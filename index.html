@@ -6,12 +6,28 @@
 <!-- Sin esto, Google devuelve 403 en los avatares al ver un referer ajeno. -->
 <meta name="referrer" content="no-referrer">
 <script>
-  /* En móvil la vista de escritorio se lee mucho mejor que las tablas
-     apiladas: se fuerza un ancho de 1024 px y el navegador la escala para
-     que quepa, igual que al pedir "Sitio para ordenador". */
-  if (screen.width < 900) {
-    document.querySelector('meta[name="viewport"]').setAttribute('content', 'width=1024');
-  }
+  /* El ancho se decide AQUÍ, antes de pintar nada: cambiarlo después hace que
+     la página salte a la vista.
+
+     Por defecto, en el móvil se fuerza un ancho de 1024 px y el navegador la
+     escala para que quepa —igual que al pedir «Sitio para ordenador»—, porque
+     las tablas enteras se leen mejor que apiladas.
+
+     Con el «modo app» puesto (interruptor en Ajustes) se suelta el ancho real
+     del teléfono y se bloquea el zoom, que es lo que hace que se comporte como
+     una aplicación y no como una web. */
+  (function () {
+    var meta = document.querySelector('meta[name="viewport"]');
+    var modoApp = false;
+    try { modoApp = localStorage.getItem('biwenger-calc-movil') === '1'; } catch (e) {}
+    if (modoApp) {
+      meta.setAttribute('content',
+        'width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover');
+      document.documentElement.classList.add('modo-app');
+    } else if (screen.width < 900) {
+      meta.setAttribute('content', 'width=1024');
+    }
+  })();
 </script>
 <title>Calculadora Biwenger jaimefgdev</title>
 <!-- Las caras y los escudos son casi cien imagenes del CDN de Biwenger:
@@ -20,7 +36,7 @@
 <link rel="dns-prefetch" href="https://cdn.biwenger.com">
 <!-- El ?v= se sube en cada publicación: obliga al navegador a bajar el archivo
      nuevo en vez de reutilizar el que tenga en caché. -->
-<link rel="stylesheet" href="styles.css?v=337">
+<link rel="stylesheet" href="styles.css?v=338">
 <!-- La tipografia se pide ya, sin esperar a que el CSS termine de leerse. -->
 <link rel="preload" href="GoogleSans-Regular.woff2" as="font" type="font/woff2" crossorigin>
 <!-- El escudo de Biwenger, el mismo que el del boton de Inicio. -->
@@ -82,6 +98,23 @@
 
   <!-- ============ ENTRADA DE DATOS ============ -->
   <section id="input-panel" class="panel input-panel">
+    <div class="panel__head">
+      <h2>Ajustes</h2>
+    </div>
+
+    <article class="source source--vista">
+      <h3 class="source__title">Vista <span class="source__tag">móvil</span></h3>
+      <label class="interruptor">
+        <input type="checkbox" id="modo-app">
+        <span class="interruptor__palanca" aria-hidden="true"></span>
+        <span class="interruptor__texto">
+          <strong>Modo app</strong>
+          <span class="muted">Se adapta al ancho del teléfono, con tamaños fijos y sin
+            zoom, en vez de encoger la vista de ordenador. Al cambiarlo se recarga la página.</span>
+        </span>
+      </label>
+    </article>
+
     <div class="panel__head">
       <h2>Origen de datos</h2>
       <p class="muted">Todo empieza en 20.000.000 € por jugador. Los datos solo cambian cuando pegas HTML aquí.</p>
@@ -671,7 +704,7 @@
 
 </main>
 
-<script src="app.js?v=407"></script>
+<script src="app.js?v=408"></script>
 <script>
   /* El service worker solo cachea los archivos de la app, nunca los datos.
      Se registra al final para que no compita con la primera carga.

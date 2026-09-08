@@ -702,6 +702,84 @@ code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft)
 .puntos-toggle:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .puntos-toggle[aria-expanded="true"] { color: var(--accent); border-bottom-color: var(--accent); }
 
+
+/* ---------- El interruptor de Ajustes ---------- */
+.source--vista { margin-bottom: 1rem; }
+.interruptor {
+  display: flex; align-items: flex-start; gap: .75rem;
+  cursor: pointer; padding: .4rem 0;
+}
+.interruptor input { position: absolute; opacity: 0; width: 0; height: 0; }
+/* La palanca. 44 px de ancho no es capricho: es lo que hace que se pueda dar
+   con el pulgar sin apuntar. */
+.interruptor__palanca {
+  position: relative; flex: none; width: 44px; height: 26px; margin-top: .1rem;
+  background: var(--bg-surface); border: 1px solid var(--border);
+  border-radius: 100px; transition: background .15s ease, border-color .15s ease;
+}
+.interruptor__palanca::after {
+  content: ''; position: absolute; top: 3px; left: 3px;
+  width: 18px; height: 18px; border-radius: 50%;
+  background: var(--text-faint); transition: transform .15s ease, background .15s ease;
+}
+.interruptor input:checked + .interruptor__palanca {
+  background: var(--accent-soft); border-color: var(--accent);
+}
+.interruptor input:checked + .interruptor__palanca::after {
+  transform: translateX(18px); background: var(--accent);
+}
+.interruptor input:focus-visible + .interruptor__palanca {
+  outline: 2px solid var(--accent); outline-offset: 2px;
+}
+.interruptor__texto { display: flex; flex-direction: column; gap: .15rem; font-size: .84rem; }
+.interruptor__texto .muted { font-size: .78rem; line-height: 1.35; }
+
+/* ---------- Modo app ----------
+   Con el ancho real del teléfono, la vista apilada que ya existe entra sola por
+   sus `@media`. Lo de aquí es lo que la hace parecer una aplicación y no una
+   web encogida: nada de tamaños que se estiran, y todo lo que se toca con el
+   dedo por encima de los 44 px que recomienda Apple.
+   `.modo-app` va en el `<html>`, que es donde lo pone `index.html` antes de
+   pintar; así no hay un salto al arrancar. */
+.modo-app body { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
+
+/* Las pestañas, abajo y fijas, como en la app de Biwenger. Es lo que más
+   cambia la sensación: el pulgar llega sin estirarse. */
+.modo-app #tabs {
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 40;
+  display: flex; justify-content: space-between; gap: 0;
+  margin: 0; padding: .3rem .2rem calc(.3rem + env(safe-area-inset-bottom));
+  background: var(--bg-elev); border-top: 1px solid var(--border);
+  overflow-x: auto; scrollbar-width: none;
+}
+.modo-app #tabs::-webkit-scrollbar { display: none; }
+.modo-app #tabs .tab {
+  flex: 1 0 auto; min-height: 44px; padding: .5rem .6rem;
+  font-size: .74rem; white-space: nowrap; border-radius: var(--radius-sm);
+}
+/* Hueco para que la barra no tape el final de la página. */
+.modo-app main { padding-bottom: calc(64px + env(safe-area-inset-bottom)); }
+
+/* Todo lo que se pulsa, del tamaño de un dedo. */
+.modo-app .btn,
+.modo-app .ambito,
+.modo-app .row-toggle,
+.modo-app .sortable { min-height: 44px; }
+.modo-app .btn--sm { min-height: 38px; }
+.modo-app .field,
+.modo-app input,
+.modo-app select,
+.modo-app textarea {
+  /* 16 px justos: por debajo, Safari hace zoom solo al escribir. */
+  font-size: 16px; min-height: 44px;
+}
+
+/* Y los tamaños, fijos. Los `clamp` de la vista de ordenador encogen con el
+   ancho, y en un teléfono dejaban letra de seis píxeles. */
+.modo-app .ranking__ficha .personal { font-size: 11px; }
+.modo-app .panel { padding: .9rem; margin-bottom: 1rem; }
+.modo-app .table td { padding: .5rem .75rem; }
+
 /* ---------- El campo ---------- */
 .field-label { display: flex; align-items: center; gap: .5rem; font-size: .8rem; color: var(--text-soft); }
 .field-label .field { min-width: 110px; }
