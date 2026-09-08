@@ -132,7 +132,7 @@ const CDN = 'https://cf.biwenger.com/api/v2';
    navegador normal y las cabeceras que este mandaría. */
 /* Marca de versión: se sube en cada cambio y se consulta con ?version=1.
    Sirve para saber desde fuera si el despliegue ha entrado o no. */
-const VERSION = '2026-09-08 · deno 108';
+const VERSION = '2026-09-08 · deno 109';
 
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ' +
   '(KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36';
@@ -1492,7 +1492,11 @@ async function nextRound() {
      su cuenta no puede saberlo: en la portada solo tiene la jornada que viene,
      y la que acaba de terminar ya no está por ningún lado. Aquí sí, y sin una
      sola consulta de más: sale del calendario que ya está guardado. */
-  round = Object.assign({}, round, { finDeLaAnterior: await finDeLaUltimaJornada() });
+  /* Solo si hay jornada: sin ella, `Object.assign({}, null, ...)` montaba un
+     objeto sin id ni número que no es una jornada de nada. */
+  if (round) {
+    round = Object.assign({}, round, { finDeLaAnterior: await finDeLaUltimaJornada() });
+  }
 
   cache.round = round;
   cache.roundAt = Date.now();
@@ -3508,9 +3512,12 @@ async function fixturesDeLaTemporada(score) {
   /* Si el CDN nos ha cortado, se sirve lo que haya: media tabla es infinitamente
      mejor que hacerle esperar por nada. */
   if (!cdnCortado() && faltan.length) {
-    const TANDA = 10;
+    /* De cinco en cinco y con medio segundo: son 38 jornadas la primera vez, y
+       de diez en diez con 120 ms Biwenger nos cortaba las consultas. Se llena
+       una vez y ya no se vuelve a pedir, así que puede ir despacio. */
+    const TANDA = 5;
     for (let i = 0; i < faltan.length; i += TANDA) {
-      if (i) await new Promise(function (listo) { setTimeout(listo, 120); });
+      if (i) await new Promise(function (listo) { setTimeout(listo, 500); });
       await Promise.all(faltan.slice(i, i + TANDA).map(async function (j) {
         const d = await roundDetail(j.id, score).catch(function () { return null; });
         if (!d) return;
