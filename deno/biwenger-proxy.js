@@ -132,7 +132,7 @@ const CDN = 'https://cf.biwenger.com/api/v2';
    navegador normal y las cabeceras que este mandaría. */
 /* Marca de versión: se sube en cada cambio y se consulta con ?version=1.
    Sirve para saber desde fuera si el despliegue ha entrado o no. */
-const VERSION = '2026-09-08 · deno 103';
+const VERSION = '2026-09-08 · deno 104';
 
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ' +
   '(KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36';
@@ -3432,10 +3432,31 @@ async function roundDetail(roundId, score) {
  */
 async function partidosDeJugador(env, id) {
   const score = await sistemaDeLaLiga(env);
-  const names = await players(score);
   const clave = String(id);
+
+  /* Lo de la última vez, guardado. Esto lo abre la ficha de CADA futbolista y
+     por debajo son decenas de consultas; sin copia, cada visita las repetía
+     enteras. Poco rato mientras la jornada rueda —las notas se mueven— y unas
+     horas cuando no. */
+  const viva = !!(cache.round && cache.round.live);
+  const vigencia = viva ? 20 * 60 * 1000 : 6 * 60 * 60 * 1000;
+  const claveKv = 'partidos-' + clave + '-' + score;
+  if (JORNADAS) {
+    try {
+      const crudo = await JORNADAS.get(claveKv);
+      const caja = crudo ? JSON.parse(crudo) : null;
+      if (caja && caja.at && Date.now() - caja.at < vigencia && caja.datos) {
+        return caja.datos;
+      }
+    } catch (error) { /* se calcula abajo */ }
+  }
+
+  /* SIN bajarse el índice a propósito: aquí solo se usaba para el slug —y el
+     número vale igual como ruta— y para saber de qué equipo es, que se saca de
+     sus propios partidos. Ese `await players(score)` eran 220 KB antes de
+     empezar, en un sitio que se abre a cada futbolista que se mira. */
+  const names = (cache.players && cache.playersScore === score) ? cache.players : {};
   const slug = names[clave + ':slug'];
-  const suEquipo = names[clave + ':team'];
 
   /* Su ficha trae, partido a partido, el rival, el resultado, los lances y
      —esto solo está aquí— los minutos jugados. El detalle de jornada no los
@@ -3463,6 +3484,20 @@ async function partidosDeJugador(env, id) {
   const data = (await pedirFicha(slug)) || (await pedirFicha(clave));
   if (!data) return { player: clave, matches: [] };
   const suyos = {};
+
+  /* De qué equipo es, sacado de sus propios informes: en cada uno viene el
+     partido con sus dos equipos y si lo jugó en casa o fuera. Es exacto y no
+     cuesta una consulta. Si no ha jugado ninguno, se tira del índice si está a
+     mano; y si tampoco, se queda sin las jornadas en las que no jugó, que es
+     mucho menos malo que esperar por ellas. */
+  let suEquipo = null;
+  (data.reports || []).forEach(function (informe) {
+    if (suEquipo != null) return;
+    const partido = informe.match || {};
+    const suyo = informe.home ? partido.home : partido.away;
+    if (suyo && suyo.id != null) suEquipo = suyo.id;
+  });
+  if (suEquipo == null) suEquipo = names[clave + ':team'];
 
   (data.reports || []).forEach(function (informe) {
     const partido = informe.match || {};
@@ -3554,8 +3589,14 @@ async function partidosDeJugador(env, id) {
 
   salida.sort(function (a, b) { return (a.number || 0) - (b.number || 0); });
 
-  return { player: clave, name: names[clave] || null, team: suEquipo,
-    teamName: names['team:' + suEquipo] || null, matches: salida };
+  const salidaFinal = { player: clave, name: data.name || names[clave] || null,
+    team: suEquipo, teamName: names['team:' + suEquipo] || null, matches: salida };
+
+  if (JORNADAS) {
+    try { await JORNADAS.put(claveKv, JSON.stringify({ at: Date.now(), datos: salidaFinal })); }
+    catch (error) { /* se recalcula la próxima vez */ }
+  }
+  return salidaFinal;
 }
 
 /**
