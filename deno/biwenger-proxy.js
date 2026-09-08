@@ -132,7 +132,7 @@ const CDN = 'https://cf.biwenger.com/api/v2';
    navegador normal y las cabeceras que este mandaría. */
 /* Marca de versión: se sube en cada cambio y se consulta con ?version=1.
    Sirve para saber desde fuera si el despliegue ha entrado o no. */
-const VERSION = '2026-09-08 · deno 113';
+const VERSION = '2026-09-08 · deno 114';
 
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ' +
   '(KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36';
@@ -4891,7 +4891,7 @@ async function priceSeries(ids, dias, names) {
   const faltan = ids.filter(function (id) {
     return salida[String(id).trim()] === undefined;
   });
-  await porTandas(faltan, 1, 900, function (id) { return uno(id, false); });
+  await porTandas(faltan, 3, 350, function (id) { return uno(id, false); });
   return salida;
 }
 
