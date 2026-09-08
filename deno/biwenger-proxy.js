@@ -132,7 +132,7 @@ const CDN = 'https://cf.biwenger.com/api/v2';
    navegador normal y las cabeceras que este mandaría. */
 /* Marca de versión: se sube en cada cambio y se consulta con ?version=1.
    Sirve para saber desde fuera si el despliegue ha entrado o no. */
-const VERSION = '2026-09-08 · deno 101';
+const VERSION = '2026-09-08 · deno 102';
 
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ' +
   '(KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36';
@@ -4432,6 +4432,39 @@ async function playerPrices(slug, id) {
   if (guardada && guardada.dia === hoy && deAyer) {
     cache.prices[slug] = deAyer;
     return deAyer;
+  }
+
+  /* SI YA LA TENEMOS DE OTRO DÍA, no hace falta volver a bajarla entera: lo
+     único que le falta es el precio de hoy, y ese ya está en el índice de
+     futbolistas, que se descarga igualmente para todo lo demás. Se le añade el
+     día que falta y listo: cero consultas al CDN.
+
+     Esto es lo que quita la espera. Antes, cada futbolista costaba una consulta
+     lenta AL DÍA —y este endpoint solo aguanta una cada pocos segundos, así que
+     abrir el Mercado eran treinta consultas en fila—. Ahora se baja UNA VEZ en
+     la vida y a partir de ahí se remata sola con lo que ya hay en memoria.
+     Solo se usa el índice si YA está descargado: pedirlo aquí a propósito sería
+     cambiar una consulta lenta por otra. */
+  /* Con el índice en memoria Y bajado HOY: si es de ayer, su «precio de hoy»
+     es el de ayer, y meterlo con la fecha de hoy sería inventarse un dato. */
+  const indiceDeHoy = !!(cache.players && cache.playersAt &&
+    isoDay(cache.playersAt) === hoy);
+  if (deAyer && indiceDeHoy) {
+    const precioHoy = cache.players[String(id || slug) + ':price'];
+    if (precioHoy != null) {
+      /* El sello es AAMMDD, como el resto de la serie. */
+      const sello = Number(hoy.slice(2).replace(/-/g, ''));
+      const ultimo = deAyer[deAyer.length - 1];
+      const serie = (ultimo && Number(ultimo[0]) === sello)
+        ? deAyer
+        : deAyer.concat([[sello, Math.round(precioHoy)]]);
+      cache.prices[slug] = serie;
+      if (JORNADAS) {
+        try { await JORNADAS.put(clave, JSON.stringify({ dia: hoy, prices: serie })); }
+        catch (error) { /* se vuelve a rematar en la siguiente */ }
+      }
+      return serie;
+    }
   }
 
   /* Si Biwenger acaba de cortarnos, NO se le pregunta: insistir mientras corta
