@@ -132,7 +132,7 @@ const CDN = 'https://cf.biwenger.com/api/v2';
    navegador normal y las cabeceras que este mandaría. */
 /* Marca de versión: se sube en cada cambio y se consulta con ?version=1.
    Sirve para saber desde fuera si el despliegue ha entrado o no. */
-const VERSION = '2026-09-08 · deno 121';
+const VERSION = '2026-09-08 · deno 122';
 
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ' +
   '(KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36';
@@ -3328,6 +3328,22 @@ function mezclarJornada(guardado, fresco) {
   const previas = {};
   guardado.standings.forEach(function (fila) { previas[fila.id] = fila; });
 
+  /* ¿EL CÁLCULO DE AHORA ES DE FIAR? La señal es que alguien tenga nota. Si
+     Biwenger nos está cortando, no llega el detalle de la jornada y TODOS los
+     alineados salen sin nota: la tabla entera a cero. Ya se evita guardar eso,
+     pero al servir también pisaba lo guardado, que sí era bueno; la jornada 6
+     pasó de 12-9-3-2 a todo ceros por esto.
+
+     Ochenta y ocho alineados y ni uno con nota no es un resultado, es un fallo.
+     Cuando pasa, mandan los puntos guardados. */
+  const notasFrescas = (fresco.standings || []).some(function (fila) {
+    return (fila.xi || []).some(function (j) { return j && j.points != null; });
+  });
+  const notasGuardadas = guardado.standings.some(function (fila) {
+    return (fila.xi || []).some(function (j) { return j && j.points != null; });
+  });
+  const fiable = notasFrescas || !notasGuardadas;
+
   /* Un cero fresco ya es el dato bueno siempre que venga con su once: lo
      calcula roundBoard mirando partido a partido si cada jugador ha
      terminado el suyo, así que si de los once nadie ha acabado, cero puntos
@@ -3345,13 +3361,14 @@ function mezclarJornada(guardado, fresco) {
       name: fila.name || antes.name,
       icon: fila.icon || antes.icon,
       position: fila.position != null ? fila.position : antes.position,
-      points: conOnce ? fila.points : (antes.points != null ? antes.points : fila.points),
+      points: (conOnce && fiable) ? fila.points
+        : (antes.points != null ? antes.points : fila.points),
       pointsOfficial: fila.pointsOfficial != null ? fila.pointsOfficial : antes.pointsOfficial,
-      played: fila.played != null ? fila.played : antes.played,
+      played: (fiable && fila.played != null) ? fila.played : antes.played,
       counts: fila.counts !== undefined ? fila.counts : antes.counts,
       gaps: fila.gaps !== undefined ? fila.gaps : antes.gaps,
       type: fila.type || antes.type,
-      xi: fila.xi && fila.xi.length ? fila.xi : (antes.xi || []),
+      xi: (fiable && fila.xi && fila.xi.length) ? fila.xi : (antes.xi || []),
       bench: fila.bench && fila.bench.length ? fila.bench : (antes.bench || []),
       xiValue: fila.xiValue || antes.xiValue || 0,
       /* Sin esto el día de los precios se perdía en cada mezcla y el valor del
@@ -3370,8 +3387,8 @@ function mezclarJornada(guardado, fresco) {
          de antes y recalcularlo cuando las primas vuelvan. */
       /* Se le pasan los puntos de la fila para que un cero de verdad no se
          tape con un abono de otro cálculo. */
-      abono: mejorAbono(fila.abono, antes.abono,
-        conOnce ? fila.points : (antes.points != null ? antes.points : fila.points))
+      abono: mejorAbono(fiable ? fila.abono : null, antes.abono,
+        (conOnce && fiable) ? fila.points : (antes.points != null ? antes.points : fila.points))
     };
   });
   return fresco;
