@@ -132,7 +132,7 @@ const CDN = 'https://cf.biwenger.com/api/v2';
    navegador normal y las cabeceras que este mandaría. */
 /* Marca de versión: se sube en cada cambio y se consulta con ?version=1.
    Sirve para saber desde fuera si el despliegue ha entrado o no. */
-const VERSION = '2026-09-08 · deno 104';
+const VERSION = '2026-09-08 · deno 105';
 
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ' +
   '(KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36';
@@ -3491,11 +3491,12 @@ async function partidosDeJugador(env, id) {
      mano; y si tampoco, se queda sin las jornadas en las que no jugó, que es
      mucho menos malo que esperar por ellas. */
   let suEquipo = null;
+  let suClub = null;
   (data.reports || []).forEach(function (informe) {
     if (suEquipo != null) return;
     const partido = informe.match || {};
     const suyo = informe.home ? partido.home : partido.away;
-    if (suyo && suyo.id != null) suEquipo = suyo.id;
+    if (suyo && suyo.id != null) { suEquipo = suyo.id; suClub = suyo.name || null; }
   });
   if (suEquipo == null) suEquipo = names[clave + ':team'];
 
@@ -3590,7 +3591,11 @@ async function partidosDeJugador(env, id) {
   salida.sort(function (a, b) { return (a.number || 0) - (b.number || 0); });
 
   const salidaFinal = { player: clave, name: data.name || names[clave] || null,
-    team: suEquipo, teamName: names['team:' + suEquipo] || null, matches: salida };
+    team: suEquipo,
+    /* El nombre del club sale de sus propios partidos; el índice solo se usa de
+       respaldo cuando no ha jugado ninguno y encima está a mano. */
+    teamName: suClub || names['team:' + suEquipo] || null,
+    matches: salida };
 
   if (JORNADAS) {
     try { await JORNADAS.put(claveKv, JSON.stringify({ at: Date.now(), datos: salidaFinal })); }
