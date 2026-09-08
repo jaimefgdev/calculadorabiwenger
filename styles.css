@@ -378,17 +378,19 @@ code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft)
    la cuenta atrás del arranque, que es donde se mira el tiempo, y desaparece
    solo en cuanto se cobra. En gris: es un dato de espera, no una alerta. */
 .round__entrega {
-  margin: 0; flex: none; max-width: 15rem;
-  font-size: .74rem; color: var(--text-soft); line-height: 1.35; text-align: right;
+  /* `margin-left: auto` la empuja al borde derecho de la tarjeta, a la altura
+     de «Jornada 5». Pegada al reloj se leía como parte de la cuenta atrás. */
+  margin: 0 0 0 auto; flex: none;
+  font-size: .78rem; color: var(--text-soft); white-space: nowrap; text-align: right;
 }
-.round__entrega strong { color: var(--marca, #ffc233); white-space: nowrap; }
-/* Que es una estimación y no un dato oficial se dice, y en pequeño. */
-.round__entrega-nota { display: block; color: var(--text-faint); font-size: .68rem; }
+.round__entrega strong { color: var(--marca, #ffc233); }
 
-/* En pantalla estrecha se pone debajo y centrado, que a la derecha del reloj no
-   cabe y parte el rótulo en cuatro líneas. */
-@media (max-width: 620px) {
-  .round__entrega { max-width: none; width: 100%; text-align: center; }
+/* En pantalla estrecha baja debajo y se centra: a la derecha del reloj no cabe
+   y partiría el rótulo en dos líneas, que es justo lo que se quería evitar. */
+@media (max-width: 700px) {
+  .round__entrega {
+    margin: .2rem 0 0; width: 100%; text-align: center; white-space: normal;
+  }
 }
 
 .round__games { margin-top: .9rem; border-top: 1px solid var(--border); padding-top: .3rem; }

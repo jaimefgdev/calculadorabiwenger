@@ -2327,9 +2327,13 @@
     if (cuando == null) { caja.hidden = true; caja.textContent = ''; return; }
     const queda = timeLeft(new Date(cuando).toISOString());
     caja.hidden = false;
+    /* Sin la coletilla de «estimado: 17:00 del día siguiente»: partía el rótulo
+       en dos líneas y lo que se mira es el tiempo que queda. Que es una
+       estimación se dice al pasar por encima. */
+    caja.title = 'Estimado: Biwenger reparte a las 17:00 del día siguiente al ' +
+      'último partido de la jornada.';
     caja.innerHTML = 'Entrega de puntos y abonos ' +
-      (queda ? 'en <strong>' + escapeHtml(queda.text) + '</strong>' : 'ya mismo') +
-      ' <span class="round__entrega-nota">(estimado: 17:00 del día siguiente)</span>';
+      (queda ? 'en <strong>' + escapeHtml(queda.text) + '</strong>' : 'ya mismo');
   }
 
   function tickRound() {
