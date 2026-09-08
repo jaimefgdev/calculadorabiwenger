@@ -132,7 +132,7 @@ const CDN = 'https://cf.biwenger.com/api/v2';
    navegador normal y las cabeceras que este mandaría. */
 /* Marca de versión: se sube en cada cambio y se consulta con ?version=1.
    Sirve para saber desde fuera si el despliegue ha entrado o no. */
-const VERSION = '2026-09-08 · deno 116';
+const VERSION = '2026-09-08 · deno 117';
 
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ' +
   '(KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36';
@@ -4054,7 +4054,12 @@ async function roundBoard(env, headers, jornada, listaNombres) {
     const guardada = await kvLeer(env, round.id).catch(function () { return null; });
     const antiguos = {};
     (((guardada || {}).standings) || []).forEach(function (fila) {
-      if (fila && fila.xiValueDay === dia && fila.xiValue != null) antiguos[String(fila.id)] = fila.xiValue;
+      /* `xiValueOk` es la marca de «este valor se calculó con los precios de
+         AQUEL día, todos». Los guardados sin ella son de antes de arreglar
+         esto: podían llevar dentro precios de hoy y hay que rehacerlos. */
+      if (fila && fila.xiValueDay === dia && fila.xiValueOk && fila.xiValue != null) {
+        antiguos[String(fila.id)] = fila.xiValue;
+      }
     });
     const faltan = standings.some(function (fila) { return antiguos[String(fila.id)] == null; });
 
@@ -4062,17 +4067,33 @@ async function roundBoard(env, headers, jornada, listaNombres) {
       standings.forEach(function (fila) {
         fila.xiValue = antiguos[String(fila.id)];
         fila.xiValueDay = dia;
+        fila.xiValueOk = true;
       });
     } else if (alineados.length) {
       const precios = await pricesOnDay(alineados, dia, names).catch(function () { return {}; });
       standings.forEach(function (fila) {
-        fila.xiValue = (fila.xi || []).reduce(function (suma, jugador) {
+        const suyos = fila.xi || [];
+        if (!suyos.length) return;
+
+        /* Con TODOS los precios de aquel día, el valor es el bueno y se sella
+           con la fecha: a partir de ahí queda congelado y no se vuelve a
+           calcular. Es lo que hace Biwenger, y es lo que debe ser: el valor del
+           once de la jornada 2 no cambia porque hoy suba Lewandowski. */
+        const completos = suyos.every(function (j) {
+          return precios[String(j.id)] != null;
+        });
+
+        /* Si falta alguno se pone lo que se pueda —con el precio de hoy para
+           el que falte, que es lo más parecido a mano— pero NO se sella. Antes
+           sí se sellaba, y ese es el fallo: una cifra con precios de hoy se
+           guardaba como si fuera la del día del arranque, y ya nunca se
+           corrigía. Sin sello se vuelve a intentar hasta que salga entera. */
+        fila.xiValue = suyos.reduce(function (suma, jugador) {
           const ese = precios[String(jugador.id)];
           return suma + (ese != null ? ese : (jugador.marketValue || 0));
         }, 0);
+        if (completos) { fila.xiValueDay = dia; fila.xiValueOk = true; }
       });
-      /* Para poder decir de cuándo son esos precios. */
-      standings.forEach(function (fila) { fila.xiValueDay = dia; });
     }
   }
 
