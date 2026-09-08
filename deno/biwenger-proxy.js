@@ -132,7 +132,7 @@ const CDN = 'https://cf.biwenger.com/api/v2';
    navegador normal y las cabeceras que este mandaría. */
 /* Marca de versión: se sube en cada cambio y se consulta con ?version=1.
    Sirve para saber desde fuera si el despliegue ha entrado o no. */
-const VERSION = '2026-09-08 · deno 95';
+const VERSION = '2026-09-08 · deno 96';
 
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ' +
   '(KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36';
@@ -411,6 +411,34 @@ const app = {
             prueba.fallo = String((error && error.name) || '') + ': ' + String((error && error.message) || error);
           }
           prueba.ms = Date.now() - t0;
+        }
+
+        /* ?version=2&precios=<id> prueba la serie de precios de UNO y cuenta
+           que ha pasado. Es la unica forma de distinguir «el CDN no contesta»
+           de «contesta 200 pero sin el campo prices» de «nos ha cortado»: la
+           serie se pide dentro de un `catch` que se lo traga todo, y desde
+           fuera solo se veia un objeto vacio. */
+        const quienPrecios = url.searchParams.get('precios');
+        if (quienPrecios && /^[0-9]+$/.test(quienPrecios)) {
+          const t1 = Date.now();
+          prueba = prueba || {};
+          prueba.precios = { id: quienPrecios, estado: null, bytes: 0,
+            entradas: 0, ms: 0, fallo: null };
+          try {
+            const r = await fetchSinTope(CDN + '/players/la-liga/' + quienPrecios +
+              '?lang=es&fields=*,prices',
+              { headers: NAVEGADOR, signal: AbortSignal.timeout(25000) });
+            prueba.precios.estado = r.status;
+            const texto = await r.text();
+            prueba.precios.bytes = texto.length;
+            const cuerpo = JSON.parse(texto);
+            prueba.precios.entradas = ((cuerpo.data || {}).prices || []).length;
+            prueba.precios.campos = Object.keys(cuerpo.data || {}).slice(0, 12);
+          } catch (error) {
+            prueba.precios.fallo = String((error && error.name) || '') + ': ' +
+              String((error && error.message) || error);
+          }
+          prueba.precios.ms = Date.now() - t1;
         }
 
         return new Response(JSON.stringify({
