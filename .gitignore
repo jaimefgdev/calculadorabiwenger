@@ -1,0 +1,11 @@
+# Lo que se queda en este ordenador y no sube a GitHub.
+
+# El proxy viejo de Cloudflare. Ya no se despliega —ahora corre en Deno, desde
+# la carpeta deno/— pero se guarda por si algun dia hace falta volver a el.
+worker/
+
+# Capturas para enseñar cosas por el chat.
+nn*.png
+
+# Ajustes locales de Claude Code.
+.claude/
