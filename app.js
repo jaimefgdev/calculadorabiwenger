@@ -714,6 +714,7 @@
     tab: 'inicio',
     expandedManager: null,
     expandedPoints: null,   // desglose de puntos por futbolista, en la clasificación
+    mejorOnce: null,        // de quién se está viendo el mejor once de la temporada
     puntosDetalle: null,    // gráfico de puntos por jornada de un futbolista
     recuento: null,         // goles, asistencias y tarjetas de toda la competición
     recuentoCargando: false,
@@ -7193,6 +7194,19 @@
       });
     });
 
+    return mejorOnceDe(porPuesto);
+  }
+
+  /**
+   * El mejor once que sale de un grupo de futbolistas ya repartidos por
+   * demarcación y ordenados de más a menos puntos.
+   *
+   * Se prueban los catorce sistemas y gana el que más suma: con los mismos
+   * futbolistas, un 3-4-3 y un 5-3-2 no dan lo mismo. Sale aparte porque lo
+   * usan dos sitios —el once ideal de una jornada y el mejor once de un
+   * mánager— y tenerlo dos veces es tenerlo mal una de las dos.
+   */
+  function mejorOnceDe(porPuesto) {
     if (!porPuesto[1].length) return null;
 
     let mejor = null;
@@ -7212,6 +7226,31 @@
     });
 
     return mejor;
+  }
+
+  /**
+   * El mejor once de un mánager en toda la temporada.
+   *
+   * No es una alineación que haya puesto: es la que habría puesto sabiendo lo
+   * que iba a pasar. Se cogen TODOS los futbolistas que ha alineado alguna vez
+   * —con lo que sumaron estando en su once, no con su total de la temporada—
+   * y se elige el mejor once posible entre ellos.
+   */
+  function mejorOnceDelManager(quien) {
+    const porPuesto = { 1: [], 2: [], 3: [], 4: [] };
+
+    futbolistasAlineados(quien).forEach(function (jugador) {
+      const puesto = jugador.position || 3;
+      (porPuesto[puesto] || porPuesto[3]).push(jugador);
+    });
+
+    Object.keys(porPuesto).forEach(function (puesto) {
+      porPuesto[puesto].sort(function (a, b) {
+        return (b.points - a.points) || ((b.played || 0) - (a.played || 0));
+      });
+    });
+
+    return mejorOnceDe(porPuesto);
   }
 
   function renderBestXi(jornada) {
@@ -7572,8 +7611,37 @@
             : '');
         }).join('') + '</tbody></table>';
 
+    /* El mejor once que se le podía sacar a lo que ha alineado. Va detrás de
+       una píldora porque es un campo entero: abierto siempre, empujaría la
+       tabla de puntos fuera de la pantalla. */
+    const once = state.mejorOnce === row.name ? mejorOnceDelManager(row.name) : null;
+    const hayOnce = suyos.length > 0;
+
+    const campo = !once
+      ? ''
+      : '<div class="once once--manager">' +
+          '<p class="muted once__pie">' + escapeHtml(once.type) + ' · <strong>' +
+            once.points + ' puntos</strong> entre los once</p>' +
+          '<div class="pitch-wrap">' + staticPitch(once.type, once.players, false) + '</div>' +
+        '</div>';
+
+    /* Si no le sale un once entero —sin portero, o sin gente para ninguno de
+       los catorce sistemas— se dice, en vez de dejar la píldora sin efecto. */
+    const aviso = (state.mejorOnce === row.name && !once)
+      ? '<p class="muted">Todavía no ha alineado suficientes futbolistas ' +
+        'como para sacarle un once completo.</p>'
+      : '';
+
     return '<tr class="detail-row"><td class="detail-cell" colspan="' + MANAGER_COLUMNS + '"><div class="detail">' +
-      '<h3 class="bench__title">Puntos por futbolista alineado</h3>' + cuerpo +
+      '<div class="detail__cab">' +
+        '<h3 class="bench__title">Puntos por futbolista alineado</h3>' +
+        (hayOnce
+          ? '<button type="button" class="ambito ficha__comparar' +
+            (state.mejorOnce === row.name ? ' ambito--on' : '') +
+            '" data-mejor-once="' + escapeHtml(row.name) + '">Mejor 11</button>'
+          : '') +
+      '</div>' +
+      campo + aviso + cuerpo +
     '</div></td></tr>';
   }
 
@@ -12263,6 +12331,16 @@
         renderManagers();
         return;
       }
+      /* La píldora del mejor once. Va ANTES que `[data-puntos]` porque vive
+         dentro del mismo desglose y, si no, el clic se lo llevaba la fila. */
+      const mejor = event.target.closest('[data-mejor-once]');
+      if (mejor) {
+        const quien = mejor.getAttribute('data-mejor-once');
+        state.mejorOnce = state.mejorOnce === quien ? null : quien;
+        renderManagers();
+        return;
+      }
+
       /* Dentro del desglose, cada futbolista abre su gráfico por jornada. */
       const detalle = event.target.closest('[data-puntos]');
       if (detalle) {
@@ -12277,6 +12355,8 @@
       if (puntos) {
         const quien = puntos.getAttribute('data-manager-points');
         state.expandedPoints = state.expandedPoints === quien ? null : quien;
+        /* Cerrado el desglose, el campo que colgaba de él no tiene dónde vivir. */
+        if (state.expandedPoints !== quien) state.mejorOnce = null;
         renderManagers();
         return;
       }

@@ -974,6 +974,19 @@ code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft)
 .picker__meta { font-size: .68rem; color: var(--text-faint); }
 
 .bench__title { font-size: .8rem; text-transform: uppercase; letter-spacing: .04em; color: var(--text-faint); margin: 1rem 0 .5rem; }
+
+/* El rótulo de un desglose y su píldora, en la misma línea: la píldora a la
+   derecha del todo y el rótulo sin su margen de arriba, que ahí sobra. */
+.detail__cab {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: .6rem; flex-wrap: wrap; margin-bottom: .5rem;
+}
+.detail__cab .bench__title { margin: 0; }
+
+/* El mejor once de un mánager, dentro de su desglose. El campo se queda a su
+   ancho normal y centrado; el pie va encima, que es donde se lee antes. */
+.once--manager { margin: 0 0 1rem; }
+.once--manager .once__pie { margin: 0 0 .5rem; text-align: center; font-size: .8rem; }
 /* El campo manda el ancho (460 px como mucho) y los suplentes ocupan lo que
    quede a su derecha. En pantalla estrecha bajan debajo. */
 .lineup-grid {
