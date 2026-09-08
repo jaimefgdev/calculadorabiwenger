@@ -132,7 +132,7 @@ const CDN = 'https://cf.biwenger.com/api/v2';
    navegador normal y las cabeceras que este mandaría. */
 /* Marca de versión: se sube en cada cambio y se consulta con ?version=1.
    Sirve para saber desde fuera si el despliegue ha entrado o no. */
-const VERSION = '2026-09-08 · deno 106';
+const VERSION = '2026-09-08 · deno 107';
 
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ' +
   '(KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36';
@@ -168,7 +168,9 @@ const NAVEGADOR = {
 let cache = { token: null, account: null, players: null, playersAt: 0, prices: {},
   round: null, roundAt: 0, tv: null, tvAt: 0, calendar: null, calendarAt: 0,
   board: null, boardAt: 0, limitedUntil: 0, lastGood: null, forzar: false,
-  primas: null };
+  primas: null,
+  /* El calendario de partidos de las 38 jornadas, uno para toda la liga. */
+  fixtures: null, fixturesScore: null, fixturesAt: 0 };
 
 const app = {
   /* Todo lo que sale por aquí pasa antes por `ponerNombresQueFaltan`, que
@@ -3430,6 +3432,82 @@ async function roundDetail(roundId, score) {
  * resultado y lo que hizo él (goles, asistencias, tarjetas, cambios y nota).
  * Sale del detalle de cada jornada, que ya está cacheado.
  */
+/**
+ * Los partidos de las 38 jornadas, guardados de una vez para toda la liga.
+ *
+ * La ficha de un futbolista tiene que enseñar también las jornadas en las que
+ * NO jugó, con el partido de su equipo en blanco. Para eso se bajaba la jornada
+ * entera, una por una: con cuatro jugadas de 38 eran TREINTA Y CUATRO descargas
+ * por futbolista, y las mismas treinta y cuatro para el siguiente.
+ *
+ * Y son las mismas para los 579. Así que se piden una vez, se guardan, y de ahí
+ * se sirven todas las fichas. Solo se vuelven a pedir las jornadas que aún
+ * pueden cambiar: una acabada ya no se mueve nunca.
+ */
+async function fixturesDeLaTemporada(score) {
+  const clave = 'fixtures-v1-' + (score || '');
+  const VIGENCIA = 60 * 60 * 1000;
+
+  if (cache.fixtures && cache.fixturesScore === score &&
+      Date.now() - cache.fixturesAt < 5 * 60 * 1000) {
+    return cache.fixtures;
+  }
+
+  let rondas = {};
+  if (JORNADAS) {
+    try {
+      const crudo = await JORNADAS.get(clave);
+      const caja = crudo ? JSON.parse(crudo) : null;
+      if (caja && caja.rondas) rondas = caja.rondas;
+    } catch (error) { /* se piden todas */ }
+  }
+
+  const calendario = await seasonRounds().catch(function () { return []; });
+  const propias = calendario.filter(function (j) { return (j.part || 1) === 1; });
+
+  const faltan = propias.filter(function (j) {
+    const guardada = rondas[String(j.id)];
+    if (!guardada) return true;
+    /* Una jornada acabada no cambia jamás: no se vuelve a pedir nunca. */
+    if (guardada.cerrada) return false;
+    return Date.now() - (guardada.at || 0) > VIGENCIA;
+  });
+
+  /* Si el CDN nos ha cortado, se sirve lo que haya: media tabla es infinitamente
+     mejor que hacerle esperar por nada. */
+  if (!cdnCortado() && faltan.length) {
+    const TANDA = 10;
+    for (let i = 0; i < faltan.length; i += TANDA) {
+      if (i) await new Promise(function (listo) { setTimeout(listo, 120); });
+      await Promise.all(faltan.slice(i, i + TANDA).map(async function (j) {
+        const d = await roundDetail(j.id, score).catch(function () { return null; });
+        if (!d) return;
+        rondas[String(j.id)] = {
+          at: Date.now(),
+          cerrada: (d.matches || []).length > 0 &&
+            (d.matches || []).every(function (m) { return m.status === 'finished'; }),
+          /* Solo lo que hace falta para pintar la fila en blanco: sin esto la
+             caja se pasaba del tamaño que admite el almacén. */
+          matches: (d.matches || []).map(function (m) {
+            return { home: m.home, away: m.away, homeId: m.homeId, awayId: m.awayId,
+              homeScore: m.homeScore, awayScore: m.awayScore,
+              start: m.start || null, status: m.status || null };
+          })
+        };
+      }));
+    }
+    if (JORNADAS) {
+      try { await JORNADAS.put(clave, JSON.stringify({ rondas: rondas })); }
+      catch (error) { /* se recalcula */ }
+    }
+  }
+
+  cache.fixtures = rondas;
+  cache.fixturesScore = score;
+  cache.fixturesAt = Date.now();
+  return rondas;
+}
+
 async function partidosDeJugador(env, id) {
   const score = await sistemaDeLaLiga(env);
   const clave = String(id);
@@ -3542,28 +3620,10 @@ async function partidosDeJugador(env, id) {
   /* Y el calendario entero, para que estén las 38 jornadas aunque no jugara. */
   const calendario = await seasonRounds().catch(function () { return []; });
 
-  /* Las jornadas en las que no jugó hay que mirarlas una a una para sacar el
-     partido de su equipo. Se piden TODAS A LA VEZ: en fila iban treinta y ocho
-     esperas encadenadas y la primera consulta de cada arranque tardaba veinte
-     segundos. En paralelo tarda lo que la más lenta. */
-  const propias = calendario.filter(function (jornada) {
-    return (jornada.part || 1) === 1 && !suyos[jornada.number];
-  });
-  const detalles = {};
-  /* Por tandas de seis con un respiro, no las treinta y ocho de golpe. Una
-     ráfaga así es de las que hacen que Biwenger corte las consultas, y cuando
-     corta no falla solo esto: cae también el índice de futbolistas y la web se
-     queda sin nombres ni precios. Casi todas salen de la caché, así que en la
-     práctica esto no se nota. */
-  const TANDA_JORNADAS = 10;
-  for (let i = 0; i < propias.length; i += TANDA_JORNADAS) {
-    if (i) await new Promise(function (listo) { setTimeout(listo, 120); });
-    await Promise.all(propias.slice(i, i + TANDA_JORNADAS).map(function (jornada) {
-      return roundDetail(jornada.id, score)
-        .then(function (d) { detalles[jornada.id] = d; })
-        .catch(function () { detalles[jornada.id] = null; });
-    }));
-  }
+  /* Las jornadas en las que no jugó salen del calendario compartido, que ya
+     está guardado: antes se bajaba cada una de esas jornadas ENTERA, y son las
+     mismas para los 579 futbolistas. */
+  const detalles = await fixturesDeLaTemporada(score).catch(function () { return {}; });
 
   const salida = [];
   for (let i = 0; i < calendario.length; i++) {
@@ -3574,7 +3634,7 @@ async function partidosDeJugador(env, id) {
     if (suyos[numero]) { salida.push(suyos[numero]); continue; }
 
     /* Sin jugar: se busca el partido de su equipo para enseñarlo en blanco. */
-    const detalle = detalles[jornada.id];
+    const detalle = detalles[String(jornada.id)];
     const juego = ((detalle && detalle.matches) || []).filter(function (partido) {
       return String(partido.homeId) === String(suEquipo) || String(partido.awayId) === String(suEquipo);
     })[0];
