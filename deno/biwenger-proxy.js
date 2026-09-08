@@ -132,7 +132,7 @@ const CDN = 'https://cf.biwenger.com/api/v2';
    navegador normal y las cabeceras que este mandaría. */
 /* Marca de versión: se sube en cada cambio y se consulta con ?version=1.
    Sirve para saber desde fuera si el despliegue ha entrado o no. */
-const VERSION = '2026-09-08 · deno 119';
+const VERSION = '2026-09-08 · deno 120';
 
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ' +
   '(KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36';
@@ -201,6 +201,11 @@ const app = {
 
     if (!env.CALC_KEY) return fail(500, 'Falta el secreto CALC_KEY en el Worker.', origin);
     if (key !== env.CALC_KEY) return fail(401, 'Clave incorrecta.', origin);
+
+    /* Si otra instancia se llevó un corte de Biwenger, esta lo respeta desde el
+       primer momento. Es UNA lectura del almacén, y ahorra las decenas de
+       consultas que renovaban el castigo. */
+    await frenoCdnGuardado();
 
     try {
       /* Modo diagnóstico: ?probe=/ruta devuelve el estado y el principio de la
@@ -4794,10 +4799,29 @@ function cdnCortado() {
 
 function apuntarCorteDelCdn(respuesta) {
   if (respuesta && (respuesta.status === 429 || respuesta.status === 403)) {
-    cache.cdnHasta = Date.now() + 90 * 1000;
+    /* Diez minutos, no noventa segundos. Con minuto y medio se volvía a
+       preguntar en seguida, caía otro 429 y el castigo se renovaba solo:
+       cuarenta veces por hora entre las fichas, los precios y el recuento. */
+    cache.cdnHasta = Date.now() + 10 * 60 * 1000;
+    /* Y guardado, que si no cada instancia nueva de Deno empieza con el freno a
+       cero y vuelve a preguntar como si nada. Sin esperar: que la escritura no
+       retrase la respuesta. */
+    if (JORNADAS) {
+      JORNADAS.put('freno-cdn', String(cache.cdnHasta)).catch(function () {});
+    }
     return true;
   }
   return false;
+}
+
+/** El freno del CDN que dejó apuntado otra instancia. */
+async function frenoCdnGuardado() {
+  if (!JORNADAS) return;
+  try {
+    const crudo = await JORNADAS.get('freno-cdn');
+    const hasta = Number(crudo) || 0;
+    if (hasta > cache.cdnHasta) cache.cdnHasta = hasta;
+  } catch (error) { /* se sigue con lo que haya en memoria */ }
 }
 
 /**
