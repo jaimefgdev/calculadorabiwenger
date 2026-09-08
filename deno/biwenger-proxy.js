@@ -132,7 +132,7 @@ const CDN = 'https://cf.biwenger.com/api/v2';
    navegador normal y las cabeceras que este mandaría. */
 /* Marca de versión: se sube en cada cambio y se consulta con ?version=1.
    Sirve para saber desde fuera si el despliegue ha entrado o no. */
-const VERSION = '2026-09-08 · deno 100';
+const VERSION = '2026-09-08 · deno 101';
 
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ' +
   '(KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36';
@@ -761,9 +761,35 @@ async function login(env) {
 }
 
 /** Llama a la API con el token; si responde 401, reintenta una vez tras relogin. */
+/**
+ * Hasta cuándo nos ha cortado Biwenger, según el KV.
+ *
+ * `cache.limitedUntil` vive en MEMORIA, y Deno Deploy levanta instancias nuevas
+ * a todas horas: cada una empezaba con el freno a cero y volvía a preguntar,
+ * así que el castigo no se respetaba casi nunca y se renovaba solo. Guardado en
+ * el KV lo ven todas.
+ */
+async function frenoGuardado() {
+  if (!JORNADAS) return 0;
+  try {
+    const crudo = await JORNADAS.get('freno-api');
+    const hasta = Number(crudo) || 0;
+    if (hasta > cache.limitedUntil) cache.limitedUntil = hasta;
+    return cache.limitedUntil;
+  } catch (error) { return cache.limitedUntil; }
+}
+
+async function apuntarFreno(ms) {
+  cache.limitedUntil = Date.now() + ms;
+  if (!JORNADAS) return;
+  try { await JORNADAS.put('freno-api', String(cache.limitedUntil)); }
+  catch (error) { /* al menos vale para esta instancia */ }
+}
+
 async function api(env, path, extra) {
   /* Si Biwenger ya nos ha cortado, no se le vuelve a llamar hasta que pase el
      castigo: seguir insistiendo alarga el bloqueo. */
+  if (!cache.forzar) await frenoGuardado();
   if (cache.limitedUntil && Date.now() < cache.limitedUntil && !cache.forzar) {
     const quedan = Math.ceil((cache.limitedUntil - Date.now()) / 1000);
     throw new Error('Biwenger ha limitado las consultas. Se reintenta en ' + quedan + ' s.');
@@ -786,9 +812,17 @@ async function api(env, path, extra) {
     await new Promise(function (listo) { setTimeout(listo, 1200); });
     response = await call(token);
     if (response.status === 429) {
-      /* Cinco minutos de tregua: durante ese rato no se llama a Biwenger. */
-      cache.limitedUntil = Date.now() + 90 * 1000;
-      throw new Error('Biwenger ha limitado las consultas. Se reintenta en un minuto y medio.');
+      /* Cuánto callarse lo dice ÉL. Cuando el corte es de los gordos contesta
+         «vuelva a intentarlo en unas horas», y ahí la tregua de minuto y medio
+         que había era contraproducente: al pasar, se volvía a preguntar, caía
+         otro 429 y el castigo se renovaba solo. Cuarenta veces por hora. */
+      const dice = await response.clone().text().catch(function () { return ''; });
+      const horas = /hora/i.test(dice);
+      await apuntarFreno(horas ? 2 * 60 * 60 * 1000 : 10 * 60 * 1000);
+      throw new Error(horas
+        ? 'Biwenger ha cortado las consultas y pide esperar unas horas. ' +
+          'Hasta entonces se sirve lo último que se guardó.'
+        : 'Biwenger ha limitado las consultas. Se reintenta en diez minutos.');
     }
   }
 
