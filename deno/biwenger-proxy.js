@@ -132,7 +132,7 @@ const CDN = 'https://cf.biwenger.com/api/v2';
    navegador normal y las cabeceras que este mandaría. */
 /* Marca de versión: se sube en cada cambio y se consulta con ?version=1.
    Sirve para saber desde fuera si el despliegue ha entrado o no. */
-const VERSION = '2026-09-08 · deno 96';
+const VERSION = '2026-09-08 · deno 97';
 
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ' +
   '(KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36';
@@ -4366,10 +4366,16 @@ async function playerPrices(slug, id) {
       if (crudo) guardada = JSON.parse(crudo);
     } catch (error) { /* se pide abajo */ }
   }
-  if (guardada && guardada.dia === hoy && (guardada.prices || []).length) {
-    cache.prices[slug] = guardada.prices;
-    return guardada.prices;
+  const deAyer = (guardada && (guardada.prices || []).length) ? guardada.prices : null;
+  if (guardada && guardada.dia === hoy && deAyer) {
+    cache.prices[slug] = deAyer;
+    return deAyer;
   }
+
+  /* Si Biwenger acaba de cortarnos, NO se le pregunta: insistir mientras corta
+     es lo que alarga el castigo, y además tumba el índice y deja la web sin
+     nombres ni precios. Se sirve lo que haya guardado y se reintenta luego. */
+  if (cdnCortado()) return deAyer;
 
   /* Se prueba por slug y, si no sale, por el número. El id SIEMPRE vale como
      ruta —igual que en la ficha del futbolista— y hay slugs que no: el que
@@ -4381,6 +4387,9 @@ async function playerPrices(slug, id) {
       '?lang=es&fields=*,prices',
       { headers: NAVEGADOR, signal: AbortSignal.timeout(TOPE_PRECIOS_MS) })
       .catch(function () { return null; });
+    /* Un 429 no es «este futbolista no tiene precios», es «para ya». Se apunta
+       para que TODO el proxy deje de pedir un rato, no solo esta consulta. */
+    if (apuntarCorteDelCdn(r)) return null;
     if (!r || !r.ok) return null;
     const cuerpo = await r.json().catch(function () { return {}; });
     const lista = (cuerpo.data && cuerpo.data.prices) || [];
@@ -4405,9 +4414,9 @@ async function playerPrices(slug, id) {
   /* Y si hoy no ha contestado pero ayer sí, se sirve lo de ayer: un gráfico
      con un día de retraso es infinitamente mejor que «no publica la
      evolución», que además es mentira. */
-  if (guardada && (guardada.prices || []).length) {
-    cache.prices[slug] = guardada.prices;
-    return guardada.prices;
+  if (deAyer) {
+    cache.prices[slug] = deAyer;
+    return deAyer;
   }
   return prices;
 }
@@ -4559,7 +4568,12 @@ async function priceSeries(ids, dias, names) {
   };
   const reparto = precioYaGuardado(ids, names);
   await Promise.all(reparto.listos.map(uno));
-  await porTandas(reparto.porPedir, 10, 120, uno);
+  /* De cuatro en cuatro y con medio segundo de respiro. Iban de diez en diez
+     con 120 ms, y esa ráfaga es justo lo que hacía que Biwenger contestara 429
+     a todo: veinticinco series de golpe son veinticinco consultas en poco más
+     de un segundo. Ahora se piden despacio, y como cada una queda guardada en
+     el KV, la lentitud solo se paga una vez por futbolista. */
+  await porTandas(reparto.porPedir, 4, 500, uno);
   return salida;
 }
 
