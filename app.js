@@ -5194,6 +5194,9 @@
 
     const ganadas = {};
     const ultimas = {};
+    /* La mejor y la peor jornada de cada uno: cuántos puntos y en cuál. */
+    const mejor = {};
+    const peor = {};
 
     /* Jornadas ganadas: solo las cerradas. Mientras rueda, el ganador puede
        cambiar con cada partido, así que no se cuenta hasta que Biwenger la
@@ -5212,6 +5215,19 @@
       });
       const campeon = orden[0];
       if (campeon) ganadas[campeon.name] = (ganadas[campeon.name] || 0) + 1;
+
+      /* Y de paso, la mejor y la peor de cada uno. Solo jornadas CERRADAS: una
+         a medias siempre sería la peor de todos, y no es que lo hayan hecho
+         mal, es que no ha acabado. */
+      const cual = (jornada.round && jornada.round.number) || null;
+      (jornada.standings || []).forEach(function (fila) {
+        if (fila.points == null) return;
+        const suya = { puntos: fila.points, jornada: cual };
+        const mejorHasta = mejor[fila.name];
+        const peorHasta = peor[fila.name];
+        if (!mejorHasta || fila.points > mejorHasta.puntos) mejor[fila.name] = suya;
+        if (!peorHasta || fila.points < peorHasta.puntos) peor[fila.name] = suya;
+      });
     });
 
     /* Las que el calendario dice que se han jugado pero no tenemos. Esto es lo
@@ -5249,7 +5265,7 @@
     });
 
     return { jornadas: conPuntos.length, ganadas: ganadas, racha: ultimas,
-      sinTraer: sinTraer };
+      mejor: mejor, peor: peor, sinTraer: sinTraer };
   }
 
   /**
@@ -5444,6 +5460,45 @@
       '</div>';
     };
 
+    /**
+     * Una jornada suelta de cada mánager: cuántos puntos y en cuál fue.
+     *
+     * `alReves` ordena de menos a más, para la peor. Quien no tenga ninguna
+     * jornada cerrada todavía queda al final con un guion, en vez de con un
+     * cero que se leería como que hizo cero puntos.
+     */
+    const listaDeJornada = function (titulo, mapa, alReves) {
+      const filas = MANAGERS.map(function (nombre) {
+        return { name: nombre, suya: mapa[nombre] || null };
+      }).sort(function (a, b) {
+        if (!a.suya && !b.suya) return a.name.localeCompare(b.name, 'es');
+        if (!a.suya) return 1;
+        if (!b.suya) return -1;
+        const dif = alReves
+          ? a.suya.puntos - b.suya.puntos
+          : b.suya.puntos - a.suya.puntos;
+        return dif || a.name.localeCompare(b.name, 'es');
+      });
+
+      return '<div class="ranking">' +
+        '<h3 class="ranking__title">' + titulo + '</h3>' +
+        '<ol class="ranking__list">' + filas.map(function (fila) {
+          return '<li class="ranking__row' + claseMia(fila.name) + '">' +
+            '<span class="ranking__boton ranking__boton--fijo">' +
+              '<span class="ranking__quien"><span class="manager">' + avatar(fila.name) +
+                '<span class="manager__name">' + escapeHtml(fila.name) + '</span></span></span>' +
+              (fila.suya
+                ? '<strong class="ranking__value">' + fila.suya.puntos + ' pts' +
+                  (fila.suya.jornada
+                    ? '<span class="ranking__matiz"> · J' + fila.suya.jornada + '</span>'
+                    : '') + '</strong>'
+                : '<strong class="ranking__value sub">—</strong>') +
+            '</span>' +
+          '</li>';
+        }).join('') + '</ol>' +
+      '</div>';
+    };
+
     /* Goles y asistencias, con el desglose de quién los hizo al pinchar. */
     const golesPor = golesDeLaLiga();
 
@@ -5507,7 +5562,9 @@
             ' \u2014 hasta que lleguen, esta cuenta no est\u00e1 completa.</span>'
           : '') +
       lista('Mejor racha <span class="ranking__matiz">(últimas 3 jornadas)</span>',
-        datos.racha, ' pts');
+        datos.racha, ' pts') +
+      listaDeJornada('Jornada con más puntos', datos.mejor, false) +
+      listaDeJornada('Jornada con menos puntos', datos.peor, true);
 
     ajustarNombres();
   }
