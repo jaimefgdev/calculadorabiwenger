@@ -5459,7 +5459,7 @@
       const mejor = ofertas[0];
       const sube = (jugador.increment || 0) > 0;
 
-      return '<tr' + (venta ? ' class="row-mine"' : '') + '>' +
+      return '<tr' + (venta ? ' class="row-venta"' : '') + '>' +
         '<td data-label="Futbolista"><span class="with-crest">' +
           playerName({ playerId: jugador.id, player: jugador.name,
             position: jugador.position, altPositions: jugador.altPositions }) +
