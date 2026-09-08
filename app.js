@@ -7611,37 +7611,35 @@
             : '');
         }).join('') + '</tbody></table>';
 
-    /* El mejor once que se le podía sacar a lo que ha alineado. Va detrás de
-       una píldora porque es un campo entero: abierto siempre, empujaría la
-       tabla de puntos fuera de la pantalla. */
-    const once = state.mejorOnce === row.name ? mejorOnceDelManager(row.name) : null;
+    /* Dos vistas del mismo desglose, y la píldora cambia de una a otra: la
+       tabla de puntos o el mejor once que se le podía sacar. No caben las dos a
+       la vez —el campo empujaría la tabla fuera de la pantalla—, así que la
+       píldora dice en cuál estás y el rótulo, lo mismo. */
+    const enElOnce = state.mejorOnce === row.name;
+    const once = enElOnce ? mejorOnceDelManager(row.name) : null;
     const hayOnce = suyos.length > 0;
 
     const campo = !once
-      ? ''
+      ? /* Si no le sale un once entero —sin portero, o sin gente para ninguno
+           de los catorce sistemas— se dice, en vez de dejar la vista vacía. */
+        '<p class="muted">Todavía no ha alineado suficientes futbolistas ' +
+        'como para sacarle un once completo.</p>'
       : '<div class="once once--manager">' +
-          '<p class="muted once__pie">' + escapeHtml(once.type) + ' · <strong>' +
-            once.points + ' puntos</strong> entre los once</p>' +
           '<div class="pitch-wrap">' + staticPitch(once.type, once.players, false) + '</div>' +
         '</div>';
 
-    /* Si no le sale un once entero —sin portero, o sin gente para ninguno de
-       los catorce sistemas— se dice, en vez de dejar la píldora sin efecto. */
-    const aviso = (state.mejorOnce === row.name && !once)
-      ? '<p class="muted">Todavía no ha alineado suficientes futbolistas ' +
-        'como para sacarle un once completo.</p>'
-      : '';
-
     return '<tr class="detail-row"><td class="detail-cell" colspan="' + MANAGER_COLUMNS + '"><div class="detail">' +
       '<div class="detail__cab">' +
-        '<h3 class="bench__title">Puntos por futbolista alineado</h3>' +
+        '<h3 class="bench__title">' +
+          (enElOnce ? 'Mejor 11 del jugador' : 'Puntos por futbolista alineado') + '</h3>' +
         (hayOnce
           ? '<button type="button" class="ambito ficha__comparar' +
-            (state.mejorOnce === row.name ? ' ambito--on' : '') +
-            '" data-mejor-once="' + escapeHtml(row.name) + '">Mejor 11</button>'
+            (enElOnce ? ' ambito--on' : '') +
+            '" data-mejor-once="' + escapeHtml(row.name) + '">' +
+            (enElOnce ? 'Mejor 11' : 'Puntos') + '</button>'
           : '') +
       '</div>' +
-      campo + aviso + cuerpo +
+      (enElOnce ? campo : cuerpo) +
     '</div></td></tr>';
   }
 

@@ -132,7 +132,7 @@ const CDN = 'https://cf.biwenger.com/api/v2';
    navegador normal y las cabeceras que este mandaría. */
 /* Marca de versión: se sube en cada cambio y se consulta con ?version=1.
    Sirve para saber desde fuera si el despliegue ha entrado o no. */
-const VERSION = '2026-09-07 · deno 93';
+const VERSION = '2026-09-08 · deno 94';
 
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ' +
   '(KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36';
@@ -2043,9 +2043,13 @@ async function todosLosJugadores(env) {
     if (clave.indexOf(':') !== -1) return;        // las claves con ':' son atributos
     const id = clave;
     const equipo = names[id + ':team'] != null ? names[id + ':team'] : null;
-    /* Sin club no pinta nada en la lista: Biwenger los deja ahí cuando se van
-       de LaLiga. Si vuelven a fichar por alguien, reaparecen solos. */
-    if (equipo == null || !names['team:' + equipo]) return;
+    /* Estar en el índice sin club NO es haberse ido de LaLiga: el que se va
+       desaparece del índice entero, sin nombre siquiera. Biwenger deja el club
+       a null en algunos —Oso, Carlos Álvarez, Tunde...— y esos juegan y
+       puntúan: Oso hizo 15 en la jornada 2. Se caían aquí nueve futbolistas, y
+       con ellos su segunda demarcación. Se quedan fuera solo los que no tienen
+       ni nombre, que esos sí son restos. */
+    if (!names[id]) return;
     lista.push({
       id: id,
       name: names[id],
@@ -3078,6 +3082,11 @@ function roundPlayer(entry, names, puntos, partidoDe, enCasa, lances, conNota) {
     name: player.name || names[id] || ('Jugador ' + id),
     position: player.position != null ? player.position
       : (names[id + ':pos'] != null ? names[id + ':pos'] : null),
+    /* Y su segunda demarcación, que faltaba. Berenguer es DL con MC de
+       repuesto, y en la alineación de una jornada salía solo como DL: la
+       plantilla sí la manda y esto no, así que el mismo futbolista llevaba una
+       chapa u otra según dónde lo miraras. Son 20 en cada jornada. */
+    altPositions: otrosPuestos(names, id),
     points: puntuacion,
     nuestra: nuestra,
     pending: pendiente,

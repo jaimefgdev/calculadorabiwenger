@@ -983,10 +983,9 @@ code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft)
 }
 .detail__cab .bench__title { margin: 0; }
 
-/* El mejor once de un mánager, dentro de su desglose. El campo se queda a su
-   ancho normal y centrado; el pie va encima, que es donde se lee antes. */
-.once--manager { margin: 0 0 1rem; }
-.once--manager .once__pie { margin: 0 0 .5rem; text-align: center; font-size: .8rem; }
+/* El mejor once de un mánager, dentro de su desglose: el campo a su ancho
+   normal y centrado, sin rótulo propio —el de la cabecera ya lo dice—. */
+.once--manager { margin: 0 0 .4rem; }
 /* El campo manda el ancho (460 px como mucho) y los suplentes ocupan lo que
    quede a su derecha. En pantalla estrecha bajan debajo. */
 .lineup-grid {
