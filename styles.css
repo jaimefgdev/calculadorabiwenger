@@ -1626,6 +1626,35 @@ html.con-ficha { scrollbar-gutter: stable; }
   padding: 1.25rem;
   margin-bottom: 1.5rem;
 }
+
+/* ---------- La marca de agua de la calculadora ----------
+   La misma del césped —el escudo y `jaimefgdev`—, detrás de la tabla del
+   presupuesto, que es la calculadora en sí. Aquí no hay hierba con la que
+   mezclarse, así que en vez de `overlay` va con opacidad muy baja: tiene que
+   leerse por debajo de las cifras sin competir con ellas ni un poco. */
+#budget-panel { position: relative; isolation: isolate; container-type: inline-size; }
+#budget-panel > * { position: relative; z-index: 1; }
+
+#budget-panel::before,
+#budget-panel::after {
+  position: absolute; left: 50%; top: 50%;
+  z-index: 0; pointer-events: none;
+}
+#budget-panel::before {
+  content: '';
+  width: 26cqw; aspect-ratio: 350.6 / 392;
+  transform: translate(-50%, calc(-50% - 3cqw));
+  background: url('biwenger.svg') center / contain no-repeat;
+  opacity: .05;
+}
+#budget-panel::after {
+  content: 'jaimefgdev';
+  transform: translate(-50%, 12cqw);
+  font-family: var(--mono); font-weight: 700;
+  font-size: 3.2cqw; letter-spacing: .2em; white-space: nowrap;
+  color: var(--text); opacity: .05;
+}
+
 .panel__head { margin-bottom: 1rem; }
 .panel__head h2 { font-size: 1rem; font-weight: 650; margin-bottom: .15rem; }
 .panel__head--row {

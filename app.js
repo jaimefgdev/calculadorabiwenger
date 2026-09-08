@@ -12644,7 +12644,21 @@
 
     let saved = null;
     try { saved = localStorage.getItem(TAB_KEY); } catch (error) { /* sin persistencia */ }
-    showTab(document.querySelector('[data-panel="' + saved + '"]') ? saved : 'inicio');
+
+    /* Al ABRIR la app se empieza siempre en Inicio; al recargar, se vuelve a
+       donde estabas. La diferencia la marca `sessionStorage`: sobrevive a una
+       recarga o a un tirón hacia abajo, pero se borra al cerrar la app. Así
+       que si no está la marca, es que se acaba de abrir. */
+    let seguimos = false;
+    try {
+      seguimos = sessionStorage.getItem('biwenger-calc-sesion') === '1';
+      sessionStorage.setItem('biwenger-calc-sesion', '1');
+    } catch (error) { /* sin sessionStorage se respeta la pestaña guardada */
+      seguimos = true;
+    }
+
+    const pestana = seguimos ? saved : 'inicio';
+    showTab(document.querySelector('[data-panel="' + pestana + '"]') ? pestana : 'inicio');
     if (hadData) {
       $('input-panel').hidden = true;
       setStatus('status-board', '');
