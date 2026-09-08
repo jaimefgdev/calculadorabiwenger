@@ -2261,7 +2261,66 @@
   }
 
   /** Actualiza el reloj; se llama cada segundo. */
+  /* Biwenger reparte los puntos y el dinero de la jornada a las 17:00 del día
+     SIGUIENTE al último partido. No lo publica en ninguna respuesta —del
+     `round` solo llegan id, nombre, estado y si está en juego—, así que se
+     calcula. Es una estimación, y la web lo dice con esas palabras. */
+  const HORA_ENTREGA = 17;
+
+  /**
+   * Cuándo se entregan los puntos y el abono de la última jornada acabada.
+   *
+   * Devuelve la fecha, o nada si no hay ninguna jornada acabada a la que le
+   * quede el reparto por delante. Se mira la última jornada con partidos que
+   * tengamos descargada, no `state.round`: cuando la jornada acaba, ese pasa a
+   * ser YA la siguiente, y lo que se está esperando es el reparto de la que
+   * terminó.
+   */
+  function cuandoSeEntrega() {
+    let ultimo = null;
+    const mirar = function (round) {
+      (round && round.matches || []).forEach(function (partido) {
+        /* Solo los acabados: con uno por jugar, la jornada no ha terminado. */
+        if (partido.status !== 'finished') return;
+        const fin = Date.parse(partido.start);
+        if (!isNaN(fin) && (ultimo == null || fin > ultimo)) ultimo = fin;
+      });
+      /* Y si le queda algún partido por jugar, esa jornada no cuenta. */
+      return (round && round.matches || []).every(function (p) {
+        return p.status === 'finished';
+      });
+    };
+
+    let completa = false;
+    Object.keys(state.jornadas.datos || {}).forEach(function (id) {
+      const j = state.jornadas.datos[id];
+      if (j && j.round && mirar(j.round)) completa = true;
+    });
+    if (state.round && mirar(state.round)) completa = true;
+    if (!completa || ultimo == null) return null;
+
+    /* Las 17:00 del día siguiente, en la hora de aquí. Al último partido se le
+       dan dos horas de margen: `start` es cuando EMPIEZA. */
+    const cuando = new Date(ultimo + 2 * 60 * 60 * 1000);
+    cuando.setDate(cuando.getDate() + 1);
+    cuando.setHours(HORA_ENTREGA, 0, 0, 0);
+    return cuando.getTime() > Date.now() ? cuando.getTime() : null;
+  }
+
+  function pintarEntrega() {
+    const caja = $('round-entrega');
+    if (!caja) return;
+    const cuando = cuandoSeEntrega();
+    if (cuando == null) { caja.hidden = true; caja.textContent = ''; return; }
+    const queda = timeLeft(new Date(cuando).toISOString());
+    caja.hidden = false;
+    caja.innerHTML = 'Entrega de puntos y abonos ' +
+      (queda ? 'en <strong>' + escapeHtml(queda.text) + '</strong>' : 'ya mismo') +
+      ' <span class="round__entrega-nota">(estimado: 17:00 del día siguiente)</span>';
+  }
+
   function tickRound() {
+    pintarEntrega();
     tickDeadlines();
     const clock = $('round-clock');
     const round = state.round;

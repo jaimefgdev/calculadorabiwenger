@@ -374,6 +374,17 @@ code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft)
 .round__unit small { font-size: .68rem; color: var(--text-faint); }
 
 /* Los partidos de la jornada, agrupados por día. */
+/* Cuándo reparte Biwenger los puntos y el dinero de la jornada. Va debajo del
+   todo y en gris: es un dato de espera, no una alerta. */
+.round__entrega {
+  margin: .5rem 0 0; padding-top: .5rem;
+  border-top: 1px solid var(--border);
+  font-size: .78rem; color: var(--text-soft); text-align: center;
+}
+.round__entrega strong { color: var(--marca, #ffc233); }
+/* Que es una estimación y no un dato oficial se dice, y en pequeño. */
+.round__entrega-nota { color: var(--text-faint); font-size: .72rem; }
+
 .round__games { margin-top: .9rem; border-top: 1px solid var(--border); padding-top: .3rem; }
 .round__day {
   margin: .7rem 0 .25rem; font-size: .72rem; text-transform: uppercase;
