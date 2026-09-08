@@ -5891,7 +5891,9 @@
       savedAt: new Date().toISOString()
     };
     if (payload.rounds && payload.rounds.length) state.jornadas.list = payload.rounds;
-    if (!callado) state.jornadas.actual = id;
+    /* Y «la actual» nunca puede ser una jornada por delante de la que se juega:
+       pedir la 6 para mirarla no la convierte en la jornada en curso. */
+    if (!callado && !jornadaDelFuturo(id)) state.jornadas.actual = id;
     persistJornadas();
     return id;
   }
@@ -6043,7 +6045,30 @@
 
   /** Qué jornada se está mirando, se haya descargado o no su clasificación. */
   function jornadaVistaId() {
-    return state.jornadaVista != null ? state.jornadaVista : state.jornadas.actual;
+    const elegida = state.jornadaVista != null ? state.jornadaVista : state.jornadas.actual;
+    return jornadaDelFuturo(elegida) ? state.jornadas.actual : elegida;
+  }
+
+  /**
+   * ¿Esa jornada va por delante de la que se está jugando?
+   *
+   * LaLiga adelanta partidos: el Real Sociedad-Celta de la JORNADA 6 se jugó el
+   * 3 de septiembre, con la 4 en marcha y la 5 sin empezar. Biwenger la marca
+   * «finished» con nueve partidos por jugar, y la web acababa plantada en ella:
+   * columna de jornada a cero, cero jugadores y la general sumando de más.
+   *
+   * Elegirla A MANO sigue valiendo —está en el selector y sus cinco notas son
+   * de verdad—; lo que no vale es acabar ahí sin haberla pedido.
+   */
+  function jornadaDelFuturo(id) {
+    if (id == null) return false;
+    if (state.jornadaVista != null && String(state.jornadaVista) === String(id)) return false;
+    const enCurso = state.round && state.round.number;
+    if (!enCurso) return false;
+    const ficha = (state.jornadas.list || []).filter(function (r) {
+      return String(r.id) === String(id);
+    })[0];
+    return !!(ficha && ficha.number != null && ficha.number > enCurso);
   }
 
   /**

@@ -132,7 +132,7 @@ const CDN = 'https://cf.biwenger.com/api/v2';
    navegador normal y las cabeceras que este mandaría. */
 /* Marca de versión: se sube en cada cambio y se consulta con ?version=1.
    Sirve para saber desde fuera si el despliegue ha entrado o no. */
-const VERSION = '2026-09-08 · deno 118';
+const VERSION = '2026-09-08 · deno 119';
 
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ' +
   '(KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36';
@@ -2164,6 +2164,15 @@ async function recuentoDeLaTemporada(env, headers, soloMiLiga) {
       racha: rachaDe(names[id + ':fit'], 3)
     });
   });
+
+  /* NI UN RECUENTO VACÍO. Si hay jornadas jugadas y no sale un solo futbolista,
+     es que no ha llegado el detalle de ninguna —Biwenger cortando—, no que no
+     se haya jugado nada. Guardarlo dejaba los Rankings diciendo «todavía no hay
+     jornadas jugadas» con media temporada disputada, y encima con cara de dato
+     bueno. Se avisa y se reintenta, que es lo que la web sabe manejar. */
+  if (!lista.length && jugadas.length) {
+    throw new Error('No se han podido traer los datos de las jornadas de Biwenger.');
+  }
 
   cache[donde] = { players: lista, rounds: jugadas.length, ambito: soloMiLiga ? 'liga' : 'laliga',
     updatedAt: new Date().toISOString() };
