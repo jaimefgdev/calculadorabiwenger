@@ -132,7 +132,7 @@ const CDN = 'https://cf.biwenger.com/api/v2';
    navegador normal y las cabeceras que este mandaría. */
 /* Marca de versión: se sube en cada cambio y se consulta con ?version=1.
    Sirve para saber desde fuera si el despliegue ha entrado o no. */
-const VERSION = '2026-09-08 · deno 102';
+const VERSION = '2026-09-08 · deno 103';
 
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ' +
   '(KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36';
@@ -4412,7 +4412,7 @@ const isoDay = (time) => new Date(time).toISOString().slice(0, 10);
    uno. Se le da margen de sobra: es UNA consulta y solo la primera vez. */
 const TOPE_PRECIOS_MS = 22000;
 
-async function playerPrices(slug, id) {
+async function playerPrices(slug, id, soloGuardado) {
   if (cache.prices[slug] && cache.prices[slug].length) return cache.prices[slug];
 
   /* Y guardada en el KV, que es lo que de verdad arregla esto. `cache.prices`
@@ -4471,6 +4471,11 @@ async function playerPrices(slug, id) {
      es lo que alarga el castigo, y además tumba el índice y deja la web sin
      nombres ni precios. Se sirve lo que haya guardado y se reintenta luego. */
   if (cdnCortado()) return deAyer;
+
+  /* `soloGuardado` = mira lo que hay, pero NO salgas a la red. Sirve para
+     resolver de golpe los que ya están guardados, sin que les toque la cola
+     lenta de los que sí hay que pedirle a Biwenger. */
+  if (soloGuardado) return null;
 
   /* Se prueba por slug y, si no sale, por el número. El id SIEMPRE vale como
      ruta —igual que en la ficha del futbolista— y hay slugs que no: el que
@@ -4647,12 +4652,12 @@ async function pricesOnDay(ids, dia, names) {
  */
 async function priceSeries(ids, dias, names) {
   const salida = {};
-  const uno = async function (id) {
+  const uno = async function (id, soloGuardado) {
     const clave = String(id).trim();
     if (!clave) return;
     const slug = names[clave + ':slug'] || clave;
     try {
-      const prices = await playerPrices(slug, clave);
+      const prices = await playerPrices(slug, clave, soloGuardado);
       if (!prices || !prices.length) return;
       /* `Infinity` deja la serie entera; `slice(-Infinity)` no vale. */
       const trozo = dias === Infinity ? prices : prices.slice(-dias);
@@ -4661,16 +4666,23 @@ async function priceSeries(ids, dias, names) {
       });
     } catch (error) { /* ese jugador se queda sin serie */ }
   };
-  const reparto = precioYaGuardado(ids, names);
-  await Promise.all(reparto.listos.map(uno));
-  /* DE UNA EN UNA, con casi un segundo entre medias. Se probaron diez a la vez
-     (que era lo que había) y cuatro a la vez, y las dos cosas se comen un 429:
-     este endpoint aguanta una consulta cada pocos segundos y poco más. Como
-     cada serie queda guardada en el KV, esta lentitud se paga UNA vez por
-     futbolista y por día; a partir de ahí se sirven todas de golpe.
-     Y si en mitad de la tanda Biwenger corta, `cdnCortado()` para en seco y lo
-     que falte se pide en la siguiente visita: no se pierde nada, se reanuda. */
-  await porTandas(reparto.porPedir, 1, 900, uno);
+
+  /* PRIMERO, todo lo que ya esté guardado —en memoria o en el KV—, de golpe y
+     sin frenos: son lecturas de disco, no consultas a Biwenger. Frenarlas era
+     regalar veinte segundos de espera sin tocar la red ni una vez, y es lo que
+     hacía que el Mercado tardara un mundo incluso la segunda vez. */
+  await Promise.all(ids.map(function (id) { return uno(id, true); }));
+
+  /* Y solo lo que de verdad falta sale a la red, DE UNA EN UNA con casi un
+     segundo entre medias. Se probaron diez a la vez (que era lo que había) y
+     cuatro a la vez, y las dos cosas se comen un 429: este endpoint aguanta
+     una consulta cada pocos segundos y poco más.
+     Si en mitad de la cola Biwenger corta, `cdnCortado()` para en seco y lo que
+     falte se pide en la siguiente visita: no se pierde nada, se reanuda. */
+  const faltan = ids.filter(function (id) {
+    return salida[String(id).trim()] === undefined;
+  });
+  await porTandas(faltan, 1, 900, function (id) { return uno(id, false); });
   return salida;
 }
 
