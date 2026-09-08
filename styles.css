@@ -810,12 +810,14 @@ code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft)
 .modo-app .lineup-grid,
 .modo-app .sources,
 .modo-app .sync-fields,
-.modo-app .rankings--dos,
 .modo-app .onces { grid-template-columns: minmax(0, 1fr) !important; }
 
 /* En fila y deslizables. `grid-auto-flow: column` los pone uno tras otro y
    `scroll-snap` hace que se paren en su sitio, como el carrusel de la app de
    Biwenger. */
+.modo-app .rankings,
+.modo-app .rankings--dos,
+.modo-app .rankings--tres,
 .modo-app .rankings-fila,
 .modo-app .movers,
 .modo-app .alineaciones {
@@ -828,6 +830,9 @@ code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft)
   -webkit-overflow-scrolling: touch;
   padding-bottom: .4rem;
 }
+.modo-app .rankings > *,
+.modo-app .rankings--dos > *,
+.modo-app .rankings--tres > *,
 .modo-app .rankings-fila > *,
 .modo-app .movers > *,
 .modo-app .alineaciones > * { scroll-snap-align: start; }
@@ -836,9 +841,8 @@ code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft)
    treinta píxeles. Dos filas de cuatro. */
 .modo-app .viz-block .chips { grid-template-columns: repeat(4, minmax(0, 1fr)) !important; }
 
-/* Los cuatro rankings de «Datos», uno debajo de otro; y la fila de tarjetas de
-   la liga (jornadas ganadas, racha, mejor y peor jornada), deslizable. */
-.modo-app .rankings { grid-template-columns: minmax(0, 1fr) !important; }
+/* Y las tarjetas de la liga, con su reparto de columnas anulado: en modo app
+   van en fila, no repartidas. */
 .modo-app .rankings-fila {
   grid-template-columns: none !important;
   grid-auto-columns: minmax(15rem, 78%);
