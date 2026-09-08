@@ -132,7 +132,7 @@ const CDN = 'https://cf.biwenger.com/api/v2';
    navegador normal y las cabeceras que este mandaría. */
 /* Marca de versión: se sube en cada cambio y se consulta con ?version=1.
    Sirve para saber desde fuera si el despliegue ha entrado o no. */
-const VERSION = '2026-09-08 · deno 111';
+const VERSION = '2026-09-08 · deno 113';
 
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ' +
   '(KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36';
@@ -3535,13 +3535,21 @@ async function fixturesDeLaTemporada(score) {
   const calendario = await seasonRounds().catch(function () { return []; });
   const propias = calendario.filter(function (j) { return (j.part || 1) === 1; });
 
-  const faltan = propias.filter(function (j) {
+  const pendientes = propias.filter(function (j) {
     const guardada = rondas[String(j.id)];
     if (!guardada) return true;
     /* Una jornada acabada no cambia jamás: no se vuelve a pedir nunca. */
     if (guardada.cerrada) return false;
     return Date.now() - (guardada.at || 0) > VIGENCIA;
   });
+
+  /* GOTA A GOTA: seis por llamada, no las 38 de golpe. Esto lo dispara la
+     sincronización normal, o sea cada minuto, y treinta y ocho descargas
+     seguidas son justo la ráfaga que hace que Biwenger corte. Y cuando corta no
+     falla solo esto: la jornada que se esté calculando se queda sin su detalle,
+     todos los alineados salen pendientes y la tabla entera sale a cero.
+     En seis o siete sincronizaciones está lleno, y luego ya no se toca. */
+  const faltan = pendientes.slice(0, 6);
 
   /* Si el CDN nos ha cortado, se sirve lo que haya: media tabla es infinitamente
      mejor que hacerle esperar por nada. */
@@ -4183,7 +4191,21 @@ async function roundBoard(env, headers, jornada, listaNombres) {
     payload = mezclarJornada(await kvLeer(env, payload.round.id), payload);
     refrescarNombres(payload, names);
     const alineaciones = payload.standings.filter(function (fila) { return (fila.xi || []).length; }).length;
-    if (alineaciones) await kvGuardar(env, payload.round.id, payload);
+
+    /* NO SE GUARDA UNA JORNADA MAL CALCULADA. Si Biwenger nos ha cortado, el
+       detalle de la jornada no llega, y sin él no se sabe qué partido ha
+       acabado: TODOS los alineados salen pendientes y la jornada entera a cero.
+       Guardar eso es peor que no guardar nada, porque se sirve así durante
+       horas y parece que se han borrado los puntos.
+
+       La señal de que está bien calculada: que alguien tenga nota. Una jornada
+       empezada en la que NADIE ha puntuado no existe. */
+    const conNotas = payload.standings.some(function (fila) {
+      return (fila.xi || []).some(function (j) { return j && j.points != null; });
+    });
+    const fiable = conNotas && !!detalle && !cdnCortado();
+
+    if (alineaciones && fiable) await kvGuardar(env, payload.round.id, payload);
   }
 
   return payload;
