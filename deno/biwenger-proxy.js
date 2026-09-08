@@ -132,7 +132,7 @@ const CDN = 'https://cf.biwenger.com/api/v2';
    navegador normal y las cabeceras que este mandaría. */
 /* Marca de versión: se sube en cada cambio y se consulta con ?version=1.
    Sirve para saber desde fuera si el despliegue ha entrado o no. */
-const VERSION = '2026-09-08 · deno 115';
+const VERSION = '2026-09-08 · deno 116';
 
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ' +
   '(KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36';
@@ -4891,7 +4891,13 @@ async function priceSeries(ids, dias, names) {
   const faltan = ids.filter(function (id) {
     return salida[String(id).trim()] === undefined;
   });
-  await porTandas(faltan, 6, 250, function (id) { return uno(id, false); });
+  /* TRES A LA VEZ, con 350 ms entre tandas. Medido contra el CDN de Biwenger:
+     de una en una tardaba 17 s en traer veinte series; de tres en tres, 6,5 s y
+     sin un solo corte; de seis en seis contesta 429 y solo llegan seis de
+     veinte. Tres es el punto.
+     Lo que provocaba los cortes de antes no era esto: era el `await players()`
+     que se bajaba los 220 KB del indice justo antes, y ese ya no esta. */
+  await porTandas(faltan, 3, 350, function (id) { return uno(id, false); });
   return salida;
 }
 
