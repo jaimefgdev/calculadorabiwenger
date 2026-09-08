@@ -132,7 +132,7 @@ const CDN = 'https://cf.biwenger.com/api/v2';
    navegador normal y las cabeceras que este mandaría. */
 /* Marca de versión: se sube en cada cambio y se consulta con ?version=1.
    Sirve para saber desde fuera si el despliegue ha entrado o no. */
-const VERSION = '2026-09-08 · deno 98';
+const VERSION = '2026-09-08 · deno 99';
 
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ' +
   '(KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36';
@@ -567,7 +567,16 @@ const app = {
            futbolista apareció en el mercado. Si no, el tope que se pida. */
         const pedido = url.searchParams.get('dias');
         const dias = pedido === 'todo' ? Infinity : Math.min(Number(pedido) || 45, 2000);
-        const data = await priceSeries(historial.split(',').slice(0, 30), dias, await players());
+        /* SIN el índice a propósito. Aquí solo se usaba para sacar el slug de
+           cada futbolista, y el número vale igual como ruta. A cambio, ese
+           `await players()` se bajaba 220 KB ANTES de pedir las series, y
+           justo después de esa descarga Biwenger contestaba 429 a todo: por eso
+           la web decía «no publica la evolución» de Mbappé o Pedri, que tienen
+           366 días cada uno. La misma función, llamada sin bajarse el índice
+           antes, devuelve la serie entera.
+           Además, así la clave de memoria es el número, la misma con la que se
+           guarda en el KV, y no hay dos formas de nombrar al mismo futbolista. */
+        const data = await priceSeries(historial.split(',').slice(0, 30), dias, {});
         return new Response(JSON.stringify(data), {
           headers: Object.assign({ 'content-type': 'application/json; charset=utf-8' }, cors(origin))
         });
