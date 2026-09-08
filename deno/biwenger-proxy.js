@@ -132,7 +132,7 @@ const CDN = 'https://cf.biwenger.com/api/v2';
    navegador normal y las cabeceras que este mandaría. */
 /* Marca de versión: se sube en cada cambio y se consulta con ?version=1.
    Sirve para saber desde fuera si el despliegue ha entrado o no. */
-const VERSION = '2026-09-08 · deno 105';
+const VERSION = '2026-09-08 · deno 106';
 
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ' +
   '(KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36';
@@ -3440,7 +3440,10 @@ async function partidosDeJugador(env, id) {
      horas cuando no. */
   const viva = !!(cache.round && cache.round.live);
   const vigencia = viva ? 20 * 60 * 1000 : 6 * 60 * 60 * 1000;
-  const claveKv = 'partidos-' + clave + '-' + score;
+  /* `v2` a propósito: las copias guardadas antes de sacar el club de los
+     informes llevan `teamName` a nulo, y sin cambiar el nombre se servirían
+     así durante horas. Cambiando la clave caducan solas. */
+  const claveKv = 'partidos-v2-' + clave + '-' + score;
   if (JORNADAS) {
     try {
       const crudo = await JORNADAS.get(claveKv);
