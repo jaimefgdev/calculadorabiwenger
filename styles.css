@@ -374,16 +374,22 @@ code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft)
 .round__unit small { font-size: .68rem; color: var(--text-faint); }
 
 /* Los partidos de la jornada, agrupados por día. */
-/* Cuándo reparte Biwenger los puntos y el dinero de la jornada. Va debajo del
-   todo y en gris: es un dato de espera, no una alerta. */
+/* Cuándo reparte Biwenger los puntos y el dinero de la jornada. Va AL LADO de
+   la cuenta atrás del arranque, que es donde se mira el tiempo, y desaparece
+   solo en cuanto se cobra. En gris: es un dato de espera, no una alerta. */
 .round__entrega {
-  margin: .5rem 0 0; padding-top: .5rem;
-  border-top: 1px solid var(--border);
-  font-size: .78rem; color: var(--text-soft); text-align: center;
+  margin: 0; flex: none; max-width: 15rem;
+  font-size: .74rem; color: var(--text-soft); line-height: 1.35; text-align: right;
 }
-.round__entrega strong { color: var(--marca, #ffc233); }
+.round__entrega strong { color: var(--marca, #ffc233); white-space: nowrap; }
 /* Que es una estimación y no un dato oficial se dice, y en pequeño. */
-.round__entrega-nota { color: var(--text-faint); font-size: .72rem; }
+.round__entrega-nota { display: block; color: var(--text-faint); font-size: .68rem; }
+
+/* En pantalla estrecha se pone debajo y centrado, que a la derecha del reloj no
+   cabe y parte el rótulo en cuatro líneas. */
+@media (max-width: 620px) {
+  .round__entrega { max-width: none; width: 100%; text-align: center; }
+}
 
 .round__games { margin-top: .9rem; border-top: 1px solid var(--border); padding-top: .3rem; }
 .round__day {
