@@ -385,13 +385,9 @@ code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft)
 }
 .round__entrega strong { color: var(--marca, #ffc233); }
 
-/* En pantalla estrecha baja debajo y se centra: a la derecha del reloj no cabe
-   y partiría el rótulo en dos líneas, que es justo lo que se quería evitar. */
-@media (max-width: 700px) {
-  .round__entrega {
-    margin: .2rem 0 0; width: 100%; text-align: center; white-space: normal;
-  }
-}
+/* Sin excepción para pantalla estrecha: cabe. El móvil fuerza el ancho a 1024
+   (lo hace `index.html` al arrancar), así que ahí se ve como en el escritorio,
+   igual que el próximo partido de al lado. */
 
 .round__games { margin-top: .9rem; border-top: 1px solid var(--border); padding-top: .3rem; }
 .round__day {
