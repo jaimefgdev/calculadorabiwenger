@@ -132,7 +132,7 @@ const CDN = 'https://cf.biwenger.com/api/v2';
    navegador normal y las cabeceras que este mandaría. */
 /* Marca de versión: se sube en cada cambio y se consulta con ?version=1.
    Sirve para saber desde fuera si el despliegue ha entrado o no. */
-const VERSION = '2026-09-08 · deno 99';
+const VERSION = '2026-09-08 · deno 100';
 
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ' +
   '(KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36';
@@ -4596,12 +4596,14 @@ async function priceSeries(ids, dias, names) {
   };
   const reparto = precioYaGuardado(ids, names);
   await Promise.all(reparto.listos.map(uno));
-  /* De cuatro en cuatro y con medio segundo de respiro. Iban de diez en diez
-     con 120 ms, y esa ráfaga es justo lo que hacía que Biwenger contestara 429
-     a todo: veinticinco series de golpe son veinticinco consultas en poco más
-     de un segundo. Ahora se piden despacio, y como cada una queda guardada en
-     el KV, la lentitud solo se paga una vez por futbolista. */
-  await porTandas(reparto.porPedir, 4, 500, uno);
+  /* DE UNA EN UNA, con casi un segundo entre medias. Se probaron diez a la vez
+     (que era lo que había) y cuatro a la vez, y las dos cosas se comen un 429:
+     este endpoint aguanta una consulta cada pocos segundos y poco más. Como
+     cada serie queda guardada en el KV, esta lentitud se paga UNA vez por
+     futbolista y por día; a partir de ahí se sirven todas de golpe.
+     Y si en mitad de la tanda Biwenger corta, `cdnCortado()` para en seco y lo
+     que falte se pide en la siguiente visita: no se pierde nada, se reanuda. */
+  await porTandas(reparto.porPedir, 1, 900, uno);
   return salida;
 }
 
