@@ -5188,7 +5188,17 @@
 
   function tandasDeLaLiga() {
     /* Con puntos en alguna fila: las que ni han empezado no cuentan para nada. */
+    /* Hasta la jornada en curso, ni una más. LaLiga adelanta partidos: el Real
+       Sociedad-Celta de la JORNADA 6 se jugó el 3 de septiembre, con la 4 en
+       marcha y la 5 sin empezar. Esa jornada 6 tiene cinco futbolistas con nota
+       y nueve sin jugar, y sin este tope se colaba en «las tres últimas»: la
+       racha salía contando J3, J4 y J6, saltandose la 5 y metiendo una jornada
+       del futuro a medio jugar. */
+    const enCurso = (state.round && state.round.number) || null;
+
     const conPuntos = jornadasGuardadas().filter(function (jornada) {
+      const cual = (jornada.round && jornada.round.number) || null;
+      if (enCurso != null && cual != null && cual > enCurso) return false;
       return (jornada.standings || []).some(function (fila) { return (fila.points || 0) !== 0; });
     });
 
