@@ -132,7 +132,7 @@ const CDN = 'https://cf.biwenger.com/api/v2';
    navegador normal y las cabeceras que este mandaría. */
 /* Marca de versión: se sube en cada cambio y se consulta con ?version=1.
    Sirve para saber desde fuera si el despliegue ha entrado o no. */
-const VERSION = '2026-09-08 · deno 107';
+const VERSION = '2026-09-08 · deno 108';
 
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ' +
   '(KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36';
@@ -1487,9 +1487,41 @@ async function nextRound() {
     });
   }
 
+  /* Cuándo acabó el último partido de la última jornada TERMINADA. La web lo
+     necesita para decir cuánto queda para el reparto de puntos y abonos, y por
+     su cuenta no puede saberlo: en la portada solo tiene la jornada que viene,
+     y la que acaba de terminar ya no está por ningún lado. Aquí sí, y sin una
+     sola consulta de más: sale del calendario que ya está guardado. */
+  round = Object.assign({}, round, { finDeLaAnterior: await finDeLaUltimaJornada() });
+
   cache.round = round;
   cache.roundAt = Date.now();
   return cache.round;
+}
+
+/**
+ * El último partido de la última jornada terminada, en ISO.
+ *
+ * Terminada de verdad: con TODOS sus partidos jugados. Una jornada a la que le
+ * queda un aplazado no ha acabado, y Biwenger no reparte hasta que acaba.
+ */
+async function finDeLaUltimaJornada() {
+  try {
+    const score = cache.score || null;
+    const fixtures = await fixturesDeLaTemporada(score);
+    let fin = null;
+    Object.keys(fixtures || {}).forEach(function (id) {
+      const j = fixtures[id];
+      const partidos = (j && j.matches) || [];
+      if (!partidos.length) return;
+      if (!partidos.every(function (m) { return m.status === 'finished'; })) return;
+      partidos.forEach(function (m) {
+        const t = Date.parse(m.start);
+        if (!isNaN(t) && (fin == null || t > fin)) fin = t;
+      });
+    });
+    return fin == null ? null : new Date(fin).toISOString();
+  } catch (error) { return null; }
 }
 
 /** La jornada activa, si ya ha empezado y todavía le quedan partidos. */

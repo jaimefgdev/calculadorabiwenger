@@ -2278,6 +2278,17 @@
    */
   function cuandoSeEntrega() {
     let ultimo = null;
+
+    /* Lo normal es que lo diga el proxy: él tiene el calendario entero y sabe
+       cuándo acabó la última jornada TERMINADA. En la portada la web no puede
+       saberlo sola —solo tiene la jornada que viene, y la que acaba de terminar
+       ya no está por ningún lado—, y por eso el aviso no salía ahí. */
+    const delProxy = state.round && state.round.finDeLaAnterior;
+    if (delProxy) {
+      const t = Date.parse(delProxy);
+      if (!isNaN(t)) ultimo = t;
+    }
+
     const mirar = function (round) {
       (round && round.matches || []).forEach(function (partido) {
         /* Solo los acabados: con uno por jugar, la jornada no ha terminado. */
@@ -2291,7 +2302,9 @@
       });
     };
 
-    let completa = false;
+    /* Y si no viniera, se busca entre las jornadas que se hayan descargado, que
+       es lo que vale en la pestaña de Jornadas. */
+    let completa = ultimo != null;
     Object.keys(state.jornadas.datos || {}).forEach(function (id) {
       const j = state.jornadas.datos[id];
       if (j && j.round && mirar(j.round)) completa = true;
