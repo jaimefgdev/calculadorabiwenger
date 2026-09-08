@@ -132,7 +132,7 @@ const CDN = 'https://cf.biwenger.com/api/v2';
    navegador normal y las cabeceras que este mandaría. */
 /* Marca de versión: se sube en cada cambio y se consulta con ?version=1.
    Sirve para saber desde fuera si el despliegue ha entrado o no. */
-const VERSION = '2026-09-08 · deno 97';
+const VERSION = '2026-09-08 · deno 98';
 
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ' +
   '(KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36';
@@ -439,6 +439,25 @@ const app = {
               String((error && error.message) || error);
           }
           prueba.precios.ms = Date.now() - t1;
+
+          /* Y ahora la funcion DE VERDAD, la que usa la web, con el mismo id.
+             La sonda de arriba y esta piden lo mismo: si una va y la otra no,
+             el problema no es el CDN, es nuestro camino. */
+          const t2 = Date.now();
+          try {
+            const names = await players(await sistemaDeLaLiga(env).catch(function () { return null; }));
+            const slug = names[quienPrecios + ':slug'] || quienPrecios;
+            const serie = await playerPrices(slug, quienPrecios);
+            prueba.precios.real = {
+              slug: slug,
+              entradas: (serie || []).length,
+              cortado: cdnCortado(),
+              ms: Date.now() - t2
+            };
+          } catch (error) {
+            prueba.precios.real = { fallo: String((error && error.message) || error),
+              ms: Date.now() - t2 };
+          }
         }
 
         return new Response(JSON.stringify({
