@@ -725,6 +725,9 @@ code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft)
       #166a41 12.5% 22.5%, #1a7548 22.5% 25%);
   box-shadow: inset 0 0 0 3px var(--linea), 0 10px 26px rgba(0, 0, 0, .35);
   overflow: hidden;
+  /* La marca de agua se mezcla con el césped, y sin esto la mezcla se saldría
+     del campo a buscar el fondo de la página. */
+  isolation: isolate;
 }
 /* Línea de medio campo y círculo central. */
 .pitch::before {
@@ -745,6 +748,44 @@ code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft)
   position: absolute; left: 50%; top: 50%;
   width: 5px; height: 5px; margin: -2.5px 0 0 -2.5px;
   border-radius: 50%; background: var(--linea);
+  /* NUNCA se come un clic. De aquí cuelga la marca de agua, que ocupa medio
+     campo: sin esto se tragaba los clics y el arrastrar de los futbolistas del
+     centro de la alineación. */
+  pointer-events: none;
+}
+
+/* La marca de agua: el escudo y `jaimefgdev` segados en el césped, como el de
+   un estadio. Cuelga del punto central porque es lo único que hay en el centro
+   de los TRES campos (la alineación, la de una jornada y la de un partido), así
+   que sale en todos sin tocar una sola línea de código.
+
+   `overlay` es lo que la deja EN TONOS DEL CÉSPED: no pinta encima con su
+   morado, sino que aclara y oscurece el verde que ya hay, que es justo el
+   aspecto de la hierba segada en dos sentidos. */
+.pitch__spot::before,
+.pitch__spot::after {
+  position: absolute; left: 50%; top: 50%;
+  mix-blend-mode: overlay;
+  pointer-events: none;
+}
+/* El escudo. Se mide en `cqw` —ancho del envoltorio— para que crezca y encoja
+   con el campo: en el móvil el campo es la mitad de ancho y la marca tiene que
+   seguir ocupando lo mismo en proporción. */
+.pitch__spot::before {
+  content: '';
+  width: 40cqw; aspect-ratio: 350.6 / 392;
+  transform: translate(-50%, calc(-50% - 5cqw));
+  background: url('biwenger.svg') center / contain no-repeat;
+  opacity: .2;
+}
+/* Y el nombre, justo debajo del escudo. Aquí sí vale la tipografía de la web
+   —es texto de verdad, no una imagen—, la misma de la cabecera. */
+.pitch__spot::after {
+  content: 'jaimefgdev';
+  transform: translate(-50%, 21cqw);
+  font-family: var(--mono); font-weight: 700;
+  font-size: 4.8cqw; letter-spacing: .18em; white-space: nowrap;
+  color: #fff; opacity: .3;
 }
 /* Áreas: se dibujan con los dos bordes del contenedor de líneas. */
 .pitch__area {
@@ -876,7 +917,12 @@ code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft)
 /* ---------- Selector de jugador (cambios en el campo) ----------
    Va encima del campo, no en mitad de la pantalla: el cambio se elige donde
    se está mirando. */
-.pitch-wrap { position: relative; width: min(100%, 460px); margin: 0 auto; }
+/* `container-type` para que la marca de agua se mida contra ESTE ancho: es lo
+   que la hace escalar con el campo en vez de quedarse en un tamaño fijo. */
+.pitch-wrap {
+  position: relative; width: min(100%, 460px); margin: 0 auto;
+  container-type: inline-size;
+}
 .picker { position: absolute; inset: 0; z-index: 5; display: grid; place-items: center; padding: .5rem; }
 .picker__backdrop { position: absolute; inset: 0; background: rgba(0, 0, 0, .55); border-radius: 6px; }
 .picker__card {
