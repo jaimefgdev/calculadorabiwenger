@@ -132,7 +132,7 @@ const CDN = 'https://cf.biwenger.com/api/v2';
    navegador normal y las cabeceras que este mandaría. */
 /* Marca de versión: se sube en cada cambio y se consulta con ?version=1.
    Sirve para saber desde fuera si el despliegue ha entrado o no. */
-const VERSION = '2026-09-08 · deno 117';
+const VERSION = '2026-09-08 · deno 118';
 
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ' +
   '(KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36';
@@ -3332,6 +3332,11 @@ function mezclarJornada(guardado, fresco) {
          once se recalculaba entero cada vez, que son casi cien consultas al
          CDN que ya estaban hechas. */
       xiValueDay: fila.xiValueDay || antes.xiValueDay || null,
+      /* El sello viaja CON su valor. Se calculaba bien pero se caía aquí: esta
+         mezcla rehace cada fila con una lista fija de campos, y el que no esté
+         en la lista se pierde. Sin él, el valor del once nunca se daba por
+         bueno y se volvía a calcular en cada carga. */
+      xiValueOk: fila.xiValue ? !!fila.xiValueOk : !!antes.xiValueOk,
       /* OJO: un abono a cero NO pisa a uno bueno ya guardado. Cuando Biwenger
          no nos da las primas, todo sale a cero; si ese cero se guardara encima,
          el importe bueno de esa jornada se perderia PARA SIEMPRE, porque la
