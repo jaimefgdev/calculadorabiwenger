@@ -20,6 +20,11 @@
     var meta = document.querySelector('meta[name="viewport"]');
     var modoApp = false;
     try { modoApp = localStorage.getItem('biwenger-calc-movil') === '1'; } catch (e) {}
+    /* Y SOLO en una pantalla de teléfono. La preferencia se guarda por sitio, o
+       sea que se comparte con el ordenador: encendido ahí, el escritorio se
+       ponía en modo teléfono y los rankings pasaban a tarjetas del 78 % de
+       ancho, con lo que se veía una y el resto había que deslizarlo. */
+    modoApp = modoApp && screen.width < 900;
     if (modoApp) {
       meta.setAttribute('content',
         'width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover');
@@ -110,7 +115,8 @@
         <span class="interruptor__texto">
           <strong>Modo app</strong>
           <span class="muted">Se adapta al ancho del teléfono, con tamaños fijos y sin
-            zoom, en vez de encoger la vista de ordenador. Al cambiarlo se recarga la página.</span>
+            zoom, en vez de encoger la vista de ordenador. Solo hace efecto en el móvil:
+            en el ordenador no cambia nada. Al cambiarlo se recarga la página.</span>
         </span>
       </label>
     </article>
