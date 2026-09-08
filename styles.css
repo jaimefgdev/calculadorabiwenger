@@ -815,7 +815,11 @@ code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft)
 /* En fila y deslizables. `grid-auto-flow: column` los pone uno tras otro y
    `scroll-snap` hace que se paren en su sitio, como el carrusel de la app de
    Biwenger. */
-.modo-app .rankings,
+/* OJO A CUÁL SE PONE AQUÍ. Estas son las que llevan TARJETAS dentro. El
+   contenedor `.rankings` de Datos NO: dentro lleva FILAS («Más puntos / Mejor
+   media / Mejor racha» es una, y las tres peores otra), y ponerlo aquí dejaba
+   las dos filas una al lado de la otra, todo apelotonado en un mismo carrusel.
+   Cada fila se desliza por su cuenta, como en Rankings. */
 .modo-app .rankings--dos,
 .modo-app .rankings--tres,
 .modo-app .rankings-fila,
@@ -830,7 +834,6 @@ code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft)
   -webkit-overflow-scrolling: touch;
   padding-bottom: .4rem;
 }
-.modo-app .rankings > *,
 .modo-app .rankings--dos > *,
 .modo-app .rankings--tres > *,
 .modo-app .rankings-fila > *,
@@ -840,6 +843,15 @@ code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft)
 /* Las ocho pastillas del gráfico de puntos, en una fila, dejan celdas de
    treinta píxeles. Dos filas de cuatro. */
 .modo-app .viz-block .chips { grid-template-columns: repeat(4, minmax(0, 1fr)) !important; }
+
+/* El contenedor de Datos, en bloque: sus filas una debajo de otra, y cada una
+   deslizable por dentro. */
+/* Solo el contenedor pelado. `#liga-tandas` lleva las dos clases —`rankings`
+   y `rankings--dos`— y ese SI es un carrusel: dentro lleva tarjetas. */
+.modo-app .rankings:not(.rankings--dos):not(.rankings--tres):not(.rankings-fila) {
+  display: block !important; grid-template-columns: none !important;
+}
+.modo-app .rankings > .rankings--tres + .rankings--tres { margin-top: 1rem; }
 
 /* Y las tarjetas de la liga, con su reparto de columnas anulado: en modo app
    van en fila, no repartidas. */
@@ -872,6 +884,8 @@ code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft)
 
 .modo-app #squad-panel .table tbody tr {
   display: grid !important;
+  /* Un bloque liso, no una franja por celda. */
+  overflow: hidden;
   /* La primera columna mide lo que la cara: así el valor cae justo debajo del
      nombre, no debajo de la foto. `minmax(0, auto)` y no `auto` a secas porque
      una columna `auto` NUNCA encoge por debajo de su contenido, y con «En venta
@@ -899,6 +913,10 @@ code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft)
   padding: 0 !important; border: 0 !important;
   text-align: left !important; white-space: nowrap;
   min-width: 0; overflow: hidden; text-overflow: ellipsis;
+  /* SIN FONDO. Las celdas seguían pintando el suyo y la tarjeta salía a
+     franjas horizontales, que es lo que la hacía no parecerse en nada a la de
+     Biwenger: allí es un bloque liso con el contorno rojo. */
+  background: transparent !important;
 }
 .modo-app #squad-panel .table tbody td::before { content: none !important; }
 
@@ -911,17 +929,26 @@ code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft)
 .modo-app #squad-panel td[data-label='Ofertas']    { grid-area: ofertas; justify-self: end; }
 .modo-app #squad-panel td.col-pujar                { grid-area: acciones; }
 
-/* La cara, grande, y el nombre al lado —como en su app—. */
-.modo-app #squad-panel td[data-label='Futbolista'] .with-crest,
+/* El escudo a la izquierda, luego la cara grande y luego el nombre —ese es el
+   orden de su app—. En el HTML el escudo va DETRÁS del nombre, así que se
+   adelanta con `order` en vez de tocar el JS. */
+.modo-app #squad-panel td[data-label='Futbolista'] .with-crest {
+  display: flex; align-items: center; gap: .5rem; min-width: 0;
+}
+.modo-app #squad-panel td[data-label='Futbolista'] .crest {
+  order: -1; flex: none; width: 1.5rem; height: 1.5rem;
+}
 .modo-app #squad-panel td[data-label='Futbolista'] .player {
-  display: flex; align-items: center; gap: .55rem; min-width: 0;
+  display: flex; align-items: center; gap: .5rem; min-width: 0;
 }
 .modo-app #squad-panel td[data-label='Futbolista'] .pic-player {
-  width: 3.4rem; height: 3.4rem; flex: none;
+  width: 3.2rem; height: 3.2rem; flex: none;
 }
 .modo-app #squad-panel td[data-label='Futbolista'] .player-name {
-  font-size: 1.02rem; font-weight: 700; min-width: 0;
+  font-size: 1.05rem; font-weight: 700; min-width: 0;
 }
+/* Las chapas de demarcación, pegadas a la cara como allí. */
+.modo-app #squad-panel td[data-label='Futbolista'] .pos { flex: none; }
 
 /* El valor, con el mismo peso que allí; y «pts» detrás del número, que sin
    cabecera un 61 suelto no dice nada. */
