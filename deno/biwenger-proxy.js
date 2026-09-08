@@ -132,7 +132,7 @@ const CDN = 'https://cf.biwenger.com/api/v2';
    navegador normal y las cabeceras que este mandaría. */
 /* Marca de versión: se sube en cada cambio y se consulta con ?version=1.
    Sirve para saber desde fuera si el despliegue ha entrado o no. */
-const VERSION = '2026-09-08 · deno 120';
+const VERSION = '2026-09-08 · deno 121';
 
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ' +
   '(KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36';
@@ -1920,8 +1920,20 @@ async function primasDeLaLiga(env) {
  * jornada no pagó nada», es «no hemos podido calcularlo». El cero con motivo
  * ('negativo') sí es un dato bueno y se respeta.
  */
-function mejorAbono(nuevo, viejo) {
+function mejorAbono(nuevo, viejo, puntos) {
+  /* CON CERO PUNTOS NO SE COBRA. El abono sale de lo que se puntúa —por punto,
+     más once ideal y MVP, que también exigen puntuar—, así que a cero puntos le
+     toca cero euros, y ahí no hay nada viejo que conservar.
+
+     Sin esto se colaba un abono de otro cálculo: en la jornada 6 salían
+     350.000 € (siete puntos) y 100.000 € (dos) para gente que figuraba con cero,
+     porque la regla de abajo prefería el guardado antes que un cero «vacío».
+     Un cero acompañado de cero puntos no está vacío: es el dato. */
+  if (puntos === 0) return nuevo || null;
+
   if (!nuevo) return viejo || null;
+  /* Y si no, un abono a cero NO pisa a uno bueno ya guardado: cuando Biwenger
+     no nos da las primas, todo sale a cero y eso sí es «no lo sabemos». */
   const vacio = !nuevo.motivo && !nuevo.total && !nuevo.fija && !nuevo.puntos;
   if (vacio && viejo) return viejo;
   return nuevo;
@@ -3356,7 +3368,10 @@ function mezclarJornada(guardado, fresco) {
          el importe bueno de esa jornada se perderia PARA SIEMPRE, porque la
          jornada ya cerrada no se vuelve a calcular sola. Prefiero conservar el
          de antes y recalcularlo cuando las primas vuelvan. */
-      abono: mejorAbono(fila.abono, antes.abono)
+      /* Se le pasan los puntos de la fila para que un cero de verdad no se
+         tape con un abono de otro cálculo. */
+      abono: mejorAbono(fila.abono, antes.abono,
+        conOnce ? fila.points : (antes.points != null ? antes.points : fila.points))
     };
   });
   return fresco;
