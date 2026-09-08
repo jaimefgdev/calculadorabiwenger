@@ -5124,6 +5124,22 @@
     return ((ficha && ficha.part) || 1) === 1;
   }
 
+  /**
+   * ¿Ha empezado esta jornada?
+   *
+   * NO se mira el `status` de Biwenger: da la jornada 6 por «finished» teniendo
+   * nueve de sus diez partidos sin jugar, porque se adelantó un Real
+   * Sociedad-Celta. Con eso, la 6 salía entre las que «faltan por traer», se
+   * pedía para nada y se colaba en el selector como si fuera la actual.
+   * El proxy manda `empezada` sacada de sus partidos, que es lo único fiable;
+   * si no viniera —proxy viejo—, se usa el `status` como antes.
+   */
+  function jornadaEmpezada(r) {
+    if (!r) return false;
+    if (r.empezada != null) return !!r.empezada;
+    return r.status != null && r.status !== 'pending';
+  }
+
   /** Las jornadas guardadas propias, de la más antigua a la más nueva. */
   function jornadasGuardadas() {
     return Object.keys(state.jornadas.datos)
@@ -5210,7 +5226,7 @@
        aplazados, cero es el resultado correcto, no un fallo. */
     const sinTraer = (state.jornadas.list || []).filter(function (r) {
       if ((r.part || 1) !== 1) return false;
-      if (r.status === 'pending') return false;
+      if (!jornadaEmpezada(r)) return false;
       return !traidas[String(r.id)];
     }).map(function (r) { return r.number; }).filter(function (n) { return n != null; });
 
@@ -5328,7 +5344,7 @@
 
     const faltan = calendario.filter(function (r) {
       if ((r.part || 1) !== 1) return false;
-      if (r.status === 'pending') return false;
+      if (!jornadaEmpezada(r)) return false;
       /* Se vuelven a pedir tanto las que no están como las que están vacías.
          Sin esto, una jornada guardada a cero no se recuperaba NUNCA: como el
          id ya figuraba, no se volvía a pedir, y como no tenía puntos, no
@@ -6498,8 +6514,14 @@
        no significa nada: es que todavía no ha llegado el momento de elegir
        once. Sin eso, cualquier jornada futura marcaba a todo el mundo fuera. */
     const jornada = jornadaActiva();
-    const empezada = !!(jornada && jornada.round && jornada.round.status &&
-      jornada.round.status !== 'pending');
+    /* Del calendario, que es quien trae la marca buena; la jornada descargada
+       solo trae el `status` de Biwenger, que para esto no vale. */
+    const enLista = jornada && jornada.round
+      ? (state.jornadas.list || []).filter(function (r) {
+          return String(r.id) === String(jornada.round.id);
+        })[0]
+      : null;
+    const empezada = jornadaEmpezada(enLista || (jornada && jornada.round));
     const juega = !empezada || !!deLaJornada.once[clave];
     return '<span class="dueno ' + (extra || '') + (juega ? '' : ' dueno--fuera') + '"' +
       ' title="' + escapeHtml(dueno) + (juega ? '' : ' (no lo ha alineado)') + '">' +

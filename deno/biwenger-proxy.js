@@ -132,7 +132,7 @@ const CDN = 'https://cf.biwenger.com/api/v2';
    navegador normal y las cabeceras que este mandaría. */
 /* Marca de versión: se sube en cada cambio y se consulta con ?version=1.
    Sirve para saber desde fuera si el despliegue ha entrado o no. */
-const VERSION = '2026-09-08 · deno 109';
+const VERSION = '2026-09-08 · deno 111';
 
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ' +
   '(KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36';
@@ -1764,8 +1764,20 @@ async function seasonRounds() {
       name: round.name || '',
       number: Number(String(round.short || '').replace(/\D/g, '')) || null,
       part: round.part || 1,
+      /* CUIDADO CON ESTE CAMPO. Biwenger da la jornada 6 por «finished»
+         teniendo nueve de sus diez partidos sin jugar: se adelantó un Real
+         Sociedad-Celta y con eso ya la marca acabada. O sea que `status` NO
+         dice si una jornada se ha jugado. Quien necesite saberlo tiene que
+         mirar sus partidos, no esto. */
       status: round.status || null
     };
+  });
+
+  /* Y EN ORDEN. Biwenger las manda como le parece —la 6 llegaba entre la 3 y
+     la 4— y esa lista es la del selector de jornadas, así que salían
+     desordenadas. Por número, y la ronda de aplazados detrás de la suya. */
+  list.sort(function (a, b) {
+    return ((a.number || 0) - (b.number || 0)) || ((a.part || 1) - (b.part || 1));
   });
 
   /* Una respuesta buena pero sin jornadas dentro no vale: es lo que contesta
@@ -3480,6 +3492,28 @@ async function roundDetail(roundId, score) {
  * se sirven todas las fichas. Solo se vuelven a pedir las jornadas que aún
  * pueden cambiar: una acabada ya no se mueve nunca.
  */
+/**
+ * El calendario con una marca fiable de en qué anda cada jornada.
+ *
+ * `empezada` = algún partido suyo ha arrancado. `cerrada` = todos han acabado.
+ * Sale de los partidos, no del `status` que manda Biwenger, que para esto no
+ * vale. Si el calendario de partidos no estuviera a mano, se devuelven las
+ * jornadas tal cual y cada uno se apaña con lo que había.
+ */
+async function calendarioConEstado(calendar, score) {
+  const fixtures = await fixturesDeLaTemporada(score).catch(function () { return null; });
+  if (!fixtures) return calendar;
+
+  return (calendar || []).map(function (j) {
+    const partidos = ((fixtures[String(j.id)] || {}).matches) || [];
+    if (!partidos.length) return j;
+    return Object.assign({}, j, {
+      empezada: partidos.some(function (m) { return m.status !== 'pending' && m.status !== 'preview'; }),
+      cerrada: partidos.every(function (m) { return m.status === 'finished'; })
+    });
+  });
+}
+
 async function fixturesDeLaTemporada(score) {
   const clave = 'fixtures-v1-' + (score || '');
   const VIGENCIA = 60 * 60 * 1000;
@@ -4124,7 +4158,12 @@ async function roundBoard(env, headers, jornada, listaNombres) {
       part: ficha.part || (detalle && detalle.part) || 1,
       status: ficha.status || (detalle && detalle.status) || null
     },
-    rounds: calendar,
+    /* El calendario, con una marca de verdad de si cada jornada ha empezado y
+       si ha acabado. Hace falta porque el `status` de Biwenger MIENTE: da la
+       jornada 6 por «finished» teniendo nueve de sus diez partidos sin jugar,
+       porque se adelantó un Real Sociedad-Celta. Con eso, la web la contaba
+       entre las que «faltan por traer» y salía a pedirla para nada. */
+    rounds: await calendarioConEstado(calendar, score),
     standings: standings,
     bestXi: once,
     /* Los importes que paga la liga, para poder explicarlos en la web sin
