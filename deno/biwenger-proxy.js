@@ -132,7 +132,7 @@ const CDN = 'https://cf.biwenger.com/api/v2';
    navegador normal y las cabeceras que este mandaría. */
 /* Marca de versión: se sube en cada cambio y se consulta con ?version=1.
    Sirve para saber desde fuera si el despliegue ha entrado o no. */
-const VERSION = '2026-09-08 · deno 94';
+const VERSION = '2026-09-08 · deno 95';
 
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ' +
   '(KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36';
@@ -4313,8 +4313,35 @@ async function marketBoard(env, headers, myId, names) {
 const ymd = (day) => Number(day.slice(2, 4) + day.slice(5, 7) + day.slice(8, 10));
 const isoDay = (time) => new Date(time).toISOString().slice(0, 10);
 
+/* La serie de precios de un futbolista tarda lo que le da la gana: midiendo
+   dieciseis futbolistas al azar, el mismo endpoint dio desde 0,3 hasta 15,8
+   segundos, y no depende de los parámetros —se probó con y sin `lang`,
+   alternando el orden, y sale igual de errático—. Con el tope general de 8 s
+   se abortaba más de la mitad, y por eso la web decía «Biwenger no publica la
+   evolución» de gente como Mbappé, Yamal o Pedri, que tienen 366 días cada
+   uno. Se le da margen de sobra: es UNA consulta y solo la primera vez. */
+const TOPE_PRECIOS_MS = 22000;
+
 async function playerPrices(slug, id) {
   if (cache.prices[slug] && cache.prices[slug].length) return cache.prices[slug];
+
+  /* Y guardada en el KV, que es lo que de verdad arregla esto. `cache.prices`
+     vive solo en memoria, y Deno Deploy levanta instancias nuevas a todas
+     horas: casi todas las consultas caían en frío y se comían la espera otra
+     vez. Con la copia en disco, cada futbolista se pide UNA vez al día. */
+  const clave = 'serie-' + String(id || slug);
+  const hoy = isoDay(Date.now());
+  let guardada = null;
+  if (JORNADAS) {
+    try {
+      const crudo = await JORNADAS.get(clave);
+      if (crudo) guardada = JSON.parse(crudo);
+    } catch (error) { /* se pide abajo */ }
+  }
+  if (guardada && guardada.dia === hoy && (guardada.prices || []).length) {
+    cache.prices[slug] = guardada.prices;
+    return guardada.prices;
+  }
 
   /* Se prueba por slug y, si no sale, por el número. El id SIEMPRE vale como
      ruta —igual que en la ficha del futbolista— y hay slugs que no: el que
@@ -4323,7 +4350,9 @@ async function playerPrices(slug, id) {
   const pedir = async function (quien) {
     if (!quien) return null;
     const r = await fetch(CDN + '/players/la-liga/' + encodeURIComponent(quien) +
-      '?fields=*,prices', { headers: NAVEGADOR }).catch(function () { return null; });
+      '?lang=es&fields=*,prices',
+      { headers: NAVEGADOR, signal: AbortSignal.timeout(TOPE_PRECIOS_MS) })
+      .catch(function () { return null; });
     if (!r || !r.ok) return null;
     const cuerpo = await r.json().catch(function () { return {}; });
     const lista = (cuerpo.data && cuerpo.data.prices) || [];
@@ -4332,9 +4361,26 @@ async function playerPrices(slug, id) {
 
   const prices = (await pedir(slug)) ||
     (id && String(id) !== String(slug) ? await pedir(id) : null);
+
   /* Solo se guarda lo que trae datos: una lista vacía guardada deja a ese
      futbolista sin gráfico hasta que se reinicie el servidor. */
-  if (prices && prices.length) cache.prices[slug] = prices;
+  if (prices && prices.length) {
+    cache.prices[slug] = prices;
+    if (JORNADAS) {
+      try {
+        await JORNADAS.put(clave, JSON.stringify({ dia: hoy, prices: prices }));
+      } catch (error) { /* da igual, se vuelve a pedir mañana */ }
+    }
+    return prices;
+  }
+
+  /* Y si hoy no ha contestado pero ayer sí, se sirve lo de ayer: un gráfico
+     con un día de retraso es infinitamente mejor que «no publica la
+     evolución», que además es mentira. */
+  if (guardada && (guardada.prices || []).length) {
+    cache.prices[slug] = guardada.prices;
+    return guardada.prices;
+  }
   return prices;
 }
 
