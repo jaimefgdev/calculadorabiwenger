@@ -132,7 +132,7 @@ const CDN = 'https://cf.biwenger.com/api/v2';
    navegador normal y las cabeceras que este mandaría. */
 /* Marca de versión: se sube en cada cambio y se consulta con ?version=1.
    Sirve para saber desde fuera si el despliegue ha entrado o no. */
-const VERSION = '2026-09-08 · deno 123';
+const VERSION = '2026-09-09 · deno 124';
 
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ' +
   '(KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36';
@@ -3412,10 +3412,31 @@ async function roundDetail(roundId, score) {
   const guardado = cache.detalles[clave];
   if (guardado && Date.now() - guardado.at < guardado.vigencia) return guardado.data;
 
+  /* La copia del KV, que es la que aguanta de verdad.
+     `cache.detalles` es memoria del isolate, y en Deno los isolates se mueren
+     entre petición y petición: la caché acertaba casi nunca, así que CADA
+     consulta se bajaba la jornada entera del CDN. Eso es lo que nos gana los
+     429 —y con el CDN cortado no había jornada que enseñar, porque no había
+     nada guardado en ningún sitio. Con el respaldo en KV la descarga se hace
+     una vez cada media hora y punto. */
+  const kvClave = 'detalle-v1-' + roundId + '-' + (score || '');
+  const deKv = await leerDetalleKv(kvClave);
+  if (deKv && Date.now() - deKv.at < vigenciaDetalle(deKv.data)) {
+    cache.detalles[clave] = { data: deKv.data, at: deKv.at, vigencia: vigenciaDetalle(deKv.data) };
+    return deKv.data;
+  }
+
   const response = await fetch(fresco(CDN + '/rounds/la-liga/' + encodeURIComponent(roundId) +
     '?lang=es' + (score ? '&score=' + encodeURIComponent(score) : '')),
     { headers: NAVEGADOR, cf: SIN_CACHE });
-  if (!response.ok) return guardado ? guardado.data : null;
+  /* Sin CDN se sirve lo último que se leyó, por viejo que sea: una jornada de
+     hace un rato es infinitamente mejor que «no se han podido traer los
+     partidos», que era lo que salía. */
+  if (!response.ok) {
+    apuntarCorteDelCdn(response);
+    if (guardado) return guardado.data;
+    return deKv ? deKv.data : null;
+  }
 
   const data = (await response.json()).data || {};
   const puntos = {};      // futbolista -> lo que lleva en esta jornada
@@ -3509,9 +3530,11 @@ async function roundDetail(roundId, score) {
     picas: picas,
     lances: lances,
     matches: partidos,
-    /* Los informes tal cual llegan, para que matchDay arme los onces y los
-       banquillos sin volver a bajarse la jornada entera. */
-    crudo: data.games || [],
+    /* Los informes, para que matchDay arme los onces y los banquillos sin
+       volver a bajarse la jornada entera. Recortados a lo que usa: lo gordo
+       del feed es `rawStats` de cada futbolista, que aquí no pinta nada y
+       multiplicaba por cuatro lo que hay que guardar en el KV. */
+    crudo: crudoLigero(data.games),
     played: jugados,
     games: partidos.length,
     live: empezados > 0 && jugados < partidos.length,
@@ -3525,11 +3548,74 @@ async function roundDetail(roundId, score) {
   cache.detalles[clave] = {
     data: detalle,
     at: Date.now(),
-    /* Con la jornada viva, o con algún partido a menos de tres horas —las
-       alineaciones se confirman una hora antes—, hay que mirar a menudo. */
-    vigencia: (detalle.live || detalle.pronto) ? 2 * 60 * 1000 : 30 * 60 * 1000
+    vigencia: vigenciaDetalle(detalle)
   };
+  await guardarDetalleKv(kvClave, detalle);
   return detalle;
+}
+
+/* Los partidos con lo justo para rehacer onces y banquillos: quién jugó, de
+   qué, qué hizo y si fue el mejor. */
+function crudoLigero(games) {
+  const lado = function (equipo) {
+    const e = equipo || {};
+    return {
+      id: e.id != null ? e.id : null,
+      name: e.name || '',
+      score: e.score != null ? e.score : null,
+      reports: (e.reports || []).map(function (informe) {
+        const j = informe.player || {};
+        return {
+          star: !!informe.star,
+          player: {
+            id: j.id != null ? j.id : null,
+            name: j.name || null,
+            position: j.position != null ? j.position : null
+          },
+          events: (informe.events || []).map(function (evento) {
+            return { type: evento.type, metadata: evento.metadata != null ? evento.metadata : null };
+          })
+        };
+      })
+    };
+  };
+
+  return (games || []).map(function (game) {
+    return {
+      id: game.id,
+      date: game.date,
+      status: game.status || null,
+      location: game.location || null,
+      initialLineups: !!game.initialLineups,
+      home: lado(game.home),
+      away: lado(game.away)
+    };
+  });
+}
+
+/* Con la jornada viva, o con algún partido a menos de tres horas —las
+   alineaciones se confirman una hora antes—, hay que mirar a menudo. */
+function vigenciaDetalle(detalle) {
+  if (!detalle) return 0;
+  return (detalle.live || detalle.pronto) ? 2 * 60 * 1000 : 30 * 60 * 1000;
+}
+
+async function leerDetalleKv(clave) {
+  if (!JORNADAS) return null;
+  try {
+    const crudo = await JORNADAS.get(clave);
+    if (!crudo) return null;
+    const caja = JSON.parse(crudo);
+    if (!caja || !caja.data || !caja.at) return null;
+    return caja;
+  } catch (error) { return null; }
+}
+
+async function guardarDetalleKv(clave, detalle) {
+  if (!JORNADAS || !detalle) return;
+  try {
+    await JORNADAS.put(clave, JSON.stringify({ at: Date.now(), data: detalle }));
+  } catch (error) { /* sin sitio: se sigue con la memoria */ }
 }
 
 /**
