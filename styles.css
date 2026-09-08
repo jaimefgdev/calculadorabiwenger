@@ -797,29 +797,9 @@ code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft)
   overscroll-behavior-x: contain;
 }
 
-/* Y el nombre siempre a la vista: sin esto, al deslizar no sabes de quién es
-   la cifra que estás leyendo. */
-.modo-app .table th:nth-child(2),
-.modo-app .table td:nth-child(2) {
-  position: sticky; left: 0; z-index: 2;
-  background: var(--bg-elev);
-  box-shadow: 1px 0 0 var(--border);
-}
-.modo-app .table thead th:nth-child(2) { z-index: 3; }
-.modo-app .table td.col-rank,
-.modo-app .table th.col-rank {
-  position: sticky; left: 0; z-index: 2;
-  width: 1.6rem; padding-left: .35rem !important; padding-right: .15rem !important;
-  background: var(--bg-elev);
-}
-.modo-app .table th:nth-child(2),
-.modo-app .table td:nth-child(2) { left: 1.9rem; }
-/* La fila abierta y la mía pintan su color también en la columna fija, que si
-   no se queda un cuadrado de otro color pegado a la izquierda. */
-.modo-app .fila--mia > td:nth-child(2),
-.modo-app .fila--mia > td.col-rank { background: color-mix(in srgb, var(--fila-mia), var(--bg-elev)); }
-.modo-app .row-venta > td:nth-child(2),
-.modo-app .row-venta > td.col-rank { background: color-mix(in srgb, var(--fila-venta), var(--bg-elev)); }
+/* SIN columna fija. Lo probé con el nombre pegado a la izquierda y es peor: se
+   come un tercio del ancho y tapa justo las cifras que vas a mirar al deslizar.
+   La app de Biwenger tampoco lo hace. Se desliza la fila entera. */
 
 /* ---------- Lo que no cabe en una columna de teléfono ----------
    Todo lo que está pensado en dos o más columnas se pone en una. Y lo que no
@@ -872,6 +852,85 @@ code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft)
 /* La ficha de un futbolista ocupa casi toda la pantalla, como en Biwenger. */
 .modo-app .picker--modal .picker__card { max-height: 82vh; }
 .modo-app .ficha__wrap { width: 100%; }
+
+/* ---------- Mi plantilla, en tarjetas ----------
+   Como en la app de Biwenger: el nombre arriba, lo que vale y lo que ha hecho
+   hoy debajo, los puntos y el estado en pequeño, y los botones a la derecha.
+   En tabla no cabe —son ocho columnas— y apilada gasta ocho líneas.
+
+   Se hace desde el CSS, sin tocar el JS: cada fila pasa a ser una rejilla y
+   cada celda se coloca por su `data-label`. Así en el ordenador sigue siendo
+   una tabla y no hay dos versiones del mismo listado que mantener. */
+.modo-app #squad-panel .table,
+.modo-app #squad-panel .table tbody { display: block !important; width: auto !important; }
+.modo-app #squad-panel .table thead { display: none !important; }
+.modo-app #squad-panel .table-scroll { overflow-x: visible !important; }
+
+.modo-app #squad-panel .table tbody tr {
+  display: grid !important;
+  /* `minmax(0, auto)` y no `auto` a secas: una columna `auto` NUNCA encoge por
+     debajo de su contenido, y con «En venta por 95.700.000 €» la tarjeta se
+     salía de la pantalla llevándose los botones fuera. */
+  grid-template-columns: minmax(0, auto) minmax(0, auto) minmax(0, 1fr) minmax(0, auto);
+  width: 100%;
+  grid-template-areas:
+    'venta  venta  venta   venta'
+    'quien  quien  quien   acciones'
+    'valor  hoy    .       acciones'
+    'pts    estado ofertas acciones';
+  gap: .2rem .6rem; align-items: center;
+  margin: 0 0 .5rem; padding: .6rem .7rem;
+  background: var(--bg-surface);
+  border: 1px solid var(--border); border-radius: var(--radius-sm);
+}
+.modo-app #squad-panel .table tbody tr.row-venta {
+  border-color: var(--neg); background: var(--fila-venta);
+}
+
+/* Las celdas dejan de ser celdas: sin relleno, sin borde y SIN alinear a la
+   derecha, que es lo que empujaba todo fuera de la tarjeta. */
+.modo-app #squad-panel .table tbody td {
+  display: block !important;
+  padding: 0 !important; border: 0 !important;
+  text-align: left !important; white-space: nowrap;
+  /* Sin esto no encogen: es lo que pone `min-width: auto` a un hijo de rejilla
+     y lo que hacía que la tarjeta se saliera. Lo largo se recorta con puntos. */
+  min-width: 0; overflow: hidden; text-overflow: ellipsis;
+}
+.modo-app #squad-panel .table tbody td::before { content: none !important; }
+
+.modo-app #squad-panel td[data-label='Futbolista'] { grid-area: quien; font-size: .95rem; white-space: normal; }
+.modo-app #squad-panel td[data-label='En venta']   { grid-area: venta; font-size: .78rem; color: var(--text-soft); }
+.modo-app #squad-panel td[data-label='Valor']      { grid-area: valor; font-weight: 650; }
+.modo-app #squad-panel td[data-label='Hoy']        { grid-area: hoy;   font-size: .82rem; }
+.modo-app #squad-panel td[data-label='Puntos']     { grid-area: pts;   font-size: .8rem; color: var(--text-soft); }
+.modo-app #squad-panel td[data-label='Estado']     { grid-area: estado; }
+.modo-app #squad-panel td[data-label='Ofertas']    { grid-area: ofertas; }
+.modo-app #squad-panel td.col-pujar                { grid-area: acciones; }
+
+/* «pts» detrás del número: sin la cabecera, un 61 suelto no dice nada. */
+.modo-app #squad-panel td[data-label='Puntos']::after {
+  content: ' pts'; color: var(--text-faint);
+}
+/* Y «En venta por» delante del precio, como en su app. */
+.modo-app #squad-panel td[data-label='En venta'] strong::before {
+  content: 'En venta por '; font-weight: 400; color: var(--text-faint);
+}
+/* Al que no está en venta ese hueco le sobra, igual que el guion de ofertas. */
+.modo-app #squad-panel td[data-label='En venta']:has(.sub),
+.modo-app #squad-panel td[data-label='Ofertas']:has(.sub) { display: none !important; }
+
+/* Los botones, apilados a la derecha. En fila se comían medio ancho de la
+   tarjeta y el tercero se salía fuera. */
+.modo-app #squad-panel td.col-pujar .acciones {
+  display: flex; flex-direction: column; gap: .3rem; align-items: stretch;
+}
+.modo-app #squad-panel td.col-pujar .btn { min-width: 2.6rem; padding-inline: .5rem; }
+
+/* Y la tarjeta no se sale: lo largo se recorta con puntos en vez de empujar. */
+.modo-app #squad-panel .table tbody tr { max-width: 100%; overflow: hidden; }
+.modo-app #squad-panel td[data-label='Futbolista'] { min-width: 0; overflow: hidden; }
+.modo-app #squad-panel td[data-label='Futbolista'] .player-name { max-width: 100%; }
 
 /* Todo lo que se pulsa, del tamaño de un dedo. */
 .modo-app .btn,
