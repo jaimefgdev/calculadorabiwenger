@@ -854,13 +854,13 @@ code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft)
 .modo-app .ficha__wrap { width: 100%; }
 
 /* ---------- Mi plantilla, en tarjetas ----------
-   Como en la app de Biwenger: el nombre arriba, lo que vale y lo que ha hecho
-   hoy debajo, los puntos y el estado en pequeño, y los botones a la derecha.
-   En tabla no cabe —son ocho columnas— y apilada gasta ocho líneas.
+   Calcada a la de la app de Biwenger: arriba «En venta por X»; debajo la cara
+   grande a la izquierda y, a su derecha, el nombre en grande con el valor y la
+   subida del día justo debajo, alineados con él; y el botón a la derecha del
+   todo.
 
-   Se hace desde el CSS, sin tocar el JS: cada fila pasa a ser una rejilla y
-   cada celda se coloca por su `data-label`. Así en el ordenador sigue siendo
-   una tabla y no hay dos versiones del mismo listado que mantener. */
+   Se hace desde el CSS, colocando cada celda por su `data-label`: en el
+   ordenador sigue siendo una tabla y no hay dos versiones del mismo listado. */
 .modo-app #squad-panel .table,
 .modo-app #squad-panel .table tbody { display: block !important; width: auto !important; }
 .modo-app #squad-panel .table thead { display: none !important; }
@@ -868,51 +868,64 @@ code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft)
 
 .modo-app #squad-panel .table tbody tr {
   display: grid !important;
-  /* `minmax(0, auto)` y no `auto` a secas: una columna `auto` NUNCA encoge por
-     debajo de su contenido, y con «En venta por 95.700.000 €» la tarjeta se
-     salía de la pantalla llevándose los botones fuera. */
-  grid-template-columns: minmax(0, auto) minmax(0, auto) minmax(0, 1fr) minmax(0, auto);
-  width: 100%;
+  /* La primera columna mide lo que la cara: así el valor cae justo debajo del
+     nombre, no debajo de la foto. `minmax(0, auto)` y no `auto` a secas porque
+     una columna `auto` NUNCA encoge por debajo de su contenido, y con «En venta
+     por 95.700.000 €» la tarjeta se salía llevándose los botones fuera. */
+  grid-template-columns: 3.4rem minmax(0, auto) minmax(0, auto) minmax(0, auto) minmax(0, 1fr) minmax(0, auto);
   grid-template-areas:
-    'venta  venta  venta   venta'
-    'quien  quien  quien   acciones'
-    'valor  hoy    .       acciones'
-    'pts    estado ofertas acciones';
-  gap: .2rem .6rem; align-items: center;
-  margin: 0 0 .5rem; padding: .6rem .7rem;
+    'venta venta venta venta  venta   ofertas'
+    'quien quien quien quien  quien   acciones'
+    '.     valor hoy   pts    estado  acciones';
+  gap: .15rem .5rem; align-items: center; width: 100%;
+  margin: 0 0 .5rem; padding: .55rem .7rem;
   background: var(--bg-surface);
   border: 1px solid var(--border); border-radius: var(--radius-sm);
 }
+/* En venta: solo el contorno rojo, como en su app. El fondo rojo en toda la
+   tarjeta tapaba las cifras y dejaba la lista pareciendo una alarma. */
 .modo-app #squad-panel .table tbody tr.row-venta {
-  border-color: var(--neg); background: var(--fila-venta);
+  border-color: var(--neg); background: var(--bg-surface);
 }
 
-/* Las celdas dejan de ser celdas: sin relleno, sin borde y SIN alinear a la
-   derecha, que es lo que empujaba todo fuera de la tarjeta. */
+/* Las celdas dejan de serlo: sin relleno, sin borde y sin alinear a la derecha,
+   que es lo que empujaba todo fuera de la tarjeta. */
 .modo-app #squad-panel .table tbody td {
   display: block !important;
   padding: 0 !important; border: 0 !important;
   text-align: left !important; white-space: nowrap;
-  /* Sin esto no encogen: es lo que pone `min-width: auto` a un hijo de rejilla
-     y lo que hacía que la tarjeta se saliera. Lo largo se recorta con puntos. */
   min-width: 0; overflow: hidden; text-overflow: ellipsis;
 }
 .modo-app #squad-panel .table tbody td::before { content: none !important; }
 
-.modo-app #squad-panel td[data-label='Futbolista'] { grid-area: quien; font-size: .95rem; white-space: normal; }
-.modo-app #squad-panel td[data-label='En venta']   { grid-area: venta; font-size: .78rem; color: var(--text-soft); }
-.modo-app #squad-panel td[data-label='Valor']      { grid-area: valor; font-weight: 650; }
-.modo-app #squad-panel td[data-label='Hoy']        { grid-area: hoy;   font-size: .82rem; }
-.modo-app #squad-panel td[data-label='Puntos']     { grid-area: pts;   font-size: .8rem; color: var(--text-soft); }
+.modo-app #squad-panel td[data-label='Futbolista'] { grid-area: quien; white-space: normal; }
+.modo-app #squad-panel td[data-label='En venta']   { grid-area: venta; }
+.modo-app #squad-panel td[data-label='Valor']      { grid-area: valor; }
+.modo-app #squad-panel td[data-label='Hoy']        { grid-area: hoy; }
+.modo-app #squad-panel td[data-label='Puntos']     { grid-area: pts; }
 .modo-app #squad-panel td[data-label='Estado']     { grid-area: estado; }
-.modo-app #squad-panel td[data-label='Ofertas']    { grid-area: ofertas; }
+.modo-app #squad-panel td[data-label='Ofertas']    { grid-area: ofertas; justify-self: end; }
 .modo-app #squad-panel td.col-pujar                { grid-area: acciones; }
 
-/* «pts» detrás del número: sin la cabecera, un 61 suelto no dice nada. */
-.modo-app #squad-panel td[data-label='Puntos']::after {
-  content: ' pts'; color: var(--text-faint);
+/* La cara, grande, y el nombre al lado —como en su app—. */
+.modo-app #squad-panel td[data-label='Futbolista'] .with-crest,
+.modo-app #squad-panel td[data-label='Futbolista'] .player {
+  display: flex; align-items: center; gap: .55rem; min-width: 0;
 }
-/* Y «En venta por» delante del precio, como en su app. */
+.modo-app #squad-panel td[data-label='Futbolista'] .pic-player {
+  width: 3.4rem; height: 3.4rem; flex: none;
+}
+.modo-app #squad-panel td[data-label='Futbolista'] .player-name {
+  font-size: 1.02rem; font-weight: 700; min-width: 0;
+}
+
+/* El valor, con el mismo peso que allí; y «pts» detrás del número, que sin
+   cabecera un 61 suelto no dice nada. */
+.modo-app #squad-panel td[data-label='Valor'] { font-weight: 700; font-size: .92rem; }
+.modo-app #squad-panel td[data-label='Hoy'] { font-size: .82rem; }
+.modo-app #squad-panel td[data-label='Puntos'] { font-size: .8rem; color: var(--text-soft); }
+.modo-app #squad-panel td[data-label='Puntos']::after { content: ' pts'; color: var(--text-faint); }
+.modo-app #squad-panel td[data-label='En venta'] { font-size: .8rem; color: var(--text-soft); }
 .modo-app #squad-panel td[data-label='En venta'] strong::before {
   content: 'En venta por '; font-weight: 400; color: var(--text-faint);
 }
@@ -920,17 +933,15 @@ code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft)
 .modo-app #squad-panel td[data-label='En venta']:has(.sub),
 .modo-app #squad-panel td[data-label='Ofertas']:has(.sub) { display: none !important; }
 
-/* Los botones, apilados a la derecha. En fila se comían medio ancho de la
-   tarjeta y el tercero se salía fuera. */
+/* Los botones, en fila a la derecha. Apilados estiraban la tarjeta a tres
+   alturas por futbolista, que es justo lo que se quería quitar. */
 .modo-app #squad-panel td.col-pujar .acciones {
-  display: flex; flex-direction: column; gap: .3rem; align-items: stretch;
+  display: flex; flex-direction: row; gap: .25rem; align-items: center;
 }
-.modo-app #squad-panel td.col-pujar .btn { min-width: 2.6rem; padding-inline: .5rem; }
-
-/* Y la tarjeta no se sale: lo largo se recorta con puntos en vez de empujar. */
-.modo-app #squad-panel .table tbody tr { max-width: 100%; overflow: hidden; }
-.modo-app #squad-panel td[data-label='Futbolista'] { min-width: 0; overflow: hidden; }
-.modo-app #squad-panel td[data-label='Futbolista'] .player-name { max-width: 100%; }
+.modo-app #squad-panel td.col-pujar .btn {
+  min-width: 2.2rem; min-height: 36px; padding-inline: .45rem;
+}
+.modo-app #squad-panel td.col-pujar .ambito { min-height: 36px; }
 
 /* Todo lo que se pulsa, del tamaño de un dedo. */
 .modo-app .btn,
