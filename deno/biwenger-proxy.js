@@ -132,7 +132,7 @@ const CDN = 'https://cf.biwenger.com/api/v2';
    navegador normal y las cabeceras que este mandaría. */
 /* Marca de versión: se sube en cada cambio y se consulta con ?version=1.
    Sirve para saber desde fuera si el despliegue ha entrado o no. */
-const VERSION = '2026-09-09 · deno 125';
+const VERSION = '2026-09-09 · deno 126';
 
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ' +
   '(KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36';
@@ -4802,10 +4802,6 @@ async function playerPrices(slug, id, soloGuardado) {
     } catch (error) { /* se pide abajo */ }
   }
   const deAyer = (guardada && (guardada.prices || []).length) ? guardada.prices : null;
-  if (guardada && guardada.dia === hoy && deAyer) {
-    cache.prices[slug] = deAyer;
-    return deAyer;
-  }
 
   /* SI YA LA TENEMOS DE OTRO DÍA, no hace falta volver a bajarla entera: lo
      único que le falta es el precio de hoy, y ese ya está en el índice de
@@ -4818,18 +4814,39 @@ async function playerPrices(slug, id, soloGuardado) {
      la vida y a partir de ahí se remata sola con lo que ya hay en memoria.
      Solo se usa el índice si YA está descargado: pedirlo aquí a propósito sería
      cambiar una consulta lenta por otra. */
-  /* Con el índice en memoria Y bajado HOY: si es de ayer, su «precio de hoy»
-     es el de ayer, y meterlo con la fecha de hoy sería inventarse un dato. */
-  const indiceDeHoy = !!(cache.players && cache.playersAt &&
-    isoDay(cache.playersAt) === hoy);
-  if (deAyer && indiceDeHoy) {
-    const precioHoy = cache.players[String(id || slug) + ':price'];
-    if (precioHoy != null) {
-      /* El sello es AAMMDD, como el resto de la serie. */
-      const sello = Number(hoy.slice(2).replace(/-/g, ''));
-      const ultimo = deAyer[deAyer.length - 1];
-      const serie = (ultimo && Number(ultimo[0]) === sello)
-        ? deAyer
+  /* ¿El índice que tenemos en memoria es de HOY? NO se pregunta al reloj.
+     `cache.playersAt` dice cuándo lo cargamos NOSOTROS, no cuándo lo publicó
+     Biwenger: cuando el CDN nos corta, `deReserva()` saca del KV una copia de
+     ayer y le pone la hora de ahora. Así el «precio de hoy» que se pegaba a la
+     serie era el de ayer con la fecha de hoy, y el 1D salía 0 en TODOS —Marrero
+     240.000 cuando Biwenger ya lo daba a 270.000—.
+
+     Se pregunta al propio dato. El índice trae `priceIncrement`, el cambio del
+     día según Biwenger, así que la serie se valida sola: si el precio del
+     índice MENOS ese cambio cuadra con el último día guardado, el índice ha
+     pasado de día y su precio es el de hoy. Si el precio del índice ES el
+     último guardado, el índice sigue siendo el de ayer y no hay nada que pegar.
+     Con `priceIncrement` a 0 —día plano de verdad— cuadra igual, que es lo
+     correcto. */
+  const precioHoy = deAyer ? cache.players && cache.players[String(id || slug) + ':price'] : null;
+  const cambioHoy = deAyer ? cache.players && cache.players[String(id || slug) + ':inc'] : null;
+  if (deAyer && precioHoy != null && cambioHoy != null) {
+    /* El sello es AAMMDD, como el resto de la serie. */
+    const sello = Number(hoy.slice(2).replace(/-/g, ''));
+    const ultimo = deAyer[deAyer.length - 1];
+    const yaEsHoy = !!(ultimo && Number(ultimo[0]) === sello);
+    /* El día ANTERIOR a hoy dentro de la serie: si ya hay un punto de hoy
+       —bueno o inventado—, el de referencia es el de antes. */
+    const anterior = yaEsHoy
+      ? (deAyer.length > 1 ? Number(deAyer[deAyer.length - 2][1]) : null)
+      : (ultimo ? Number(ultimo[1]) : null);
+
+    if (anterior != null && Math.round(precioHoy - cambioHoy) === Math.round(anterior)) {
+      /* Si ya había un punto de hoy se SUSTITUYE, no se conserva: los que se
+         guardaron mal siguen ahí y así se corrigen solos en la primera
+         consulta, sin tener que tirar las series y volver a bajarlas todas. */
+      const serie = yaEsHoy
+        ? deAyer.slice(0, -1).concat([[sello, Math.round(precioHoy)]])
         : deAyer.concat([[sello, Math.round(precioHoy)]]);
       cache.prices[slug] = serie;
       if (JORNADAS) {
@@ -4838,6 +4855,14 @@ async function playerPrices(slug, id, soloGuardado) {
       }
       return serie;
     }
+  }
+
+  /* Guardada hoy y sin forma de rematarla con el índice: se sirve tal cual en
+     vez de salir al CDN. Va DESPUÉS del remate a propósito, que si no un punto
+     de hoy mal guardado se devolvía sin pasar por la corrección de arriba. */
+  if (guardada && guardada.dia === hoy && deAyer) {
+    cache.prices[slug] = deAyer;
+    return deAyer;
   }
 
   /* Si Biwenger acaba de cortarnos, NO se le pregunta: insistir mientras corta
