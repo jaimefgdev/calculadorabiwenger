@@ -6864,7 +6864,34 @@
        Cuenta tambien la de repuesto: quien vale de medio y de delantero sale en
        los dos filtros, igual que lleva las dos chapas. */
     const puestos = state.puestosJugadores || [];
+
+    /* Fuera los que no tienen club Y no le sirven a nadie.
+       Biwenger deja en el índice a gente sin equipo, y son 34: la mayoría
+       canteranos y descartes que no han jugado un minuto ni los tiene nadie.
+       Ahí solo estorban.
+
+       Pero NO todos los que no tienen club sobran, y esto ya nos mordió una
+       vez: la jornada 2 de Eneko salía con 8 puntos en vez de 25 justamente por
+       dar por idos a los que estaban sin club. Se quedan dos casos:
+
+         · los que tiene alguno de los ocho —Owono, Boiro, Goti, Neyou y
+           Etienne Eto'o son de plantillas de verdad—;
+         · y los que YA han puntuado esta temporada, aunque ahora estén libres:
+           Oso lleva 16 puntos y Gustavo Puerta 13, y su histórico cuenta.
+
+       Se recalcula cada vez, no se guarda: el día que uno fiche por un club,
+       vuelve a salir solo. */
+    /* Y hasta que no se sabe de quién es cada uno NO se quita a nadie: con las
+       plantillas todavía sin llegar, `deQuien` está vacío y se llevaría por
+       delante a los cinco que sí tiene alguien. Mejor enseñarlos un segundo de
+       más que esconder a uno de tu plantilla. */
+    const deQuien = duenosDeFutbolistas();
+    const seSabeDeQuien = squadList().length > 0;
     const lista = state.jugadores.filter(function (jugador) {
+      if (seSabeDeQuien &&
+          jugador.team == null &&
+          !deQuien[String(jugador.id)] &&
+          !jugador.points && !jugador.played) return false;
       if (busca &&
           normalize(jugador.name).indexOf(busca) === -1 &&
           normalize(jugador.teamName || '').indexOf(busca) === -1) return false;
@@ -11333,7 +11360,10 @@
     /* `ensureJugadores` porque de esa lista salen ahora los que más se mueven:
        sin ella los dos cuadros saldrían vacíos hasta el siguiente repintado. */
     if (name === 'mercado') { ensureJugadores(); ensureMarket(); renderMarket(); renderMovers(); }
-    if (name === 'jugadores') { ensureJugadores(); renderJugadores(); }
+    /* `ensureSquads` porque de ahí sale de quién es cada futbolista, y sin eso
+       el filtro de «sin club» se llevaría por delante a los que SÍ tiene
+       alguien. Con el sello puesto no cuesta una consulta si nada ha cambiado. */
+    if (name === 'jugadores') { ensureJugadores(); ensureSquads(); renderJugadores(); }
     if (name === 'jornadas') { ensureJornada(state.jornadaVista || 'actual'); renderJornadas(); }
   }
 
@@ -11390,7 +11420,7 @@
       renderRankings(); renderRankingsTemporada(); renderCaros();
     }
     if (state.tab === 'mercado') { renderMarket(); renderMovers(); }
-    if (state.tab === 'jugadores') { ensureJugadores(); renderJugadores(); }
+    if (state.tab === 'jugadores') { ensureJugadores(); ensureSquads(); renderJugadores(); }
   }
 
   /* ---------- Persistencia ---------- */
