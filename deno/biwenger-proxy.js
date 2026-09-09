@@ -140,7 +140,7 @@ const CDN = 'https://cf.biwenger.com/api/v2';
    navegador normal y las cabeceras que este mandaría. */
 /* Marca de versión: se sube en cada cambio y se consulta con ?version=1.
    Sirve para saber desde fuera si el despliegue ha entrado o no. */
-const VERSION = '2026-09-09 · deno 134';
+const VERSION = '2026-09-09 · deno 135';
 
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ' +
   '(KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36';
@@ -2746,7 +2746,7 @@ async function playerStats(id, names, score, env) {
      cuando no, porque lo que hizo en un partido ya jugado no cambia. */
   const viva = !!(cache.round && cache.round.live);
   const vigenciaFicha = viva ? 20 * 60 * 1000 : 6 * 60 * 60 * 1000;
-  const claveFicha = 'ficha-v1-' + String(id) + '-' + sistema;
+  const claveFicha = 'ficha-v2-' + String(id) + '-' + sistema;
   if (JORNADAS) {
     try {
       const crudo = await JORNADAS.get(claveFicha);
