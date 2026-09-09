@@ -3933,6 +3933,35 @@
     caja.innerHTML = '<div class="op-card">' + html + '</div>';
     caja.hidden = false;
     opSesion++;
+
+    /* Enter envía, igual que el botón. Escribes la cifra y le das: no tiene
+       sentido teclear el importe y tener que ir al ratón para confirmarlo.
+       Se busca el botón de acción de la propia tarjeta —el primario— en vez de
+       apuntar a una operación concreta, así vale para todas: pujar, pedir una
+       cesión, cambiar el precio de venta o enviar la alineación.
+
+       Con cuidado de tres cosas: en un `textarea` el Enter es un salto de línea
+       y ahí no se toca; con el botón deshabilitado —o mientras se está enviando
+       algo— no se hace nada; y no se dispara con Alt, Ctrl o Meta, que son
+       atajos del navegador. */
+    caja.addEventListener('keydown', function (evento) {
+      if (evento.key !== 'Enter' || evento.isComposing) return;
+      if (evento.altKey || evento.ctrlKey || evento.metaKey) return;
+
+      /* SOLO desde un campo de escribir. De estas tarjetas, tres no piden nada
+         y solo preguntan «¿seguro?» —una de ellas para retirar tu venta del
+         mercado—, y ahí un Enter despistado seria una faena. Escribiendo una
+         cifra el gesto es evidente y no hay nada que confundir. */
+      const donde = evento.target;
+      if (!donde || donde.tagName !== 'INPUT') return;
+      const tipo = (donde.getAttribute('type') || 'text').toLowerCase();
+      if (['checkbox', 'radio', 'button', 'submit', 'file'].indexOf(tipo) !== -1) return;
+
+      const boton = caja.querySelector('.op-botones .btn--primary:not([disabled])');
+      if (!boton) return;
+      evento.preventDefault();
+      boton.click();
+    });
   }
 
   function opAviso(texto, mal) {
