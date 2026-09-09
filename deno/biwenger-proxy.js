@@ -132,7 +132,7 @@ const CDN = 'https://cf.biwenger.com/api/v2';
    navegador normal y las cabeceras que este mandaría. */
 /* Marca de versión: se sube en cada cambio y se consulta con ?version=1.
    Sirve para saber desde fuera si el despliegue ha entrado o no. */
-const VERSION = '2026-09-09 · deno 126';
+const VERSION = '2026-09-09 · deno 127';
 
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ' +
   '(KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36';
@@ -1318,6 +1318,32 @@ async function players(score) {
 }
 
 /** El último índice bueno que se guardó, para cuando Biwenger no contesta. */
+/**
+ * El índice con el que se rematan las series de precios.
+ *
+ * `cache.players` está vacío casi siempre: la ruta del historial NO se baja el
+ * índice a propósito —esos 220 KB antes de pedir las series eran justo lo que
+ * nos ganaba los 429— y en Deno cada petición cae en un isolate nuevo. Así que
+ * el remate no tenía con qué comparar y la serie se quedaba con el punto de hoy
+ * mal, aunque el arreglo estuviera puesto.
+ *
+ * Se tira de la copia del KV, que no cuesta una llamada a Biwenger. Y da igual
+ * que sea de ayer: quien remata valida el día con `priceIncrement`, así que una
+ * copia vieja se rechaza sola en vez de colar el precio de ayer como el de hoy.
+ */
+async function indiceParaSeries() {
+  if (cache.players && Object.keys(cache.players).length) return cache.players;
+  if (cache.indiceSeries !== undefined) return cache.indiceSeries;
+
+  let sistema = cache.score || null;
+  if (!sistema && JORNADAS) {
+    try { sistema = Number(await JORNADAS.get('sistema-puntuacion')) || null; }
+    catch (error) { sistema = null; }
+  }
+  cache.indiceSeries = sistema ? await indiceDeReserva(sistema) : null;
+  return cache.indiceSeries;
+}
+
 async function indiceDeReserva(sistema) {
   if (!JORNADAS) return null;
   try {
@@ -4828,8 +4854,9 @@ async function playerPrices(slug, id, soloGuardado) {
      último guardado, el índice sigue siendo el de ayer y no hay nada que pegar.
      Con `priceIncrement` a 0 —día plano de verdad— cuadra igual, que es lo
      correcto. */
-  const precioHoy = deAyer ? cache.players && cache.players[String(id || slug) + ':price'] : null;
-  const cambioHoy = deAyer ? cache.players && cache.players[String(id || slug) + ':inc'] : null;
+  const indice = deAyer ? await indiceParaSeries() : null;
+  const precioHoy = indice ? indice[String(id || slug) + ':price'] : null;
+  const cambioHoy = indice ? indice[String(id || slug) + ':inc'] : null;
   if (deAyer && precioHoy != null && cambioHoy != null) {
     /* El sello es AAMMDD, como el resto de la serie. */
     const sello = Number(hoy.slice(2).replace(/-/g, ''));
