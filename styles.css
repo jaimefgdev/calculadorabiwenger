@@ -1400,8 +1400,21 @@ code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft)
 .table tbody tr.row-pujada > td,
 .table tbody tr.row-pujada .player-name,
 .table tbody tr.row-pujada .manager__name,
+/* «Libre» es una etiqueta con su propio gris, y la cuenta atrás y tu importe
+   traen el suyo: sin nombrarlos se quedaban apagados en mitad de la fila. */
+.table tbody tr.row-pujada .tag--free,
+.table tbody tr.row-pujada .deadline,
+.table tbody tr.row-pujada .pujado,
 .table tbody tr.row-pujada strong,
 .table tbody tr.row-pujada .sub { color: var(--marca); }
+/* El botón de cambiar la puja, a juego. */
+.table tbody tr.row-pujada .ambito--pujado {
+  border-color: var(--marca); color: var(--marca);
+}
+/* Lo que NO se toca: el estado y las flechas de subida y bajada. Son datos del
+   futbolista, no de tu puja, y en amarillo dejarían de significar lo suyo.
+   La cuenta atrás urgente pierde el rojo pero conserva la negrita, que es lo
+   que hace que se lea como «corre». */
 
 /* La fila abierta y el ratón por encima siguen mandando: son estados, y un
    estado tiene que verse por encima de «esta es la tuya», que es permanente.
