@@ -8613,7 +8613,8 @@
          deportiva, que es justo la que da Biwenger. */
       country: deBiwenger.country || null,
       countryName: deBiwenger.country ? nombreDePais(deBiwenger.country) : null,
-      foot: (f && f.pie) || null
+      foot: (f && f.pie) || null,
+      contractUntil: (f && f.contrato) || null
     };
   }
 
@@ -8967,7 +8968,9 @@
 
   const SOFA = 'https://api.sofascore.com/api/v1';
   /* Lo manda en inglés. */
-  const PIES = { Left: 'Zurdo', Right: 'Diestro', Both: 'Ambidiestro' };
+  /* En ingles los mandaba SofaScore; en español, Transfermarkt. */
+  const PIES = { Left: 'Zurdo', Right: 'Diestro', Both: 'Ambidiestro',
+    izquierdo: 'Zurdo', derecho: 'Diestro', ambidiestro: 'Ambidiestro' };
 
   function mismoClub(uno, otro) {
     const limpiar = function (t) {
