@@ -5610,9 +5610,18 @@
     seccion.hidden = false;
 
     /* Por demarcación —portero, defensas, medios, delanteros— y dentro de cada
-       una, el que más vale primero. */
+       una, el que más puntos lleva. Antes mandaba el valor, y en una plantilla
+       eso no es lo que se mira: lo que se busca al abrirla es a quién poner, y
+       eso lo dicen los puntos. El valor se queda de desempate, y el nombre
+       detrás para que dos empatados no bailen de sitio en cada repintado.
+       Sin puntos —recién fichado— va al final de los suyos, no al principio:
+       un `null` no es un cero, es que todavía no ha jugado. */
+    const puntosDe = function (jugador) {
+      return jugador.points == null ? -Infinity : jugador.points;
+    };
     const lista = plantilla.slice().sort(function (a, b) {
       return ((a.position || 9) - (b.position || 9)) ||
+        (puntosDe(b) - puntosDe(a)) ||
         ((b.marketValue || 0) - (a.marketValue || 0)) ||
         String(a.name || '').localeCompare(String(b.name || ''), 'es');
     });
