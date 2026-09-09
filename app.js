@@ -8500,6 +8500,27 @@
    * siquiera lo tienen todos, asi que unas fichas caian a dos lineas y otras no.
    * En la ficha del futbolista, que tiene sitio de sobra, se siguen enseñando.
    */
+  /**
+   * La pestaña «Ficha»: estatura, edad y dorsal arriba, y debajo por dónde ha
+   * pasado.
+   *
+   * Los dos cuadros salen de SofaScore y los dos se devuelven vacíos cuando no
+   * hay nada, así que la pestaña se quedaba EN BLANCO —sin un cuadro, sin un
+   * aviso, sin nada— con los futbolistas de los que no tienen datos: canteranos
+   * y suplentes que no han jugado. Parecía rota cuando lo único que pasaba es
+   * que no hay ficha que enseñar, así que ahora se dice.
+   */
+  function fichaPersonal(id) {
+    const sofa = state.sofa[String(id)];
+    if (sofa === undefined || sofa === 'pidiendo') {
+      return '<p class="muted">Cargando la ficha…</p>';
+    }
+    const cuerpo = tiraPersonal(id) + trayectoria(id);
+    if (cuerpo) return cuerpo;
+    return '<p class="muted">No hay ficha personal de este futbolista. ' +
+      'Suele pasar con los canteranos y con quien todavía no ha debutado.</p>';
+  }
+
   function tiraPersonal(id, apretada) {
     const bio = state.sofa[String(id)];
     if (!bio || bio === 'pidiendo') return '';
@@ -9422,11 +9443,14 @@
             (jugado ? juego.homeScore + '\u2013' + juego.awayScore : '\u2013') + '</span>' +
           escudoDeEquipo(juego.awayId, juego.away) +
         '</span>' +
-        /* Si no jugó ni un minuto, esas casillas se quedan vacías. */
+        /* Si no jugó, con guion: en blanco parecía que faltaba el dato o que la
+           pestaña se había quedado a medias, y con un futbolista que no ha
+           debutado eran treinta y ocho filas seguidas de huecos. El guion dice
+           lo que hay que decir: no jugó. */
         '<span class="partido-jug__lances">' + (juego.alineado ? lancesDe(juego) : '') + '</span>' +
         '<span class="partido-jug__min">' +
-          (juego.minutes ? juego.minutes + "'" : '') + '</span>' +
-        (juego.alineado ? notaDePartido(juego.points) : '<span class="nota nota--sin"></span>') +
+          (juego.minutes ? juego.minutes + "'" : '–') + '</span>' +
+        (juego.alineado ? notaDePartido(juego.points) : notaDePartido(null)) +
       '</div>';
     }).join('');
 
@@ -9739,7 +9763,7 @@
         /* La ficha va sola, como los partidos: quien la abre quiere sus datos y
            su trayectoria, no repasar otra vez las cifras de la temporada. */
         (abierto.ficha && !abierto.partidos && !abierto.comparar
-          ? tiraPersonal(abierto.id) + trayectoria(abierto.id)
+          ? fichaPersonal(abierto.id)
           : '') +
         /* Los partidos van solos: ni estadísticas ni gráficos. Y comparando
            tampoco: esos cuadros son de uno solo y repiten, peor contadas, las
