@@ -8060,16 +8060,28 @@
   /* ---------- Plantillas ---------- */
 
   /* La plantilla se ordena por demarcación (portero, defensas, medios,
-     delanteros) salvo que pulses otra cabecera. */
+     delanteros) y, dentro de cada una, por puntos, salvo que pulses otra
+     cabecera. Igual que «Mi plantilla» en Inicio: mandaba el valor de mercado,
+     y al mirar una plantilla lo que se busca es quién rinde, no quién cuesta.
+     El valor queda de desempate y el nombre detrás, para que dos empatados no
+     bailen de sitio en cada repintado. */
   function sortSquad(players) {
     const sort = state.sort.squad;
     const list = players.slice();
 
     if (!sort.key || sort.key === 'position') {
       const dir = sort.key === 'position' ? sort.dir : 1;
+      /* Sin puntos —recién fichado— va al final de los suyos, no al principio:
+         un `null` no es un cero, es que todavía no ha jugado. */
+      const puntosDe = function (jugador) {
+        return jugador.points == null ? -Infinity : jugador.points;
+      };
       return list.sort(function (a, b) {
         const diff = ((a.position || 9) - (b.position || 9)) * dir;
-        return diff || (b.marketValue || 0) - (a.marketValue || 0);
+        return diff ||
+          (puntosDe(b) - puntosDe(a)) ||
+          ((b.marketValue || 0) - (a.marketValue || 0)) ||
+          String(a.name || '').localeCompare(String(b.name || ''), 'es');
       });
     }
 
