@@ -807,6 +807,9 @@
     jugadoresCargando: false,
     estadisticas: {},       // resumen de temporada de cada futbolista
     sofa: {},               // trayectoria, pie y contrato, de SofaScore
+    /* Las fichas comprobadas: estatura, nacimiento, nacionalidad y
+       trayectoria. Se baja una vez, al abrir la primera. */
+    fichas: undefined,
     golesAbierto: null,     // que desglose de goles esta desplegado
     partidos: {},           // partidos de cada jornada, con sus alineaciones
     partidosEstado: '',
@@ -8537,14 +8540,98 @@
    * y suplentes que no han jugado. Parecía rota cuando lo único que pasaba es
    * que no hay ficha que enseñar, así que ahora se dice.
    */
+  /* ---------- Las fichas, de Wikidata ----------
+     SofaScore, de donde salia todo esto, nos devuelve 403 desde hace unos dias
+     —probado desde casa y desde el proxy—, asi que la pestaña se quedaba en
+     blanco. Wikidata tiene lo mismo y no bloquea: estatura, nacimiento,
+     nacionalidad y por donde ha pasado cada uno, canteras y filiales incluidos.
+
+     Va en un archivo aparte, hecho de una vez y comprobado futbolista a
+     futbolista contra la fecha de nacimiento que da Biwenger: emparejar por
+     nombre se equivoca de persona con los nombres repetidos, y sin ese filtro
+     a «Antonio Blanco» le salia la ficha de uno nacido en 1896. Si las dos
+     fechas no cuadran, ese no lleva ficha: mejor sin ficha que con la de otro.
+
+     Se baja una sola vez, cuando abres la primera ficha. */
+  function ensureFichas() {
+    if (state.fichas !== undefined) return;
+    state.fichas = 'pidiendo';
+    const guardado = cacheLeer('fichas-wd');
+    if (guardado) { state.fichas = guardado; return; }
+    fetch('fichas.json?v=1', { headers: { 'accept': 'application/json' } })
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (datos) {
+        state.fichas = datos || null;
+        if (datos) cacheGuardar('fichas-wd', datos);
+        renderPriceModal();
+      })
+      .catch(function () { state.fichas = null; renderPriceModal(); });
+  }
+
+  /**
+   * La ficha de este futbolista, SI es suya de verdad.
+   *
+   * Emparejar por nombre se equivoca con los nombres repetidos: a «Antonio
+   * Blanco» le salía uno nacido en 1896 y a «Belaid» un argelino de 1940. Al
+   * hacer el archivo se descartaron los que se pudieron comprobar, pero de
+   * trescientos y pico no había fecha con la que comparar en ese momento.
+   *
+   * Aquí sí la hay: la ficha de Biwenger llega con `birthDate` al abrir el
+   * futbolista. Si las dos fechas no cuadran, esta ficha es de otro y no se
+   * enseña. Cuando Biwenger no da fecha se acepta, que es lo que había.
+   */
+  function fichaComprobada(id) {
+    const f = state.fichas && state.fichas !== 'pidiendo'
+      ? state.fichas[String(id)] : null;
+    if (!f) return null;
+    const suyo = state.estadisticas[String(id)];
+    const suya = (suyo && suyo !== 'pidiendo') ? suyo.birthDate : null;
+    if (!suya || !f.nacido) return f;
+    if (suya === f.nacido) return f;
+    /* Biwenger rellena con un 1 de enero al que no sabe: con el mismo año se da
+       por bueno en vez de tirar una ficha que probablemente sí es la suya. */
+    if (suya.slice(0, 4) === f.nacido.slice(0, 4) &&
+        (suya.slice(5) === '01-01' || f.nacido.slice(5) === '01-01')) return f;
+    return null;
+  }
+
+  /** Lo que sabemos de un futbolista, con la forma que espera `tiraPersonal`. */
+  function bioDeFicha(id) {
+    const f = fichaComprobada(id);
+    const suyo = state.estadisticas[String(id)];
+    const deBiwenger = (suyo && suyo !== 'pidiendo') ? suyo : {};
+    if (!f && !deBiwenger.birthDate && !deBiwenger.number && !deBiwenger.country) return null;
+    return {
+      height: (f && f.altura) || null,
+      /* La fecha de Biwenger manda: es la que se ha usado para comprobar que la
+         ficha es de este futbolista y no de otro con su nombre. */
+      birthDate: deBiwenger.birthDate || (f && f.nacimiento) || null,
+      number: deBiwenger.number != null ? deBiwenger.number : null,
+      /* La nacionalidad la manda Biwenger y punto. En Wikidata muchos tienen
+         varias —Courtois salía israelí y Aubameyang francés— y coger la
+         primera acertaba trece veces de menos: la que vale aquí es la
+         deportiva, que es justo la que da Biwenger. */
+      country: deBiwenger.country || null,
+      countryName: deBiwenger.country ? nombreDePais(deBiwenger.country) : null,
+      foot: (f && f.pie) || null
+    };
+  }
+
   function fichaPersonal(id) {
+    ensureFichas();
     const sofa = state.sofa[String(id)];
-    if (sofa === undefined || sofa === 'pidiendo') {
+    if (sofa === undefined || sofa === 'pidiendo' || state.fichas === 'pidiendo') {
       return '<p class="muted">Cargando la ficha…</p>';
     }
 
     const cuerpo = tiraPersonal(id) + trayectoria(id);
     if (cuerpo) return cuerpo;
+
+    const bio = bioDeFicha(id);
+    const suya = fichaComprobada(id);
+    if (bio || (suya && (suya.carrera || []).length)) {
+      return tiraPersonal(null, false, bio || {}) + trayectoriaDeFicha(suya);
+    }
 
     /* Sin SofaScore, con lo que manda Biwenger.
        La ficha salía ENTERA de SofaScore, y desde que nos devuelve 403 se
@@ -8556,24 +8643,40 @@
        que ya se lee para las estadísticas, así que eso se enseña siempre. Lo
        que no manda nadie —estatura, pie y la trayectoria por clubes— se dice
        que falta y por qué, en vez de dejar el hueco. */
-    const suyo = state.estadisticas[String(id)];
-    if (suyo && suyo !== 'pidiendo' && (suyo.birthDate || suyo.number || suyo.country)) {
-      return tiraDeBiwenger(suyo) +
-        '<p class="muted ficha__falta">La estatura, el pie y por dónde ha pasado ' +
-        'los da SofaScore, que ahora mismo no nos responde.</p>';
-    }
-
-    return '<p class="muted">No hemos podido traer la ficha de este futbolista.</p>';
+    return '<p class="muted">No hay ficha comprobada de este futbolista. ' +
+      'Se deja en blanco a propósito: entre dos futbolistas con el mismo ' +
+      'nombre, antes que enseñar la del otro.</p>';
   }
 
-  /** Los datos personales que manda Biwenger, con la misma pinta que los otros. */
-  function tiraDeBiwenger(datos) {
-    return tiraPersonal(null, false, {
-      birthDate: datos.birthDate || null,
-      number: datos.number != null ? datos.number : null,
-      country: datos.country || null,
-      countryName: datos.country ? nombreDePais(datos.country) : null
-    });
+  /** La trayectoria por clubes, tal como viene en el archivo de fichas. */
+  function trayectoriaDeFicha(suya) {
+    const filas = (suya && suya.carrera) || [];
+    if (!filas.length) return '';
+
+    /* Del club de ahora hacia atrás: lo primero que se mira es dónde está. */
+    const orden = filas.slice().reverse();
+    const anos = function (fila) {
+      const desde = String(fila.desde || '').slice(0, 4);
+      const hasta = String(fila.hasta || '').slice(0, 4);
+      if (!desde && !hasta) return '—';
+      if (!hasta) return desde + '–act.';
+      if (!desde) return hasta;
+      return desde === hasta ? desde : desde + '–' + hasta.slice(-2);
+    };
+
+    return '<h4 class="stats__titulo">Trayectoria</h4>' +
+      '<table class="table detail-table trayecto">' +
+        '<thead><tr><th>Club</th><th class="num">Años</th>' +
+        '<th class="num" title="Partidos jugados">PJ</th>' +
+        '<th class="num">Goles</th></tr></thead><tbody>' +
+        orden.map(function (fila, i) {
+          return '<tr' + (i === 0 && !fila.hasta ? ' class="trayecto__ahora"' : '') + '>' +
+            '<td>' + escapeHtml(fila.club) + '</td>' +
+            '<td class="num">' + escapeHtml(anos(fila)) + '</td>' +
+            '<td class="num">' + (fila.pj != null ? fila.pj : '–') + '</td>' +
+            '<td class="num">' + (fila.goles != null ? fila.goles : '–') + '</td>' +
+          '</tr>';
+        }).join('') + '</tbody></table>';
   }
 
   function tiraPersonal(id, apretada, deFuera) {

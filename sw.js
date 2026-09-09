@@ -11,7 +11,7 @@
 
 /* Se sube en cada publicación: al cambiar, el navegador tira lo guardado y se
    baja los archivos nuevos. Sin esto, un cambio en app.js podría no llegar. */
-const VERSION = 'calc-v26';
+const VERSION = 'calc-v27';
 
 /* Lo que hace falta para pintar la app aunque no haya red. */
 const BASICOS = [
@@ -20,6 +20,9 @@ const BASICOS = [
   './styles.css',
   './app.js',
   './biwenger.svg',
+  /* Las fichas de los futbolistas: son 193 KB que no cambian casi nunca, y sin
+     esto la pestaña «Ficha» se queda sin nada al abrir la app sin cobertura. */
+  './fichas.json',
   './icono-192.png',
   './icono-512.png',
   './icono-splash.png',
