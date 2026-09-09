@@ -140,7 +140,7 @@ const CDN = 'https://cf.biwenger.com/api/v2';
    navegador normal y las cabeceras que este mandaría. */
 /* Marca de versión: se sube en cada cambio y se consulta con ?version=1.
    Sirve para saber desde fuera si el despliegue ha entrado o no. */
-const VERSION = '2026-09-09 · deno 133';
+const VERSION = '2026-09-09 · deno 134';
 
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ' +
   '(KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36';
@@ -259,6 +259,34 @@ const app = {
         const sistema = await sistemaDeLaLiga(env);
         const data = await roundBoard(env, headers, cual, await players(sistema));
         return new Response(JSON.stringify(data), {
+          headers: Object.assign({ 'content-type': 'application/json; charset=utf-8' }, cors(origin))
+        });
+      }
+
+      /* ?sofa=<ruta> reenvia una consulta a SofaScore.
+         De ahi salen la estatura, el pie, el contrato y la trayectoria por
+         clubes —los filiales incluidos—, y la web lo pedia DESDE EL NAVEGADOR.
+         El dia que SofaScore empezo a devolver 403 la pestaña «Ficha» se quedo
+         en blanco entera, y no habia nada que hacer desde la web. Pasando por
+         aqui se prueba con otra IP y con cabeceras de navegador; si tambien nos
+         corta, la web tiene los datos de Biwenger como respaldo.
+         Solo se dejan pasar las rutas que se usan, no cualquier cosa. */
+      const sofa = url.searchParams.get('sofa');
+      if (sofa) {
+        const permitida = /^\/(search\/all\?q=|player\/\d+)/.test(sofa);
+        if (!permitida) return fail(400, 'Ruta no permitida.', origin);
+        const r = await fetch('https://api.sofascore.com/api/v1' + sofa, {
+          headers: {
+            'user-agent': UA,
+            'accept': 'application/json, text/plain, */*',
+            'accept-language': 'es-ES,es;q=0.9',
+            'referer': 'https://www.sofascore.com/',
+            'origin': 'https://www.sofascore.com'
+          }
+        }).catch(function () { return null; });
+        if (!r || !r.ok) return fail(502, 'SofaScore no responde (' + (r ? r.status : 'sin red') + ').', origin);
+        const texto = await r.text();
+        return new Response(texto, {
           headers: Object.assign({ 'content-type': 'application/json; charset=utf-8' }, cors(origin))
         });
       }
@@ -2837,9 +2865,24 @@ async function playerStats(id, names, score, env) {
     return partidos ? Math.round((total / partidos) * 100) / 100 : null;
   };
 
+  /* La fecha de nacimiento viene como número, 20030114. */
+  const nacimiento = function (n) {
+    const t = String(n || '');
+    if (!/^\d{8}$/.test(t)) return null;
+    return t.slice(0, 4) + '-' + t.slice(4, 6) + '-' + t.slice(6, 8);
+  };
+
   const ficha = {
     id: String(id),
     name: data.name || names[String(id)] || null,
+    /* Datos personales del propio Biwenger. Hasta ahora la pestaña «Ficha»
+       salía SOLO de SofaScore, y el día que SofaScore nos empezó a devolver
+       403 la pestaña se quedó en blanco para todo el mundo. Estos tres los
+       manda Biwenger en la misma respuesta que ya se está leyendo: no cuesta
+       una consulta más y la ficha deja de depender de nadie de fuera. */
+    birthDate: nacimiento(data.birthday),
+    number: data.number != null ? data.number : null,
+    country: data.country || null,
     position: data.position != null ? data.position : (names[String(id) + ':pos'] || null),
     /* Lesión o sanción, con el parte tal como lo escribe Biwenger, para
        poder decirlo en la ficha en vez de solo pintar la marca. */
