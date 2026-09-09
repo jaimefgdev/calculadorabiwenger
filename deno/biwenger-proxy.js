@@ -132,27 +132,30 @@ const CDN = 'https://cf.biwenger.com/api/v2';
    navegador normal y las cabeceras que este mandaría. */
 /* Marca de versión: se sube en cada cambio y se consulta con ?version=1.
    Sirve para saber desde fuera si el despliegue ha entrado o no. */
-const VERSION = '2026-09-09 · deno 124';
+const VERSION = '2026-09-09 · deno 125';
 
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ' +
   '(KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36';
-/**
- * Rompe la copia cacheada de Biwenger.
- *
- * Su API dice «no-store», pero el Cloudflare que tienen delante guarda copia
- * igual y a veces nos sirve una de hace horas: con la jornada en juego eso son
- * marcadores viejos, partidos sin jugar y futbolistas sin sus goles. Se le
- * cuelga un parámetro que cambia cada minuto: rompe la copia sin dispararle
- * las peticiones, que si insistimos nos limita.
- */
-function fresco(url) {
-  return url + (url.indexOf('?') === -1 ? '?' : '&') + '_=' + Math.floor(Date.now() / 60000);
-}
+/* AQUI VIVIA fresco(), que le colgaba a cada URL del CDN un parámetro
+   cambiante para saltarse la copia de Cloudflare. La idea era no comernos
+   marcadores viejos; el efecto real era el contrario y mucho peor.
+
+   Medido con las cabeceras del propio CDN, tres peticiones seguidas:
+
+     sin el parámetro:  MISS · HIT · HIT     lo sirve el borde de Cloudflare
+     con el parámetro:  MISS · MISS · MISS   todas al origen de Biwenger
+
+   El borde no limita; el origen sí. Con el rompecachés puesto, CADA lectura
+   —el índice, cada jornada, cada ficha, cada partido en vivo— aterrizaba en
+   el origen, y de ahí los 429 que dejaban la web sin partidos y sin rankings.
+
+   Y no se ganaba frescura: el borde guarda un par de minutos, y es de donde
+   come la propia app de Biwenger. Rompiéndola pedíamos más que su cliente
+   oficial para ver exactamente lo mismo. */
 
 /* Esto era para que el Cloudflare nuestro tampoco guardara copia. Aquí ya no
    hace nada —Deno no tiene esa caché y se limita a ignorar la opción—, pero se
-   deja puesto: si algún día hubiera que volver a Cloudflare, vuelve a valer.
-   Quien de verdad rompe la copia de Biwenger es fresco(), que sigue igual. */
+   deja puesto: si algún día hubiera que volver a Cloudflare, vuelve a valer. */
 const SIN_CACHE = { cacheTtl: 0, cacheEverything: false };
 
 const NAVEGADOR = {
@@ -1195,14 +1198,14 @@ async function players(score) {
      una vez —el fallo típico es un límite de consultas momentáneo de
      Biwenger— y, si tampoco, se sirve el último bueno aunque esté pasado: un
      índice de hace una hora es infinitamente mejor que ninguno. */
-  let response = await fetch(fresco(CDN + '/competitions/la-liga/data?lang=es&score=' +
-    encodeURIComponent(sistema)), { headers: NAVEGADOR, cf: SIN_CACHE })
+  let response = await fetch(CDN + '/competitions/la-liga/data?lang=es&score=' +
+    encodeURIComponent(sistema), { headers: NAVEGADOR, cf: SIN_CACHE })
     .catch(function () { return null; });
   apuntarCorteDelCdn(response);
   if (!response || !response.ok) {
     await new Promise(function (listo) { setTimeout(listo, 1500); });
-    response = await fetch(fresco(CDN + '/competitions/la-liga/data?lang=es&score=' +
-      encodeURIComponent(sistema)), { headers: NAVEGADOR, cf: SIN_CACHE })
+    response = await fetch(CDN + '/competitions/la-liga/data?lang=es&score=' +
+      encodeURIComponent(sistema), { headers: NAVEGADOR, cf: SIN_CACHE })
       .catch(function () { return null; });
   }
   /* Ni con el reintento: se tira de lo que haya, primero de memoria y luego de
@@ -1614,7 +1617,7 @@ async function proximaJornada() {
     ? CDN + '/rounds/la-liga/' + encodeURIComponent(enJuego.id) + '?lang=es'
     : CDN + '/rounds/la-liga/next?lang=es';
 
-  const response = await fetch(fresco(url), { headers: NAVEGADOR, cf: SIN_CACHE });
+  const response = await fetch(url, { headers: NAVEGADOR, cf: SIN_CACHE });
   if (!response.ok) return null;
 
   const data = (await response.json()).data || {};
@@ -2313,11 +2316,8 @@ async function matchDay(roundId, score, names, primas) {
 
   /* Los informes crudos ya vienen dentro del detalle: son EXACTAMENTE la misma
      descarga que acaba de hacer roundDetail, misma URL y mismo segundo. Pedirla
-     otra vez no traía un dato nuevo, solo un 429 —Biwenger corta la repetición
-     de una URL idéntica, y como `fresco()` le pone rompecachés, cada intento
-     llegaba al origen—. Así se caía la pestaña de partidos con un «no se ha
-     podido leer esa jornada» en siete décimas, con el índice y el detalle ya
-     en memoria: no era falta de red, era la segunda descarga. */
+     otra vez no traía un dato nuevo, solo una petición más contra el mismo
+     sitio que ya nos estaba limitando. */
   const data = { games: detalle.crudo || [] };
 
   /* Los puntos del informe del partido bailan entre peticiones: para el mismo
@@ -2382,7 +2382,7 @@ async function matchDay(roundId, score, names, primas) {
    * o tres a la vez.
    */
   const onceEnVivo = async function (id) {
-    const respuesta = await fetch(fresco(CDN + '/matches/la-liga/' + encodeURIComponent(id) + '?lang=es'),
+    const respuesta = await fetch(CDN + '/matches/la-liga/' + encodeURIComponent(id) + '?lang=es',
       { headers: NAVEGADOR, cf: SIN_CACHE }).catch(function () { return null; });
     if (!respuesta || !respuesta.ok) return null;
     const suyo = ((await respuesta.json().catch(function () { return {}; })).data) || {};
@@ -3426,8 +3426,8 @@ async function roundDetail(roundId, score) {
     return deKv.data;
   }
 
-  const response = await fetch(fresco(CDN + '/rounds/la-liga/' + encodeURIComponent(roundId) +
-    '?lang=es' + (score ? '&score=' + encodeURIComponent(score) : '')),
+  const response = await fetch(CDN + '/rounds/la-liga/' + encodeURIComponent(roundId) +
+    '?lang=es' + (score ? '&score=' + encodeURIComponent(score) : ''),
     { headers: NAVEGADOR, cf: SIN_CACHE });
   /* Sin CDN se sirve lo último que se leyó, por viejo que sea: una jornada de
      hace un rato es infinitamente mejor que «no se han podido traer los
