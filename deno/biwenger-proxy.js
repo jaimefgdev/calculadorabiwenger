@@ -140,7 +140,7 @@ const CDN = 'https://cf.biwenger.com/api/v2';
    navegador normal y las cabeceras que este mandaría. */
 /* Marca de versión: se sube en cada cambio y se consulta con ?version=1.
    Sirve para saber desde fuera si el despliegue ha entrado o no. */
-const VERSION = '2026-09-09 · deno 130';
+const VERSION = '2026-09-09 · deno 131';
 
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ' +
   '(KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36';
@@ -1200,6 +1200,33 @@ async function players(score) {
     Date.now() - cache.playersAt < vigencia;
   if (fresh) return cache.players;
 
+  /* EN FRIO, la copia del KV antes que la descarga.
+     `cache.playersAt` vive en memoria y en Deno los isolates se mueren entre
+     peticion y peticion, asi que casi cada sincronizacion arrancaba con la
+     memoria vacia y se bajaba los 220 KB del indice otra vez. Con la copia
+     guardada eso pasa a ser una descarga por hora de verdad, no una por
+     arranque: la sincronizacion en frio baja de siete segundos a dos, se le
+     piden muchas menos cosas a Biwenger —que es lo que nos ganaba los 429— y
+     de paso se escribe en el KV mucho menos, porque solo se guarda cuando de
+     verdad se ha bajado algo nuevo.
+
+     La copia se acepta con la MISMA vigencia que la de memoria: si vale un
+     minuto para esta instancia, vale un minuto para la siguiente. */
+  if (!cache.players && JORNADAS) {
+    try {
+      const cuando = Number(await JORNADAS.get('indice-fecha-' + sistema)) || 0;
+      if (cuando && Date.now() - cuando < vigencia) {
+        const guardado = await indiceDeReserva(sistema);
+        if (guardado) {
+          cache.players = guardado;
+          cache.playersScore = sistema;
+          cache.playersAt = cuando;
+          return guardado;
+        }
+      }
+    } catch (error) { /* se baja, que para eso esta lo de abajo */ }
+  }
+
   /* Este índice es la columna vertebral de todo: de él salen los nombres, los
      precios, los puestos y los equipos. Si la descarga falla y se devuelve
      vacío, la web entera se queda en «Jugador 1679» a 0 €. Así que se reintenta
@@ -1313,13 +1340,14 @@ async function players(score) {
        cuanto contesta y la escritura se queda a medias: la copia no llegaba a
        existir. Por eso, el dia que Biwenger nos corto, la red de seguridad no
        estaba puesta y la web se quedo sin nombres, sin precios y sin rankings. */
+  /* Se refresca CADA VEZ que se ha bajado de verdad, no cada seis horas. Con
+     lo de arriba, bajarse el indice ya es raro —una vez por vigencia, no una
+     por arranque—, asi que esto son un puñado de escrituras al dia y a cambio
+     la copia esta siempre lo bastante fresca como para servirla en frio. */
   if (JORNADAS) {
     try {
-      const cuando = await JORNADAS.get('indice-fecha-' + sistema);
-      if (!cuando || Date.now() - Number(cuando) > 6 * 60 * 60 * 1000) {
-        await JORNADAS.put('indice-' + sistema, JSON.stringify(names));
-        await JORNADAS.put('indice-fecha-' + sistema, String(Date.now()));
-      }
+      await JORNADAS.put('indice-' + sistema, JSON.stringify(names));
+      await JORNADAS.put('indice-fecha-' + sistema, String(Date.now()));
     } catch (error) { /* sin copia esta vez; se reintenta en la siguiente */ }
   }
   return names;
@@ -5472,18 +5500,30 @@ async function build(env, debug) {
     );
   };
 
-  /* La liga va primero y sola: de ella sale el sistema de puntuación, y el
-     índice de futbolistas hay que pedirlo ya con él o los puntos no serán los
-     que enseña Biwenger. */
-  const league = await api(env, '/league?include=all&fields=*,standings', headers);
-  if (league && league.scoreID != null) {
-    cache.score = league.scoreID;
-    if (env.JORNADAS) {
-      try { await env.JORNADAS.put('sistema-puntuacion', String(cache.score)); } catch (e) { /* da igual */ }
-    }
+  /* El sistema de puntuación, del KV. De él depende el índice de futbolistas
+     —con otro sistema los puntos no son los que enseña Biwenger—, así que
+     hasta ahora la consulta de la liga iba PRIMERA Y SOLA y todo lo demás
+     esperaba a que contestara. Leyéndolo de aquí, la liga se pide a la vez que
+     el resto y esa espera desaparece. Es un dato que no cambia nunca en la
+     práctica, y si cambiara, la propia respuesta de la liga lo corrige abajo
+     para la siguiente. */
+  let sistema = cache.score || null;
+  if (!sistema && env.JORNADAS) {
+    try { sistema = Number(await env.JORNADAS.get('sistema-puntuacion')) || null; }
+    catch (error) { sistema = null; }
+  }
+  if (sistema) cache.score = sistema;
+
+  /* Sin saberlo todavía —la primera vez— se hace como antes: la liga delante,
+     porque pedir el índice con el sistema equivocado da puntos que no son. */
+  let league = null;
+  if (!sistema) {
+    league = await api(env, '/league?include=all&fields=*,standings', headers);
+    if (league && league.scoreID != null) cache.score = league.scoreID;
   }
 
-  const [boardResult, offersResult, lineupResult, marketResult, names, roundResult] = await Promise.all([
+  const [leagueParalela, boardResult, offersResult, lineupResult, marketResult, names, roundResult] = await Promise.all([
+    league ? Promise.resolve(league) : api(env, '/league?include=all&fields=*,standings', headers),
     soft(boardItems(env, headers, who.leagueId)),
     /* /offers devuelve una lista incompleta (se dejaba pujas fuera);
        /user?fields=offers sí trae todas las pendientes, enviadas y recibidas. */
@@ -5493,6 +5533,24 @@ async function build(env, debug) {
     players(cache.score),
     soft(nextRound())
   ]);
+  league = leagueParalela;
+
+  /* Y el sistema se guarda SOLO si ha cambiado. Escribirlo en cada
+     sincronización era una escritura del KV por visita para dejar el mismo
+     número que ya estaba. */
+  if (league && league.scoreID != null) {
+    if (cache.score !== league.scoreID) {
+      cache.score = league.scoreID;
+      if (env.JORNADAS) {
+        try { await env.JORNADAS.put('sistema-puntuacion', String(cache.score)); }
+        catch (e) { /* da igual */ }
+      }
+    } else if (!sistema && env.JORNADAS) {
+      /* Primera vez: todavía no estaba guardado. */
+      try { await env.JORNADAS.put('sistema-puntuacion', String(cache.score)); }
+      catch (e) { /* da igual */ }
+    }
+  }
 
   const status = (marketResult.data && marketResult.data.status) || {};
 
