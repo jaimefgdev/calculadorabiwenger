@@ -60,14 +60,22 @@ const JORNADAS = {
 
   async put(clave, valor) {
     const texto = String(valor);
-    await JORNADAS.delete(clave);             // fuera lo que hubiera antes
+    /* Cuántos trozos había antes, para borrar SOLO los que sobren. Antes se
+       hacía un `delete` a ciegas —una lectura y un borrado por trozo— delante
+       de cada escritura, aunque el nuevo valor fuera a ocupar los mismos
+       trozos y a pisarlos uno por uno. Era duplicar el gasto de escrituras
+       para no ganar nada. */
+    const cabeza = await almacen.get([clave]);
+    const antes = (cabeza.value && typeof cabeza.value === 'object' && cabeza.value.__partido)
+      ? cabeza.value.trozos : 0;
 
-    if (texto.length <= TROZO) {
+    const trozos = texto.length <= TROZO ? 0 : Math.ceil(texto.length / TROZO);
+    for (let i = trozos; i < antes; i++) await almacen.delete([clave, i]);
+
+    if (!trozos) {
       await almacen.set([clave], texto);
       return;
     }
-
-    const trozos = Math.ceil(texto.length / TROZO);
     for (let i = 0; i < trozos; i++) {
       await almacen.set([clave, i], texto.slice(i * TROZO, (i + 1) * TROZO));
     }
@@ -132,7 +140,7 @@ const CDN = 'https://cf.biwenger.com/api/v2';
    navegador normal y las cabeceras que este mandaría. */
 /* Marca de versión: se sube en cada cambio y se consulta con ?version=1.
    Sirve para saber desde fuera si el despliegue ha entrado o no. */
-const VERSION = '2026-09-09 · deno 127';
+const VERSION = '2026-09-09 · deno 128';
 
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ' +
   '(KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36';
@@ -3576,7 +3584,13 @@ async function roundDetail(roundId, score) {
     at: Date.now(),
     vigencia: vigenciaDetalle(detalle)
   };
-  await guardarDetalleKv(kvClave, detalle);
+  /* Y solo se guarda si de verdad ha cambiado algo. Una jornada en juego se
+     vuelve a bajar cada dos minutos, pero entre dos consultas seguidas lo
+     normal es que no se haya movido nada: reescribirla igual son varias
+     escrituras del KV —va en trozos— para dejar lo mismo que había. */
+  if (!deKv || JSON.stringify(deKv.data) !== JSON.stringify(detalle)) {
+    await guardarDetalleKv(kvClave, detalle);
+  }
   return detalle;
 }
 
@@ -3623,7 +3637,12 @@ function crudoLigero(games) {
    alineaciones se confirman una hora antes—, hay que mirar a menudo. */
 function vigenciaDetalle(detalle) {
   if (!detalle) return 0;
-  return (detalle.live || detalle.pronto) ? 2 * 60 * 1000 : 30 * 60 * 1000;
+  if (detalle.live || detalle.pronto) return 2 * 60 * 1000;
+  /* Con TODOS sus partidos acabados, esa jornada ya no va a cambiar nunca. Con
+     media hora se volvía a bajar y a guardar cuarenta y ocho veces al día, por
+     cada una de las jornadas jugadas, para reescribir exactamente lo mismo. */
+  if (detalle.games && detalle.played === detalle.games) return 12 * 60 * 60 * 1000;
+  return 30 * 60 * 1000;
 }
 
 async function leerDetalleKv(clave) {
@@ -4867,6 +4886,16 @@ async function playerPrices(slug, id, soloGuardado) {
     const anterior = yaEsHoy
       ? (deAyer.length > 1 ? Number(deAyer[deAyer.length - 2][1]) : null)
       : (ultimo ? Number(ultimo[1]) : null);
+
+    /* YA ESTÁ BIEN: el punto de hoy existe y trae el precio del índice. No hay
+       nada que escribir. Sin esta salida se reconstruía una serie idéntica y se
+       volvía a guardar EN CADA PETICIÓN —treinta futbolistas por cada vez que
+       se abre el Mercado, y cada guardado son varias escrituras porque la serie
+       va en trozos—. Eso es lo que disparó la cuota de escrituras del KV. */
+    if (yaEsHoy && Math.round(Number(ultimo[1])) === Math.round(precioHoy)) {
+      cache.prices[slug] = deAyer;
+      return deAyer;
+    }
 
     if (anterior != null && Math.round(precioHoy - cambioHoy) === Math.round(anterior)) {
       /* Si ya había un punto de hoy se SUSTITUYE, no se conserva: los que se
