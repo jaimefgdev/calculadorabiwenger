@@ -8586,12 +8586,13 @@
     if (!f) return null;
     const suyo = state.estadisticas[String(id)];
     const suya = (suyo && suyo !== 'pidiendo') ? suyo.birthDate : null;
-    if (!suya || !f.nacido) return f;
-    if (suya === f.nacido) return f;
+    const nuestra = f.nacimiento || f.nacido || null;
+    if (!suya || !nuestra) return f;
+    if (suya === nuestra) return f;
     /* Biwenger rellena con un 1 de enero al que no sabe: con el mismo año se da
        por bueno en vez de tirar una ficha que probablemente sí es la suya. */
-    if (suya.slice(0, 4) === f.nacido.slice(0, 4) &&
-        (suya.slice(5) === '01-01' || f.nacido.slice(5) === '01-01')) return f;
+    if (suya.slice(0, 4) === nuestra.slice(0, 4) &&
+        (suya.slice(5) === '01-01' || nuestra.slice(5) === '01-01')) return f;
     return null;
   }
 
