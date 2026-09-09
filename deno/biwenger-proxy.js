@@ -140,7 +140,7 @@ const CDN = 'https://cf.biwenger.com/api/v2';
    navegador normal y las cabeceras que este mandaría. */
 /* Marca de versión: se sube en cada cambio y se consulta con ?version=1.
    Sirve para saber desde fuera si el despliegue ha entrado o no. */
-const VERSION = '2026-09-09 · deno 129';
+const VERSION = '2026-09-09 · deno 130';
 
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ' +
   '(KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36';
@@ -2751,8 +2751,12 @@ async function playerStats(id, names, score, env) {
 
   jornadas.sort(function (a, b) { return a.number - b.number; });
 
+  /* A DOS decimales. Con uno solo, un gol en cuatro partidos daba 0,2 en vez
+     de 0,25: el redondeo se comia justo la diferencia que se quiere mirar. Y
+     como esto viaja ya redondeado, no valia arreglarlo solo en la web —el
+     0,25 no llegaba nunca—. */
   const media = function (total, partidos) {
-    return partidos ? Math.round((total / partidos) * 10) / 10 : null;
+    return partidos ? Math.round((total / partidos) * 100) / 100 : null;
   };
 
   return {

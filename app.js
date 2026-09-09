@@ -8616,7 +8616,9 @@
        antes y despu\u00e9s de que el futbolista juegue. */
     const numero = function (valor) { return valor == null ? 0 : valor; };
     /* Con coma, como se escriben los decimales aquí. */
-    const decimal = function (valor) { return (valor == null ? 0 : valor).toFixed(1).replace('.', ','); };
+    /* Dos decimales: una media de 1 gol en 4 partidos es 0,25, y con un solo
+       decimal salia 0,2. */
+    const decimal = function (valor) { return (valor == null ? 0 : valor).toFixed(2).replace('.', ','); };
 
     const celda = function (rotulo, valor, extra) {
       return '<div class="stat' + (extra ? ' ' + extra : '') + '">' +
@@ -9348,10 +9350,10 @@
       /* En casa y fuera, para ver de quién te puedes fiar dónde. */
       { rotulo: 'Puntos en casa', valor: function (d) { return d && d.home ? num(d.home.points) : 0; } },
       { rotulo: 'Media en casa', valor: function (d) {
-          return d && d.home && d.home.played ? num(d.home.average).toFixed(1).replace('.', ',') : '0,0'; } },
+          return d && d.home && d.home.played ? num(d.home.average).toFixed(2).replace('.', ',') : '0,00'; } },
       { rotulo: 'Puntos fuera', valor: function (d) { return d && d.away ? num(d.away.points) : 0; } },
       { rotulo: 'Media fuera', valor: function (d) {
-          return d && d.away && d.away.played ? num(d.away.average).toFixed(1).replace('.', ',') : '0,0'; } },
+          return d && d.away && d.away.played ? num(d.away.average).toFixed(2).replace('.', ',') : '0,00'; } },
       { rotulo: 'Valor', valor: function (d, f) { return money(f.marketValue || 0); }, texto: true }
     ];
 
@@ -10491,7 +10493,7 @@
     const porRacha = conRacha.slice().sort(function (a, b) { return b.racha - a.racha; });
 
     const enteros = function (j) { return j.points + ' pts'; };
-    const decimales = function (j) { return j.media.toFixed(1).replace('.', ','); };
+    const decimales = function (j) { return j.media.toFixed(2).replace('.', ','); };
     const racha = function (j) { return j.racha + ' pts'; };
     const veces = function (j) {
       return '<span class="ranking__sub">' + j.played +
