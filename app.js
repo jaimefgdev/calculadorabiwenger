@@ -884,8 +884,15 @@
     (lista || []).forEach(function (jugador) {
       if (!jugador || jugador.id == null) return;
       if (jugador.position != null) posicionConocida[String(jugador.id)] = jugador.position;
-      if (jugador.altPositions && jugador.altPositions.length) {
-        altConocida[String(jugador.id)] = jugador.altPositions;
+      /* Una lista VACIA es un dato, no un hueco: significa que Biwenger le ha
+         quitado la segunda demarcacion. Antes solo se escribia cuando venia
+         llena, asi que la chapa vieja no se borraba nunca y a quien perdia la
+         multiposicion —Juan Iglesias y Pedrosa hoy mismo— le seguia saliendo.
+         Lo que NO manda es que el campo no venga: eso es no saberlo, y ahi se
+         conserva lo ultimo bueno. */
+      if (Array.isArray(jugador.altPositions)) {
+        if (jugador.altPositions.length) altConocida[String(jugador.id)] = jugador.altPositions;
+        else delete altConocida[String(jugador.id)];
       }
       const como = jugador.name || jugador.player;
       if (como && !ES_RELLENO.test(como)) nombreConocido[String(jugador.id)] = como;
@@ -999,7 +1006,10 @@
 
   /** Las demarcaciones de repuesto de alguien, vengan en el objeto o guardadas. */
   function otrosPuestosDe(jugador, id) {
-    if (jugador && jugador.altPositions && jugador.altPositions.length) return jugador.altPositions;
+    /* Igual que arriba: si el objeto TRAE la lista, manda ella aunque este
+       vacia. Con el `.length` delante, a quien acababa de perder la segunda
+       demarcacion se le caia la respuesta buena y se cogia la guardada. */
+    if (jugador && Array.isArray(jugador.altPositions)) return jugador.altPositions;
     const clave = String(id != null ? id : (jugador && jugador.id));
     return altConocida[clave] || [];
   }
