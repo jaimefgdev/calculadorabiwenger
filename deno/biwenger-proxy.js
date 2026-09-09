@@ -140,7 +140,7 @@ const CDN = 'https://cf.biwenger.com/api/v2';
    navegador normal y las cabeceras que este mandaría. */
 /* Marca de versión: se sube en cada cambio y se consulta con ?version=1.
    Sirve para saber desde fuera si el despliegue ha entrado o no. */
-const VERSION = '2026-09-09 · deno 131';
+const VERSION = '2026-09-09 · deno 132';
 
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ' +
   '(KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36';
@@ -1507,10 +1507,34 @@ async function nextRound() {
   const vigencia = cache.round && cache.round.live ? 2 * 60 * 1000 : 30 * 60 * 1000;
   if (cache.round && Date.now() - cache.roundAt < vigencia) return cache.round;
 
+  /* Copia en el KV, igual que el índice y el calendario. Esto vivía solo en
+     memoria, y armarlo son varias consultas al CDN: en un arranque en frío que
+     tardara de más, la jornada salía NULL y con ella se caían la cuenta atrás
+     del próximo partido y el «entrega de puntos». Se ha visto pasar. Con la
+     copia, un arranque en frío tiene jornada desde el primer momento. */
+  let guardada = null;
+  if (JORNADAS) {
+    try {
+      const crudo = await JORNADAS.get('proxima-jornada');
+      const caja = crudo ? JSON.parse(crudo) : null;
+      if (caja && caja.data && caja.at) {
+        guardada = caja;
+        const suVigencia = caja.data.live ? 2 * 60 * 1000 : 30 * 60 * 1000;
+        if (Date.now() - caja.at < suVigencia) {
+          cache.round = caja.data;
+          cache.roundAt = caja.at;
+          return caja.data;
+        }
+      }
+    } catch (error) { /* se arma abajo */ }
+  }
+
   const enJuego = await jornadaEnJuego().catch(function () { return null; });
   const proxima = await proximaJornada().catch(function () { return null; });
   let round = enJuego || proxima;
-  if (!round) return cache.round || null;
+  /* Sin poder armarla, lo último que se supo, por viejo que sea: una jornada de
+     hace un rato es infinitamente mejor que ninguna. */
+  if (!round) return cache.round || (guardada && guardada.data) || null;
 
   /* LaLiga no juega las jornadas seguidas: la 1 puede quedarse con partidos
      aplazados y colarse la 2 entre medias. Así que el siguiente partido se
@@ -1570,6 +1594,10 @@ async function nextRound() {
 
   cache.round = round;
   cache.roundAt = Date.now();
+  if (JORNADAS) {
+    try { await JORNADAS.put('proxima-jornada', JSON.stringify({ at: cache.roundAt, data: round })); }
+    catch (error) { /* se vuelve a guardar en la siguiente */ }
+  }
   return cache.round;
 }
 
