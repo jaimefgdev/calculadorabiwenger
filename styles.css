@@ -1389,6 +1389,20 @@ code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft)
   box-shadow: inset 3px 0 0 var(--neg);
 }
 
+/* Con puja puesta, en el mercado. En amarillo —el mismo `--marca` que ya lleva
+   el primero de cada ranking y el marcador en vivo—, no en rojo: el rojo aquí
+   ya significa «esto lo vendes tú». Van las letras y no el fondo, que el velo
+   se pisaba con el de «es la tuya» y no se distinguía cuál era cuál.
+
+   Se nombran los hijos uno a uno porque cada uno trae su propio color puesto
+   —el nombre, el dueño, el precio en negrita, los guiones apagados—, y un
+   `color` en la celda no los pisa. */
+.table tbody tr.row-pujada > td,
+.table tbody tr.row-pujada .player-name,
+.table tbody tr.row-pujada .manager__name,
+.table tbody tr.row-pujada strong,
+.table tbody tr.row-pujada .sub { color: var(--marca); }
+
 /* La fila abierta y el ratón por encima siguen mandando: son estados, y un
    estado tiene que verse por encima de «esta es la tuya», que es permanente.
    El fondo va en las celdas, no en la fila, y una celda con color tapa el de su

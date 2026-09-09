@@ -3629,9 +3629,13 @@
 
     cuerpo.innerHTML = sortMarket(visibles).map(function (venta) {
       const sube = venta.increment > 0;
+      /* Con puja puesta, la fila va en amarillo: entre cuarenta del mercado,
+         las que te juegas algo tienen que cantar sin leerlas. Lo tuyo en venta
+         manda, que ahí no se puja. */
+      const pujada = !venta.mine && !!miPujaPor(venta.playerId);
       /* De lo que vendes tú la API no da el contador, pero las ofertas
          recibidas sí están: se cuentan de ahí. */
-      return '<tr' + (venta.mine ? ' class="row-mine"' : '') + '>' +
+      return '<tr' + (venta.mine ? ' class="row-mine"' : (pujada ? ' class="row-pujada"' : '')) + '>' +
         '<td data-label="Futbolista"><span class="with-crest">' +
           playerName({ playerId: venta.playerId, player: venta.player }) +
           crestOf(venta, 'crest--badge') + '</span></td>' +
