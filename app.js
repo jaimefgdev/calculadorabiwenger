@@ -9898,7 +9898,11 @@
         /* El título solo si hay tabla debajo: el reparto también cuenta como
            historial, así que la condición la decide `playerHistory`. */
         (function () {
-          if (abierto.partidos || abierto.ficha) return '';
+          /* Comparando tampoco: «En la liga» cuenta de quién es y por cuánto se
+             fichó, y eso es de UNO solo. Enfrentando a dos, la tabla de abajo
+             es la del primero y no dice nada del otro, así que ahí sobra igual
+             que sobran las estadísticas sueltas. */
+          if (abierto.partidos || abierto.ficha || abierto.comparar) return '';
           const historial = playerHistory(ficha, abierto.id);
           return historial ? '<h3 class="bench__title">En la liga</h3>' + historial : '';
         })() +
