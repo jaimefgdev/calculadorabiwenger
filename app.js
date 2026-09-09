@@ -53,11 +53,89 @@
     catch (error) { return {}; }
   }
 
-  function cacheLeer(nombre) {
+  function cacheCaja(nombre) {
     const caja = cacheTodo()[nombre];
-    if (!caja || !caja.at) return null;
+    return (caja && caja.at) ? caja : null;
+  }
+
+  function cacheLeer(nombre) {
+    const caja = cacheCaja(nombre);
+    if (!caja) return null;
     if (Date.now() - caja.at > CACHE_HORAS * 3600e3) return null;
     return caja.data;
+  }
+
+  /**
+   * Lo guardado, si SIGUE SIENDO VÁLIDO. Devuelve null si hay que volver a
+   * pedirlo.
+   *
+   * Las doce horas de arriba son un plazo a ojo: no dicen si el dato ha
+   * cambiado, solo cuánto hace que se pidió. Y casi nada de esto cambia con el
+   * reloj. Los rankings y el recuento de la temporada no se mueven hasta que se
+   * juega un partido; las plantillas, hasta que alguien ficha o vende. Se
+   * guarda junto al dato un SELLO de aquello que sí lo cambia, y mientras el
+   * sello sea el mismo no hay nada que preguntar: ni espera, ni consulta al
+   * proxy, ni gasto de cuota.
+   *
+   * Con sello se aguantan siete días, no doce horas: el sello es una garantía
+   * mucho mejor que el reloj. El plazo largo está solo por si algún día el
+   * sello se queda corto para algo que no habíamos previsto.
+   */
+  function cacheVigente(nombre, sello) {
+    if (!sello) return null;
+    const caja = cacheCaja(nombre);
+    if (!caja || caja.sello !== sello) return null;
+    if (Date.now() - caja.at > 7 * 24 * 3600e3) return null;
+    return caja.data;
+  }
+
+  /* Lo que cambia los datos de jornada: qué jornada es y cuántos partidos suyos
+     se han acabado ya. Mientras no se mueva, los puntos, los rankings y el
+     recuento de la temporada son exactamente los mismos. */
+  function selloDeJornada() {
+    const r = state.round;
+    if (!r || r.id == null) return null;
+    return 'j' + r.id + ':' + (r.played != null ? r.played : '?') + ':' + (r.live ? 1 : 0);
+  }
+
+  /* Y lo que cambia las plantillas: que alguien fiche o venda. El tablón viene
+     con la sincronización normal, que es rápida, así que sale gratis. */
+  function selloDeMovimientos() {
+    const lista = state.movements || [];
+    if (!lista.length) return null;
+    return 'm' + lista.length + ':' + (lista[0].date || '');
+  }
+
+  /**
+   * Repasa si lo que se sirvió de la caché sigue valiendo.
+   *
+   * Hace falta porque al arrancar se usa la jornada GUARDADA —`showTab()` corre
+   * antes de la primera sincronización—, y esa puede ser de antes de que se
+   * jugara un partido. Cuando llega la de verdad se comparan los sellos: si
+   * alguno ha cambiado, lo que se enseñó era viejo y se vuelve a pedir. Sin
+   * esto, ahorrar la consulta significaría enseñar los rankings de ayer hasta
+   * que recargaras dos veces.
+   */
+  function revisarSellos() {
+    const j = selloDeJornada();
+    if (j && state.selloRecuento && state.selloRecuento !== j) {
+      state.selloRecuento = null;
+      state.recuento = null;
+      state.recuentoCargando = false;
+      ensureRecuento();
+    }
+    if (j && state.selloRecuentoLiga && state.selloRecuentoLiga !== j) {
+      state.selloRecuentoLiga = null;
+      state.recuentoLiga = null;
+      state.recuentoLigaCargando = false;
+      if (state.rankingsAmbito === 'liga') ensureRecuentoDeLiga();
+    }
+    const m = selloDeMovimientos();
+    if (m && state.selloSquads && state.selloSquads !== m) {
+      state.selloSquads = null;
+      state.squads = null;
+      ensureSquads();
+    }
   }
 
   /** Lista de ids a diccionario, para poder preguntar por uno de golpe. */
@@ -67,10 +145,10 @@
     return mapa;
   }
 
-  function cacheGuardar(nombre, data) {
+  function cacheGuardar(nombre, data, sello) {
     try {
       const todo = cacheTodo();
-      todo[nombre] = { at: Date.now(), data: data };
+      todo[nombre] = { at: Date.now(), data: data, sello: sello || null };
       localStorage.setItem(CACHE_KEY, JSON.stringify(todo));
     } catch (error) {
       /* Sin sitio: se tira lo guardado y se sigue, que esto es un apaño de
@@ -2519,6 +2597,19 @@
       ? { status: 'ok', list: guardado.squads || [] }
       : { status: 'loading', list: [] };
     if (guardado) (guardado.squads || []).forEach(function (s) { recordarPosiciones(s.players); });
+
+    /* Las ocho plantillas son ocho consultas. Solo cambian cuando alguien ficha
+       o vende, y eso lo dice el tablón, que ya viene con la sincronización
+       normal: mientras no haya un movimiento nuevo, no hay nada que traer. */
+    const selloS = selloDeMovimientos();
+    const valeS = cacheVigente('squads', selloS);
+    if (valeS && (valeS.squads || []).length) {
+      state.squads = { status: 'ok', list: valeS.squads };
+      valeS.squads.forEach(function (s) { recordarPosiciones(s.players); });
+      state.selloSquads = selloS;
+      return;
+    }
+
     fetch(config.url.replace(/\/+$/, '') + '/?key=' + encodeURIComponent(config.key) + '&squads=1',
       { headers: { 'accept': 'application/json' } })
       .then(function (response) { return response.json(); })
@@ -2526,7 +2617,8 @@
         if (payload.error) throw new Error(payload.error);
         state.squads = { status: 'ok', list: payload.squads || [] };
         (payload.squads || []).forEach(function (s) { recordarPosiciones(s.players); });
-        cacheGuardar('squads', payload);
+        state.selloSquads = selloS;
+        cacheGuardar('squads', payload, selloS);
         render();
         if (state.tab === 'jornadas') renderPartidos();
       })
@@ -10418,6 +10510,26 @@
       recordarPosiciones(state.recuento);
       state.recuento.forEach(function (j) { amarillasDe[String(j.id)] = j.yellow || 0; });
     }
+
+    /* Y si la jornada no se ha movido desde que se guardó, NO se pide nada.
+       Este es el más caro de todos —repasa la temporada entera, ocho segundos
+       largos cuando el proxy arranca en frío— y lo estábamos pidiendo en cada
+       carga de página para recibir exactamente lo mismo. Un gol de hace tres
+       jornadas no se va a descontar. */
+    const selloR = selloDeJornada();
+    const valido = cacheVigente('recuento', selloR);
+    if (valido && valido.players && valido.players.length) {
+      state.recuento = valido.players;
+      state.recuentoAt = Date.now();
+      recordarPosiciones(state.recuento);
+      state.recuento.forEach(function (j) { amarillasDe[String(j.id)] = j.yellow || 0; });
+      state.recuentoCargando = false;
+      state.recuentoFallo = false;
+      state.selloRecuento = selloR;
+      renderRankingsTemporada();
+      return;
+    }
+
     state.recuentoCargando = true;
     fetch(config.url.replace(/\/+$/, '') + '/?key=' + encodeURIComponent(config.key) + '&recuento=1',
       { headers: { 'accept': 'application/json' } })
@@ -10434,7 +10546,8 @@
            queda sin indice y contesta sin nadie; guardarlo dejaba la pestana de
            Datos en blanco tambien en la siguiente visita, ya sin red de por
            medio y sin forma de saber por que. */
-        if (state.recuento.length) cacheGuardar('recuento', payload);
+        state.selloRecuento = selloR;
+        if (state.recuento.length) cacheGuardar('recuento', payload, selloR);
         renderRankingsTemporada();
         /* Las amarillas llegan después de pintar: si alguien está a una de
            sanción, hay que repasar las vistas para que salga su tarjeta. */
@@ -10460,6 +10573,18 @@
     if (!config.url || !config.key) return;
     if (state.recuentoLiga || state.recuentoLigaCargando) return;
 
+    /* Igual que el de LaLiga: sin jornada nueva no hay nada que recontar. */
+    const selloL = selloDeJornada();
+    const valeLo = cacheVigente('recuentoLiga', selloL);
+    if (valeLo && valeLo.players && valeLo.players.length) {
+      state.recuentoLiga = valeLo.players;
+      state.recuentoLigaCargando = false;
+      state.recuentoLigaFallo = false;
+      state.selloRecuentoLiga = selloL;
+      renderRankingsTemporada();
+      return;
+    }
+
     state.recuentoLigaCargando = true;
     renderRankingsTemporada();
     fetch(config.url.replace(/\/+$/, '') + '/?key=' + encodeURIComponent(config.key) + '&recuento=liga',
@@ -10470,6 +10595,8 @@
         state.recuentoLiga = payload.players || [];
         state.recuentoLigaCargando = false;
         state.recuentoLigaFallo = false;
+        state.selloRecuentoLiga = selloL;
+        if (state.recuentoLiga.length) cacheGuardar('recuentoLiga', payload, selloL);
         renderRankingsTemporada();
       })
       .catch(function () {
@@ -11675,6 +11802,13 @@
     state.listings = Array.isArray(payload.listings) ? payload.listings : [];
     state.lineup = payload.lineup || null;
     state.round = payload.round || state.round;
+    /* Guardada para el arranque siguiente: `showTab()` corre antes de la
+       primera sincronización, así que sin esto no habría sello con el que
+       decidir y se volvería a pedir todo igualmente. */
+    if (state.round) cacheGuardar('round', state.round);
+    /* Con la jornada y el tablón ya al día: si algo de lo que se sirvió de la
+       caché se ha quedado viejo, se vuelve a pedir ahora. */
+    revisarSellos();
     state.movers = payload.movers || state.movers;
     /* Los que tienen foto de destacado. Se guardan como diccionario para poder
        preguntar por uno sin recorrer los setenta y pico cada vez que se pinta
@@ -12739,6 +12873,11 @@
     } catch (error) { /* sin sessionStorage se respeta la pestaña guardada */
       seguimos = true;
     }
+
+    /* La jornada de la última vez, para que las pestañas que abren ya sepan si
+       lo guardado sigue valiendo. La de verdad llega con la sincronización y
+       `revisarSellos()` corrige si hace falta. */
+    if (!state.round) state.round = cacheLeer('round') || null;
 
     const pestana = seguimos ? saved : 'inicio';
     showTab(document.querySelector('[data-panel="' + pestana + '"]') ? pestana : 'inicio');
