@@ -1407,14 +1407,11 @@ code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft)
 .table tbody tr.row-pujada .pujado,
 .table tbody tr.row-pujada strong,
 .table tbody tr.row-pujada .sub { color: var(--marca); }
-/* El botón de cambiar la puja, a juego. */
-.table tbody tr.row-pujada .ambito--pujado {
-  border-color: var(--marca); color: var(--marca);
-}
-/* Lo que NO se toca: el estado y las flechas de subida y bajada. Son datos del
-   futbolista, no de tu puja, y en amarillo dejarían de significar lo suyo.
-   La cuenta atrás urgente pierde el rojo pero conserva la negrita, que es lo
-   que hace que se lea como «corre». */
+/* Lo que NO se toca: el botón de cambiar la puja, el estado del futbolista y
+   las flechas de subida y bajada del valor. El botón es un control, no un dato
+   de la fila; las otras dos son datos suyos, no de tu puja, y en amarillo
+   dejarían de significar lo suyo. La cuenta atrás urgente sí pierde el rojo,
+   pero conserva la negrita, que es lo que se lee como «corre». */
 
 /* La fila abierta y el ratón por encima siguen mandando: son estados, y un
    estado tiene que verse por encima de «esta es la tuya», que es permanente.
