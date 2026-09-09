@@ -140,7 +140,7 @@ const CDN = 'https://cf.biwenger.com/api/v2';
    navegador normal y las cabeceras que este mandaría. */
 /* Marca de versión: se sube en cada cambio y se consulta con ?version=1.
    Sirve para saber desde fuera si el despliegue ha entrado o no. */
-const VERSION = '2026-09-09 · deno 132';
+const VERSION = '2026-09-09 · deno 133';
 
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ' +
   '(KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36';
@@ -2707,6 +2707,28 @@ async function playerStats(id, names, score, env) {
 
   const sistema = String(score || 1);
 
+  /* Copia en el KV, igual que los partidos. Esto no era solo lentitud: en un
+     arranque en frío, con el CDN tardando, la consulta se comía el tope de
+     ocho segundos y la ficha salía con «No hay ficha de ese futbolista» —le
+     pasaba a Belaid, Calero, Ruibal, Sergi Canós y Esquivel, y al rato a
+     ninguno—. No era cosa de esos futbolistas: era el arranque en frío. Con la
+     copia, la segunda visita no depende de que el CDN conteste a tiempo.
+
+     Poco rato con la jornada rodando, que las notas se mueven; unas horas
+     cuando no, porque lo que hizo en un partido ya jugado no cambia. */
+  const viva = !!(cache.round && cache.round.live);
+  const vigenciaFicha = viva ? 20 * 60 * 1000 : 6 * 60 * 60 * 1000;
+  const claveFicha = 'ficha-v1-' + String(id) + '-' + sistema;
+  if (JORNADAS) {
+    try {
+      const crudo = await JORNADAS.get(claveFicha);
+      const caja = crudo ? JSON.parse(crudo) : null;
+      if (caja && caja.at && caja.datos && Date.now() - caja.at < vigenciaFicha) {
+        return caja.datos;
+      }
+    } catch (error) { /* se arma abajo */ }
+  }
+
   /* Las Súper Picas de la temporada, de la cuenta guardada. Si algo falla se
      enseña cero antes que romper la ficha entera por un dato de adorno. */
   const cuentaPicas = await superPicasDeLaTemporada(env, sistema)
@@ -2815,7 +2837,7 @@ async function playerStats(id, names, score, env) {
     return partidos ? Math.round((total / partidos) * 100) / 100 : null;
   };
 
-  return {
+  const ficha = {
     id: String(id),
     name: data.name || names[String(id)] || null,
     position: data.position != null ? data.position : (names[String(id) + ':pos'] || null),
@@ -2852,6 +2874,12 @@ async function playerStats(id, names, score, env) {
     superPicas: picas,
     updatedAt: new Date().toISOString()
   };
+
+  if (JORNADAS) {
+    try { await JORNADAS.put(claveFicha, JSON.stringify({ at: Date.now(), datos: ficha })); }
+    catch (error) { /* sin copia esta vez; se guarda en la siguiente */ }
+  }
+  return ficha;
 }
 
 /**
