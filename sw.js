@@ -11,7 +11,7 @@
 
 /* Se sube en cada publicación: al cambiar, el navegador tira lo guardado y se
    baja los archivos nuevos. Sin esto, un cambio en app.js podría no llegar. */
-const VERSION = 'calc-v11';
+const VERSION = 'calc-v12';
 
 /* Lo que hace falta para pintar la app aunque no haya red. */
 const BASICOS = [
@@ -87,11 +87,32 @@ self.addEventListener('fetch', function (evento) {
       if (respuesta && respuesta.ok) {
         const copia = respuesta.clone();
         caches.open(VERSION).then(function (cache) { cache.put(peticion, copia); });
+        return respuesta;
       }
-      return respuesta;
+      /* Contestar NO es contestar bien. Un 404 o un 502 no lanzan excepción, así
+         que se colaban tal cual hasta la página: durante los segundos que tarda
+         en publicarse una versión, un `styles.css?v=` que todavía no existe
+         volvía como 404 y la web se quedaba sin estilos. Se busca lo guardado
+         antes de dar el fallo por bueno. */
+      return caches.match(peticion, { ignoreSearch: true }).then(function (guardada) {
+        return guardada || respuesta;
+      });
     }).catch(function () {
-      return caches.match(peticion).then(function (guardada) {
-        return guardada || caches.match('./index.html');
+      /* `ignoreSearch` es lo que hace que esto sirva de algo. Sin él, la copia
+         guardada es «styles.css» y lo que se pide es «styles.css?v=414»: no
+         casan, y la red de seguridad no salta nunca justo el día que cambias
+         la version, que es cuando hace falta. */
+      return caches.match(peticion, { ignoreSearch: true }).then(function (guardada) {
+        if (guardada) return guardada;
+        /* Y el index.html SOLO para una navegación. Devolvérselo a una
+           petición de CSS o de JS es peor que fallar: el navegador recibe
+           HTML donde esperaba una hoja de estilos, la descarta entera y la
+           página se queda sin estilos —el campo de fútbol, que es CSS puro,
+           desaparecía— sin un solo error que lo explique. */
+        if (peticion.mode === 'navigate') {
+          return caches.match('./index.html', { ignoreSearch: true });
+        }
+        return Response.error();
       });
     })
   );
