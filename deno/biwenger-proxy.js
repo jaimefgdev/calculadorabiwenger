@@ -140,7 +140,7 @@ const CDN = 'https://cf.biwenger.com/api/v2';
    navegador normal y las cabeceras que este mandaría. */
 /* Marca de versión: se sube en cada cambio y se consulta con ?version=1.
    Sirve para saber desde fuera si el despliegue ha entrado o no. */
-const VERSION = '2026-09-09 · deno 135';
+const VERSION = '2026-09-09 · deno 136';
 
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ' +
   '(KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36';
@@ -278,10 +278,18 @@ const app = {
         const r = await fetch('https://api.sofascore.com/api/v1' + sofa, {
           headers: {
             'user-agent': UA,
-            'accept': 'application/json, text/plain, */*',
-            'accept-language': 'es-ES,es;q=0.9',
+            'accept': '*/*',
+            'accept-language': 'es-ES,es;q=0.9,en;q=0.8',
             'referer': 'https://www.sofascore.com/',
-            'origin': 'https://www.sofascore.com'
+            'origin': 'https://www.sofascore.com',
+            'sec-ch-ua': '"Chromium";v="140", "Not=A?Brand";v="24"',
+            'sec-ch-ua-mobile': '?0',
+            'sec-ch-ua-platform': '"Windows"',
+            'sec-fetch-dest': 'empty',
+            'sec-fetch-mode': 'cors',
+            'sec-fetch-site': 'same-site',
+            'cache-control': 'no-cache',
+            'pragma': 'no-cache'
           }
         }).catch(function () { return null; });
         if (!r || !r.ok) return fail(502, 'SofaScore no responde (' + (r ? r.status : 'sin red') + ').', origin);
