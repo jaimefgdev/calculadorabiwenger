@@ -1397,6 +1397,9 @@ code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft)
    Se nombran los hijos uno a uno porque cada uno trae su propio color puesto
    —el nombre, el dueño, el precio en negrita, los guiones apagados—, y un
    `color` en la celda no los pisa. */
+/* El aviso de lo que falta en la ficha, debajo de los datos que si hay. */
+.ficha__falta { margin-top: .7rem; font-size: .78rem; line-height: 1.4; }
+
 .table tbody tr.row-pujada > td,
 .table tbody tr.row-pujada .player-name,
 .table tbody tr.row-pujada .manager__name,

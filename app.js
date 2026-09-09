@@ -8542,16 +8542,46 @@
     if (sofa === undefined || sofa === 'pidiendo') {
       return '<p class="muted">Cargando la ficha…</p>';
     }
+
     const cuerpo = tiraPersonal(id) + trayectoria(id);
     if (cuerpo) return cuerpo;
-    return '<p class="muted">No hay ficha personal de este futbolista. ' +
-      'Suele pasar con los canteranos y con quien todavía no ha debutado.</p>';
+
+    /* Sin SofaScore, con lo que manda Biwenger.
+       La ficha salía ENTERA de SofaScore, y desde que nos devuelve 403 se
+       quedaba en blanco: ni un dato ni una explicación. Peor todavía, el aviso
+       que había culpaba al futbolista —«suele pasar con los canteranos»—
+       cuando le pasaba a todos, tuvieran club y puntos o no.
+
+       Biwenger manda nacimiento, dorsal y nacionalidad en la misma respuesta
+       que ya se lee para las estadísticas, así que eso se enseña siempre. Lo
+       que no manda nadie —estatura, pie y la trayectoria por clubes— se dice
+       que falta y por qué, en vez de dejar el hueco. */
+    const suyo = state.estadisticas[String(id)];
+    if (suyo && suyo !== 'pidiendo' && (suyo.birthDate || suyo.number || suyo.country)) {
+      return tiraDeBiwenger(suyo) +
+        '<p class="muted ficha__falta">La estatura, el pie y por dónde ha pasado ' +
+        'los da SofaScore, que ahora mismo no nos responde.</p>';
+    }
+
+    return '<p class="muted">No hemos podido traer la ficha de este futbolista.</p>';
   }
 
-  function tiraPersonal(id, apretada) {
-    const bio = state.sofa[String(id)];
+  /** Los datos personales que manda Biwenger, con la misma pinta que los otros. */
+  function tiraDeBiwenger(datos) {
+    return tiraPersonal(null, false, {
+      birthDate: datos.birthDate || null,
+      number: datos.number != null ? datos.number : null,
+      country: datos.country || null,
+      countryName: datos.country ? nombreDePais(datos.country) : null
+    });
+  }
+
+  function tiraPersonal(id, apretada, deFuera) {
+    /* `deFuera` deja pasar un bio que no venga de SofaScore —el de Biwenger—
+       sin duplicar toda la maquetación de los datos. */
+    const bio = deFuera || state.sofa[String(id)];
     if (!bio || bio === 'pidiendo') return '';
-    if (!bio.height && !bio.birthDate && !bio.number) return '';
+    if (!bio.height && !bio.birthDate && !bio.number && !bio.country) return '';
 
     /* El orden lo marca el ancho de cada dato: primero los cortos y fijos, y al
        final el dorsal, que cierra. */
