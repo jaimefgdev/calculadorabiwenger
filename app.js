@@ -9882,13 +9882,7 @@
       suyos.sort(function (a, b) { return b.dif - a.dif; });
       detalle[manager] = {
         mejor: suyos[0] || null,
-        peor: suyos[suyos.length - 1] || null,
-        /* Cuántos entran en la cuenta y cuántos tiene. Sin esto la columna
-           engañaba: uno sumaba DOS futbolistas y otro TRECE, y las dos cifras
-           se leían como si midieran lo mismo. El que casi no ficha sale
-           siempre mejor, porque casi no cuenta a nadie. */
-        cuantos: suyos.length,
-        plantilla: (equipo.players || []).length
+        peor: suyos[suyos.length - 1] || null
       };
     });
 
@@ -9901,9 +9895,7 @@
         latente: l,
         total: r + l,
         mejor: (detalle[nombre] || {}).mejor || null,
-        peor: (detalle[nombre] || {}).peor || null,
-        cuantos: (detalle[nombre] || {}).cuantos || 0,
-        plantilla: (detalle[nombre] || {}).plantilla || 0
+        peor: (detalle[nombre] || {}).peor || null
       };
     }).sort(function (a, b) { return b.total - a.total; });
   }
@@ -9966,7 +9958,7 @@
       '<div class="table-scroll"><table class="table table--mercadeo"><thead><tr>' +
         '<th>Jugador</th>' +
         '<th class="num" title="Ganado con los futbolistas que compró y ya vendió. Esto ya está cobrado">Compra/venta</th>' +
-        '<th class="num" title="Lo que valen hoy los que aún tiene frente a lo que pagó. Cambia cada día y solo se hace real si vende. Debajo, cuántos de su plantilla entran en la cuenta: los del reparto no, porque no se pagó nada por ellos">Sin vender</th>' +
+        '<th class="num" title="Lo que valen hoy los que aún tiene frente a lo que pagó. Cambia cada día y solo se hace real si vende. Solo cuentan los fichados: por los del reparto no se pagó nada">Sin vender</th>' +
         '<th class="num">Total</th>' +
         '<th title="Su mejor y su peor fichaje de los que todavía conserva">Mejor / peor</th>' +
       '</tr></thead><tbody>' +
@@ -9983,13 +9975,7 @@
           '<td data-label="Jugador"><span class="manager">' + avatar(f.name) +
             '<span class="manager__name">' + escapeHtml(f.name) + '</span></span></td>' +
           '<td class="num" data-label="Compra/venta">' + celdaDinero(f.realizado) + '</td>' +
-          '<td class="num" data-label="Sin vender">' + celdaDinero(f.latente) +
-            (f.plantilla
-              ? '<span class="mercadeo__cuantos" title="' + f.cuantos + ' de sus ' +
-                f.plantilla + ' est' + (f.cuantos === 1 ? 'á' : 'án') + ' fichados en el mercado. ' +
-                'Los del reparto no cuentan: no se pagó nada por ellos">' +
-                f.cuantos + ' de ' + f.plantilla + '</span>'
-              : '') + '</td>' +
+          '<td class="num" data-label="Sin vender">' + celdaDinero(f.latente) + '</td>' +
           '<td class="num" data-label="Total"><strong>' + celdaDinero(f.total) + '</strong></td>' +
           '<td class="cartera" data-label="Mejor / peor">' +
             (f.mejor

@@ -1397,14 +1397,6 @@ code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft)
    Se nombran los hijos uno a uno porque cada uno trae su propio color puesto
    —el nombre, el dueño, el precio en negrita, los guiones apagados—, y un
    `color` en la celda no los pisa. */
-/* Cuántos futbolistas entran en la cuenta de «Sin vender», debajo del importe.
-   Sin esto la columna comparaba peras con manzanas: una fila sumaba dos
-   fichajes y otra trece, y las dos cifras se leían igual de grandes. */
-.mercadeo__cuantos {
-  display: block; font-size: .7rem; color: var(--text-faint);
-  font-weight: 400; margin-top: .1rem; white-space: nowrap;
-}
-
 .table tbody tr.row-pujada > td,
 .table tbody tr.row-pujada .player-name,
 .table tbody tr.row-pujada .manager__name,
