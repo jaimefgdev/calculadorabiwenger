@@ -140,7 +140,7 @@ const CDN = 'https://cf.biwenger.com/api/v2';
    navegador normal y las cabeceras que este mandaría. */
 /* Marca de versión: se sube en cada cambio y se consulta con ?version=1.
    Sirve para saber desde fuera si el despliegue ha entrado o no. */
-const VERSION = '2026-09-09 · deno 128';
+const VERSION = '2026-09-09 · deno 129';
 
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ' +
   '(KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36';
@@ -5528,6 +5528,12 @@ async function build(env, debug) {
     /* Los destacados de la última jornada. Van solo los ids: la ruta la compone
        la web. */
     heroes: destacados,
+    /* La version desplegada, en la sincronizacion normal. La web guarda cada
+       jornada calculada y necesita saber cuando volver a pedirla: hasta ahora
+       refrescaba UNA VEZ POR SESION cada jornada que mirabas, por si el proxy
+       habia cambiado los numeros. Con esto lo hace una vez por DESPLIEGUE, que
+       es cuando de verdad pueden cambiar. */
+    calc: VERSION,
     me: {
       id: who.userId,
       balance: status.balance != null ? status.balance : null,

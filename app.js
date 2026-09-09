@@ -81,12 +81,19 @@
    * mucho mejor que el reloj. El plazo largo está solo por si algún día el
    * sello se queda corto para algo que no habíamos previsto.
    */
-  function cacheVigente(nombre, sello) {
+  function cacheVigente(nombre, sello, topeMs) {
     if (!sello) return null;
     const caja = cacheCaja(nombre);
     if (!caja || caja.sello !== sello) return null;
-    if (Date.now() - caja.at > 7 * 24 * 3600e3) return null;
+    if (Date.now() - caja.at > (topeMs || 7 * 24 * 3600e3)) return null;
     return caja.data;
+  }
+
+  /* El día del mercado. Biwenger renueva precios y futbolistas libres de
+     madrugada, así que lo que cambia «de un día para otro» cambia aquí. */
+  function selloDelDia() {
+    const d = new Date();
+    return 'd' + d.getFullYear() + '-' + (d.getMonth() + 1) + '-' + d.getDate();
   }
 
   /* Lo que cambia los datos de jornada: qué jornada es y cuántos partidos suyos
@@ -5246,6 +5253,16 @@
     return r.status != null && r.status !== 'pending';
   }
 
+  /** Cerrada del todo: todos sus partidos jugados, ya no puede cambiar. */
+  function jornadaCerrada(id) {
+    const ficha = (state.jornadas.list || []).filter(function (r) {
+      return String(r.id) === String(id);
+    })[0];
+    if (!ficha) return false;
+    if (ficha.cerrada != null) return !!ficha.cerrada;
+    return ficha.status === 'finished';
+  }
+
   /** Las jornadas guardadas propias, de la más antigua a la más nueva. */
   function jornadasGuardadas() {
     return Object.keys(state.jornadas.datos)
@@ -6055,7 +6072,14 @@
     if (guardada && !forzar) {
       state.jornadaVista = cual;
       if (!state.jornadasRefrescadas) state.jornadasRefrescadas = {};
-      if (!state.jornadasRefrescadas[cual]) {
+      /* Una jornada CERRADA calculada con la version que hay desplegada no
+         puede dar otros numeros: no se vuelve a pedir. Antes se refrescaba una
+         vez por sesion y por jornada —abrir Jornadas y pasear por cinco eran
+         cinco consultas cada vez— y el motivo era que un arreglo del proxy
+         llegase al navegador. Con la version delante, eso pasa a ser una vez
+         por DESPLIEGUE, que es cuando de verdad cambian los numeros. */
+      const yaVale = state.calc && guardada.calc === state.calc && jornadaCerrada(cual);
+      if (!yaVale && !state.jornadasRefrescadas[cual]) {
         state.jornadasRefrescadas[cual] = true;
         fetch(config.url.replace(/\/+$/, '') + '/?key=' + encodeURIComponent(config.key) +
           '&jornada=' + encodeURIComponent(cual), { headers: { 'accept': 'application/json' } })
@@ -6577,6 +6601,23 @@
       state.jugadores = previo.players;
       recordarPosiciones(state.jugadores);
     }
+
+    /* Los 577 de LaLiga. Su precio se renueva de madrugada y sus puntos cuando
+       se juega, así que el sello lleva el día y la jornada. Con TOPE de tres
+       horas a propósito, que no todo lo de aquí es diario: una lesión o una
+       sanción aparecen cuando aparecen, y con eso se decide a quién alinear.
+       Aun así son cuatro o cinco consultas al día en vez de una por cada vez
+       que abres la web. */
+    const selloJ = selloDelDia() + '|' + (selloDeJornada() || '');
+    const valeJ = cacheVigente('jugadores', selloJ, 3 * 3600e3);
+    if (valeJ && (valeJ.players || []).length) {
+      state.jugadores = valeJ.players;
+      state.jugadoresAt = Date.now();
+      recordarPosiciones(state.jugadores);
+      state.jugadoresCargando = false;
+      return;
+    }
+
     state.jugadoresCargando = true;
     fetch(config.url.replace(/\/+$/, '') + '/?key=' + encodeURIComponent(config.key) + '&jugadores=1',
       { headers: { 'accept': 'application/json' } })
@@ -6587,7 +6628,7 @@
         state.jugadoresAt = Date.now();
         recordarPosiciones(state.jugadores);
         state.jugadoresCargando = false;
-        cacheGuardar('jugadores', payload);
+        cacheGuardar('jugadores', payload, selloJ);
         renderJugadores();
         /* El índice es lo que trae los nombres, las demarcaciones y los valores
            que faltan: en cuanto llega hay que volver a pintar TODO lo que se
@@ -11806,6 +11847,9 @@
        primera sincronización, así que sin esto no habría sello con el que
        decidir y se volvería a pedir todo igualmente. */
     if (state.round) cacheGuardar('round', state.round);
+    /* La version del proxy, para saber si lo que tenemos guardado se calculo
+       con ella o con una anterior. */
+    if (payload.calc) state.calc = payload.calc;
     /* Con la jornada y el tablón ya al día: si algo de lo que se sirvió de la
        caché se ha quedado viejo, se vuelve a pedir ahora. */
     revisarSellos();
