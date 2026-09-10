@@ -60,6 +60,17 @@ const JORNADAS = {
 
   async put(clave, valor) {
     const texto = String(valor);
+
+    /* NO SE ESCRIBE LO QUE YA ESTA. Media aplicacion vuelve a guardar cada
+       poco lo mismo que hay: el indice de futbolistas cuando no ha cambiado un
+       precio, el detalle de una jornada cerrada, la ficha de alguien que no ha
+       jugado. Cada una de esas son varias escrituras —los valores grandes van
+       en trozos de 16 KB— y el plan gratuito de Deno las cuenta todas: por eso
+       llegamos al 90% de la cuota. Comparar antes cuesta UNA lectura, que no
+       se cuenta igual, y ahorra todas las escrituras cuando no hay cambio. */
+    const yaEsta = await JORNADAS.get(clave).catch(function () { return null; });
+    if (yaEsta === texto) return;
+
     /* Cuántos trozos había antes, para borrar SOLO los que sobren. Antes se
        hacía un `delete` a ciegas —una lectura y un borrado por trozo— delante
        de cada escritura, aunque el nuevo valor fuera a ocupar los mismos
@@ -140,7 +151,7 @@ const CDN = 'https://cf.biwenger.com/api/v2';
    navegador normal y las cabeceras que este mandaría. */
 /* Marca de versión: se sube en cada cambio y se consulta con ?version=1.
    Sirve para saber desde fuera si el despliegue ha entrado o no. */
-const VERSION = '2026-09-09 · deno 136';
+const VERSION = '2026-09-10 · deno 137';
 
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ' +
   '(KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36';
@@ -1630,7 +1641,10 @@ async function nextRound() {
 
   cache.round = round;
   cache.roundAt = Date.now();
-  if (JORNADAS) {
+  /* Solo si ha cambiado algo de verdad. Lleva la hora dentro, asi que la
+     comparacion del almacen no la salva: dos jornadas iguales con distinto
+     sello se guardan igual. Se compara el contenido a mano. */
+  if (JORNADAS && (!guardada || JSON.stringify(guardada.data) !== JSON.stringify(round))) {
     try { await JORNADAS.put('proxima-jornada', JSON.stringify({ at: cache.roundAt, data: round })); }
     catch (error) { /* se vuelve a guardar en la siguiente */ }
   }
