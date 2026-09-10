@@ -2913,8 +2913,14 @@
       huecos.forEach(function (par) {
         const pos = par[0];
         for (let i = 0; i < par[1] && indice < lineup.players.length; i++) {
-          slots[pos + '-' + i] = String(lineup.players[indice].id);
+          /* Los huecos vienen como null y HAY QUE RESPETARLOS: son la posición
+             que dejaste vacía. Saltárselos hacía que todos los de detrás
+             subieran un puesto: en un 3-2-5 con un hueco en defensa y otro en
+             ataque, Marc Casadó salía de defensa y Mariano de medio. */
+          const quien = lineup.players[indice];
           indice += 1;
+          if (!quien || quien.id == null) continue;
+          slots[pos + '-' + i] = String(quien.id);
         }
       });
     }
@@ -2932,7 +2938,7 @@
   function playerById(id) {
     const found = mySquad().filter(function (player) { return player.id === String(id); })[0];
     const inLineup = ((state.lineup && state.lineup.players) || [])
-      .filter(function (player) { return player.id === String(id); })[0];
+      .filter(function (player) { return player && player.id === String(id); })[0];
     const base = found || inLineup;
     if (!base) return null;
 
@@ -2961,7 +2967,7 @@
     const inSquad = playerById(id);
     if (inSquad && inSquad.position) return inSquad.position;
     const inLineup = ((state.lineup && state.lineup.players) || [])
-      .filter(function (player) { return player.id === String(id); })[0];
+      .filter(function (player) { return player && player.id === String(id); })[0];
     return inLineup ? inLineup.position : null;
   }
 

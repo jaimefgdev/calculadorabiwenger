@@ -151,7 +151,7 @@ const CDN = 'https://cf.biwenger.com/api/v2';
    navegador normal y las cabeceras que este mandaría. */
 /* Marca de versión: se sube en cada cambio y se consulta con ?version=1.
    Sirve para saber desde fuera si el despliegue ha entrado o no. */
-const VERSION = '2026-09-10 · deno 137';
+const VERSION = '2026-09-10 · deno 138';
 
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ' +
   '(KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36';
@@ -5357,9 +5357,15 @@ function normalizeLineup(user, names) {
       return suplente && suplente.id != null ? String(suplente.id) : null;
     }),
     coach: lineup.coach && lineup.coach.id != null ? String(lineup.coach.id) : null,
-    /* Los huecos sin jugador vienen como null: hay que tirarlos antes de leer
-       nada de ellos. */
-    players: (lineup.players || []).filter(Boolean).map(function (player) {
+    /* Los huecos sin jugador vienen como null y AQUI SE QUEDAN, en su sitio.
+       Tirarlos parecia lo limpio y era justo lo que descolocaba el once: la
+       lista deja de decir quien va en cada posicion y pasa a ser «los que
+       hay», asi que al repartirla por lineas todos suben un puesto. Con un
+       3-2-5 con un hueco en defensa y otro en ataque, Marc Casado salia de
+       defensa y Mariano de medio. Quien lea esto tiene que saltarse los
+       nulos, pero sin ellos no hay forma de saber donde iba cada uno. */
+    players: (lineup.players || []).map(function (player) {
+      if (!player || player.id == null) return null;
       const id = String(player.id);
       return {
         id: id,
