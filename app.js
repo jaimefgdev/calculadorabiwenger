@@ -11895,20 +11895,11 @@
         } catch (e) { /* sin memoria: al menos vale para esta sesión */ }
       }
 
-      /* Y de vuelta a Cloudflare. Deno suspendió el proyecto por pasarse de
-         escrituras del almacén en el plan gratuito, y con él se cayó la web
-         entera: sin proxy no hay datos. El Worker de Cloudflare sigue en pie
-         con sus secretos y su almacén, así que se vuelve allí.
-         Una sola vez: si después lo cambias a mano en Ajustes, se respeta. */
-      if (url && data && !data.aCloudflare && url.indexOf('deno.net') !== -1) {
-        url = 'https://' + PROXY_VIEJO;
-        try {
-          localStorage.setItem(SYNC_KEY, JSON.stringify({
-            url: url, key: data.key || '', lastSync: data.lastSync || null,
-            mudado: true, aCloudflare: true
-          }));
-        } catch (e) { /* sin memoria: al menos vale para esta sesión */ }
-      }
+      /* AQUI ESTUVO un desvio a Cloudflare, puesto cuando Deno suspendio el
+         proyecto. Se quita: Cloudflare NO sirve los dias de partido, porque
+         las operadoras españolas bloquean sus rangos enteros durante LaLiga y
+         el proxy se queda inalcanzable justo cuando mas se usa. Deno va por
+         Google Cloud, que no entra en esos bloqueos. */
 
       return {
         url: url,
