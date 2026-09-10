@@ -43,6 +43,10 @@
      mientras por detrás se pide la de ahora. */
   const CACHE_KEY = 'biwenger-calc-cache';
 
+  /* Version del archivo de fichas. SUBIRLA cada vez que se regenere
+     `fichas.json`: es lo que evita que el navegador sirva la de antes. */
+  const FICHAS_V = 2;
+
   /* Cuánto se da por bueno lo guardado sin ni siquiera repintarlo luego. Es
      solo para no enseñar algo de anteayer: aunque esté fresco, siempre se
      vuelve a pedir por detrás. */
@@ -52,6 +56,20 @@
     try { return JSON.parse(localStorage.getItem(CACHE_KEY) || '{}') || {}; }
     catch (error) { return {}; }
   }
+
+  /* Tira la copia de las fichas que se guardo en su dia.
+     Ocupaba 200 KB de los cinco megas que da el navegador —tanto como todo lo
+     demas junto— y ya no se usa. Mientras siga ahi, le quita sitio a lo que si
+     hace falta y hace que se borre la cache entera cuando algo no cabe. */
+  (function tirarFichasGuardadas() {
+    try {
+      const todo = cacheTodo();
+      if (todo['fichas-wd']) {
+        delete todo['fichas-wd'];
+        localStorage.setItem(CACHE_KEY, JSON.stringify(todo));
+      }
+    } catch (error) { /* si no se puede, tampoco pasa nada */ }
+  })();
 
   function cacheCaja(nombre) {
     const caja = cacheTodo()[nombre];
@@ -8556,13 +8574,23 @@
   function ensureFichas() {
     if (state.fichas !== undefined) return;
     state.fichas = 'pidiendo';
-    const guardado = cacheLeer('fichas-wd');
-    if (guardado) { state.fichas = guardado; return; }
-    fetch('fichas.json?v=1', { headers: { 'accept': 'application/json' } })
+    /* SIN guardarlo en el navegador, y esto es la razon:
+       lo guardaba en localStorage y lo leia de ahi ANTES de pedir nada, con
+       doce horas de validez. Asi que la primera version del archivo —la que
+       aun no traia estatura, pie ni contrato— se quedaba pegada medio dia, y
+       por mucho que yo subiera datos nuevos la ficha seguia enseñando solo la
+       edad, el nacimiento, la nacionalidad y el dorsal. Eso es exactamente lo
+       que se veia.
+       Y encima son 200 KB en un almacen que no llega a cinco megas: cuando no
+       cabe, `cacheGuardar` borra la cache ENTERA de la web para hacer sitio.
+       No hace ninguna falta: el archivo ya lo guarda el service worker, asi
+       que pedirlo es instantaneo y funciona sin cobertura igual.
+       El numero de version va en la direccion y sube en cada cambio, para que
+       una version nueva no pueda servirse de una copia vieja. */
+    fetch('fichas.json?v=' + FICHAS_V, { headers: { 'accept': 'application/json' } })
       .then(function (r) { return r.ok ? r.json() : null; })
       .then(function (datos) {
         state.fichas = datos || null;
-        if (datos) cacheGuardar('fichas-wd', datos);
         renderPriceModal();
       })
       .catch(function () { state.fichas = null; renderPriceModal(); });
