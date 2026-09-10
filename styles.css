@@ -1840,6 +1840,13 @@ html.con-ficha { scrollbar-gutter: stable; }
 .ficha__acciones {
   display: grid; grid-template-columns: 1fr auto 1fr;
   align-items: center; row-gap: .35rem;
+  /* Todo el ancho de la cabecera. La cabecera es una columna con
+     `align-items: center`, asi que la fila se quedaba del tamaño de su
+     contenido y centrada: sobraban 59 px muertos a cada lado y «Comparar» no
+     llegaba al borde. Estirandola, la caja de la derecha se pega al canto y
+     las pestañas siguen centradas, que para eso las dos columnas de los lados
+     miden lo mismo. */
+  width: 100%;
   /* El hueco entre columnas cae justo entre las tres pestañas y lo de al lado,
      y ahi tiene que notarse: pegada a ellas, «Cesion» se leia como una cuarta
      pestaña. Dentro de su caja los botones siguen juntos, que si van juntos es

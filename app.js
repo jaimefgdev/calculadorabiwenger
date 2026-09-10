@@ -1012,6 +1012,26 @@
     });
   }
 
+  /* Al que se ha quedado SIN EQUIPO no lo trae el índice de LaLiga, así que en
+     la plantilla de su mánager salía como «Jugador 25386» y sin demarcación.
+     Biwenger sí sabe quién es, y lo cuenta en su ficha: se le pide una vez y a
+     partir de ahí queda bien en toda la app.
+     Solo a los que les falta el nombre de verdad —son un par— y una sola vez,
+     que `ensureEstadisticas` no repite lo ya pedido y el proxy lo guarda. */
+  function rescatarSinNombre(plantillas) {
+    const vistos = {};
+    (plantillas || []).forEach(function (equipo) {
+      (equipo.players || []).forEach(function (jugador) {
+        if (!jugador || jugador.id == null) return;
+        const clave = String(jugador.id);
+        if (vistos[clave] || nombreConocido[clave]) return;
+        if (!ES_RELLENO.test(jugador.name || jugador.player || '')) return;
+        vistos[clave] = true;
+        ensureEstadisticas(clave);
+      });
+    });
+  }
+
   /**
    * Coloca una línea del campo como la coloca Biwenger.
    *
@@ -1115,6 +1135,13 @@
     const guardado = jugador.name || jugador.player || '';
     if (jugador.id == null) return guardado;
     return nombreConocido[String(jugador.id)] || guardado;
+  }
+
+  /** Su demarcación, venga en el objeto o guardada de cuando se supo. */
+  function puestoDe(jugador, id) {
+    if (jugador && jugador.position != null) return jugador.position;
+    const clave = String(id != null ? id : (jugador && jugador.id));
+    return posicionConocida[clave] != null ? posicionConocida[clave] : null;
   }
 
   /** Las demarcaciones de repuesto de alguien, vengan en el objeto o guardadas. */
@@ -2631,7 +2658,10 @@
     state.squads = guardado
       ? { status: 'ok', list: guardado.squads || [] }
       : { status: 'loading', list: [] };
-    if (guardado) (guardado.squads || []).forEach(function (s) { recordarPosiciones(s.players); });
+    if (guardado) {
+      (guardado.squads || []).forEach(function (s) { recordarPosiciones(s.players); });
+      rescatarSinNombre(guardado.squads);
+    }
 
     /* Las ocho plantillas son ocho consultas. Solo cambian cuando alguien ficha
        o vende, y eso lo dice el tablón, que ya viene con la sincronización
@@ -2641,6 +2671,7 @@
     if (valeS && (valeS.squads || []).length) {
       state.squads = { status: 'ok', list: valeS.squads };
       valeS.squads.forEach(function (s) { recordarPosiciones(s.players); });
+      rescatarSinNombre(valeS.squads);
       state.selloSquads = selloS;
       return;
     }
@@ -2652,6 +2683,7 @@
         if (payload.error) throw new Error(payload.error);
         state.squads = { status: 'ok', list: payload.squads || [] };
         (payload.squads || []).forEach(function (s) { recordarPosiciones(s.players); });
+        rescatarSinNombre(payload.squads);
         state.selloSquads = selloS;
         cacheGuardar('squads', payload, selloS);
         render();
@@ -2708,7 +2740,7 @@
   /* Vale tal cual como comparador de `sort`, que solo pasa dos argumentos y
      deja `dir` en 1: el orden normal. */
   function porPuestoYPuntos(a, b, dir) {
-    return ((a.position || 9) - (b.position || 9)) * (dir || 1) || porPuntos(a, b);
+    return ((puestoDe(a) || 9) - (puestoDe(b) || 9)) * (dir || 1) || porPuntos(a, b);
   }
 
   /** Cuántos jugadores pide cada línea del sistema elegido. */
@@ -7456,7 +7488,7 @@
 
     const fila = function (jugador) {
       return '<div class="alin__fila">' +
-        '<span class="alin__pos">' + (jugador.position ? POSITION_NAMES[jugador.position] : '\u2014') + '</span>' +
+        '<span class="alin__pos">' + (puestoDe(jugador) ? POSITION_NAMES[puestoDe(jugador)] : '\u2014') + '</span>' +
         '<span class="with-crest">' + playerName({ playerId: jugador.id, player: jugador.name,
           position: jugador.position, altPositions: jugador.altPositions }) +
           chapaDeManager(jugador, 'dueno--fila') + '</span>' +
@@ -8112,7 +8144,7 @@
           return '<tr class="fila-puntos' + (abierto ? ' row-open' : '') + '"' +
               ' data-puntos="' + escapeHtml(clave) + '">' +
             '<td class="detail-rank">' +
-              (jugador.position ? POSITION_NAMES[jugador.position] : '—') + '</td>' +
+              (puestoDe(jugador) ? POSITION_NAMES[puestoDe(jugador)] : '—') + '</td>' +
             '<td><span class="with-crest">' +
               playerName({ playerId: jugador.id, player: jugador.name,
                 position: jugador.position, altPositions: jugador.altPositions }) +
@@ -9291,6 +9323,21 @@
         state.estadisticasAt = Date.now();
         /* Con el club ya en la mano se puede buscar en SofaScore sin colarse
            de futbolista. Por eso va aquí y no al abrir la ficha. */
+        /* Y se apunta cómo se llama y de qué juega. El índice de LaLiga solo
+           trae a los que tienen equipo, así que al que se ha quedado sin club
+           —Owono, sin ir más lejos— no había forma de ponerle nombre y salía
+           como «Jugador 25386» y sin demarcación en la plantilla de su
+           mánager. Biwenger sí lo sabe, y lo manda aquí: en cuanto se abre su
+           ficha una vez, queda bien en toda la app. */
+        if (payload && (payload.name || payload.position != null)) {
+          const antes = nombreConocido[clave];
+          recordarPosiciones([{ id: clave, name: payload.name,
+            position: payload.position }]);
+          /* Si acabamos de aprender cómo se llama, hay tablas pintadas con el
+             relleno esperando a que alguien las corrija. Solo la primera vez:
+             en las demás fichas esto no dispara nada. */
+          if (!antes && nombreConocido[clave]) render();
+        }
         if (payload && payload.name) ensureSofa(clave, payload.name, payload.teamName, payload.slug);
         renderPriceModal();
         /* Puede estar abierta dentro de un ranking en vez de en la ficha. */
@@ -9619,9 +9666,6 @@
 
     /* Comparando dos porteros hay filas que cambian de sentido. Se mira antes
        de armarlas porque alguna se define según esto. */
-    const puestoDe = function (ficha, id) {
-      return ficha && ficha.position != null ? ficha.position : posicionConocida[String(id)];
-    };
     const puestos = [puestoDe(uno, unoId), puestoDe(otro, otroId)];
     const sonPorteros = puestos.every(function (p) { return p === 1; });
     const filas = [
@@ -9957,10 +10001,14 @@
              («Lesion en el biceps femoral...»), que lo dice con todas las
              letras. El icono solo repetia lo mismo peor. */
           '<span class="ficha__nombre' + (rival ? ' ficha__nombre--dos' : '') + '">' +
+            /* Por `comoSeLlama` y no por el nombre con el que se abrió: si el
+               bueno se aprende DESPUÉS —al llegar su ficha—, el título se
+               corrige solo en el siguiente repintado en vez de quedarse con el
+               «Jugador 25386» hasta que la cierres y la vuelvas a abrir. */
             (rival
-              ? nombreDeFicha(abierto.name, ficha.teamName) +
-                nombreDeFicha(rival.name, rival.teamName)
-              : '<strong>' + escapeHtml(abierto.name) + '</strong>') +
+              ? nombreDeFicha(comoSeLlama(abierto), ficha.teamName) +
+                nombreDeFicha(comoSeLlama(rival), rival.teamName)
+              : '<strong>' + escapeHtml(comoSeLlama(abierto)) + '</strong>') +
           '</span>' +
           /* Mientras se elige rival, la pastilla estorba: su sitio lo ocupa el
              aspa que hay junto al buscador. */
@@ -10213,7 +10261,7 @@
           const diff = base == null || player.marketValue == null
             ? null : player.marketValue - base;
           return '<tr>' +
-            '<td class="detail-rank">' + (player.position ? POSITION_NAMES[player.position] : '—') + '</td>' +
+            '<td class="detail-rank">' + (puestoDe(player) ? POSITION_NAMES[puestoDe(player)] : '—') + '</td>' +
             '<td><span class="with-crest">' +
               playerName({ playerId: player.id, player: player.name }) +
               crestOf(player, 'crest--badge') + '</span></td>' +
