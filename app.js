@@ -2688,6 +2688,26 @@
     return mine ? mine.players : [];
   }
 
+  /* Por demarcación —portero, defensas, medios, delanteros— y dentro de cada
+     una, el que más puntos lleva. Antes mandaba el valor, y en una plantilla
+     eso no es lo que se mira: lo que se busca al abrirla es a quién poner, y
+     eso lo dicen los puntos. El valor se queda de desempate, y el nombre
+     detrás para que dos empatados no bailen de sitio en cada repintado.
+     Sin puntos —recién fichado— va al final de los suyos, no al principio:
+     un `null` no es un cero, es que todavía no ha jugado. */
+  function puntosPara(jugador) {
+    return jugador.points == null ? -Infinity : jugador.points;
+  }
+
+  /* Vale tal cual como comparador de `sort`, que solo pasa dos argumentos y
+     deja `dir` en 1: el orden normal. */
+  function porPuestoYPuntos(a, b, dir) {
+    return ((a.position || 9) - (b.position || 9)) * (dir || 1) ||
+      (puntosPara(b) - puntosPara(a)) ||
+      ((b.marketValue || 0) - (a.marketValue || 0)) ||
+      String(a.name || '').localeCompare(String(b.name || ''), 'es');
+  }
+
   /** Cuántos jugadores pide cada línea del sistema elegido. */
   function formationLines(type) {
     const parts = String(type || '4-4-2').split('-').map(Number);
@@ -3572,7 +3592,11 @@
     // Suplentes: los de la plantilla que no estén en el once.
     const inXi = {};
     Object.keys(state.xi.slots).forEach(function (key) { inXi[state.xi.slots[key]] = true; });
-    const bench = mySquad().filter(function (player) { return !inXi[player.id]; });
+    /* En el mismo orden que la plantilla: por demarcación y, dentro de cada
+       una, el que más puntos lleva. Venían como los daba Biwenger, así que
+       para ver quién merece subir al once había que repasarlos uno a uno. */
+    const bench = mySquad().filter(function (player) { return !inXi[player.id]; })
+      .sort(porPuestoYPuntos);
 
     $('bench').innerHTML = bench.length === 0
       ? '<p class="muted">' + (state.squads && state.squads.status === 'loading'
@@ -5847,22 +5871,7 @@
     if (!plantilla.length) { seccion.hidden = true; return; }
     seccion.hidden = false;
 
-    /* Por demarcación —portero, defensas, medios, delanteros— y dentro de cada
-       una, el que más puntos lleva. Antes mandaba el valor, y en una plantilla
-       eso no es lo que se mira: lo que se busca al abrirla es a quién poner, y
-       eso lo dicen los puntos. El valor se queda de desempate, y el nombre
-       detrás para que dos empatados no bailen de sitio en cada repintado.
-       Sin puntos —recién fichado— va al final de los suyos, no al principio:
-       un `null` no es un cero, es que todavía no ha jugado. */
-    const puntosDe = function (jugador) {
-      return jugador.points == null ? -Infinity : jugador.points;
-    };
-    const lista = plantilla.slice().sort(function (a, b) {
-      return ((a.position || 9) - (b.position || 9)) ||
-        (puntosDe(b) - puntosDe(a)) ||
-        ((b.marketValue || 0) - (a.marketValue || 0)) ||
-        String(a.name || '').localeCompare(String(b.name || ''), 'es');
-    });
+    const lista = plantilla.slice().sort(porPuestoYPuntos);
 
     cuerpo.innerHTML = lista.map(function (jugador) {
       const venta = miVentaDe(jugador.id);
@@ -8191,18 +8200,7 @@
 
     if (!sort.key || sort.key === 'position') {
       const dir = sort.key === 'position' ? sort.dir : 1;
-      /* Sin puntos —recién fichado— va al final de los suyos, no al principio:
-         un `null` no es un cero, es que todavía no ha jugado. */
-      const puntosDe = function (jugador) {
-        return jugador.points == null ? -Infinity : jugador.points;
-      };
-      return list.sort(function (a, b) {
-        const diff = ((a.position || 9) - (b.position || 9)) * dir;
-        return diff ||
-          (puntosDe(b) - puntosDe(a)) ||
-          ((b.marketValue || 0) - (a.marketValue || 0)) ||
-          String(a.name || '').localeCompare(String(b.name || ''), 'es');
-      });
+      return list.sort(function (a, b) { return porPuestoYPuntos(a, b, dir); });
     }
 
     return list.sort(function (a, b) {
