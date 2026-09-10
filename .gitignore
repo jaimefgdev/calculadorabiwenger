@@ -1,8 +1,9 @@
 # Lo que se queda en este ordenador y no sube a GitHub.
 
-# El proxy viejo de Cloudflare. Ya no se despliega —ahora corre en Deno, desde
-# la carpeta deno/— pero se guarda por si algun dia hace falta volver a el.
-worker/
+# La carpeta worker/ VUELVE al repositorio: Deno suspendio el proyecto por
+# agotar la cuota de escrituras de su almacen, asi que el proxy que se
+# despliega es otra vez el de Cloudflare. El de deno/ se queda por si algun dia
+# se puede volver.
 
 # Capturas para enseñar cosas por el chat.
 nn*.png
