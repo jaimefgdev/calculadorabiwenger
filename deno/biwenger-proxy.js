@@ -223,7 +223,7 @@ const CDN = 'https://cf.biwenger.com/api/v2';
    navegador normal y las cabeceras que este mandaría. */
 /* Marca de versión: se sube en cada cambio y se consulta con ?version=1.
    Sirve para saber desde fuera si el despliegue ha entrado o no. */
-const VERSION = '2026-09-10 · deno 140';
+const VERSION = '2026-09-10 · deno 141';
 
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ' +
   '(KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36';
@@ -3935,8 +3935,14 @@ async function fixturesDeLaTemporada(score) {
   const clave = 'fixtures-v1-' + (score || '');
   const VIGENCIA = 60 * 60 * 1000;
 
+  /* Con el calendario ya entero, cinco minutos de descanso. Mientras le falten
+     jornadas, medio minuto: se llena en un par de minutos en vez de en media
+     hora, que es lo que tardaba con un almacen recien creado, y sigue yendo de
+     seis en seis para no soltarle una rafaga a Biwenger. */
+  const yaEstaEntero = !!(cache.fixtures && cache.fixturesCompleto);
+  const descanso = yaEstaEntero ? 5 * 60 * 1000 : 30 * 1000;
   if (cache.fixtures && cache.fixturesScore === score &&
-      Date.now() - cache.fixturesAt < 5 * 60 * 1000) {
+      Date.now() - cache.fixturesAt < descanso) {
     return cache.fixtures;
   }
 
@@ -4003,6 +4009,9 @@ async function fixturesDeLaTemporada(score) {
   cache.fixtures = rondas;
   cache.fixturesScore = score;
   cache.fixturesAt = Date.now();
+  /* Si ya estan todas las de parte 1, se deja de correr: a partir de aqui
+     basta con mirar de tarde en tarde. */
+  cache.fixturesCompleto = propias.every(function (j) { return rondas[String(j.id)]; });
   return rondas;
 }
 
@@ -4019,7 +4028,7 @@ async function partidosDeJugador(env, id) {
   /* `v2` a propósito: las copias guardadas antes de sacar el club de los
      informes llevan `teamName` a nulo, y sin cambiar el nombre se servirían
      así durante horas. Cambiando la clave caducan solas. */
-  const claveKv = 'partidos-v2-' + clave + '-' + score;
+  const claveKv = 'partidos-v3-' + clave + '-' + score;
   if (JORNADAS) {
     try {
       const crudo = await JORNADAS.get(claveKv);
