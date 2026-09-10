@@ -45,7 +45,7 @@
 
   /* Version del archivo de fichas. SUBIRLA cada vez que se regenere
      `fichas.json`: es lo que evita que el navegador sirva la de antes. */
-  const FICHAS_V = 2;
+  const FICHAS_V = 3;
 
   /* Cuánto se da por bueno lo guardado sin ni siquiera repintarlo luego. Es
      solo para no enseñar algo de anteayer: aunque esté fresco, siempre se
@@ -8704,14 +8704,21 @@
       return desde === hasta ? desde : desde + '–' + hasta.slice(-2);
     };
 
+    /* Los años de cantera se marcan: son parte de por dónde ha pasado, pero no
+       se cuentan igual que un club de primer equipo, y ahí no hay partidos ni
+       goles que enseñar. */
     return '<h4 class="stats__titulo">Trayectoria</h4>' +
       '<table class="table detail-table trayecto">' +
         '<thead><tr><th>Club</th><th class="num">Años</th>' +
         '<th class="num" title="Partidos jugados">PJ</th>' +
         '<th class="num">Goles</th></tr></thead><tbody>' +
         orden.map(function (fila, i) {
-          return '<tr' + (i === 0 && !fila.hasta ? ' class="trayecto__ahora"' : '') + '>' +
-            '<td>' + escapeHtml(fila.club) + '</td>' +
+          const clases = [];
+          if (i === 0 && !fila.hasta) clases.push('trayecto__ahora');
+          if (fila.cantera) clases.push('trayecto__cantera');
+          return '<tr' + (clases.length ? ' class="' + clases.join(' ') + '"' : '') + '>' +
+            '<td>' + escapeHtml(fila.club) +
+              (fila.cantera ? ' <span class="trayecto__chapa">cantera</span>' : '') + '</td>' +
             '<td class="num">' + escapeHtml(anos(fila)) + '</td>' +
             '<td class="num">' + (fila.pj != null ? fila.pj : '–') + '</td>' +
             '<td class="num">' + (fila.goles != null ? fila.goles : '–') + '</td>' +

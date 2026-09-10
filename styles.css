@@ -1389,6 +1389,15 @@ code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft)
   box-shadow: inset 3px 0 0 var(--neg);
 }
 
+/* Los años de cantera en la trayectoria: se ven, pero un punto por detrás de
+   los clubes de primer equipo, que es lo que se va a mirar. */
+.trayecto__cantera > td { color: var(--text-soft); }
+.trayecto__chapa {
+  font-size: .64rem; text-transform: uppercase; letter-spacing: .04em;
+  color: var(--text-faint); border: 1px solid var(--border);
+  border-radius: 4px; padding: 0 .25rem; margin-left: .3rem; white-space: nowrap;
+}
+
 /* Con puja puesta, en el mercado. En amarillo —el mismo `--marca` que ya lleva
    el primero de cada ranking y el marcador en vivo—, no en rojo: el rojo aquí
    ya significa «esto lo vendes tú». Van las letras y no el fondo, que el velo
