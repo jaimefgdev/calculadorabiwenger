@@ -1839,7 +1839,12 @@ html.con-ficha { scrollbar-gutter: stable; }
    miden lo mismo (`1fr`) y por eso el centro es el centro. */
 .ficha__acciones {
   display: grid; grid-template-columns: 1fr auto 1fr;
-  align-items: center; gap: .35rem;
+  align-items: center; row-gap: .35rem;
+  /* El hueco entre columnas cae justo entre las tres pestañas y lo de al lado,
+     y ahi tiene que notarse: pegada a ellas, «Cesion» se leia como una cuarta
+     pestaña. Dentro de su caja los botones siguen juntos, que si van juntos es
+     porque son un grupo. */
+  column-gap: 1.1rem;
 }
 .ficha__vistas { grid-column: 2; justify-self: center; }
 .ficha__extra {
@@ -3259,6 +3264,18 @@ main.wrap { padding-top: 1.15rem; padding-bottom: 3.5rem; }
 .ficha__comparar,
 .ficha__comparar:hover {
   border-color: var(--accent);
+}
+
+/* «Cesion» pide algo a otro manager y no se deshace solo, asi que se avisa con
+   las LETRAS en rojo —el contorno rojo ya lo lleva «Comparar» y dos pildoras
+   con el mismo aro no se distinguirian—. El fondo y el borde, los de siempre.
+   Va con su `:hover` por lo mismo que la de arriba: `.ambito:hover` tiene dos
+   clases y si no le devolvia el gris al pasar por encima.
+   Solo la de PEDIR: cuando ya esta pedida pone «Cambiar», lleva
+   `.ambito--on` y va en rojo entero, que ese es su estado encendido. */
+.ficha__ceder:not(.ambito--on),
+.ficha__ceder:not(.ambito--on):hover {
+  color: var(--neg);
 }
 .comparar { margin: .6rem 0; }
 .comparar__barra { display: flex; align-items: center; gap: .4rem; margin-bottom: .5rem; }

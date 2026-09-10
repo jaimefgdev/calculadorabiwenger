@@ -9990,15 +9990,10 @@
                aparecer «Comparar» las pestañas se descolocaban hacia la
                izquierda: la fila centraba el conjunto, no las pestañas. */
             '<span class="ficha__extra">' +
-            /* Comparar SOLO en Estadísticas: es lo único que se compara de
-               verdad —los números y el gráfico—. En Partidos y en Ficha no
-               tenía nada que hacer y solo ensuciaba la fila.
-               Con la comparación puesta se sigue viendo, que si no no habría
-               forma de quitarla. */
-            (vistaDeFicha(abierto) === 'stats' || abierto.comparar
-              ? '<button type="button" class="ambito ficha__comparar" data-comparar>' +
-                  (abierto.comparar ? 'Quitar comparación' : 'Comparar') + '</button>'
-              : '') +
+            /* «Cesión» va primero y «Comparar» al final del todo: son cosas
+               distintas —una pide algo al dueño, la otra cambia lo que estás
+               mirando— y comparar es la que se usa en cualquier futbolista, así
+               que se queda siempre en el mismo sitio, a la derecha. */
             /* Pedir cedido: solo en las estadísticas de UNO y solo si el
                futbolista es de OTRO mánager. Una cesión se le PIDE a su dueño,
                así que en los tuyos y en los libres la píldora no pinta nada.
@@ -10023,6 +10018,15 @@
                       ' title="Anular la cesión" aria-label="Anular la cesión">✕</button>' +
                   '</span>';
                 })()
+              : '') +
+            /* Comparar SOLO en Estadísticas: es lo único que se compara de
+               verdad —los números y el gráfico—. En Partidos y en Ficha no
+               tenía nada que hacer y solo ensuciaba la fila.
+               Con la comparación puesta se sigue viendo, que si no no habría
+               forma de quitarla. */
+            (vistaDeFicha(abierto) === 'stats' || abierto.comparar
+              ? '<button type="button" class="ambito ficha__comparar" data-comparar>' +
+                  (abierto.comparar ? 'Quitar comparación' : 'Comparar') + '</button>'
               : '') +
             '</span>' +
             '</span>') +
