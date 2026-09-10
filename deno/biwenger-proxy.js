@@ -40,26 +40,96 @@ const almacen = await Deno.openKv();
    una vez cada seis horas. */
 const TROZO = 16 * 1024;
 
+/* Lo que se guarda va COMPRIMIDO, y no es un adorno.
+   Deno cuenta una escritura por cada trozo, y el indice de futbolistas son
+   137 KB: diez escrituras cada vez que se guarda. Comprimido baja a 32 KB, o
+   sea cuatro. Con 17.800 peticiones se habian gastado 300.000 escrituras —unas
+   diecisiete por peticion— y eso es lo que agoto la cuota.
+   Las lecturas, en cambio, van sobradas: la mitad de un tope que ademas es el
+   doble. Asi que cambiar escrituras por lecturas y por un poco de CPU sale a
+   cuenta con mucho. */
+async function comprimir(texto) {
+  const crudo = new TextEncoder().encode(texto);
+  const flujo = new Blob([crudo]).stream().pipeThrough(new CompressionStream('gzip'));
+  const bytes = new Uint8Array(await new Response(flujo).arrayBuffer());
+  /* A base64 en trozos: con el array entero, `String.fromCharCode` se pasa del
+     limite de argumentos y revienta con los indices grandes. */
+  let binario = '';
+  for (let i = 0; i < bytes.length; i += 8192) {
+    binario += String.fromCharCode.apply(null, bytes.subarray(i, i + 8192));
+  }
+  return btoa(binario);
+}
+
+async function descomprimir(b64) {
+  const binario = atob(b64);
+  const bytes = new Uint8Array(binario.length);
+  for (let i = 0; i < binario.length; i++) bytes[i] = binario.charCodeAt(i);
+  const flujo = new Blob([bytes]).stream().pipeThrough(new DecompressionStream('gzip'));
+  return await new Response(flujo).text();
+}
+
+/* Lo comprimido se marca para poder seguir leyendo lo que ya hay guardado sin
+   comprimir: durante un rato conviven los dos. */
+const MARCA_GZIP = 'gz:';
+
+/* Cuantas escrituras lleva ESTA instancia. No es la cuenta real —los isolates
+   van y vienen— pero es lo unico que permite ver si una peticion escribe una
+   vez o diecisiete, que es de lo que iba todo esto. Sale en ?version=1. */
+const contador = { escrituras: 0, borrados: 0 };
+
 const JORNADAS = {
   async get(clave) {
     const cabeza = await almacen.get([clave]);
     if (cabeza.value == null) return null;
+    let valor;
     /* Valor normal: se devuelve tal cual. */
     if (typeof cabeza.value !== 'object' || !cabeza.value.__partido) {
-      return cabeza.value;
+      valor = cabeza.value;
+    } else {
+      /* Partido en trozos: se juntan en orden. */
+      let entero = '';
+      for (let i = 0; i < cabeza.value.trozos; i++) {
+        const parte = await almacen.get([clave, i]);
+        if (parte.value == null) return null;   // falta un trozo: como si no hubiera nada
+        entero += parte.value;
+      }
+      valor = entero;
     }
-    /* Partido en trozos: se juntan en orden. */
+    if (typeof valor === 'string' && valor.indexOf(MARCA_GZIP) === 0) {
+      try { return await descomprimir(valor.slice(MARCA_GZIP.length)); }
+      catch (error) { return null; }          // ilegible: como si no hubiera nada
+    }
+    return valor;
+  },
+
+  /* Lo guardado tal cual, sin descomprimir: es con lo que se compara antes de
+     escribir. Descomprimiendo primero se compararian cosas distintas y se
+     volveria a escribir siempre. */
+  async crudo(clave) {
+    const cabeza = await almacen.get([clave]);
+    if (cabeza.value == null) return null;
+    if (typeof cabeza.value !== 'object' || !cabeza.value.__partido) return cabeza.value;
     let entero = '';
     for (let i = 0; i < cabeza.value.trozos; i++) {
       const parte = await almacen.get([clave, i]);
-      if (parte.value == null) return null;   // falta un trozo: como si no hubiera nada
+      if (parte.value == null) return null;
       entero += parte.value;
     }
     return entero;
   },
 
   async put(clave, valor) {
-    const texto = String(valor);
+    let texto = String(valor);
+
+    /* Comprimir solo compensa a partir de cierto tamaño: por debajo, el base64
+       de la salida abulta mas que el original y encima cuesta CPU. */
+    if (texto.length > 2048 && texto.indexOf(MARCA_GZIP) !== 0) {
+      try {
+        const apretado = MARCA_GZIP + (await comprimir(texto));
+        if (apretado.length < texto.length) texto = apretado;
+      } catch (error) { /* sin comprimir, que es peor pero funciona */ }
+    }
 
     /* NO SE ESCRIBE LO QUE YA ESTA. Media aplicacion vuelve a guardar cada
        poco lo mismo que hay: el indice de futbolistas cuando no ha cambiado un
@@ -68,7 +138,7 @@ const JORNADAS = {
        en trozos de 16 KB— y el plan gratuito de Deno las cuenta todas: por eso
        llegamos al 90% de la cuota. Comparar antes cuesta UNA lectura, que no
        se cuenta igual, y ahorra todas las escrituras cuando no hay cambio. */
-    const yaEsta = await JORNADAS.get(clave).catch(function () { return null; });
+    const yaEsta = await JORNADAS.crudo(clave).catch(function () { return null; });
     if (yaEsta === texto) return;
 
     /* Cuántos trozos había antes, para borrar SOLO los que sobren. Antes se
@@ -81,16 +151,18 @@ const JORNADAS = {
       ? cabeza.value.trozos : 0;
 
     const trozos = texto.length <= TROZO ? 0 : Math.ceil(texto.length / TROZO);
-    for (let i = trozos; i < antes; i++) await almacen.delete([clave, i]);
+    for (let i = trozos; i < antes; i++) { await almacen.delete([clave, i]); contador.borrados += 1; }
 
     if (!trozos) {
       await almacen.set([clave], texto);
+      contador.escrituras += 1;
       return;
     }
     for (let i = 0; i < trozos; i++) {
       await almacen.set([clave, i], texto.slice(i * TROZO, (i + 1) * TROZO));
     }
     await almacen.set([clave], { __partido: true, trozos: trozos });
+    contador.escrituras += trozos + 1;
   },
 
   async delete(clave) {
@@ -151,7 +223,7 @@ const CDN = 'https://cf.biwenger.com/api/v2';
    navegador normal y las cabeceras que este mandaría. */
 /* Marca de versión: se sube en cada cambio y se consulta con ?version=1.
    Sirve para saber desde fuera si el despliegue ha entrado o no. */
-const VERSION = '2026-09-10 · deno 138';
+const VERSION = '2026-09-10 · deno 139';
 
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ' +
   '(KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36';
@@ -532,6 +604,10 @@ const app = {
           copiaKv: copia,
           cortado: cdnCortado(),
           kv: !!JORNADAS,
+          /* Escrituras de ESTA instancia: si una peticion normal deja esto en
+             mas de un puñado, hay algo escribiendo de mas. */
+          escrituras: contador.escrituras,
+          borrados: contador.borrados,
           score: sistema,
           primas: primas,
           primasValen: algoQuePagar(primas),
