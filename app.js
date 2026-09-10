@@ -3366,29 +3366,42 @@
     if (!id) return;
 
     const rect = origen.getBoundingClientRect();
-    const fantasma = origen.cloneNode(true);
-    /* Se CONSERVAN las clases del original y solo se añade `arrastrando`.
-       Antes se hacía `className = 'arrastrando'`, que las borraba todas, y esa
-       clase solo pone posición, opacidad y sombra: no coloca nada por dentro.
-       Así que el fantasma perdía la maquetación de la ficha —al llevar un
-       suplente al campo se le descolocaba el escudo, y al sacar a un titular al
-       banquillo se le iba la foto—. Se quitan solo las clases de ESTADO, que
-       son de dónde estaba y no del muñeco que se arrastra. */
-    fantasma.classList.remove('pitch__slot--origen', 'pitch__slot--vale',
-      'pitch__slot--encima', 'pitch__slot--nope', 'bench--encima', 'bench--nope');
-    fantasma.classList.add('arrastrando');
-    fantasma.style.width = rect.width + 'px';
-    /* Y el alto del original: en el campo los huecos miden lo que miden y sin
-       esto el fantasma se encogía al soltarse de su sitio. */
-    fantasma.style.height = rect.height + 'px';
+    /* El muñeco que se arrastra se construye SIEMPRE con la forma del campo,
+       venga del campo o del banquillo.
+       Antes era una copia del sitio de origen, y las dos fichas no se parecen:
+       la del banquillo lleva la cara a 56 px fijos y el nombre en otro tamaño,
+       así que al llevar un suplente al campo el muñeco salía distinto al de
+       los demás. Y clonando además había que arrastrar con él sus clases,
+       que era de donde venían el escudo descolocado y la foto perdida.
+       Con una sola forma, arrastrar es igual en los dos sentidos. */
+    const quien = playerById(id);
+    const fantasma = document.createElement('div');
+    fantasma.className = 'pitch__slot arrastrando';
+    fantasma.innerHTML = crestOf(quien, 'crest--ghost') +
+      (quien ? caraConChapas(quien, 'pitch__face')
+             : '<span class="face-box"><span class="pic-player pitch__face"></span></span>') +
+      '<span class="pitch__name">' +
+        (quien ? escapeHtml(comoSeLlama(quien)) : '') + '</span>';
+    /* Del ancho de un hueco del campo, que es la referencia. Si no hubiera
+       ninguno a mano, el del sitio de donde salió. */
+    const enElCampo = document.querySelector('#pitch .pitch__slot');
+    const ancho = enElCampo ? enElCampo.getBoundingClientRect().width : rect.width;
+    fantasma.style.width = ancho + 'px';
+    /* Los huecos del campo tienen tope de ancho en % —del campo, cuando están
+       dentro—. Colgando del `body` ese % se mediría contra la pantalla entera,
+       así que se quita y manda el ancho de arriba. */
+    fantasma.style.maxWidth = 'none';
     document.body.appendChild(fantasma);
 
     arrastre = {
       id: id,
       desdeHueco: origen.getAttribute('data-hueco'),   // null si viene del banquillo
       fantasma: fantasma,
-      dx: evento.clientX - rect.left,
-      dy: evento.clientY - rect.top
+      /* Agarrado por el centro de la cara: como el muñeco ya no mide lo que
+         medía el sitio de origen, conservar el desfase del clic lo dejaba
+         colgando de una esquina. */
+      dx: ancho / 2,
+      dy: ancho / 2
     };
     origen.classList.add('pitch__slot--origen');
     huboArrastre = true;
