@@ -2796,6 +2796,16 @@
         const fuera = payload && payload.lineup;
         if (!fuera || !fuera.slots || !fuera.savedAt) return;
 
+        /* La compartida tambien pudo guardarse mientras el once se leia mal.
+           Si lleva la misma hora exacta que la de Biwenger es que se adopto de
+           alli, asi que se comprueba contra la de alli y, si no coincide, no
+           vale: se queda la que se acaba de rehacer bien. */
+        const alli = alineacionOficial();
+        if (alli && alli.date && fuera.savedAt === alli.date &&
+            !mismosSlots(fuera.slots, slotsDeAlineacion(alli, fuera.type || alli.type))) {
+          return;
+        }
+
         const mia = state.xi;
         /* Entre los dos aparatos manda la más reciente. Pero si lo que hay
            aquí es la de Biwenger —sembrada al abrir, no puesta por ti— la
@@ -2868,6 +2878,39 @@
     return { type: type, players: actual.players, date: actual.date || null };
   }
 
+  /**
+   * El once de Biwenger repartido por líneas, tal cual está allí.
+   *
+   * Su lista es POSICIONAL: una entrada por sitio y `null` en los que dejaste
+   * vacíos. Hay que recorrerla en orden y respetar los huecos; saltárselos sube
+   * un puesto a todos los de detrás.
+   */
+  function slotsDeAlineacion(lineup, type) {
+    const slots = {};
+    if (!lineup || !lineup.players) return slots;
+    const lines = formationLines(type || lineup.type || '4-4-2');
+    const huecos = [[1, 1], [2, lines[2]], [3, lines[3]], [4, lines[4]]];
+    let indice = 0;
+    huecos.forEach(function (par) {
+      const pos = par[0];
+      for (let i = 0; i < par[1] && indice < lineup.players.length; i++) {
+        const quien = lineup.players[indice];
+        indice += 1;
+        if (!quien || quien.id == null) continue;
+        slots[pos + '-' + i] = String(quien.id);
+      }
+    });
+    return slots;
+  }
+
+  /** ¿Son el mismo once? */
+  function mismosSlots(uno, otro) {
+    const a = Object.keys(uno || {}).sort();
+    const b = Object.keys(otro || {}).sort();
+    if (a.length !== b.length) return false;
+    return a.every(function (k, i) { return k === b[i] && uno[k] === otro[k]; });
+  }
+
   function ensureXi() {
     /* Si la guardaste en Biwenger, vale igual que si la hubieras guardado
        aquí: se tira la de aquí y se rehace con la suya. La ÚNICA que no cuenta
@@ -2876,6 +2919,18 @@
        no al quitar—: esa se ignora y se queda la tuya hasta que la cambies. */
     const oficial = alineacionOficial();
     if (state.xi && guardadaEnBiwenger(oficial)) state.xi = null;
+
+    /* La que se ADOPTÓ de Biwenger lleva su misma hora exacta: por ahí se sabe
+       que no la colocaste tú. Si no coincide con la de allí, se rehace.
+       Hace falta porque las que se adoptaron mientras el once se leía mal
+       —descolocando a todos por culpa de los huecos— se quedaron guardadas
+       aquí y en el otro aparato, y con la misma hora que la de Biwenger no las
+       pisaba nadie. Una que hayas movido tú lleva la hora del cambio, así que
+       esto no la toca. */
+    if (state.xi && oficial && oficial.date && state.xi.savedAt === oficial.date) {
+      const comoAlli = slotsDeAlineacion(oficial, state.xi.type || oficial.type);
+      if (!mismosSlots(state.xi.slots, comoAlli)) state.xi = null;
+    }
 
     /* Lo guardado manda, pero se limpian los que ya no estén en la plantilla
        (vendidos desde la última vez). */
@@ -2899,31 +2954,7 @@
     }
     const lineup = alineacionOficial();
     const type = (lineup && lineup.type) || '4-4-2';
-    const slots = {};
-
-    if (lineup && lineup.players) {
-      /* Biwenger manda el once en orden —portero, defensas, medios y
-         delanteros— según el sistema puesto, y el puesto de ficha de cada uno
-         no vale: Berenguer es delantero de ficha y juega de medio, así que
-         repartiendo por ficha se quedaba fuera del 4-6-0. */
-      const lines = formationLines(type);
-      const huecos = [[1, 1], [2, lines[2]], [3, lines[3]], [4, lines[4]]];
-      let indice = 0;
-
-      huecos.forEach(function (par) {
-        const pos = par[0];
-        for (let i = 0; i < par[1] && indice < lineup.players.length; i++) {
-          /* Los huecos vienen como null y HAY QUE RESPETARLOS: son la posición
-             que dejaste vacía. Saltárselos hacía que todos los de detrás
-             subieran un puesto: en un 3-2-5 con un hueco en defensa y otro en
-             ataque, Marc Casadó salía de defensa y Mariano de medio. */
-          const quien = lineup.players[indice];
-          indice += 1;
-          if (!quien || quien.id == null) continue;
-          slots[pos + '-' + i] = String(quien.id);
-        }
-      });
-    }
+    const slots = slotsDeAlineacion(lineup, type);
     /* Si la guardaste tú allí, es tuya y se pasa al otro aparato. Si es la que
        Biwenger puso solo —o no hay fecha—, se marca como suya: sirve para no
        empezar con el campo vacío, pero la del otro aparato la sustituye en
