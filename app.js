@@ -9958,6 +9958,11 @@
                   v.rotulo + '</button>';
               }).join('') +
             '</span>' +
+            /* Lo que no son pestañas va en su propia caja, pegado a la derecha.
+               Antes iban todos sueltos en la misma fila centrada, así que al
+               aparecer «Comparar» las pestañas se descolocaban hacia la
+               izquierda: la fila centraba el conjunto, no las pestañas. */
+            '<span class="ficha__extra">' +
             /* Comparar SOLO en Estadísticas: es lo único que se compara de
                verdad —los números y el gráfico—. En Partidos y en Ficha no
                tenía nada que hacer y solo ensuciaba la fila.
@@ -9992,6 +9997,7 @@
                   '</span>';
                 })()
               : '') +
+            '</span>' +
             '</span>') +
         '</div>' +
         /* «MED · Barcelona · 52 puntos · Libre» es de UNO solo: comparando

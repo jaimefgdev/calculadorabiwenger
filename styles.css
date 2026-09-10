@@ -1807,13 +1807,29 @@ html.con-ficha { scrollbar-gutter: stable; }
   display: flex; align-items: center; justify-content: center; gap: .4rem;
   font-size: 1.1rem; line-height: 1.2;
 }
-/* Pestanas y «Comparar» en la MISMA fila. El hueco grande del gap separa el
-   boton de las pestanas: no es una vista mas, es un modo que se superpone a la
-   que estes mirando, y pegado a ellas parecia una cuarta pestana. */
+/* Las pestañas SIEMPRE centradas, y lo demás a la derecha del todo.
+   En tres columnas, no en una fila centrada: así las pestañas caen en el
+   centro de verdad, esté o no el botón de comparar. Antes se centraba el
+   conjunto, así que al aparecer «Comparar» las pestañas se corrían a la
+   izquierda y bailaban al cambiar de vista. Las dos columnas de los lados
+   miden lo mismo (`1fr`) y por eso el centro es el centro. */
 .ficha__acciones {
-  display: flex; flex-wrap: wrap; align-items: center; justify-content: center;
-  gap: .35rem 2.8rem;
+  display: grid; grid-template-columns: 1fr auto 1fr;
+  align-items: center; gap: .35rem;
 }
+.ficha__vistas { grid-column: 2; justify-self: center; }
+.ficha__extra {
+  grid-column: 3; justify-self: end;
+  display: flex; align-items: center; gap: .35rem;
+}
+
+/* En pantalla estrecha no caben en tres columnas: se apilan y se centra todo,
+   que es mejor que dejar las pestañas espachurradas en un tercio del ancho. */
+@media (max-width: 560px) {
+  .ficha__acciones { grid-template-columns: 1fr; justify-items: center; }
+  .ficha__vistas, .ficha__extra { grid-column: 1; justify-self: center; }
+}
+
 .ficha__head--alto .ficha__vistas,
 .ficha__head--alto .ficha__comparar { margin: 0; }
 .ficha__head--alto .ficha__vistas { flex-wrap: wrap; justify-content: center; }
@@ -3209,7 +3225,8 @@ main.wrap { padding-top: 1.15rem; padding-bottom: 3.5rem; }
 .tope { align-items: center; text-align: center; }
 
 /* ---------- Comparar dos futbolistas ---------- */
-.ficha__comparar { margin-left: auto; }
+/* Sin `margin-left: auto`: ahora quien lo empuja a la derecha es la columna
+   de `.ficha__extra`, y ese margen ademas separaba los botones entre si. */
 /* «Comparar» no es una vista mas, es un modo que se superpone a la que estes
    mirando: mismo fondo y mismas letras que las demas pildoras, y solo el
    contorno en rojo para que no se lea como una cuarta pestana. Igual que
