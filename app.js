@@ -45,7 +45,7 @@
 
   /* Version del archivo de fichas. SUBIRLA cada vez que se regenere
      `fichas.json`: es lo que evita que el navegador sirva la de antes. */
-  const FICHAS_V = 3;
+  const FICHAS_V = 4;
 
   /* Cuánto se da por bueno lo guardado sin ni siquiera repintarlo luego. Es
      solo para no enseñar algo de anteayer: aunque esté fresco, siempre se
