@@ -223,7 +223,7 @@ const CDN = 'https://cf.biwenger.com/api/v2';
    navegador normal y las cabeceras que este mandaría. */
 /* Marca de versión: se sube en cada cambio y se consulta con ?version=1.
    Sirve para saber desde fuera si el despliegue ha entrado o no. */
-const VERSION = '2026-09-10 · deno 139';
+const VERSION = '2026-09-10 · deno 140';
 
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ' +
   '(KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36';
@@ -4158,7 +4158,16 @@ async function partidosDeJugador(env, id) {
     teamName: suClub || names['team:' + suEquipo] || null,
     matches: salida };
 
-  if (JORNADAS) {
+  /* SOLO se guarda si el calendario esta COMPLETO.
+     Las 38 jornadas se van bajando por tandas para no soltar una rafaga a
+     Biwenger, asi que las primeras veces solo hay unas cuantas. Guardando eso,
+     la respuesta a medias se quedaba fija durante horas: a Victor Garcia le
+     salian 18 partidos en vez de 38, y por mucho que se pidiera otra vez ya no
+     crecia, porque lo servia la copia. Mientras falten jornadas se recalcula
+     cada vez, que es barato, y se guarda cuando ya esta entero. */
+  const esperadas = calendario.filter(function (r) { return (r.part || 1) === 1; }).length;
+  const completo = esperadas > 0 && salida.length >= esperadas;
+  if (JORNADAS && completo) {
     try { await JORNADAS.put(claveKv, JSON.stringify({ at: Date.now(), datos: salidaFinal })); }
     catch (error) { /* se recalcula la próxima vez */ }
   }
