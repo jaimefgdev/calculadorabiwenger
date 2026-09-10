@@ -2699,13 +2699,16 @@
     return jugador.points == null ? -Infinity : jugador.points;
   }
 
+  function porPuntos(a, b) {
+    return (puntosPara(b) - puntosPara(a)) ||
+      ((b.marketValue || 0) - (a.marketValue || 0)) ||
+      String(a.name || '').localeCompare(String(b.name || ''), 'es');
+  }
+
   /* Vale tal cual como comparador de `sort`, que solo pasa dos argumentos y
      deja `dir` en 1: el orden normal. */
   function porPuestoYPuntos(a, b, dir) {
-    return ((a.position || 9) - (b.position || 9)) * (dir || 1) ||
-      (puntosPara(b) - puntosPara(a)) ||
-      ((b.marketValue || 0) - (a.marketValue || 0)) ||
-      String(a.name || '').localeCompare(String(b.name || ''), 'es');
+    return ((a.position || 9) - (b.position || 9)) * (dir || 1) || porPuntos(a, b);
   }
 
   /** Cuántos jugadores pide cada línea del sistema elegido. */
@@ -3592,11 +3595,12 @@
     // Suplentes: los de la plantilla que no estén en el once.
     const inXi = {};
     Object.keys(state.xi.slots).forEach(function (key) { inXi[state.xi.slots[key]] = true; });
-    /* En el mismo orden que la plantilla: por demarcación y, dentro de cada
-       una, el que más puntos lleva. Venían como los daba Biwenger, así que
-       para ver quién merece subir al once había que repasarlos uno a uno. */
+    /* Solo por puntos, sin separar por demarcación: el banquillo no es una
+       plantilla que se consulte, es la lista de quién puede entrar, y ahí lo
+       que se busca es al que más puntúa, juegue donde juegue. Venían como los
+       daba Biwenger y había que repasarlos uno a uno. */
     const bench = mySquad().filter(function (player) { return !inXi[player.id]; })
-      .sort(porPuestoYPuntos);
+      .sort(porPuntos);
 
     $('bench').innerHTML = bench.length === 0
       ? '<p class="muted">' + (state.squads && state.squads.status === 'loading'
