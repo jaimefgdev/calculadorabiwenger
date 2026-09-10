@@ -64,10 +64,17 @@
   (function tirarFichasGuardadas() {
     try {
       const todo = cacheTodo();
-      if (todo['fichas-wd']) {
-        delete todo['fichas-wd'];
-        localStorage.setItem(CACHE_KEY, JSON.stringify(todo));
-      }
+      let tocado = false;
+      if (todo['fichas-wd']) { delete todo['fichas-wd']; tocado = true; }
+      /* Y las listas de partidos VACÍAS que se guardaron mientras el proxy
+         estuvo devolviéndolas a medias. Mientras sigan ahí, la pestaña de
+         partidos enseña «todavía no hay partidos suyos» a quien sí ha jugado. */
+      Object.keys(todo).forEach(function (k) {
+        if (k.indexOf('partidos:') !== 0) return;
+        const d = todo[k] && todo[k].data;
+        if (!d || !(d.matches || []).length) { delete todo[k]; tocado = true; }
+      });
+      if (tocado) localStorage.setItem(CACHE_KEY, JSON.stringify(todo));
     } catch (error) { /* si no se puede, tampoco pasa nada */ }
   })();
 
@@ -6678,7 +6685,10 @@
         state.jugadoresAt = Date.now();
         recordarPosiciones(state.jugadores);
         state.jugadoresCargando = false;
-        cacheGuardar('jugadores', payload, selloJ);
+        /* Vacío no se guarda: un índice sin nadie es lo que contesta el proxy
+           cuando Biwenger le corta, y guardarlo deja la web sin nombres ni
+           precios hasta que caduque. */
+        if (state.jugadores.length) cacheGuardar('jugadores', payload, selloJ);
         renderJugadores();
         /* El índice es lo que trae los nombres, las demarcaciones y los valores
            que faltan: en cuanto llega hay que volver a pintar TODO lo que se
@@ -9728,10 +9738,15 @@
     if (state.partidosJugador[clave] !== undefined) return;
 
     /* Lo de la última vez se enseña al instante y no se pide nada: los
-       partidos ya jugados no cambian. Solo se vuelve a preguntar si no hay
-       nada guardado. */
+       partidos ya jugados no cambian.
+       PERO solo si de verdad trae partidos. Esta mañana el proxy estuvo un rato
+       devolviendo la lista VACÍA —se bajaba la jornada dos veces y Biwenger
+       cortaba la segunda—, y una lista vacía es un objeto válido, así que se
+       guardó tal cual y se ha estado sirviendo doce horas: por eso salía
+       «todavía no hay partidos suyos» hasta en futbolistas que han jugado
+       cuatro. Sin partidos dentro, se vuelve a preguntar. */
     const guardado = cacheLeer('partidos:' + clave);
-    if (guardado) {
+    if (guardado && (guardado.matches || []).length) {
       state.partidosJugador[clave] = guardado;
       renderPriceModal();
       return;
@@ -9748,7 +9763,10 @@
       .then(function (payload) {
         const datos = payload && payload.error ? null : payload;
         state.partidosJugador[clave] = datos;
-        if (datos) cacheGuardar('partidos:' + clave, datos);
+        /* Y NO se guarda una lista vacía, que es lo que nos metió en esto. */
+        if (datos && (datos.matches || []).length) {
+          cacheGuardar('partidos:' + clave, datos);
+        }
         renderPriceModal();
         /* Igual que en la jornada: los goles de falta los pone ESPN despues. */
         if (datos) {
