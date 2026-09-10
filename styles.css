@@ -1298,7 +1298,10 @@ code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft)
 .lineup-grid {
   display: grid; gap: 1.2rem;
   grid-template-columns: minmax(0, 460px) minmax(0, 1fr);
-  align-items: start;
+  /* `stretch` y no `start`: los suplentes ocupan TODO el alto de la columna de
+     la derecha, no una franja pegada arriba con el resto en blanco. El campo
+     es alto y ese hueco quedaba enorme. */
+  align-items: stretch;
 }
 .lineup-bench .bench__title { margin-top: 0; }
 /* Con menos de 720 px no caben las dos cosas al lado: el banquillo baja.
@@ -1310,10 +1313,31 @@ code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft)
 
 /* Los suplentes se leen igual que el campo: cara redonda y nombre debajo. */
 /* Cuatro por fila, fijos: con columnas automáticas el número bailaba según el
-   ancho que le quedara al lado del campo. */
+   ancho que le quedara al lado del campo.
+   Y las filas se reparten el alto que sobra, que es lo que hace que ocupen la
+   zona entera en vez de amontonarse arriba. Con pocos suplentes quedan más
+   separados, que es justo lo que se busca: llenar el hueco. */
 .bench {
   display: grid; gap: .7rem;
   grid-template-columns: repeat(4, minmax(0, 1fr));
+  /* Las caras arriba, pero la CAJA ocupa toda la columna: el banquillo es la
+     zona donde se sueltan los que quitas del campo, y antes solo valía la
+     franja donde estaban las caras. Ahora vale toda la derecha, que es un
+     blanco mucho más fácil de acertar arrastrando. */
+  grid-auto-rows: min-content;
+  align-content: start;
+  height: 100%;
+}
+/* La columna de la derecha, en vertical: el título arriba y el banquillo
+   quedándose con todo lo que sobra. */
+.lineup-bench { display: flex; flex-direction: column; }
+.lineup-bench .bench { flex: 1; }
+
+/* Debajo del campo (pantalla estrecha) no hay alto que repartir: las filas
+   vuelven a medir lo que midan. */
+@media (max-width: 720px) {
+  .bench { grid-auto-rows: min-content; height: auto; }
+  .lineup-bench .bench { flex: none; }
 }
 .bench__player {
   /* Un respiro a los lados. Sin el, el bloque de tres demarcaciones, que sale

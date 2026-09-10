@@ -3367,8 +3367,20 @@
 
     const rect = origen.getBoundingClientRect();
     const fantasma = origen.cloneNode(true);
-    fantasma.className = 'arrastrando';
+    /* Se CONSERVAN las clases del original y solo se añade `arrastrando`.
+       Antes se hacía `className = 'arrastrando'`, que las borraba todas, y esa
+       clase solo pone posición, opacidad y sombra: no coloca nada por dentro.
+       Así que el fantasma perdía la maquetación de la ficha —al llevar un
+       suplente al campo se le descolocaba el escudo, y al sacar a un titular al
+       banquillo se le iba la foto—. Se quitan solo las clases de ESTADO, que
+       son de dónde estaba y no del muñeco que se arrastra. */
+    fantasma.classList.remove('pitch__slot--origen', 'pitch__slot--vale',
+      'pitch__slot--encima', 'pitch__slot--nope', 'bench--encima', 'bench--nope');
+    fantasma.classList.add('arrastrando');
     fantasma.style.width = rect.width + 'px';
+    /* Y el alto del original: en el campo los huecos miden lo que miden y sin
+       esto el fantasma se encogía al soltarse de su sitio. */
+    fantasma.style.height = rect.height + 'px';
     document.body.appendChild(fantasma);
 
     arrastre = {
