@@ -8984,16 +8984,21 @@
           celda('Titular', numero(datos.played) - numero(datos.subsIn)) +
           celda('Suplente', numero(datos.subsIn)) +
           celda('Cambio', numero(datos.subsOut)) +
-          /* Al portero le interesan los goles que le meten, no los que mete. */
-          (portero ? celda('Goles encajados', numero(datos.conceded))
-                   : celda('Goles', numero(datos.goals))) +
-          (atras ? celda('Porterías a cero', numero(datos.cleanSheets)) +
-                   /* Al defensa también le cuentan los que encaja; al portero
-                      ya se los hemos puesto arriba. */
-                   (portero ? '' : celda('Goles encajados', numero(datos.conceded)))
-                 : celda('Gol cada', golCada(datos)) +
-                   celda('Media goles p/p', decimal(datos.goalsPerGame))) +
+          /* La asistencia, delante. Es un dato suelto, y todo lo de gol —los
+             que mete, los que le meten, las porterías a cero— se lee de corrido
+             si va junto y al final; antes la asistencia partía ese bloque por
+             la mitad. */
           celda('Asistencias', numero(datos.assists)) +
+          /* Al portero le interesan los goles que le meten, no los que mete. */
+          (portero
+            ? celda('Goles encajados', numero(datos.conceded)) +
+              celda('Porterías a cero', numero(datos.cleanSheets))
+            : celda('Goles', numero(datos.goals)) +
+              /* Al defensa también le cuentan los que encaja. */
+              (atras ? celda('Porterías a cero', numero(datos.cleanSheets)) +
+                       celda('Goles encajados', numero(datos.conceded))
+                     : celda('Gol cada', golCada(datos)) +
+                       celda('Media goles p/p', decimal(datos.goalsPerGame)))) +
           celda('Amarillas', numero(datos.yellow)) +
           celda('Rojas', numero(datos.red)) +
         '</div>' +
