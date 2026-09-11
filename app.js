@@ -885,6 +885,7 @@
     syncPendiente: false,
     syncForzada: false,     // la que espera turno, ¿tiene que saltarse la caché?
     finJornada: null,       // cuándo terminó cada jornada, para el liderato
+    inicioJornada: null,    // y cuándo empezó, que es lo que le da su mes
     finJornadaPedido: false,
     syncFails: 0,          // fallos seguidos, para espaciar los reintentos
     nextSyncAt: 0,         // no se vuelve a intentar antes de este momento
@@ -5640,6 +5641,28 @@
     return meses + (meses === 1 ? ' mes' : ' meses');
   }
 
+  const MESES = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio',
+    'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
+
+  /* De qué mes es una jornada: del mes en que EMPEZÓ, como lo cuenta Biwenger.
+     Una que arranca el 30 de agosto y acaba el 1 de septiembre es de agosto.
+     La clave lleva el año delante para que ordene sola y para no mezclar el
+     enero de dos temporadas. */
+  function mesDeJornada(numero) {
+    const inicio = state.inicioJornada;
+    if (!inicio || numero == null || !inicio[numero]) return null;
+    const cuando = new Date(inicio[numero]);
+    if (isNaN(cuando.getTime())) return null;
+    return cuando.getFullYear() + '-' + String(cuando.getMonth() + 1).padStart(2, '0');
+  }
+
+  function comoSeLeeElMes(clave) {
+    const trozos = String(clave).split('-');
+    const mes = MESES[Number(trozos[1]) - 1];
+    if (!mes) return clave;
+    return mes.charAt(0).toUpperCase() + mes.slice(1) + ' ' + trozos[0];
+  }
+
   function tandasDeLaLiga() {
     /* Con puntos en alguna fila: las que ni han empezado no cuentan para nada. */
     /* Hasta la jornada en curso, ni una más. LaLiga adelanta partidos: el Real
@@ -5670,6 +5693,13 @@
        quién iba primero aquel día. */
     const acumulado = {};
     const liderato = {};
+    /* El puesto en la TABLA GENERAL después de cada jornada, para la media de
+       la clasificación. No es lo mismo que el puesto de la jornada: uno dice
+       dónde vas, el otro cómo te fue ese fin de semana. */
+    const clasif = {};
+    /* Y lo que sumó cada uno en cada mes. La jornada cuenta para el mes en que
+       EMPEZÓ, como en Biwenger. */
+    const porMes = {};
     /* Quién iba primero después de cada jornada, en orden: de ahí sale el
        tiempo que ha llevado el liderato cada uno. */
     const mando = [];
@@ -5734,6 +5764,32 @@
         mando.push({ quien: lider, jornada: (jornada.round && jornada.round.number) || null });
       }
 
+      /* Cómo queda la tabla general tras esta jornada. Los empatados a puntos
+         comparten puesto, igual que en la clasificación de verdad. */
+      const tabla = Object.keys(acumulado).sort(function (a, b) {
+        return acumulado[b] - acumulado[a];
+      });
+      tabla.forEach(function (nombre, i) {
+        const puesto = i > 0 && acumulado[tabla[i - 1]] === acumulado[nombre]
+          ? clasif[tabla[i - 1]].ultimo
+          : i + 1;
+        const suyo = clasif[nombre] || (clasif[nombre] = { suma: 0, veces: 0, ultimo: 0 });
+        suyo.suma += puesto;
+        suyo.veces += 1;
+        suyo.ultimo = puesto;
+      });
+
+      /* Y a qué mes va esta jornada. Sin las fechas no se puede repartir, y
+         entonces el apartado de los meses sencillamente no sale. */
+      const mes = mesDeJornada((jornada.round && jornada.round.number) || null);
+      if (mes) {
+        const caja = porMes[mes] || (porMes[mes] = {});
+        (jornada.standings || []).forEach(function (fila) {
+          if (fila.points == null) return;
+          caja[fila.name] = (caja[fila.name] || 0) + (fila.counts === false ? 0 : fila.points);
+        });
+      }
+
       /* Y de paso, la mejor y la peor de cada uno. Solo jornadas CERRADAS: una
          a medias siempre sería la peor de todos, y no es que lo hayan hecho
          mal, es que no ha acabado. */
@@ -5791,6 +5847,7 @@
     return { jornadas: conPuntos.length, ganadas: ganadas, racha: ultimas,
       mejor: mejor, peor: peor, sinTraer: sinTraer,
       totales: totales, puestos: puestos, liderato: liderato,
+      clasif: clasif, porMes: porMes,
       tiempoAlMando: tiempoDeLiderato(mando) };
   }
 
@@ -5991,6 +6048,10 @@
         lider: (datos.liderato || {})[nombre] || 0,
         liderMs: ms,
         puesto: p && p.veces ? p.suma / p.veces : null,
+        clasif: (function () {
+          const c = (datos.clasif || {})[nombre];
+          return c && c.veces ? c.suma / c.veces : null;
+        })(),
         mejor: datos.mejor[nombre] || null,
         peor: datos.peor[nombre] || null
       };
@@ -6037,6 +6098,11 @@
           return '<span class="statbox__lider">' +
             (f.liderMs ? comoDeLargo(f.liderMs) : jornadas(f.lider)) + '</span>';
         } },
+      /* Dónde has ido en la TABLA a lo largo de la temporada. Es la que dice si
+         has estado arriba todo el rato o si has subido al final. */
+      { titulo: 'Clasificación media', mejorAlto: false,
+        valor: function (f) { return f.clasif == null ? 99 : f.clasif; },
+        pinta: function (f) { return f.clasif == null ? sinDato : dec1(f.clasif) + 'º'; } },
       { titulo: 'Puesto medio en la jornada', mejorAlto: false,
         valor: function (f) { return f.puesto == null ? 99 : f.puesto; },
         pinta: function (f) { return f.puesto == null ? sinDato : dec1(f.puesto) + 'º'; } },
@@ -6049,6 +6115,29 @@
         valor: function (f) { return f.peor ? f.peor.puntos : Infinity; },
         pinta: function (f) { return conJornada(f.peor); } }
     ];
+
+    /* Y un bloque por mes, del más reciente al más antiguo: es lo que se mira
+       para saber quién está en racha ahora, no en agosto. Si no han llegado las
+       fechas de las jornadas no sale ninguno, que repartir meses a ojo sería
+       inventárselo. */
+    const porMeses = function () {
+      const meses = Object.keys(datos.porMes || {}).sort().reverse();
+      return meses.map(function (mes) {
+        const suyos = datos.porMes[mes];
+        const orden = Object.keys(suyos).sort(function (a, b) { return suyos[b] - suyos[a]; });
+        return '<section class="statgrupo">' +
+          '<h3 class="statgrupo__titulo">Puntos en ' + escapeHtml(comoSeLeeElMes(mes)) + '</h3>' +
+          '<div class="statboxes">' +
+          orden.map(function (nombre, i) {
+            return '<article class="statbox' + (i === 0 ? ' statbox--primero' : '') + '">' +
+              '<span class="statbox__puesto">' + (i + 1) + 'º</span>' +
+              '<span class="statbox__nombre">' + escapeHtml(nombre) + '</span>' +
+              '<span class="statbox__valor">' + suyos[nombre] + '</span>' +
+            '</article>';
+          }).join('') +
+          '</div></section>';
+      }).join('');
+    };
 
     caja.innerHTML = bloques.map(function (bloque) {
       const orden = gente.slice().sort(function (a, b) {
@@ -6067,11 +6156,7 @@
           '</article>';
         }).join('') +
         '</div></section>';
-    }).join('') +
-    '<p class="muted stats__pie">Con ' + jornadas(datos.jornadas) + ' guardadas.' +
-      ((datos.sinTraer || []).length
-        ? ' Faltan por traer: J' + datos.sinTraer.join(', J') + '.'
-        : '') + '</p>';
+    }).join('') + porMeses();
   }
 
   function renderTandasDeLiga() {
@@ -11868,7 +11953,10 @@
     state.finJornadaPedido = true;
 
     const guardado = cacheLeer('finJornadas');
-    if (guardado && guardado.fin) state.finJornada = guardado.fin;
+    if (guardado && guardado.fin) {
+      state.finJornada = guardado.fin;
+      state.inicioJornada = guardado.inicio || null;
+    }
 
     fetch(config.url.replace(/\/+$/, '') + '/?key=' + encodeURIComponent(config.key) + '&fechas=1',
       { headers: { 'accept': 'application/json' } })
@@ -11876,6 +11964,7 @@
       .then(function (datos) {
         if (!datos || !datos.fin) return;
         state.finJornada = datos.fin;
+        state.inicioJornada = datos.inicio || null;
         cacheGuardar('finJornadas', datos);
         renderEstadisticasDeLiga();
       })
