@@ -223,7 +223,7 @@ const CDN = 'https://cf.biwenger.com/api/v2';
    navegador normal y las cabeceras que este mandaría. */
 /* Marca de versión: se sube en cada cambio y se consulta con ?version=1.
    Sirve para saber desde fuera si el despliegue ha entrado o no. */
-const VERSION = '2026-09-11 · deno 146';
+const VERSION = '2026-09-11 · deno 147';
 
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ' +
   '(KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36';
@@ -1317,6 +1317,43 @@ async function account(env) {
 
 /* ---------- Nombres de jugadores (endpoint público, sin token) ---------- */
 
+/**
+ * ¿Hay una jornada en juego ahora mismo?
+ *
+ * Se mira la copia de la proxima jornada que queda en el almacen, porque la de
+ * memoria no sobrevive entre peticiones. Si no se puede saber, se dice que no:
+ * equivocarse por ahi solo alarga una cache, no da datos falsos.
+ */
+async function hayJornadaRodando() {
+  if (cache.rodandoAt && Date.now() - cache.rodandoAt < 60 * 1000) return cache.rodando;
+  let round = null;
+  if (JORNADAS) {
+    try {
+      const crudo = await JORNADAS.get('proxima-jornada');
+      round = crudo ? (JSON.parse(crudo) || {}).data : null;
+    } catch (error) { round = null; }
+  }
+  let vale = false;
+  if (round) {
+    if (round.live) vale = true;
+    else {
+      /* O a punto: entre el primer partido y unas horas despues del ultimo, los
+         puntos se mueven. */
+      const horas = (round.matches || [])
+        .map(function (m) { return Date.parse(m.start); })
+        .filter(function (t) { return !isNaN(t); });
+      if (horas.length) {
+        const ahora = Date.now();
+        vale = ahora >= Math.min.apply(null, horas) &&
+               ahora <= Math.max.apply(null, horas) + 3 * 60 * 60 * 1000;
+      }
+    }
+  }
+  cache.rodando = vale;
+  cache.rodandoAt = Date.now();
+  return vale;
+}
+
 async function players(score) {
   /* Cada liga puntúa con un sistema y los puntos cambian con él: esta juega
      con el 5, la media del AS y SofaScore, y sin pedirlo llegarían los del 1,
@@ -1328,7 +1365,13 @@ async function players(score) {
      no se mueven en horas, y esta descarga son 220 KB: repetirla cada diez
      minutos de madrugada, con la web preguntando cada minuto, es lo que llena
      la cuota de tráfico sin que cambie un solo dato. */
-  const rodando = !!(cache.round && cache.round.live);
+  /* OJO: `cache.round` es memoria del isolate, y en Deno el isolate se muere
+     entre peticion y peticion, asi que casi siempre esta VACIO. Preguntando
+     solo por ahi, `rodando` salia falso incluso con la jornada jugandose, y el
+     indice se quedaba cacheado una HORA: los puntos de la jornada —que salen
+     de aqui, no del parte del partido— se quedaban clavados. Con la copia del
+     KV se sabe de verdad si hay algo rodando; leer no cuesta. */
+  const rodando = !!(cache.round && cache.round.live) || await hayJornadaRodando();
   const vigencia = rodando ? 10 * 60 * 1000 : 60 * 60 * 1000;
   const fresh = cache.players && cache.playersScore === sistema &&
     Date.now() - cache.playersAt < vigencia;
