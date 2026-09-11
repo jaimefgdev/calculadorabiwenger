@@ -1362,6 +1362,26 @@
    * @param {Array} [options.series] Varias líneas en el mismo gráfico, cada
    *        una con su campo y color; entonces `key` solo fija la escala.
    */
+  /* ¿Se pisan los puntos de una línea?
+     No es «tiene muchos puntos», es «sus puntos no caben»: uno que solo cotiza
+     desde hace dos meses tiene pocos, pero apretados en un tercio del ancho
+     están tan encimados como los del que lleva la temporada entera. Contando
+     puntos, ese se quedaba con los gordos, y sus bordes —2 px del color del
+     fondo— se comían el trazo: la línea salía de puntitos en vez de seguida
+     mientras la otra salía bien.
+     Se mide el hueco más pequeño que queda entre dos seguidos. Si no caben los
+     gordos, motas para toda la serie. */
+  const CABE_PUNTO = 9;   // px: el punto gordo mide 8 de diámetro más su borde
+
+  function puntosApretados(coords) {
+    if (!coords || coords.length < 2) return false;
+    let hueco = Infinity;
+    for (let i = 1; i < coords.length; i++) {
+      hueco = Math.min(hueco, coords[i].x - coords[i - 1].x);
+    }
+    return hueco < CABE_PUNTO;
+  }
+
   function lineChart(points, key, color, label, options) {
     const opts = options || {};
     const isCount = !!opts.count;
@@ -1488,13 +1508,11 @@
         const d = points2.map(function (c, i) {
           return (i ? 'L' : 'M') + c.x.toFixed(1) + ' ' + c.y.toFixed(1);
         }).join(' ');
-        /* Con un dato por día son cientos de puntos, y cada uno lleva un borde
-           de 2 px del color del fondo (.viz__dot): amontonados, esos bordes
-           oscuros pintan por encima y BORRAN la línea. Por eso no se veían los
-           colores. Cuando hay muchos, los puntos se quedan en una mota y sin
-           borde, para que la línea quede a la vista; siguen llevando su
-           etiqueta al pasar por encima. */
-        const denso = points2.length > 60;
+        /* Cada punto lleva un borde de 2 px del color del fondo (.viz__dot):
+           amontonados, esos bordes pintan por encima y BORRAN la línea. Cuando
+           no caben se quedan en una mota y sin borde, para que el trazo se vea;
+           siguen llevando su etiqueta al pasar por encima. */
+        const denso = puntosApretados(points2);
         const radio = denso ? 1.4 : 4;
         /* Por clase y no por atributo: el `stroke` de `.viz__dot` viene del
            CSS, y una regla de CSS siempre le gana a un atributo del SVG. */
@@ -1513,9 +1531,8 @@
         escapeHtml(label) + ' por día">' + grid + body + firstLabel + lastLabel + '</svg>';
     }
 
-    /* Lo mismo que arriba: con muchos días, puntos de mota y sin borde, que
-       si no tapan la línea. */
-    const densoUno = coords.length > 60;
+    /* Lo mismo que arriba, y con la misma regla. */
+    const densoUno = puntosApretados(coords);
     const radioUno = densoUno ? 1.4 : 4;
     const claseUno = 'viz__dot' + (densoUno ? ' viz__dot--mota' : '');
     const dots = coords.map(function (c) {
@@ -9787,6 +9804,10 @@
           return valor.toFixed(2).replace('.', ',');
         } },
       { rotulo: 'Partidos ganados', valor: function (d) { return d ? num(d.wins) : 0; } },
+      /* El empate no lo gana ninguno de los dos: va sin marcar mejor, como el
+         valor. Los perdidos sí, por lo bajo. */
+      { rotulo: 'Partidos empatados', valor: function (d) { return d ? num(d.draws) : 0; }, texto: true },
+      { rotulo: 'Partidos perdidos', valor: function (d) { return d ? num(d.losses) : 0; }, menor: true },
       /* Dejar la portería a cero solo puntúa a porteros y defensas: en un
          medio o un delantero es un dato que no dice nada. */
       { rotulo: 'Porterías a cero', valor: function (d) { return d ? num(d.cleanSheets) : 0; }, atras: true },

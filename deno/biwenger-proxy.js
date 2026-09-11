@@ -223,7 +223,7 @@ const CDN = 'https://cf.biwenger.com/api/v2';
    navegador normal y las cabeceras que este mandaría. */
 /* Marca de versión: se sube en cada cambio y se consulta con ?version=1.
    Sirve para saber desde fuera si el despliegue ha entrado o no. */
-const VERSION = '2026-09-11 · deno 143';
+const VERSION = '2026-09-11 · deno 144';
 
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ' +
   '(KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36';
@@ -2844,7 +2844,9 @@ async function playerStats(id, names, score, env) {
      cuando no, porque lo que hizo en un partido ya jugado no cambia. */
   const viva = !!(cache.round && cache.round.live);
   const vigenciaFicha = viva ? 20 * 60 * 1000 : 6 * 60 * 60 * 1000;
-  const claveFicha = 'ficha-v2-' + String(id) + '-' + sistema;
+  /* v3: las fichas guardadas con la clave vieja no llevan empatados ni
+     perdidos, y saldrían a cero para siempre. */
+  const claveFicha = 'ficha-v3-' + String(id) + '-' + sistema;
   if (JORNADAS) {
     try {
       const crudo = await JORNADAS.get(claveFicha);
@@ -2883,7 +2885,7 @@ async function playerStats(id, names, score, env) {
 
   const suma = {
     played: 0, minutes: 0, goals: 0, assists: 0, cleanSheets: 0,
-    yellow: 0, red: 0, subsIn: 0, subsOut: 0, wins: 0,
+    yellow: 0, red: 0, subsIn: 0, subsOut: 0, wins: 0, draws: 0, losses: 0,
     points: 0, conceded: 0, home: { played: 0, points: 0 }, away: { played: 0, points: 0 }
   };
   /* Jornada a jornada, para dibujar su racha. */
@@ -2928,10 +2930,23 @@ async function playerStats(id, names, score, env) {
     suma.goals += bruto.goals || 0;
     suma.assists += bruto.assists || 0;
     if (bruto.cleanSheet) suma.cleanSheets += 1;
-    if (bruto.win) suma.wins += 1;
-    /* Lo que le metieron a su equipo ese día: para los porteros, sus encajados. */
+    /* Lo que metió su equipo y lo que le metieron. Lo segundo son, para un
+       portero, sus goles encajados. */
+    const aFavor = informe.home ? bruto.homeScore : bruto.awayScore;
     const enContra = informe.home ? bruto.awayScore : bruto.homeScore;
     if (typeof enContra === 'number') suma.conceded += enContra;
+
+    /* Ganados, empatados y perdidos SALEN DEL MARCADOR, no de la marca `win`
+       de Biwenger: así los tres suman siempre los partidos que jugó, que es lo
+       que se espera al verlos juntos. Si algún día no viniera el marcador se
+       cae a la marca, que es mejor que no contar nada. */
+    if (typeof aFavor === 'number' && typeof enContra === 'number') {
+      if (aFavor > enContra) suma.wins += 1;
+      else if (aFavor === enContra) suma.draws += 1;
+      else suma.losses += 1;
+    } else if (bruto.win) {
+      suma.wins += 1;
+    }
     suma.points += puntos;
 
     lances.forEach(function (lance) {
@@ -3004,6 +3019,8 @@ async function playerStats(id, names, score, env) {
     subsIn: suma.subsIn,
     subsOut: suma.subsOut,
     wins: suma.wins,
+    draws: suma.draws,
+    losses: suma.losses,
     points: suma.points,
     average: media(suma.points, suma.played),
     goalsPerGame: media(suma.goals, suma.played),
