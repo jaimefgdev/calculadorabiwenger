@@ -223,7 +223,7 @@ const CDN = 'https://cf.biwenger.com/api/v2';
    navegador normal y las cabeceras que este mandaría. */
 /* Marca de versión: se sube en cada cambio y se consulta con ?version=1.
    Sirve para saber desde fuera si el despliegue ha entrado o no. */
-const VERSION = '2026-09-12 · deno 151';
+const VERSION = '2026-09-12 · deno 152';
 
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ' +
   '(KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36';
@@ -3755,6 +3755,10 @@ async function roundDetail(roundId, score) {
      una vez cada media hora y punto. */
   const kvClave = 'detalle-v1-' + roundId + '-' + (score || '');
   const deKv = await leerDetalleKv(kvClave);
+  cache.detalleDeKv = deKv
+    ? { edadMin: Math.round((Date.now() - deKv.at) / 60000), vigenciaMin: Math.round(vigenciaDetalle(deKv.data) / 60000),
+        played: deKv.data && deKv.data.played, games: deKv.data && deKv.data.games }
+    : 'sin copia';
   if (deKv && Date.now() - deKv.at < vigenciaDetalle(deKv.data)) {
     cache.detalles[clave] = { data: deKv.data, at: deKv.at, vigencia: vigenciaDetalle(deKv.data) };
     return deKv.data;
@@ -3763,6 +3767,7 @@ async function roundDetail(roundId, score) {
   const response = await fetch(CDN + '/rounds/la-liga/' + encodeURIComponent(roundId) +
     '?lang=es' + (score ? '&score=' + encodeURIComponent(score) : ''),
     { headers: NAVEGADOR, cf: SIN_CACHE });
+  cache.ultimoDetalle = { id: roundId, status: response && response.status, at: Date.now() };
   /* Sin CDN se sirve lo último que se leyó, por viejo que sea: una jornada de
      hace un rato es infinitamente mejor que «no se han podido traer los
      partidos», que era lo que salía. */
@@ -4784,7 +4789,9 @@ async function roundBoard(env, headers, jornada, listaNombres) {
       partidos: ((detalle && detalle.matches) || []).length,
       cerrada: cerrada,
       score: score,
-      muestra: (detalle && detalle.puntos) ? detalle.puntos['38194'] : null
+      muestra: (detalle && detalle.puntos) ? detalle.puntos['38194'] : null,
+      ultimaBajada: cache.ultimoDetalle || null,
+      deKv: cache.detalleDeKv || null
     },
     standings: standings,
     bestXi: once,
