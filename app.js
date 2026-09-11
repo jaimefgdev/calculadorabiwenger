@@ -2937,7 +2937,10 @@
     /* Manda la que tienes puesta ahora en Biwenger: la de la jornada es el
        registro de lo que alineaste ese día y puede tener a gente ya vendida. */
     if (!actual || !(actual.players || []).length) {
-      return mia && mia.type && (mia.xi || []).length === 11
+      /* Once completo quiere decir once FUTBOLISTAS, no once sitios: la lista
+         puede traer huecos vacíos y contarlos daría por buena una alineación a
+         medias. */
+      return mia && mia.type && (mia.xi || []).filter(Boolean).length === 11
         ? { type: mia.type, players: mia.xi, date: null }
         : actual;
     }
@@ -2946,10 +2949,19 @@
        once: «/user» lo calcula por el puesto de ficha y a veces se equivoca
        (un 4-6-0 con un delantero de medio se lo devuelve como 4-5-1). */
     let type = actual.type;
-    if (mia && mia.type && (mia.xi || []).length === (actual.players || []).length) {
-      const suyos = (mia.xi || []).map(function (p) { return String(p.id); }).sort().join(',');
-      const mios = (actual.players || []).map(function (p) { return String(p.id); }).sort().join(',');
-      if (suyos === mios) type = mia.type;
+    if (mia && mia.type) {
+      /* OJO CON LOS HUECOS VACÍOS. La lista del once es POSICIONAL: una entrada
+         por sitio y `null` en los que no has cubierto. Aquí se leía `p.id` de
+         cada una sin mirar, así que en cuanto tenías un hueco sin cubrir esto
+         reventaba —y con ello el botón de sistema y el de cambiar jugador, que
+         pasan por aquí—. Se comparan solo los sitios con alguien dentro, que es
+         lo que se quiere saber: si son los mismos once. */
+      const quienes = function (lista) {
+        return (lista || []).filter(Boolean)
+          .map(function (p) { return String(p.id); }).sort().join(',');
+      };
+      const suyos = quienes(mia.xi);
+      if (suyos && suyos === quienes(actual.players)) type = mia.type;
     }
 
     return { type: type, players: actual.players, date: actual.date || null };
