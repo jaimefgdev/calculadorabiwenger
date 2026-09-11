@@ -223,7 +223,7 @@ const CDN = 'https://cf.biwenger.com/api/v2';
    navegador normal y las cabeceras que este mandaría. */
 /* Marca de versión: se sube en cada cambio y se consulta con ?version=1.
    Sirve para saber desde fuera si el despliegue ha entrado o no. */
-const VERSION = '2026-09-11 · deno 149';
+const VERSION = '2026-09-12 · deno 150';
 
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ' +
   '(KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36';
@@ -3937,12 +3937,16 @@ function crudoLigero(games) {
    alineaciones se confirman una hora antes—, hay que mirar a menudo. */
 function vigenciaDetalle(detalle) {
   if (!detalle) return 0;
-  if (detalle.live || detalle.pronto) return 2 * 60 * 1000;
   /* Con TODOS sus partidos acabados, esa jornada ya no va a cambiar nunca. Con
      media hora se volvía a bajar y a guardar cuarenta y ocho veces al día, por
      cada una de las jornadas jugadas, para reescribir exactamente lo mismo. */
-  if (detalle.games && detalle.played === detalle.games) return 12 * 60 * 60 * 1000;
-  return 30 * 60 * 1000;
+  if (detalle.games > 0 && detalle.played >= detalle.games) return 12 * 60 * 60 * 1000;
+  /* Y TODO lo demas, dos minutos. Antes eran treinta salvo que la jornada
+     estuviera marcada `live` o `pronto`, y esa foto se tomaba ANTES de que
+     empezara el primer partido: sin partes todavia, `puntos` salia vacio, y esa
+     copia vacia se servia media hora. Con ella, los puntos de la jornada no se
+     movian del sitio. Una jornada a medias se vuelve a pedir y punto. */
+  return 2 * 60 * 1000;
 }
 
 async function leerDetalleKv(clave) {
