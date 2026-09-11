@@ -3675,30 +3675,22 @@
   }
 
   /** «5h 12m» en negrita, solo cuando la jornada está encima. */
-  /* Cómo está un futbolista, para el aviso del once: el estado malo y el parte
-     de Biwenger, cogidos de donde estén igual que hace la ficha. */
+  /* Qué le pasa a un futbolista, para el aviso del once. SOLO el estado: el
+     parte de Biwenger —«Operación en el menisco externo de su rodilla derecha.
+     Retorno estimado: vuelta indefinida»— es media línea por cabeza y convertía
+     el aviso en un parrafón. Para decidir basta con saber que está lesionado;
+     quien quiera el detalle lo tiene en su ficha. */
   function comoEsta(id) {
     const clave = String(id);
     const busca = function (lista) {
       return (lista || []).filter(function (j) { return j && String(j.id) === clave; })[0];
     };
     let estado = null;
-    let parte = null;
     [busca(mySquad()), busca(state.jugadores)].forEach(function (fuente) {
-      if (!fuente) return;
-      if (!estado && fuente.status && fuente.status !== 'ok') estado = fuente.status;
-      if (!parte && fuente.statusInfo) parte = fuente.statusInfo;
+      if (!estado && fuente && fuente.status && fuente.status !== 'ok') estado = fuente.status;
     });
-    return estado ? { estado: estado, parte: parte } : null;
+    return estado;
   }
-
-  /* «Duda» no admite el «está» de los demás. */
-  const FRASE_ESTADO = {
-    injured:    'está lesionado',
-    sanctioned: 'está sancionado',
-    doubt:      'es duda',
-    discarded:  'está descartado'
-  };
 
   function rotuloCuentaAtras(cerca, round) {
     if (!cerca) return '';
@@ -3740,22 +3732,23 @@
 
     /* Y quién de los que has puesto no está para jugar. La chapa ya sale en su
        foto, pero es un circulito en una esquina y con once muñecos en el campo
-       se pasa por alto; un titular que no juega es un cero. Uno por línea, con
-       el parte de Biwenger, que es lo que de verdad dice si cambiarlo o
-       esperar. La cuenta atrás solo en el primero, que si no se repite. */
-    let primeroTocado = true;
+       se pasa por alto; un titular que no juega es un cero. Todos en una línea:
+       cuántos son, quiénes y qué les pasa. */
+    const tocados = [];
     Object.keys(state.xi.slots).forEach(function (hueco) {
       const id = state.xi.slots[hueco];
       if (!id) return;
-      const mal = comoEsta(id);
-      if (!mal) return;
-      const quien = playerById(id);
-      avisos.push(escapeHtml(comoSeLlama(quien) || 'Un titular') + ' es titular y ' +
-        (FRASE_ESTADO[mal.estado] || 'no está disponible') + '.' +
-        (mal.parte ? ' ' + escapeHtml(mal.parte) : '') +
-        (primeroTocado ? rotuloCuentaAtras(cerca, round) : ''));
-      primeroTocado = false;
+      const estado = comoEsta(id);
+      if (!estado) return;
+      const marca = STATUS_MARKS[estado];
+      tocados.push(escapeHtml(comoSeLlama(playerById(id)) || 'Uno') +
+        ' (' + (marca ? marca.label.toLowerCase() : 'no disponible') + ')');
     });
+    if (tocados.length) {
+      avisos.push('<strong>' + tocados.length +
+        (tocados.length === 1 ? ' titular' : ' titulares') + ' con problemas</strong>: ' +
+        tocados.join(' · ') + '.' + rotuloCuentaAtras(cerca, round));
+    }
 
     caja.hidden = avisos.length === 0;
     caja.innerHTML = avisos.map(function (texto) {
