@@ -3278,7 +3278,9 @@
         chapaDePuesto(player && player.position, 'puesto--esquina', otrosPuestosDe(player)) +
         statusMark(player, 'mark--esquina') + pointsBadge(player, 'pts--esquina') +
       '</span>' +
-      '<span class="pitch__name">' + (player ? escapeHtml(comoSeLlama(player)) : '—') + '</span>' +
+      /* Sin nombre en el hueco vacío: el guion no decía nada que no dijera ya
+         el círculo rojo, y encima parecía que ahí había alguien sin nombre. */
+      (player ? '<span class="pitch__name">' + escapeHtml(comoSeLlama(player)) + '</span>' : '') +
       '<button type="button" class="pitch__pick" data-slot="' + key + '" data-position="' + position + '"' +
         ' aria-label="Cambiar el ' + POSITION_NAMES[position] +
         (player ? ': ahora ' + escapeHtml(player.name) : '') + '"></button>' +

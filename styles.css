@@ -1212,20 +1212,32 @@ code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft)
    confundia con una foto que no habia llegado a cargar. */
 .pic-player.pitch__face--empty {
   border: 2px dashed var(--neg); box-shadow: none;
-  /* Relleno rojo pero translucido: que se vea el cesped por debajo, porque
-     opaco parecia una ficha mas y no un sitio sin cubrir.
-     Van DOS capas a proposito. Rojo solo sobre verde da marron —mezclar rojo
-     con verde es literalmente eso— y habia que subirlo al 65 % para que se
-     leyera rojo, con lo que se quedaba en un disco macizo. Un velo negro
-     flojito apaga el verde primero, y entonces el rojo se lee rojo con mucha
-     menos carga: pasa el 47 % del fondo, mas que aquel 35 %, y encima limpio.
-     Bajar mas se ha probado y no compensa: sin velo suficiente vuelve a asomar
-     el verde por debajo y el circulo se pone marron otra vez. */
-  background-color: rgba(0, 0, 0, .26);
-  background-image: linear-gradient(
-    color-mix(in srgb, var(--neg) 36%, transparent),
-    color-mix(in srgb, var(--neg) 36%, transparent));
+  /* Relleno rojo, y translucido de verdad: por el circulo se sigue viendo el
+     cesped con sus rayas.
+     El problema no era la opacidad, era el VERDE. Rojo sobre verde da marron
+     —mezclar rojo con verde es literalmente eso—, asi que para que se leyera
+     rojo habia que cargar tanto la mano que acababa en un disco macizo.
+     La solucion no es echar mas rojo: es quitarle el verde a lo que hay detras.
+     `backdrop-filter` lo apaga en el sitio, y sobre eso un rojo muy flojito ya
+     se lee rojo. Con un 13 % basta, frente al 65 % que hacia falta antes: por
+     el circulo se ven pasar las rayas del cesped. Mas abajo se ha probado y se
+     queda en gris, que ya no dice nada. */
+  background-color: color-mix(in srgb, var(--neg) 13%, transparent);
+  -webkit-backdrop-filter: saturate(.08) brightness(.92);
+  backdrop-filter: saturate(.08) brightness(.92);
 }
+
+/* Donde no haya `backdrop-filter` no se puede apagar el verde, asi que alli se
+   vuelve al apaño de antes: un velo negro y el rojo encima. */
+@supports not (backdrop-filter: saturate(.5)) {
+  .pic-player.pitch__face--empty {
+    background-color: rgba(0, 0, 0, .26);
+    background-image: linear-gradient(
+      color-mix(in srgb, var(--neg) 36%, transparent),
+      color-mix(in srgb, var(--neg) 36%, transparent));
+  }
+}
+
 .pitch__name {
   font-size: .7rem; font-weight: 600; color: #fff; text-align: center;
   max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
