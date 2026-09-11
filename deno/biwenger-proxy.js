@@ -223,7 +223,7 @@ const CDN = 'https://cf.biwenger.com/api/v2';
    navegador normal y las cabeceras que este mandaría. */
 /* Marca de versión: se sube en cada cambio y se consulta con ?version=1.
    Sirve para saber desde fuera si el despliegue ha entrado o no. */
-const VERSION = '2026-09-11 · deno 142';
+const VERSION = '2026-09-11 · deno 143';
 
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ' +
   '(KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36';
@@ -5959,7 +5959,13 @@ async function aprenderNombresIdos(env) {
 
   const faltan = {};
   (tablon || []).forEach(function (post) {
-    ((post && post.content) || []).forEach(function (apunte) {
+    /* `content` SOLO es una lista en los apuntes con futbolistas dentro
+       —fichajes, altas y bajas—. En los avisos de texto del tablon es una
+       cadena, y ahi `.forEach` no existe: esto reventaba en el primer post de
+       texto, antes de aprender un solo nombre, y por eso seguian saliendo los
+       «Jugador 40070» por mucho que la web llamara. */
+    if (!post || !Array.isArray(post.content)) return;
+    post.content.filter(Boolean).forEach(function (apunte) {
       const id = apunte && apunte.player != null ? String(apunte.player) : null;
       if (!id) return;
       if (indice[id]) return;                 // sigue en LaLiga: tiene nombre
@@ -5975,7 +5981,8 @@ async function aprenderNombresIdos(env) {
      hace una vez en la vida por futbolista; no hay ninguna prisa, y una ráfaga
      aquí es lo que nos dejó sin índice. */
   let nuevos = 0;
-  await porTandas(ids.slice(0, 12), 3, 500, async function (id) {
+  const POR_VEZ = 24;
+  await porTandas(ids.slice(0, POR_VEZ), 3, 500, async function (id) {
     if (cdnCortado()) return;
     const r = await fetch(CDN + '/players/la-liga/' + encodeURIComponent(id) +
       '?lang=es&fields=id,name,slug', { headers: NAVEGADOR })
@@ -6003,7 +6010,7 @@ async function aprenderNombresIdos(env) {
   return {
     aprendidos: nuevos,
     sabidos: Object.keys(sabidos).length,
-    quedan: Math.max(0, ids.length - 12),
+    quedan: Math.max(0, ids.length - POR_VEZ),
     nombres: Object.keys(sabidos).filter(function (id) { return sabidos[id]; }).length
   };
 }

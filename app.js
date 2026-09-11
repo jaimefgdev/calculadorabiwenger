@@ -11542,8 +11542,8 @@
    * quedaba sin rankings, sin puntos y sin precios. Aquí, si falla, no se
    * entera nadie: lo único que pasa es que esos nombres tardan un día más.
    */
-  function ensureNombresIdos() {
-    if (state.nombresIdosPedido) return;
+  function ensureNombresIdos(vuelta) {
+    if (!vuelta && state.nombresIdosPedido) return;
     const config = loadSyncConfig();
     if (!config.url || !config.key) return;
     state.nombresIdosPedido = true;
@@ -11555,6 +11555,16 @@
            lo que se pida a partir de ahora ya vendrá bien solo. Solo se vuelve
            a pedir la tabla que ya estuviera pintada. */
         if (hecho && hecho.aprendidos) ensureLaLiga(true);
+        /* Y si quedan, se sigue. El proxy los pregunta con cuentagotas a
+           propósito —una ráfaga contra Biwenger es lo que nos dejaba sin
+           índice—, así que en vez de subir el ritmo se insiste con calma hasta
+           acabar. Antes se pedía UNA sola vez por sesión y con más de un puñado
+           pendientes no se terminaban nunca. */
+        const quedan = (hecho && hecho.quedan) || 0;
+        const ronda = (vuelta || 0) + 1;
+        if (quedan > 0 && ronda < 8) {
+          setTimeout(function () { ensureNombresIdos(ronda); }, 8000);
+        }
       })
       .catch(function () { /* un adorno; ni se menciona */ });
   }
