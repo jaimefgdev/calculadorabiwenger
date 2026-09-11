@@ -3679,38 +3679,40 @@ main.wrap { padding-top: 1.15rem; padding-bottom: 3.5rem; }
 .pts--top { background: var(--marca); box-shadow: 0 1px 4px rgba(0, 0, 0, .55); }
 
 /* ---------- Contra quien juega esta jornada ----------
+   OJO CON EL NOMBRE: esto se llamo `.partido` y choco con las tarjetas de
+   partido de Jornadas, que llevan borde. El resultado era una caja negra
+   alrededor del avion y el escudo, justo lo que no se queria.
    Una pastilla blanca con la casita o el avion y, al lado, el escudo del
    rival. Va en la esquina de abajo a la derecha de la cara, que era el unico
    rincon libre: arriba a la izquierda esta la demarcacion, a la izquierda la
    marca de lesionado y abajo a la izquierda los puntos. */
-.partido {
+.juega {
   display: inline-flex; align-items: center; gap: 2px;
   line-height: 0;
 }
-.partido__donde { display: block; width: 14px; height: 14px; }
-.partido__donde svg { display: block; width: 100%; height: 100%; }
-/* En casa en verde y fuera en naranja: de un vistazo se ve donde juega sin
-   tener que distinguir el dibujo a once pixeles. Tonos CLAROS, que los
-   oscuros de antes se apoyaban en el circulo blanco y sobre el cesped
-   desaparecian. */
-.partido--casa .partido__donde { color: #5ee79b; }
-.partido--fuera .partido__donde { color: #ffab52; }
-.partido__rival {
+.juega__donde { display: block; width: 14px; height: 14px; }
+.juega__donde svg { display: block; width: 100%; height: 100%; }
+/* La casa negra y el avion blanco. Los dos se leen sobre el cesped y sobre la
+   foto, y no hace falta distinguir el dibujo para saber cual es: cambia el
+   color antes que la forma. */
+.juega--casa .juega__donde { color: #000; }
+.juega--fuera .juega__donde { color: #fff; }
+.juega__rival {
   display: block; width: 16px; height: 16px; flex: none;
   background: center / contain no-repeat;
 }
 /* En la cara, pegada a la esquina y sin comerse los clics. */
-.partido--esquina {
+.juega--esquina {
   position: absolute; z-index: 3; bottom: 0; right: 0;
   transform: translate(26%, -8%);
   pointer-events: none;
 }
 /* En la tabla va suelta, sin esquina que valga, y mas grande: ahi no compite
    con la cara ni con las otras chapas, y hay sitio de sobra. */
-.partido--fila { position: static; transform: none; gap: 4px; }
-.partido--fila .partido__donde { width: 19px; height: 19px; }
-.partido--fila .partido__rival { width: 22px; height: 22px; }
-.partido-cell { white-space: nowrap; }
+.juega--fila { position: static; transform: none; gap: 4px; }
+.juega--fila .juega__donde { width: 19px; height: 19px; }
+.juega--fila .juega__rival { width: 22px; height: 22px; }
+.juega-cell { white-space: nowrap; }
 
 /* Cómo llegó cada futbolista a la plantilla: procedencia en pequeño e importe
    al tamaño normal, en una sola línea. */

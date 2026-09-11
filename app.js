@@ -3301,14 +3301,14 @@
     if (!juego) return '';
     const donde = juego.casa ? 'En casa' : 'Fuera';
     const contra = juego.nombre ? ' contra ' + juego.nombre : '';
-    return '<span class="partido ' + (extra || '') +
-      (juego.casa ? ' partido--casa' : ' partido--fuera') + '"' +
+    return '<span class="juega ' + (extra || '') +
+      (juego.casa ? ' juega--casa' : ' juega--fuera') + '"' +
       ' title="' + escapeHtml(donde + contra) + '"' +
       ' aria-label="' + escapeHtml(donde + contra) + '">' +
-      '<span class="partido__donde" aria-hidden="true">' +
+      '<span class="juega__donde" aria-hidden="true">' +
         (juego.casa ? CASITA : AVION) + '</span>' +
       (juego.rival != null
-        ? '<span class="partido__rival" aria-hidden="true" style="background-image:url(\'' +
+        ? '<span class="juega__rival" aria-hidden="true" style="background-image:url(\'' +
           crestUrl(juego.rival) + '\')"></span>'
         : '') +
     '</span>';
@@ -3366,7 +3366,7 @@
       '<span class="face-box">' + face +
         chapaDePuesto(player && player.position, 'puesto--esquina', otrosPuestosDe(player)) +
         statusMark(player, 'mark--esquina') + pointsBadge(player, 'pts--esquina') +
-        chapaDePartido(player, 'partido--esquina') +
+        chapaDePartido(player, 'juega--esquina') +
       '</span>' +
       /* Sin nombre en el hueco vacío: el guion no decía nada que no dijera ya
          el círculo rojo, y encima parecía que ahí había alguien sin nombre. */
@@ -6435,8 +6435,8 @@
             position: jugador.position, altPositions: jugador.altPositions }) +
           crestOf(jugador, 'crest--badge') + '</span></td>' +
         '<td class="num" data-label="Puntos">' + puntosConTope(jugador) + '</td>' +
-        '<td class="partido-cell" data-label="Partido">' +
-          (chapaDePartido(jugador, 'partido--fila') || '<span class="sub">—</span>') + '</td>' +
+        '<td class="juega-cell" data-label="Partido">' +
+          (chapaDePartido(jugador, 'juega--fila') || '<span class="sub">—</span>') + '</td>' +
         '<td class="estado-cell" data-label="Estado">' + statusCell(jugador) + '</td>' +
         '<td class="num" data-label="Valor"><strong>' + money(jugador.marketValue || 0) + '</strong></td>' +
         '<td class="num" data-label="Hoy">' + (jugador.increment
@@ -7488,7 +7488,7 @@
       chapaDePuesto(jugador.position, 'puesto--esquina', otrosPuestosDe(jugador)) +
       statusMark(jugador, 'mark--esquina') + pointsBadge(jugador, 'pts--esquina') +
       /* Abajo a la derecha, el único rincón que quedaba libre. */
-      chapaDePartido(jugador, 'partido--esquina') +
+      chapaDePartido(jugador, 'juega--esquina') +
     '</span>';
   }
 
