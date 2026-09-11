@@ -3531,13 +3531,8 @@
         (quien ? escapeHtml(comoSeLlama(quien)) : '') + '</span>';
     /* Del ancho de un hueco del campo, que es la referencia. Si no hubiera
        ninguno a mano, el del sitio de donde salió. */
-    /* `offsetWidth` y no `getBoundingClientRect()`: con el campo en perspectiva
-       el segundo devuelve el ancho PROYECTADO, que es distinto en cada linea
-       —los de arriba estan mas lejos y salen mas pequeños—, y el muñeco
-       cambiaba de tamaño segun de donde lo cogieras. `offsetWidth` da el de la
-       maquetacion, que es el mismo para todos. */
     const enElCampo = document.querySelector('#pitch .pitch__slot');
-    const ancho = (enElCampo && enElCampo.offsetWidth) || rect.width;
+    const ancho = enElCampo ? enElCampo.getBoundingClientRect().width : rect.width;
     fantasma.style.width = ancho + 'px';
     /* Los huecos del campo tienen tope de ancho en % —del campo, cuando están
        dentro—. Colgando del `body` ese % se mediría contra la pantalla entera,
@@ -3686,45 +3681,6 @@
     });
   }
 
-  /**
-   * Todos los muñecos del mismo tamaño, esté donde esté el hueco.
-   *
-   * El campo va en perspectiva y eso encoge lo que está al fondo: los de arriba
-   * salían casi un cuarto más pequeños que el portero. En Biwenger no pasa —las
-   * fichas miden lo mismo en todo el campo, lo único que cambia es DÓNDE se
-   * colocan—, así que a cada uno se le devuelve lo que la perspectiva le quita.
-   *
-   * Se MIDE en vez de calcularlo: el ancho que ocupa en pantalla partido por el
-   * que mide en la maquetación es exactamente el factor, y así no hay que saber
-   * nada del ángulo ni de la distancia de la cámara ni volver aquí si se
-   * cambian. Y se iguala a la mediana, no a uno: lo que se quiere es que todos
-   * midan lo mismo, no que crezcan.
-   */
-  function igualarMunecos() {
-    const huecos = Array.prototype.slice.call(
-      document.querySelectorAll('#pitch .pitch__slot'));
-    if (!huecos.length) return;
-
-    /* Primero se quita la corrección anterior: si no, lo que se mide es el
-       tamaño YA corregido y cada pasada lo desviaría un poco más. */
-    huecos.forEach(function (hueco) { hueco.style.removeProperty('--encoge'); });
-
-    const factores = huecos.map(function (hueco) {
-      const suyo = hueco.offsetWidth;
-      const enPantalla = hueco.getBoundingClientRect().width;
-      return (suyo && enPantalla) ? enPantalla / suyo : 0;
-    });
-
-    const buenos = factores.filter(Boolean).slice().sort(function (a, b) { return a - b; });
-    if (!buenos.length) return;
-    const mediana = buenos[Math.floor(buenos.length / 2)];
-
-    huecos.forEach(function (hueco, i) {
-      if (!factores[i]) return;
-      hueco.style.setProperty('--encoge', (mediana / factores[i]).toFixed(4));
-    });
-  }
-
   function renderLineup() {
     const section = $('lineup-panel');
     if (!state.me || !state.lineup) { section.hidden = true; return; }
@@ -3747,10 +3703,6 @@
       '<span class="pitch__area pitch__area--top" aria-hidden="true"></span>' +
       '<span class="pitch__area pitch__area--bottom" aria-hidden="true"></span>' +
       '<span class="pitch__spot" aria-hidden="true"></span>' +
-      /* Las hebras del borde de delante, donde el cesped se encuentra con la
-         tierra. Va como elemento y no en el fondo del campo porque tiene que
-         asomar POR DEBAJO de su borde, y un fondo no pinta fuera de su caja. */
-      '<span class="pitch__hierba" aria-hidden="true"></span>' +
       rows.map(function (row) {
         /* Se colocan las CASILLAS, no los futbolistas: cada una conserva su
            clave (`3-0`, `3-1`…), que es lo que se guarda y lo que usa el
@@ -3797,8 +3749,6 @@
     }, 0);
     $('lineup-count').textContent = titulares + ' de 11 titulares · ' + money(valor) + ' de valor en el campo';
 
-    /* Con el campo ya pintado: hay que medirlo para poder igualarlos. */
-    igualarMunecos();
     pintarAvisosDeAlineacion(titulares);
     /* Y los puntos amarillos de Mi plantilla, que viven en otra tabla: si no se
        repasan aquí se quedan señalando a quien acabas de sacar del once. */

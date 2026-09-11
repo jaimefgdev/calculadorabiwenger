@@ -1045,12 +1045,7 @@ code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft)
      no se toquen. */
   width: min(100%, 540px);
   aspect-ratio: 68 / 96;
-  /* Tumbado, el campo ocupa menos alto del que mide su caja, y esa diferencia
-     se quedaba como un hueco muerto encima. Se sube con un margen negativo
-     medido en el ANCHO del envoltorio (`cqw`), que es de lo que depende: son
-     19 puntos de ese ancho, medidos en el navegador.
-     Abajo NO se toca: ese hueco es el que ocupa la tierra. */
-  margin: -19cqw auto 0;
+  margin: 0 auto;
   /* Más aire arriba y abajo: los de las puntas de cada línea van adelantados
      (el escalonado de Biwenger), y en un 3-2-5 el que más sube se salía por el
      borde de arriba. */
@@ -1071,38 +1066,12 @@ code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft)
     repeating-linear-gradient(180deg,
       #1e8350 0 10%, #1a7548 10% 12.5%,
       #166a41 12.5% 22.5%, #1a7548 22.5% 25%);
-  /* El campo como un TEPE: un bloque de cesped con su tierra debajo, como en
-     la app de Biwenger. Son capas de sombra apiladas hacia abajo —no hay
-     elemento nuevo ni cambia la maquetacion—: primero la raya del corte, luego
-     tres tonos de tierra de mas claro a mas oscuro para que el canto tenga
-     volumen, y al final la sombra sobre el suelo.
-     Las sombras exteriores no las recorta el `overflow: hidden`, asi que el
-     bloque se ve entero. */
-  box-shadow:
-    inset 0 0 0 3px var(--linea),
-    0 3px 0 #3c2d1b,
-    0 9px 0 #6b4a2a,
-    0 14px 0 #55381f,
-    0 17px 0 #3a2614,
-    0 26px 26px rgba(0, 0, 0, .5);
-  /* Tumbado, como se ve un campo desde la grada.
-     El `scale` no es un capricho: al tumbarlo, el borde de abajo se acerca a la
-     camara y CRECE, asi que el campo proyectado se salia por abajo y por los
-     lados de su sitio. Con el 88 % vuelve a caber entero. */
-  transform: perspective(1100px) rotateX(24deg) scale(.88);
-  /* Los munecos son hijos suyos y tienen que vivir en el MISMO espacio de tres
-     dimensiones para poder enderezarse; si no, se aplastarian con el campo. */
-  transform-style: preserve-3d;
-  /* Sin `overflow: hidden`: aplana el espacio 3D y se lleva por delante el
-     enderezado de los munecos. La marca de agua no se sale igualmente —esta
-     medida en `cqw` y centrada—, asi que no hacia falta para esto. */
+  box-shadow: inset 0 0 0 3px var(--linea), 0 10px 26px rgba(0, 0, 0, .35);
+  overflow: hidden;
   /* La marca de agua se mezcla con el césped, y sin esto la mezcla se saldría
      del campo a buscar el fondo de la página. */
   isolation: isolate;
 }
-/* El 3D tiene que llegar hasta el muneco: cada capa de por medio que no lo
-   conserve aplana lo que lleva dentro. */
-.pitch__line { transform-style: preserve-3d; }
 /* Línea de medio campo y círculo central. */
 .pitch::before {
   content: '';
@@ -1169,19 +1138,6 @@ code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft)
 }
 .pitch__area--top { top: -3px; border-top: 0; }
 .pitch__area--bottom { bottom: -3px; border-bottom: 0; }
-
-/* Las hebras del borde de delante, donde el cesped se encuentra con la tierra.
-   Asoman por debajo del campo —de ahi que sea un elemento y no una capa del
-   fondo, que no pintaria fuera de la caja— y viven dentro del 3D, asi que se
-   tumban con el campo igual que todo lo demas. */
-.pitch__hierba {
-  position: absolute; left: 0; right: 0; bottom: 0;
-  height: 20px;
-  transform: translateY(13px);
-  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 60 20' preserveAspectRatio='none'%3E%3Cpath fill='%231e8350' d='M0 0h60v4H0z'/%3E%3Cpath fill='%231a7548' d='M1.0%203l1.4%2015%203.8-15%20zM6.0%203l2.6%209%201.0-9%20zM10.0%203l2.6%2013%201.8-13%20zM14.6%203l0.9%207%202.1-7%20zM18.2%203l3.8%2016%201.8-16%20zM24.0%203l1.3%2010%202.1-10%20zM27.8%203l3.0%2012%201.8-12%20zM32.8%203l0.8%208%202.4-8%20zM36.4%203l3.0%2014%202.0-14%20zM41.8%203l1.4%2010%202.4-10%20zM46.0%203l3.2%2013%201.4-13%20zM51.0%203l1.0%208%202.4-8%20zM54.8%203l2.4%2011%201.8-11%20z'/%3E%3C/svg%3E") repeat-x bottom center / 60px 20px;
-  pointer-events: none;
-  z-index: 1;
-}
 /* Área pequeña, dentro de la grande. */
 .pitch__area::before {
   content: ''; position: absolute; left: 50%; transform: translateX(-50%);
@@ -1220,14 +1176,8 @@ code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft)
      por el borde de arriba: pasaba con cinco delanteros y con seis medios. Va
      en la MISMA transformada para que el escalonado no cambie, solo se deslice
      el bloque entero. */
-  /* El escalonado de siempre, y detras el enderezado: se gira lo mismo que se
-     ha tumbado el campo, pero al reves, asi que el muneco queda de pie sobre
-     el cesped en vez de tumbado con el. Por los pies, que es por donde pisa. */
   transform: translate(calc(var(--desx, 0) * 1%),
-                       calc(var(--rango, 0) * -42% + var(--baja, 0) * 1%))
-             rotateX(-24deg)
-             scale(var(--encoge, 1));
-  transform-origin: 50% 100%;
+                       calc(var(--rango, 0) * -42% + var(--baja, 0) * 1%));
   position: relative; display: flex; flex-direction: column; align-items: center;
   gap: .2rem; min-width: 0;
   /* Se reparten la línea a partes iguales, con tope: hasta cinco quedan al
@@ -1294,17 +1244,30 @@ code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft)
    confundia con una foto que no habia llegado a cargar. */
 .pic-player.pitch__face--empty {
   border: 2px dashed var(--neg); box-shadow: none;
-  /* Relleno rojo y translucido. Va en DOS capas: rojo sobre verde da marron
-     —mezclar rojo con verde es literalmente eso—, asi que un velo negro
-     flojito apaga el cesped primero y encima el rojo se lee rojo con poca
-     carga. Pasa casi la mitad del fondo.
-     Se hacia con `backdrop-filter`, que quedaba mejor, pero DEJA DE FUNCIONAR
-     dentro de un elemento en 3D: al poner el campo en perspectiva el circulo
-     se quedo sin relleno y solo se le veia el borde. */
-  background-color: rgba(0, 0, 0, .26);
-  background-image: linear-gradient(
-    color-mix(in srgb, var(--neg) 36%, transparent),
-    color-mix(in srgb, var(--neg) 36%, transparent));
+  /* Relleno rojo, y translucido de verdad: por el circulo se sigue viendo el
+     cesped con sus rayas.
+     El problema no era la opacidad, era el VERDE. Rojo sobre verde da marron
+     —mezclar rojo con verde es literalmente eso—, asi que para que se leyera
+     rojo habia que cargar tanto la mano que acababa en un disco macizo.
+     La solucion no es echar mas rojo: es quitarle el verde a lo que hay detras.
+     `backdrop-filter` lo apaga en el sitio, y sobre eso un rojo muy flojito ya
+     se lee rojo. Con un 13 % basta, frente al 65 % que hacia falta antes: por
+     el circulo se ven pasar las rayas del cesped. Mas abajo se ha probado y se
+     queda en gris, que ya no dice nada. */
+  background-color: color-mix(in srgb, var(--neg) 13%, transparent);
+  -webkit-backdrop-filter: saturate(.08) brightness(.92);
+  backdrop-filter: saturate(.08) brightness(.92);
+}
+
+/* Donde no haya `backdrop-filter` no se puede apagar el verde, asi que alli se
+   vuelve al apaño de antes: un velo negro y el rojo encima. */
+@supports not (backdrop-filter: saturate(.5)) {
+  .pic-player.pitch__face--empty {
+    background-color: rgba(0, 0, 0, .26);
+    background-image: linear-gradient(
+      color-mix(in srgb, var(--neg) 36%, transparent),
+      color-mix(in srgb, var(--neg) 36%, transparent));
+  }
 }
 
 .pitch__name {
@@ -1331,12 +1294,6 @@ code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft)
 .pitch-wrap {
   position: relative; width: min(100%, 460px); margin: 0 auto;
   container-type: inline-size;
-  /* OJO: la camara NO va aqui.
-     Con `perspective` en el envoltorio, sus hijos se ordenan en 3D entre si, y
-     el campo, al estar tumbado, tiene media superficie POR DELANTE del plano
-     cero: tapaba el selector de sistema y el de cambios, que son hermanos
-     suyos. Se dejaban de poder pulsar. La camara va dentro del propio
-     `transform` del campo, que hace lo mismo sin arrastrar a los hermanos. */
 }
 .picker { position: absolute; inset: 0; z-index: 5; display: grid; place-items: center; padding: .5rem; }
 .picker__backdrop { position: absolute; inset: 0; background: rgba(0, 0, 0, .55); border-radius: 6px; }
@@ -3190,7 +3147,7 @@ input[type="search"]::-webkit-search-cancel-button:hover { opacity: .75; }
 
 /* ---------- Respiración ----------
    El campo iba pegado a la cabecera y la página terminaba en seco. */
-.pitch-wrap { margin-top: .9rem; margin-bottom: 1.4rem; }   /* aire para la tierra */
+.pitch-wrap { margin-top: .9rem; }
 .lineup-bench { margin-top: .2rem; }
 /* La barra de arriba es pegajosa: sin este aire, la primera tarjeta de cada
    pestaña queda pegada al menú y parece que se mete debajo. */
