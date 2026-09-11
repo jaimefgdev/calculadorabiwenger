@@ -6853,7 +6853,7 @@
     const config = loadSyncConfig();
     if (!config.url || !config.key) return;
 
-    jornadasGuardadas()
+    const cuales = jornadasGuardadas()
       .filter(function (jornada) { return !jornadaCerrada(jornada); })
       /* Y que HAYA EMPEZADO. Una jornada sin un solo punto no es que esté
          abierta: es que no se ha jugado, y volver a pedirla en cada
@@ -6865,12 +6865,21 @@
           return (fila.points || 0) !== 0;
         });
       })
-      .forEach(function (jornada) {
-        const id = jornada.round.id;
-        /* La que se está mirando ya la pide ensureJornada, con su aviso de
-           «cargando»; aquí solo van las de detrás, y sin tocar la vista. */
-        if (String(id) === String(jornadaVistaId())) return;
+      .map(function (jornada) { return jornada.round.id; });
 
+    /* Y SIEMPRE la que se está jugando, esté guardada o no y tenga puntos o no.
+       Es la única que se mueve en este momento, y no la pedía nadie: el proxy
+       llama «actual» a la última TERMINADA, y aquí se saltaba justo la que
+       estás mirando —que por defecto es esa—. Resultado: con la jornada en
+       marcha, los puntos se quedaban clavados hasta que cambiabas de pestaña. */
+    const enJuego = jornadaDeAhora();
+    if (enJuego != null && cuales.indexOf(enJuego) === -1 &&
+        !cuales.some(function (id) { return String(id) === String(enJuego); })) {
+      cuales.push(enJuego);
+    }
+
+    cuales
+      .forEach(function (id) {
         fetch(config.url.replace(/\/+$/, '') + '/?key=' + encodeURIComponent(config.key) +
           '&jornada=' + encodeURIComponent(id), { headers: { 'accept': 'application/json' } })
           .then(function (response) { return response.json(); })
