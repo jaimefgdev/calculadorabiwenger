@@ -223,7 +223,7 @@ const CDN = 'https://cf.biwenger.com/api/v2';
    navegador normal y las cabeceras que este mandaría. */
 /* Marca de versión: se sube en cada cambio y se consulta con ?version=1.
    Sirve para saber desde fuera si el despliegue ha entrado o no. */
-const VERSION = '2026-09-11 · deno 144';
+const VERSION = '2026-09-11 · deno 145';
 
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ' +
   '(KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36';
@@ -443,6 +443,17 @@ const app = {
          Va SOLO en su endpoint y nunca dentro de la sincronia: cuesta
          consultas al mismo servidor del que sale el indice, y una rafaga ahi
          nos deja sin indice y sin media web. */
+      /* ?fechas=1: cuando terminó cada jornada. Sale de los partidos que ya
+         están guardados en el almacén, así que no pide NADA a Biwenger: es
+         leer y contar. La web lo necesita para saber cuánto tiempo ha ido
+         primero cada uno, que en jornadas no dice lo mismo. */
+      if (url.searchParams.get('fechas')) {
+        const cuando = await finDeCadaJornada(env);
+        return new Response(JSON.stringify(cuando), {
+          headers: Object.assign({ 'content-type': 'application/json; charset=utf-8' }, cors(origin))
+        });
+      }
+
       if (url.searchParams.get('nombres')) {
         const hecho = await aprenderNombresIdos(env);
         return new Response(JSON.stringify(hecho), {
@@ -4030,6 +4041,53 @@ async function fixturesDeLaTemporada(score) {
      basta con mirar de tarde en tarde. */
   cache.fixturesCompleto = propias.every(function (j) { return rondas[String(j.id)]; });
   return rondas;
+}
+
+/**
+ * Cuándo terminó cada jornada: la hora del ÚLTIMO partido que se jugó en ella.
+ *
+ * No pide nada. Los partidos de toda la temporada ya se guardan en el almacén
+ * para poder pintar los de cada futbolista, y ahí viene la hora de cada uno;
+ * esto solo los lee y se queda con la última de cada jornada.
+ *
+ * Hace falta porque el calendario de Biwenger NO trae fechas: las jornadas
+ * pasadas llegan sin `start` y sin partidos, así que sin esto no hay forma de
+ * saber cuánto tiempo ha ido primero nadie.
+ */
+async function finDeCadaJornada(env) {
+  const score = await sistemaDeLaLiga(env);
+  const clave = 'fixtures-v1-' + (score || '');
+
+  let rondas = cache.fixtures;
+  if (!rondas && JORNADAS) {
+    try {
+      const crudo = await JORNADAS.get(clave);
+      rondas = crudo ? (JSON.parse(crudo) || {}).rondas : null;
+    } catch (error) { rondas = null; }
+  }
+  if (!rondas) return { fin: {}, nota: 'Todavía no están guardados los partidos de la temporada.' };
+
+  const calendario = await seasonRounds().catch(function () { return []; });
+  const numeroDe = {};
+  calendario.forEach(function (j) { numeroDe[String(j.id)] = j.number; });
+
+  const fin = {};
+  Object.keys(rondas).forEach(function (id) {
+    const partidos = (rondas[id] || {}).matches || [];
+    /* Solo los jugados: un partido aplazado con fecha dentro de un mes diría
+       que la jornada acabó en el futuro. */
+    const horas = partidos
+      .filter(function (m) { return m.status === 'finished' && m.start; })
+      .map(function (m) { return Date.parse(m.start); })
+      .filter(function (t) { return !isNaN(t); });
+    if (!horas.length) return;
+    const numero = numeroDe[String(id)];
+    if (numero == null) return;
+    /* Dos horas después del comienzo del último: un partido dura eso. */
+    fin[numero] = new Date(Math.max.apply(null, horas) + 2 * 60 * 60 * 1000).toISOString();
+  });
+
+  return { fin: fin, jornadas: Object.keys(fin).length };
 }
 
 async function partidosDeJugador(env, id) {
