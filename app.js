@@ -12378,7 +12378,21 @@
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify({
         movements: state.movements,
-        teams: state.teams
+        teams: state.teams,
+        /* Y lo demás de la última sincronización. Aquí solo se guardaban los
+           movimientos y los equipos, o sea la calculadora, así que al abrir la
+           app esa salía llena al instante y Mi alineación, Mi plantilla y las
+           ofertas se quedaban en blanco los dos segundos que tarda la red.
+           Con esto la app abre entera y lo que llega después manda. */
+        offers: state.offers,
+        listings: state.listings,
+        lineup: state.lineup,
+        me: state.me,
+        leagueStart: state.leagueStart
+        /* `movers` y `laligaMoves` NO: son cientos de futbolistas con todos sus
+           datos, viven en Mercado y en Fichajes —que no son lo que abre— y
+           engordarían esto hasta arriesgar el sitio del navegador. Lo guardado
+           tiene que ser lo justo para que Inicio abra lleno. */
       }));
     } catch (error) {
       state.warnings.push('No se han podido guardar los datos en este navegador.');
@@ -12393,6 +12407,13 @@
       const data = JSON.parse(raw);
       state.movements = Array.isArray(data.movements) ? data.movements : [];
       state.teams = data.teams && typeof data.teams === 'object' ? data.teams : {};
+      /* Lo de la última vez, para que la app abra llena. Todo esto lo pisa la
+         sincronización en cuanto llega, un par de segundos después. */
+      state.offers = Array.isArray(data.offers) ? data.offers : [];
+      state.listings = Array.isArray(data.listings) ? data.listings : [];
+      state.lineup = data.lineup || null;
+      state.me = data.me || null;
+      state.leagueStart = data.leagueStart || state.leagueStart;
       return state.movements.length > 0 || Object.keys(state.teams).length > 0;
     } catch (error) {
       return false;
