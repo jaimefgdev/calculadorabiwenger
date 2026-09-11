@@ -3354,7 +3354,21 @@ main.wrap { padding-top: 1.15rem; padding-bottom: 3.5rem; }
   padding: .3rem .4rem; background: var(--bg-surface); border-radius: var(--radius-sm);
 }
 .versus__dato { font-variant-numeric: tabular-nums; font-weight: 600; text-align: center; }
+/* Pie de la tabla de estadisticas de la liga: con cuantas jornadas esta hecha
+   la cuenta, que sin eso los numeros no se saben leer. */
+/* Los puntos totales de la ficha. Naranja de serie, y amarillo —el color de
+   la marca— cuando es de los diez que mas puntuan de su demarcacion: ahi el
+   numero pasa de ser un dato a ser una noticia. */
+.stat--destaca strong { color: #f08a1c; }
+.stat--top strong { color: var(--marca); }
+
+.stats__pie { margin-top: .6rem; font-size: .75rem; }
+.table--stats .detail-rank { margin-right: .1rem; }
+
 .versus__dato--mejor { color: var(--pos); }
+/* No son un merito, son un aviso: el que mas empata y el que mas pierde. */
+.versus__dato--ambar { color: var(--marca); }
+.versus__dato--rojo { color: var(--neg); }
 .versus__label {
   font-size: .66rem; color: var(--text-faint);
   text-transform: uppercase; letter-spacing: .04em;

@@ -5603,6 +5603,9 @@
     /* La mejor y la peor jornada de cada uno: cuántos puntos y en cuál. */
     const mejor = {};
     const peor = {};
+    /* Puntos sumados y puesto medio de cada uno, jornada a jornada. */
+    const totales = {};
+    const puestos = {};
 
     /* Jornadas ganadas: solo las cerradas. Mientras rueda, el ganador puede
        cambiar con cada partido, así que no se cuenta hasta que Biwenger la
@@ -5621,6 +5624,27 @@
       });
       const campeon = orden[0];
       if (campeon) ganadas[campeon.name] = (ganadas[campeon.name] || 0) + 1;
+
+      /* Y el puesto de cada uno EN ESA JORNADA, del mismo orden con el que se
+         acaba de decidir el campeón. No es su puesto en la tabla general: es
+         cómo le fue ese fin de semana, que es lo que dice si va fino o si lleva
+         una racha mala. Los empatados a puntos comparten puesto. */
+      orden.forEach(function (fila, i) {
+        const puesto = i > 0 && orden[i - 1].points === fila.points
+          ? puestos[orden[i - 1].name].ultimo
+          : i + 1;
+        const suyo = puestos[fila.name] || (puestos[fila.name] = { suma: 0, veces: 0, ultimo: 0 });
+        suyo.suma += puesto;
+        suyo.veces += 1;
+        suyo.ultimo = puesto;
+      });
+
+      /* Los puntos de cada uno, para el total y la media. */
+      filas.forEach(function (fila) {
+        const suyo = totales[fila.name] || (totales[fila.name] = { puntos: 0, jugadas: 0 });
+        suyo.puntos += fila.points;
+        suyo.jugadas += 1;
+      });
 
       /* Y de paso, la mejor y la peor de cada uno. Solo jornadas CERRADAS: una
          a medias siempre sería la peor de todos, y no es que lo hayan hecho
@@ -5671,7 +5695,8 @@
     });
 
     return { jornadas: conPuntos.length, ganadas: ganadas, racha: ultimas,
-      mejor: mejor, peor: peor, sinTraer: sinTraer };
+      mejor: mejor, peor: peor, sinTraer: sinTraer,
+      totales: totales, puestos: puestos };
   }
 
   /**
@@ -5819,7 +5844,7 @@
        hacia que Biwenger cortara por exceso de consultas, y entonces no llegaba
        ninguna: la jornada se quedaba sin puntos y parecia rota. */
     const siguiente = function (i) {
-      if (i >= faltan.length) { renderTandasDeLiga(); renderJornadas(); return; }
+      if (i >= faltan.length) { renderTandasDeLiga(); renderEstadisticasDeLiga(); renderJornadas(); return; }
       fetch(config.url.replace(/\/+$/, '') + '/?key=' + encodeURIComponent(config.key) +
         '&jornada=' + encodeURIComponent(faltan[i]), { headers: { 'accept': 'application/json' } })
         .then(function (r) { return r.json(); })
@@ -5830,6 +5855,95 @@
         .then(function () { setTimeout(function () { siguiente(i + 1); }, 1200); });
     };
     siguiente(0);
+  }
+
+  /**
+   * La tabla de estadísticas de la liga.
+   *
+   * Sale ENTERA de las jornadas que ya están guardadas en el navegador, así que
+   * no cuesta una sola petición: son las mismas cuentas que alimentan «Los
+   * mejores», puestas una al lado de otra para poder compararse.
+   *
+   * La posición media es la de CADA JORNADA —cómo le fue ese fin de semana—, no
+   * la de la tabla general. Es la que dice si alguien va fino o lleva un mes
+   * malo, que es justo lo que no se ve en la clasificación.
+   */
+  function renderEstadisticasDeLiga() {
+    const caja = $('liga-estadisticas');
+    if (!caja) return;
+
+    const datos = tandasDeLaLiga();
+    if (!datos.jornadas) {
+      caja.innerHTML = '<p class="muted">Todavía no hay jornadas guardadas.</p>';
+      return;
+    }
+
+    const dec = function (n) { return n.toFixed(2).replace('.', ','); };
+    const dec1 = function (n) { return n.toFixed(1).replace('.', ','); };
+
+    const filas = Object.keys(datos.totales).map(function (nombre) {
+      const t = datos.totales[nombre];
+      const p = datos.puestos[nombre];
+      return {
+        nombre: nombre,
+        puntos: t.puntos,
+        jugadas: t.jugadas,
+        media: t.jugadas ? t.puntos / t.jugadas : 0,
+        ganadas: datos.ganadas[nombre] || 0,
+        puesto: p && p.veces ? p.suma / p.veces : null,
+        mejor: datos.mejor[nombre] || null,
+        peor: datos.peor[nombre] || null
+      };
+    }).sort(function (a, b) { return b.puntos - a.puntos; });
+
+    if (!filas.length) {
+      caja.innerHTML = '<p class="muted">Todavía no hay jornadas cerradas.</p>';
+      return;
+    }
+
+    /* La jornada en la que hizo su tope, entre paréntesis: un «73» sin más no
+       dice cuándo fue, y eso es media noticia. */
+    const conJornada = function (x) {
+      if (!x) return '<span class="sub">—</span>';
+      return '<strong>' + x.puntos + '</strong>' +
+        (x.jornada ? ' <span class="sub">J' + x.jornada + '</span>' : '');
+    };
+
+    caja.innerHTML =
+      '<div class="table-scroll"><table class="table table--stats">' +
+      '<thead><tr>' +
+        '<th>Mánager</th>' +
+        '<th class="num">Puntos</th>' +
+        '<th class="num" title="Puntos por jornada">Media</th>' +
+        '<th class="num" title="Jornadas terminadas en primera posición">Ganadas</th>' +
+        '<th class="num" title="En qué puesto suele quedar cada jornada">Puesto medio</th>' +
+        '<th class="num">Mejor</th>' +
+        '<th class="num">Peor</th>' +
+      '</tr></thead><tbody>' +
+      filas.map(function (f, i) {
+        /* `data-label` en cada celda: por debajo de 940 px las tablas se apilan
+           en tarjetas y es el CSS quien escribe ahí el nombre de la columna.
+           Sin esto, en el móvil salía una lista de números sin decir cuál es
+           cuál. */
+        return '<tr>' +
+          '<td data-label="Mánager"><span class="with-crest">' +
+            '<span class="detail-rank">' + (i + 1) + 'º</span> ' +
+            escapeHtml(f.nombre) + '</span></td>' +
+          '<td class="num" data-label="Puntos"><strong>' + f.puntos + '</strong></td>' +
+          '<td class="num" data-label="Media">' + dec(f.media) + '</td>' +
+          '<td class="num" data-label="Ganadas">' + (f.ganadas || '<span class="sub">—</span>') + '</td>' +
+          '<td class="num" data-label="Puesto medio">' +
+            (f.puesto == null ? '<span class="sub">—</span>' : dec1(f.puesto) + 'º') + '</td>' +
+          '<td class="num" data-label="Mejor">' + conJornada(f.mejor) + '</td>' +
+          '<td class="num" data-label="Peor">' + conJornada(f.peor) + '</td>' +
+        '</tr>';
+      }).join('') +
+      '</tbody></table></div>' +
+      '<p class="muted stats__pie">Con ' + datos.jornadas +
+        (datos.jornadas === 1 ? ' jornada guardada' : ' jornadas guardadas') + '.' +
+        ((datos.sinTraer || []).length
+          ? ' Faltan por traer: J' + datos.sinTraer.join(', J') + '.'
+          : '') + '</p>';
   }
 
   function renderTandasDeLiga() {
@@ -9051,6 +9165,33 @@
         }).join('') + '</tbody></table>';
   }
 
+  /* Los diez que más puntúan de cada demarcación.
+     Un total de puntos no dice nada solo: 61 es una barbaridad para un defensa
+     y del montón para un delantero. Saber si está entre los diez mejores DE LO
+     SUYO sí lo dice. Sale del índice de LaLiga, que ya está descargado, y se
+     calcula una sola vez por lista: son mil y pico y ordenarlos en cada
+     repintado de ficha sería tirar el tiempo. */
+  let topeLista = null;
+  let topePuestos = null;
+
+  function entreLosDiezDeSuPuesto(id, posicion) {
+    const lista = state.jugadores || [];
+    if (!lista.length || !posicion) return false;
+    if (topeLista !== lista) {
+      topeLista = lista;
+      topePuestos = {};
+      [1, 2, 3, 4].forEach(function (puesto) {
+        const suyos = {};
+        lista.filter(function (j) { return j.position === puesto && j.points != null; })
+          .sort(function (a, b) { return b.points - a.points; })
+          .slice(0, 10)
+          .forEach(function (j) { suyos[String(j.id)] = true; });
+        topePuestos[puesto] = suyos;
+      });
+    }
+    return !!(topePuestos[posicion] && topePuestos[posicion][String(id)]);
+  }
+
   function estadisticasDeTemporada(id) {
     const datos = state.estadisticas[String(id)];
     /* Mientras no estén (o si no llegan) no se dice nada: aparecen solas al
@@ -9074,6 +9215,10 @@
 
     /* Las porter\u00edas a cero solo dicen algo de porteros y defensas; los goles
        por partido, de medios y delanteros. */
+    /* Hace falta el índice para saber si está entre los diez de su puesto. Está
+       guardado de antes, así que esto casi nunca pide nada. */
+    ensureJugadores();
+
     const portero = datos.position === 1;
     const atras = portero || datos.position === 2;
 
@@ -9120,7 +9265,10 @@
            una segunda fila él solo. Esta rejilla las estrecha para que entren
            todas en una línea. */
         '<div class="stats__rejilla stats__rejilla--siete">' +
-          celda('Totales', numero(datos.points)) +
+          /* Los puntos totales, destacados: en naranja siempre, y en amarillo
+             si es de los diez que más puntúan de su demarcación. */
+          celda('Totales', numero(datos.points),
+            entreLosDiezDeSuPuesto(id, datos.position) ? 'stat--top' : 'stat--destaca') +
           celda('Media', decimal(datos.average)) +
           celda('Casa', numero(datos.home.points)) +
           celda('Media casa', decimal(datos.home.average)) +
@@ -9804,10 +9952,12 @@
           return valor.toFixed(2).replace('.', ',');
         } },
       { rotulo: 'Partidos ganados', valor: function (d) { return d ? num(d.wins) : 0; } },
-      /* El empate no lo gana ninguno de los dos: va sin marcar mejor, como el
-         valor. Los perdidos sí, por lo bajo. */
-      { rotulo: 'Partidos empatados', valor: function (d) { return d ? num(d.draws) : 0; }, texto: true },
-      { rotulo: 'Partidos perdidos', valor: function (d) { return d ? num(d.losses) : 0; }, menor: true },
+      /* En estas dos no gana nadie: se señala quién tiene MÁS, y del color de lo
+         que significa —ámbar el empate, rojo la derrota—. Marcar al que menos
+         perdía en verde, como si fuera un mérito suyo, decía lo contrario de lo
+         que se mira aquí. */
+      { rotulo: 'Partidos empatados', valor: function (d) { return d ? num(d.draws) : 0; }, destaca: 'ambar' },
+      { rotulo: 'Partidos perdidos', valor: function (d) { return d ? num(d.losses) : 0; }, destaca: 'rojo' },
       /* Dejar la portería a cero solo puntúa a porteros y defensas: en un
          medio o un delantero es un dato que no dice nada. */
       { rotulo: 'Porterías a cero', valor: function (d) { return d ? num(d.cleanSheets) : 0; }, atras: true },
@@ -9844,10 +9994,17 @@
         const porLoBajo = typeof fila.menor === 'function' ? fila.menor() : fila.menor;
         const gana = porLoBajo ? -bruto : bruto;
         const rotulo = typeof fila.rotulo === 'function' ? fila.rotulo() : fila.rotulo;
+        /* Lo normal es marcar en verde al que va mejor. Con `destaca`, en cambio,
+           se señala al que tiene MÁS y con el color que se pida: no es un
+           mérito, es un aviso. Empatados a nada se marca ninguno. */
+        const marca = function (suyo) {
+          if (fila.destaca) return suyo > 0 ? ' versus__dato--' + fila.destaca : '';
+          return suyo > 0 ? ' versus__dato--mejor' : '';
+        };
         return '<div class="versus__fila">' +
-          '<span class="versus__dato' + (gana > 0 ? ' versus__dato--mejor' : '') + '">' + a + '</span>' +
+          '<span class="versus__dato' + marca(fila.destaca ? bruto : gana) + '">' + a + '</span>' +
           '<span class="versus__label">' + rotulo + '</span>' +
-          '<span class="versus__dato' + (gana < 0 ? ' versus__dato--mejor' : '') + '">' + b + '</span>' +
+          '<span class="versus__dato' + marca(fila.destaca ? -bruto : -gana) + '">' + b + '</span>' +
         '</div>';
       }).join('') + '</div>' +
     '</div>';
@@ -11789,7 +11946,7 @@
        LaLiga para el nombre, la demarcacion y el valor de mercado de cada
        futbolista; al llegar, repinta el solo. */
     if (name === 'managers') {
-      ensureJugadores(); renderManagers(); renderSquads(); renderTandasDeLiga();
+      ensureJugadores(); renderManagers(); renderSquads(); renderTandasDeLiga(); renderEstadisticasDeLiga();
     }
     /* Los dos últimos faltaban aquí y solo se pintaban desde `render()`, así que
        al entrar en la pestaña salían como dos cuadros grises vacíos y solo se
@@ -11862,7 +12019,7 @@
     renderPlantilla();
     renderWarnings();
     if (state.tab === 'managers') {
-      ensureJugadores(); renderManagers(); renderSquads(); renderTandasDeLiga();
+      ensureJugadores(); renderManagers(); renderSquads(); renderTandasDeLiga(); renderEstadisticasDeLiga();
     }
     if (state.tab === 'fichajes') { renderDataKpis(); renderKpiCharts(); renderSpending(); pintarFichajes(); renderReventas(); renderMercadeo(); }
     if (state.tab === 'datos') {
