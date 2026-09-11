@@ -1212,11 +1212,18 @@ code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft)
    confundia con una foto que no habia llegado a cargar. */
 .pic-player.pitch__face--empty {
   border: 2px dashed var(--neg); box-shadow: none;
-  /* Relleno rojo pero translucido, que se siga viendo el cesped por debajo:
-     opaco parecia una ficha mas y no un sitio sin cubrir. Al 32 % sobre el
-     verde salia un marron y al 80 un disco opaco; el 65 se lee rojo y deja
-     pasar la hierba. */
-  background-color: color-mix(in srgb, var(--neg) 65%, transparent);
+  /* Relleno rojo pero translucido: que se vea el cesped por debajo, porque
+     opaco parecia una ficha mas y no un sitio sin cubrir.
+     Van DOS capas a proposito. Rojo solo sobre verde da marron —mezclar rojo
+     con verde es literalmente eso— y habia que subirlo al 65 % para que se
+     leyera rojo, con lo que se quedaba en un disco macizo. Un velo negro
+     flojito primero apaga el verde, y entonces el rojo se lee rojo con mucha
+     menos carga: pasa el 42 % del fondo en vez del 35 %, y encima sale limpio
+     en vez de marron. */
+  background-color: rgba(0, 0, 0, .30);
+  background-image: linear-gradient(
+    color-mix(in srgb, var(--neg) 40%, transparent),
+    color-mix(in srgb, var(--neg) 40%, transparent));
 }
 .pitch__name {
   font-size: .7rem; font-weight: 600; color: #fff; text-align: center;
