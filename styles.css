@@ -3710,6 +3710,11 @@ main.wrap { padding-top: 1.15rem; padding-bottom: 3.5rem; }
 .juega__rival {
   display: block; width: 16px; height: 16px; flex: none;
   background: center / contain no-repeat;
+  /* Un halo que sigue la SILUETA del escudo, no una caja: `drop-shadow` se
+     apoya en la transparencia del PNG. Dos pasadas, que con una sola apenas se
+     nota. Blanco: el escudo cae medio sobre la foto oscura y medio sobre el
+     cesped, y es lo unico que despega de los dos a la vez. */
+  filter: drop-shadow(0 0 1px #fff) drop-shadow(0 0 1px #fff);
 }
 /* En la cara, pegada a la esquina y sin comerse los clics. */
 .juega--esquina {
@@ -3722,6 +3727,11 @@ main.wrap { padding-top: 1.15rem; padding-bottom: 3.5rem; }
 .juega--fila { position: static; transform: none; gap: 4px; }
 .juega--fila .juega__donde { width: 19px; height: 19px; }
 .juega--fila .juega__rival { width: 22px; height: 22px; }
+/* En la tabla el fondo lo pone el tema, no el cesped: el halo va del color de
+   la fila para que el escudo despegue de ella. */
+.juega--fila .juega__rival {
+  filter: drop-shadow(0 0 1px var(--bg-elev)) drop-shadow(0 0 1px var(--bg-elev));
+}
 .juega-cell { white-space: nowrap; }
 
 /* Cómo llegó cada futbolista a la plantilla: procedencia en pequeño e importe
