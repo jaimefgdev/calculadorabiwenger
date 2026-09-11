@@ -3360,7 +3360,60 @@ main.wrap { padding-top: 1.15rem; padding-bottom: 3.5rem; }
    la marca— cuando es de los diez que mas puntuan de su demarcacion: ahi el
    numero pasa de ser un dato a ser una noticia. */
 .stat--destaca strong { color: #f08a1c; }
+/* Y cuando es de los diez de su puesto, la casilla entera: pildora amarilla
+   con fondo, para que el numero no sea un dato mas de la rejilla. */
+.stat--top {
+  align-self: start;
+  padding: .2rem .55rem .3rem;
+  border: 1px solid var(--marca);
+  border-radius: 100px;
+  background: color-mix(in srgb, var(--marca) 16%, transparent);
+}
+.stat--top .stat__label { color: var(--marca); }
 .stat--top strong { color: var(--marca); }
+
+/* Estadisticas de la liga: una caja por manager, como las de Biwenger, para
+   poder mirarlas de una en una en vez de leer una tabla de siete columnas. */
+.statboxes {
+  display: grid; gap: .6rem;
+  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+}
+.statbox {
+  padding: .7rem .8rem;
+  background: var(--bg-surface);
+  border: 1px solid var(--border); border-radius: var(--radius-sm);
+}
+.statbox--primero { border-color: var(--accent); }
+.statbox__cab {
+  display: flex; align-items: center; gap: .45rem;
+  margin-bottom: .5rem; min-width: 0;
+}
+.statbox__puesto {
+  flex: none; display: grid; place-items: center;
+  min-width: 22px; height: 22px; padding: 0 5px;
+  font-size: .68rem; font-weight: 700;
+  color: var(--text-faint);
+  border: 1px solid var(--border-strong); border-radius: 100px;
+}
+.statbox--primero .statbox__puesto { color: var(--accent); border-color: var(--accent); }
+.statbox__nombre {
+  font-weight: 650; font-size: .88rem;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.statbox__datos { margin: 0; display: grid; gap: .18rem; }
+.statbox__dato {
+  display: flex; align-items: baseline; justify-content: space-between; gap: .6rem;
+}
+.statbox__dato dt {
+  font-size: .7rem; color: var(--text-faint);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.statbox__dato dd {
+  margin: 0; font-size: .82rem; font-weight: 600; white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+/* El liderato en amarillo: es el dato que se busca al abrir esto. */
+.statbox__lider { color: var(--marca); }
 
 .stats__pie { margin-top: .6rem; font-size: .75rem; }
 .table--stats .detail-rank { margin-right: .1rem; }
@@ -3610,6 +3663,11 @@ main.wrap { padding-top: 1.15rem; padding-bottom: 3.5rem; }
 .pts--esquina { bottom: 0; left: 0; transform: translate(-32%, -12%); }
 /* El que pincha se nota: círculo blanco igual, número en rojo. */
 .pts--neg { color: var(--neg); }
+/* De los diez que mas puntuan de su demarcacion. El circulo pasa a amarillo y
+   la tinta se queda negra, que sobre este amarillo se lee mejor que en blanco.
+   Sale en el campo, en el banquillo y en la lista: donde hay veinte caras de
+   golpe es donde de verdad sirve. */
+.pts--top { background: var(--marca); box-shadow: 0 1px 4px rgba(0, 0, 0, .55); }
 
 /* Cómo llegó cada futbolista a la plantilla: procedencia en pequeño e importe
    al tamaño normal, en una sola línea. */

@@ -3239,8 +3239,16 @@
   /** Puntos del futbolista, en su círculo abajo a la izquierda de la foto. */
   function pointsBadge(player, extra) {
     if (!player || player.points == null) return '';
-    return '<span class="pts ' + (extra || '') + '" title="' + player.points +
-      (player.points === 1 ? ' punto' : ' puntos') + ' esta temporada">' + player.points + '</span>';
+    /* En amarillo si es de los diez que más puntúan de su demarcación. El mismo
+       aviso que en la ficha, pero aquí es donde de verdad sirve: en el campo,
+       en el banquillo y en la lista se ven veinte caras de golpe y así se
+       distingue al que lo está petando sin abrir nada. */
+    const top = entreLosDiezDeSuPuesto(player.id, puestoDe(player));
+    return '<span class="pts ' + (extra || '') + (top ? ' pts--top' : '') +
+      '" title="' + player.points +
+      (player.points === 1 ? ' punto' : ' puntos') + ' esta temporada' +
+      (top ? ' · de los diez mejores de su demarcación' : '') +
+      '">' + player.points + '</span>';
   }
 
   /** Escudo del club del futbolista. `extra` decide si va como marca de agua. */
@@ -5606,6 +5614,12 @@
     /* Puntos sumados y puesto medio de cada uno, jornada a jornada. */
     const totales = {};
     const puestos = {};
+    /* Cuántas jornadas ha ido primero cada uno. Se suma sobre la marcha y no se
+       mira el puesto que manda Biwenger: ese es el de la tabla general EN EL
+       MOMENTO DE PEDIRLO, el mismo para todas las jornadas, así que no dice
+       quién iba primero aquel día. */
+    const acumulado = {};
+    const liderato = {};
 
     /* Jornadas ganadas: solo las cerradas. Mientras rueda, el ganador puede
        cambiar con cada partido, así que no se cuenta hasta que Biwenger la
@@ -5645,6 +5659,19 @@
         suyo.puntos += fila.points;
         suyo.jugadas += 1;
       });
+
+      /* Y quién queda primero DESPUÉS de esta jornada. Al que empezó en
+         negativo esa jornada no le suma nada, pero sigue en la cuenta: no
+         desaparece de la tabla por eso. */
+      (jornada.standings || []).forEach(function (fila) {
+        if (fila.points == null) return;
+        acumulado[fila.name] = (acumulado[fila.name] || 0) +
+          (fila.counts === false ? 0 : fila.points);
+      });
+      const lider = Object.keys(acumulado).sort(function (a, b) {
+        return acumulado[b] - acumulado[a];
+      })[0];
+      if (lider) liderato[lider] = (liderato[lider] || 0) + 1;
 
       /* Y de paso, la mejor y la peor de cada uno. Solo jornadas CERRADAS: una
          a medias siempre sería la peor de todos, y no es que lo hayan hecho
@@ -5696,7 +5723,7 @@
 
     return { jornadas: conPuntos.length, ganadas: ganadas, racha: ultimas,
       mejor: mejor, peor: peor, sinTraer: sinTraer,
-      totales: totales, puestos: puestos };
+      totales: totales, puestos: puestos, liderato: liderato };
   }
 
   /**
@@ -5878,9 +5905,6 @@
       return;
     }
 
-    const dec = function (n) { return n.toFixed(2).replace('.', ','); };
-    const dec1 = function (n) { return n.toFixed(1).replace('.', ','); };
-
     const filas = Object.keys(datos.totales).map(function (nombre) {
       const t = datos.totales[nombre];
       const p = datos.puestos[nombre];
@@ -5890,6 +5914,7 @@
         jugadas: t.jugadas,
         media: t.jugadas ? t.puntos / t.jugadas : 0,
         ganadas: datos.ganadas[nombre] || 0,
+        lider: (datos.liderato || {})[nombre] || 0,
         puesto: p && p.veces ? p.suma / p.veces : null,
         mejor: datos.mejor[nombre] || null,
         peor: datos.peor[nombre] || null
@@ -5901,46 +5926,48 @@
       return;
     }
 
-    /* La jornada en la que hizo su tope, entre paréntesis: un «73» sin más no
-       dice cuándo fue, y eso es media noticia. */
+    const dec = function (n) { return n.toFixed(2).replace('.', ','); };
+    const dec1 = function (n) { return n.toFixed(1).replace('.', ','); };
+    const jornadas = function (n) {
+      return n + (n === 1 ? ' jornada' : ' jornadas');
+    };
+
+    /* La jornada en la que hizo su tope, al lado: un «73» a secas no dice
+       cuándo fue, y eso es media noticia. */
     const conJornada = function (x) {
       if (!x) return '<span class="sub">—</span>';
-      return '<strong>' + x.puntos + '</strong>' +
-        (x.jornada ? ' <span class="sub">J' + x.jornada + '</span>' : '');
+      return x.puntos + (x.jornada ? ' <span class="sub">J' + x.jornada + '</span>' : '');
+    };
+
+    const dato = function (rotulo, valor, clase) {
+      return '<div class="statbox__dato' + (clase ? ' ' + clase : '') + '">' +
+        '<dt>' + rotulo + '</dt><dd>' + valor + '</dd></div>';
     };
 
     caja.innerHTML =
-      '<div class="table-scroll"><table class="table table--stats">' +
-      '<thead><tr>' +
-        '<th>Mánager</th>' +
-        '<th class="num">Puntos</th>' +
-        '<th class="num" title="Puntos por jornada">Media</th>' +
-        '<th class="num" title="Jornadas terminadas en primera posición">Ganadas</th>' +
-        '<th class="num" title="En qué puesto suele quedar cada jornada">Puesto medio</th>' +
-        '<th class="num">Mejor</th>' +
-        '<th class="num">Peor</th>' +
-      '</tr></thead><tbody>' +
+      '<div class="statboxes">' +
       filas.map(function (f, i) {
-        /* `data-label` en cada celda: por debajo de 940 px las tablas se apilan
-           en tarjetas y es el CSS quien escribe ahí el nombre de la columna.
-           Sin esto, en el móvil salía una lista de números sin decir cuál es
-           cuál. */
-        return '<tr>' +
-          '<td data-label="Mánager"><span class="with-crest">' +
-            '<span class="detail-rank">' + (i + 1) + 'º</span> ' +
-            escapeHtml(f.nombre) + '</span></td>' +
-          '<td class="num" data-label="Puntos"><strong>' + f.puntos + '</strong></td>' +
-          '<td class="num" data-label="Media">' + dec(f.media) + '</td>' +
-          '<td class="num" data-label="Ganadas">' + (f.ganadas || '<span class="sub">—</span>') + '</td>' +
-          '<td class="num" data-label="Puesto medio">' +
-            (f.puesto == null ? '<span class="sub">—</span>' : dec1(f.puesto) + 'º') + '</td>' +
-          '<td class="num" data-label="Mejor">' + conJornada(f.mejor) + '</td>' +
-          '<td class="num" data-label="Peor">' + conJornada(f.peor) + '</td>' +
-        '</tr>';
+        return '<article class="statbox' + (i === 0 ? ' statbox--primero' : '') + '">' +
+          '<header class="statbox__cab">' +
+            '<span class="statbox__puesto">' + (i + 1) + 'º</span>' +
+            '<span class="statbox__nombre">' + escapeHtml(f.nombre) + '</span>' +
+          '</header>' +
+          '<dl class="statbox__datos">' +
+            dato('Puntos', '<strong>' + f.puntos + '</strong>') +
+            dato('Media por jornada', dec(f.media)) +
+            dato('Jornadas ganadas', f.ganadas || '<span class="sub">—</span>') +
+            dato('Puesto medio', f.puesto == null
+              ? '<span class="sub">—</span>' : dec1(f.puesto) + 'º') +
+            dato('Líder', f.lider
+              ? '<span class="statbox__lider">' + jornadas(f.lider) + '</span>'
+              : '<span class="sub">—</span>') +
+            dato('Mejor jornada', conJornada(f.mejor)) +
+            dato('Peor jornada', conJornada(f.peor)) +
+          '</dl>' +
+        '</article>';
       }).join('') +
-      '</tbody></table></div>' +
-      '<p class="muted stats__pie">Con ' + datos.jornadas +
-        (datos.jornadas === 1 ? ' jornada guardada' : ' jornadas guardadas') + '.' +
+      '</div>' +
+      '<p class="muted stats__pie">Con ' + jornadas(datos.jornadas) + ' guardadas.' +
         ((datos.sinTraer || []).length
           ? ' Faltan por traer: J' + datos.sinTraer.join(', J') + '.'
           : '') + '</p>';
