@@ -1217,13 +1217,14 @@ code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft)
      Van DOS capas a proposito. Rojo solo sobre verde da marron —mezclar rojo
      con verde es literalmente eso— y habia que subirlo al 65 % para que se
      leyera rojo, con lo que se quedaba en un disco macizo. Un velo negro
-     flojito primero apaga el verde, y entonces el rojo se lee rojo con mucha
-     menos carga: pasa el 42 % del fondo en vez del 35 %, y encima sale limpio
-     en vez de marron. */
-  background-color: rgba(0, 0, 0, .30);
+     flojito apaga el verde primero, y entonces el rojo se lee rojo con mucha
+     menos carga: pasa el 47 % del fondo, mas que aquel 35 %, y encima limpio.
+     Bajar mas se ha probado y no compensa: sin velo suficiente vuelve a asomar
+     el verde por debajo y el circulo se pone marron otra vez. */
+  background-color: rgba(0, 0, 0, .26);
   background-image: linear-gradient(
-    color-mix(in srgb, var(--neg) 40%, transparent),
-    color-mix(in srgb, var(--neg) 40%, transparent));
+    color-mix(in srgb, var(--neg) 36%, transparent),
+    color-mix(in srgb, var(--neg) 36%, transparent));
 }
 .pitch__name {
   font-size: .7rem; font-weight: 600; color: #fff; text-align: center;
