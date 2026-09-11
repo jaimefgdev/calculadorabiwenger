@@ -223,7 +223,7 @@ const CDN = 'https://cf.biwenger.com/api/v2';
    navegador normal y las cabeceras que este mandaría. */
 /* Marca de versión: se sube en cada cambio y se consulta con ?version=1.
    Sirve para saber desde fuera si el despliegue ha entrado o no. */
-const VERSION = '2026-09-11 · deno 147';
+const VERSION = '2026-09-11 · deno 148';
 
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ' +
   '(KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36';
@@ -4494,6 +4494,24 @@ async function roundBoard(env, headers, jornada, listaNombres) {
   /* Quiénes tienen una nota leída de su ficha PARA ESTA JORNADA. Solo esos y
      los que la traen en la alineación puntúan si ya se fueron de LaLiga. */
   const conNota = (buenas && buenas.notas) || {};
+
+  /* Y para la jornada QUE SE ESTÁ JUGANDO, lo que dice el parte del partido.
+     Ni el índice ni la ficha del futbolista traen todavía la nota de la jornada
+     en curso —comprobado: la ficha de Suazo tenía la J1 a la J4 y ni rastro de
+     la J5—, así que `base` se quedaba con la nota de la jornada ANTERIOR y la
+     servía como si fuera de esta. De ahí que saliera con 4 cuando Biwenger ya
+     le daba 8.
+     El parte sí la trae. Se descartó en su día porque «bailaba entre
+     peticiones», pero eso era pedirlo SIN FIJAR EL SISTEMA: el 1 da 10, el 3
+     da 7 y el 5 da 8 —justo el 6/8/4 de aquel comentario—. Con el sistema de la
+     liga fijado se ha medido cinco veces seguidas y da lo mismo siempre, y
+     cuadra con Biwenger al punto.
+     Solo entra donde NO hay nota de verdad, así que en las jornadas cerradas,
+     que sí la tienen, esto no cambia absolutamente nada. */
+  const delParte = (detalle && detalle.puntos) || {};
+  Object.keys(delParte).forEach(function (id) {
+    if (conNota[id] == null && delParte[id] != null) base[id] = delParte[id];
+  });
 
   /* En qué puesto jugó cada uno de verdad. De la ficha si la hemos leído; si
      no, su demarcación de siempre, que es la que acierta casi siempre. */
