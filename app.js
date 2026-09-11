@@ -883,6 +883,7 @@
     syncing: false,
     /* Una sincronía pedida mientras corría otra: se hace al acabar. */
     syncPendiente: false,
+    syncForzada: false,     // la que espera turno, ¿tiene que saltarse la caché?
     syncFails: 0,          // fallos seguidos, para espaciar los reintentos
     nextSyncAt: 0,         // no se vuelve a intentar antes de este momento
     lastSync: null,
@@ -5127,9 +5128,11 @@
         opPendiente = null;
         const volver = trasOperar;
         trasOperar = null;
-        /* Lo que diga Biwenger manda: se vuelve a preguntar todo. */
+        /* Lo que diga Biwenger manda: se vuelve a preguntar todo, y FORZADO, que
+           si no el proxy contesta con el tablón que tenía guardado —hasta tres
+           minutos— y la calculadora se queda con el saldo de antes de vender. */
         setTimeout(function () {
-          syncNow(true);
+          syncNow(true, true);
           /* Si mientras se resolvía cerraste el diálogo (o abriste otra oferta
              encima), aquí ya no se pinta nada: ni se reabre la lista —que a
              estas alturas está vacía, porque la oferta acaba de resolverse— ni
@@ -5187,6 +5190,16 @@
          y de tu alineación ahora mismo, no cuando llegue la siguiente sincronía. */
       const vendido = opPendiente.accion === 'aceptar' ? opPendiente.playerId : null;
       trasOperarLimpia = function () {
+        /* Lo que te pagan y lo que valía: hay que leerlos AHORA, que dentro de
+           dos líneas la oferta ya no está en la lista y él ya no está en la
+           plantilla. */
+        const cobrada = (state.offers || []).filter(function (o) {
+          return String(o.id) === String(respondida);
+        })[0];
+        const importe = (cobrada && cobrada.amount) || 0;
+        const suyo = vendido != null ? playerById(vendido) : null;
+        const valia = (suyo && suyo.marketValue != null) ? suyo.marketValue : 0;
+
         state.offers = state.offers.filter(function (o) {
           if (String(o.id) === String(respondida)) return false;
           /* Al devolverlo al mercado se tumban todas las suyas, no solo esta. */
@@ -5201,6 +5214,20 @@
               return String(p.id) !== String(vendido);
             });
           });
+          /* Y la calculadora, al momento: uno menos, el saldo con lo cobrado y
+             el valor del equipo sin lo que valía él. Se quitaba de la plantilla
+             en el acto pero el presupuesto se quedaba con los números de antes
+             de vender hasta la siguiente sincronía.
+             No hay nada que descuadrar: el presupuesto se recalcula entero en
+             cada repintado a partir de esto, y la sincronía de dentro de dos
+             segundos lo reescribe con lo que diga Biwenger. */
+          const equipo = state.teams[myName()];
+          if (equipo) {
+            if (equipo.players != null) equipo.players -= 1;
+            if (equipo.value != null) equipo.value -= valia;
+            if (equipo.balance != null) equipo.balance += importe;
+          }
+          if (state.me && state.me.balance != null) state.me.balance += importe;
           ensureXi();
         }
         render();
@@ -12400,14 +12427,25 @@
    * @param {boolean} auto  true si la dispara el temporizador: entonces no
    *                        abre paneles ni roba el foco, solo deja el aviso.
    */
-  function syncNow(auto) {
+  /* `forzar` le dice al proxy que no se conforme con su tablón guardado. Se usa
+     solo después de operar: es la única vez que sabemos con certeza que lo que
+     tiene guardado ya no vale. */
+  function syncNow(auto, forzar) {
     /* Ya hay una en marcha: no se tira esta, se apunta. Antes se descartaba en
        silencio, y aceptando dos ventas seguidas la segunda caía justo mientras
        corría la sincronía de la primera —que ahora tarda más, porque el proxy
        va dosificando las peticiones—. Se perdía, la pantalla no se refrescaba
        nunca y parecía que la app se quedaba bloqueada. */
-    if (state.syncing) { state.syncPendiente = true; return; }
+    if (state.syncing) {
+      state.syncPendiente = true;
+      /* Y si la que se queda esperando era forzada, la de después también lo
+         será: si no, encadenar dos ventas seguidas perdía el aviso de la
+         segunda y volvía el saldo viejo. */
+      if (forzar) state.syncForzada = true;
+      return;
+    }
     state.syncPendiente = false;
+    if (state.syncForzada) { forzar = true; state.syncForzada = false; }
 
     const url = collapse($('sync-url').value);
     const key = $('sync-key').value.trim();
@@ -12433,7 +12471,8 @@
     $('btn-sync').disabled = true;
     $('btn-sync-top').disabled = true;
 
-    const endpoint = url.replace(/\/+$/, '') + '/?key=' + encodeURIComponent(key);
+    const endpoint = url.replace(/\/+$/, '') + '/?key=' + encodeURIComponent(key) +
+      (forzar ? '&force=1' : '');
 
     fetch(endpoint, { headers: { 'accept': 'application/json' } })
       .then(function (response) {
