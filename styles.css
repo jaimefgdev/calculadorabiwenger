@@ -3372,48 +3372,49 @@ main.wrap { padding-top: 1.15rem; padding-bottom: 3.5rem; }
 .stat--top .stat__label { color: var(--marca); }
 .stat--top strong { color: var(--marca); }
 
-/* Estadisticas de la liga: una caja por manager, como las de Biwenger, para
-   poder mirarlas de una en una en vez de leer una tabla de siete columnas. */
+/* Estadisticas de la liga: un bloque por ESTADISTICA y dentro los ocho, como
+   las de Biwenger. Asi se comparan de un vistazo; con una caja por manager
+   habia que ir saltando de una a otra para ver quien tiene mas de algo. */
+.statgrupo { margin-bottom: 1.1rem; }
+.statgrupo__titulo {
+  margin: 0 0 .45rem;
+  font-size: .74rem; font-weight: 650; text-transform: uppercase;
+  letter-spacing: .05em; color: var(--text-faint);
+}
 .statboxes {
-  display: grid; gap: .6rem;
-  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+  display: grid; gap: .45rem;
+  grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
 }
 .statbox {
-  padding: .7rem .8rem;
+  display: flex; align-items: center; gap: .5rem; min-width: 0;
+  padding: .5rem .7rem;
   background: var(--bg-surface);
   border: 1px solid var(--border); border-radius: var(--radius-sm);
 }
 .statbox--primero { border-color: var(--accent); }
-.statbox__cab {
-  display: flex; align-items: center; gap: .45rem;
-  margin-bottom: .5rem; min-width: 0;
-}
 .statbox__puesto {
   flex: none; display: grid; place-items: center;
   min-width: 22px; height: 22px; padding: 0 5px;
-  font-size: .68rem; font-weight: 700;
+  font-size: .66rem; font-weight: 700;
   color: var(--text-faint);
   border: 1px solid var(--border-strong); border-radius: 100px;
 }
 .statbox--primero .statbox__puesto { color: var(--accent); border-color: var(--accent); }
 .statbox__nombre {
-  font-weight: 650; font-size: .88rem;
+  flex: 1 1 auto; min-width: 0;
+  font-size: .82rem; font-weight: 600;
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
-.statbox__datos { margin: 0; display: grid; gap: .18rem; }
-.statbox__dato {
-  display: flex; align-items: baseline; justify-content: space-between; gap: .6rem;
-}
-.statbox__dato dt {
-  font-size: .7rem; color: var(--text-faint);
-  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-}
-.statbox__dato dd {
-  margin: 0; font-size: .82rem; font-weight: 600; white-space: nowrap;
-  font-variant-numeric: tabular-nums;
+.statbox__valor {
+  flex: none; font-size: .84rem; font-weight: 650;
+  font-variant-numeric: tabular-nums; white-space: nowrap;
 }
 /* El liderato en amarillo: es el dato que se busca al abrir esto. */
 .statbox__lider { color: var(--marca); }
+
+/* Los puntos de un futbolista que esta entre los diez de su demarcacion, donde
+   van escritos y no encima de la cara: mismo amarillo que la chapa. */
+.pts-top { color: var(--marca); font-weight: 700; }
 
 .stats__pie { margin-top: .6rem; font-size: .75rem; }
 .table--stats .detail-rank { margin-right: .1rem; }

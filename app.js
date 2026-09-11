@@ -884,6 +884,8 @@
     /* Una sincronía pedida mientras corría otra: se hace al acabar. */
     syncPendiente: false,
     syncForzada: false,     // la que espera turno, ¿tiene que saltarse la caché?
+    finJornada: null,       // cuándo terminó cada jornada, para el liderato
+    finJornadaPedido: false,
     syncFails: 0,          // fallos seguidos, para espaciar los reintentos
     nextSyncAt: 0,         // no se vuelve a intentar antes de este momento
     lastSync: null,
@@ -5590,6 +5592,54 @@
     return !(state.round && String(state.round.id) === String(jornada.round.id));
   }
 
+  /**
+   * Cuánto tiempo ha llevado el liderato cada uno.
+   *
+   * Se pone primero cuando se cierra la jornada en la que adelanta, y lo lleva
+   * hasta que se cierra la siguiente —o hasta ahora mismo, si es el que manda
+   * ahora—. Las fechas las da el proxy: el calendario de Biwenger no las trae.
+   *
+   * El hito de cada jornada es el MAYOR de los fines hasta ella, no el suyo: la
+   * jornada 1 se terminó de jugar el 27 de agosto, después de la 2, porque le
+   * quedaba un partido aplazado. Sin esto salían tramos negativos.
+   */
+  function tiempoDeLiderato(mando) {
+    const fin = state.finJornada;
+    if (!fin || !mando.length) return null;
+
+    const hito = function (numero) {
+      let mayor = 0;
+      Object.keys(fin).forEach(function (n) {
+        if (Number(n) > numero) return;
+        const t = Date.parse(fin[n]);
+        if (!isNaN(t) && t > mayor) mayor = t;
+      });
+      return mayor || null;
+    };
+
+    const suma = {};
+    for (let i = 0; i < mando.length; i++) {
+      const desde = hito(mando[i].jornada);
+      if (!desde) continue;
+      const hasta = i + 1 < mando.length ? hito(mando[i + 1].jornada) : Date.now();
+      if (!hasta || hasta <= desde) continue;
+      suma[mando[i].quien] = (suma[mando[i].quien] || 0) + (hasta - desde);
+    }
+    return Object.keys(suma).length ? suma : null;
+  }
+
+  /* «3 días», «2 semanas», «5 meses». Como lo cuenta Biwenger: la unidad que
+     deja un número que se lee de un vistazo. */
+  function comoDeLargo(ms) {
+    const dias = Math.round(ms / 86400000);
+    if (dias < 1) return 'menos de un día';
+    if (dias < 14) return dias + (dias === 1 ? ' día' : ' días');
+    const semanas = Math.round(dias / 7);
+    if (dias < 60) return semanas + (semanas === 1 ? ' semana' : ' semanas');
+    const meses = Math.round(dias / 30.4);
+    return meses + (meses === 1 ? ' mes' : ' meses');
+  }
+
   function tandasDeLaLiga() {
     /* Con puntos en alguna fila: las que ni han empezado no cuentan para nada. */
     /* Hasta la jornada en curso, ni una más. LaLiga adelanta partidos: el Real
@@ -5620,6 +5670,9 @@
        quién iba primero aquel día. */
     const acumulado = {};
     const liderato = {};
+    /* Quién iba primero después de cada jornada, en orden: de ahí sale el
+       tiempo que ha llevado el liderato cada uno. */
+    const mando = [];
 
     /* Jornadas ganadas: solo las cerradas. Mientras rueda, el ganador puede
        cambiar con cada partido, así que no se cuenta hasta que Biwenger la
@@ -5671,7 +5724,11 @@
       const lider = Object.keys(acumulado).sort(function (a, b) {
         return acumulado[b] - acumulado[a];
       })[0];
-      if (lider) liderato[lider] = (liderato[lider] || 0) + 1;
+      if (lider) {
+        liderato[lider] = (liderato[lider] || 0) + 1;
+        /* Y en qué jornada se puso primero, para medir después cuánto aguantó. */
+        mando.push({ quien: lider, jornada: (jornada.round && jornada.round.number) || null });
+      }
 
       /* Y de paso, la mejor y la peor de cada uno. Solo jornadas CERRADAS: una
          a medias siempre sería la peor de todos, y no es que lo hayan hecho
@@ -5723,7 +5780,8 @@
 
     return { jornadas: conPuntos.length, ganadas: ganadas, racha: ultimas,
       mejor: mejor, peor: peor, sinTraer: sinTraer,
-      totales: totales, puestos: puestos, liderato: liderato };
+      totales: totales, puestos: puestos, liderato: liderato,
+      tiempoAlMando: tiempoDeLiderato(mando) };
   }
 
   /**
@@ -5899,78 +5957,102 @@
     const caja = $('liga-estadisticas');
     if (!caja) return;
 
+    ensureFinDeJornadas();
+
     const datos = tandasDeLaLiga();
     if (!datos.jornadas) {
       caja.innerHTML = '<p class="muted">Todavía no hay jornadas guardadas.</p>';
       return;
     }
 
-    const filas = Object.keys(datos.totales).map(function (nombre) {
+    const dec = function (n) { return n.toFixed(2).replace('.', ','); };
+    const dec1 = function (n) { return n.toFixed(1).replace('.', ','); };
+    const jornadas = function (n) { return n + (n === 1 ? ' jornada' : ' jornadas'); };
+
+    const gente = Object.keys(datos.totales).map(function (nombre) {
       const t = datos.totales[nombre];
       const p = datos.puestos[nombre];
+      const ms = (datos.tiempoAlMando || {})[nombre] || 0;
       return {
         nombre: nombre,
         puntos: t.puntos,
-        jugadas: t.jugadas,
         media: t.jugadas ? t.puntos / t.jugadas : 0,
         ganadas: datos.ganadas[nombre] || 0,
         lider: (datos.liderato || {})[nombre] || 0,
+        liderMs: ms,
         puesto: p && p.veces ? p.suma / p.veces : null,
         mejor: datos.mejor[nombre] || null,
         peor: datos.peor[nombre] || null
       };
-    }).sort(function (a, b) { return b.puntos - a.puntos; });
+    });
 
-    if (!filas.length) {
+    if (!gente.length) {
       caja.innerHTML = '<p class="muted">Todavía no hay jornadas cerradas.</p>';
       return;
     }
 
-    const dec = function (n) { return n.toFixed(2).replace('.', ','); };
-    const dec1 = function (n) { return n.toFixed(1).replace('.', ','); };
-    const jornadas = function (n) {
-      return n + (n === 1 ? ' jornada' : ' jornadas');
-    };
-
-    /* La jornada en la que hizo su tope, al lado: un «73» a secas no dice
-       cuándo fue, y eso es media noticia. */
+    const sinDato = '<span class="sub">—</span>';
     const conJornada = function (x) {
-      if (!x) return '<span class="sub">—</span>';
+      if (!x) return sinDato;
       return x.puntos + (x.jornada ? ' <span class="sub">J' + x.jornada + '</span>' : '');
     };
 
-    const dato = function (rotulo, valor, clase) {
-      return '<div class="statbox__dato' + (clase ? ' ' + clase : '') + '">' +
-        '<dt>' + rotulo + '</dt><dd>' + valor + '</dd></div>';
-    };
+    /* Cada bloque es UNA estadística con los ocho dentro, ordenados por ella.
+       Así se comparan de un vistazo, que es para lo que se mira esto; con una
+       caja por mánager había que ir saltando de una a otra para ver quién
+       tiene más de algo. `mejorAlto` dice si el primero es el que más tiene. */
+    const bloques = [
+      { titulo: 'Puntos', mejorAlto: true,
+        valor: function (f) { return f.puntos; },
+        pinta: function (f) { return '<strong>' + f.puntos + '</strong>'; } },
+      { titulo: 'Media por jornada', mejorAlto: true,
+        valor: function (f) { return f.media; },
+        pinta: function (f) { return dec(f.media); } },
+      { titulo: 'Jornadas ganadas', mejorAlto: true,
+        valor: function (f) { return f.ganadas; },
+        pinta: function (f) { return f.ganadas || sinDato; } },
+      { titulo: 'Liderato', mejorAlto: true,
+        valor: function (f) { return f.liderMs || f.lider; },
+        pinta: function (f) {
+          if (!f.lider) return sinDato;
+          /* En tiempo si se sabe cuándo terminó cada jornada; si no llegan las
+             fechas, en jornadas, que es lo que se puede decir sin inventar. */
+          return '<span class="statbox__lider">' +
+            (f.liderMs ? comoDeLargo(f.liderMs) : jornadas(f.lider)) + '</span>';
+        } },
+      { titulo: 'Puesto medio en la jornada', mejorAlto: false,
+        valor: function (f) { return f.puesto == null ? 99 : f.puesto; },
+        pinta: function (f) { return f.puesto == null ? sinDato : dec1(f.puesto) + 'º'; } },
+      { titulo: 'Mejor jornada', mejorAlto: true,
+        valor: function (f) { return f.mejor ? f.mejor.puntos : -Infinity; },
+        pinta: function (f) { return conJornada(f.mejor); } },
+      { titulo: 'Peor jornada', mejorAlto: true,
+        valor: function (f) { return f.peor ? f.peor.puntos : -Infinity; },
+        pinta: function (f) { return conJornada(f.peor); } }
+    ];
 
-    caja.innerHTML =
-      '<div class="statboxes">' +
-      filas.map(function (f, i) {
-        return '<article class="statbox' + (i === 0 ? ' statbox--primero' : '') + '">' +
-          '<header class="statbox__cab">' +
+    caja.innerHTML = bloques.map(function (bloque) {
+      const orden = gente.slice().sort(function (a, b) {
+        const x = bloque.valor(a);
+        const y = bloque.valor(b);
+        return bloque.mejorAlto ? (y - x) : (x - y);
+      });
+      return '<section class="statgrupo">' +
+        '<h3 class="statgrupo__titulo">' + bloque.titulo + '</h3>' +
+        '<div class="statboxes">' +
+        orden.map(function (f, i) {
+          return '<article class="statbox' + (i === 0 ? ' statbox--primero' : '') + '">' +
             '<span class="statbox__puesto">' + (i + 1) + 'º</span>' +
             '<span class="statbox__nombre">' + escapeHtml(f.nombre) + '</span>' +
-          '</header>' +
-          '<dl class="statbox__datos">' +
-            dato('Puntos', '<strong>' + f.puntos + '</strong>') +
-            dato('Media por jornada', dec(f.media)) +
-            dato('Jornadas ganadas', f.ganadas || '<span class="sub">—</span>') +
-            dato('Puesto medio', f.puesto == null
-              ? '<span class="sub">—</span>' : dec1(f.puesto) + 'º') +
-            dato('Líder', f.lider
-              ? '<span class="statbox__lider">' + jornadas(f.lider) + '</span>'
-              : '<span class="sub">—</span>') +
-            dato('Mejor jornada', conJornada(f.mejor)) +
-            dato('Peor jornada', conJornada(f.peor)) +
-          '</dl>' +
-        '</article>';
-      }).join('') +
-      '</div>' +
-      '<p class="muted stats__pie">Con ' + jornadas(datos.jornadas) + ' guardadas.' +
-        ((datos.sinTraer || []).length
-          ? ' Faltan por traer: J' + datos.sinTraer.join(', J') + '.'
-          : '') + '</p>';
+            '<span class="statbox__valor">' + bloque.pinta(f) + '</span>' +
+          '</article>';
+        }).join('') +
+        '</div></section>';
+    }).join('') +
+    '<p class="muted stats__pie">Con ' + jornadas(datos.jornadas) + ' guardadas.' +
+      ((datos.sinTraer || []).length
+        ? ' Faltan por traer: J' + datos.sinTraer.join(', J') + '.'
+        : '') + '</p>';
   }
 
   function renderTandasDeLiga() {
@@ -6171,8 +6253,7 @@
           playerName({ playerId: jugador.id, player: jugador.name,
             position: jugador.position, altPositions: jugador.altPositions }) +
           crestOf(jugador, 'crest--badge') + '</span></td>' +
-        '<td class="num" data-label="Puntos">' +
-          (jugador.points == null ? '<span class="sub">—</span>' : jugador.points) + '</td>' +
+        '<td class="num" data-label="Puntos">' + puntosConTope(jugador) + '</td>' +
         '<td class="estado-cell" data-label="Estado">' + statusCell(jugador) + '</td>' +
         '<td class="num" data-label="Valor"><strong>' + money(jugador.marketValue || 0) + '</strong></td>' +
         '<td class="num" data-label="Hoy">' + (jugador.increment
@@ -8400,7 +8481,7 @@
               playerName({ playerId: jugador.id, player: jugador.name,
                 position: jugador.position, altPositions: jugador.altPositions }) +
               crestOf(jugador, 'crest--badge') + '</span></td>' +
-            '<td class="num"><strong>' + jugador.points + '</strong></td>' +
+            '<td class="num"><strong>' + puntosConTope(jugador) + '</strong></td>' +
             '<td class="num">' + jugador.played + '</td>' +
           '</tr>' +
           (abierto
@@ -9217,6 +9298,16 @@
       });
     }
     return !!(topePuestos[posicion] && topePuestos[posicion][String(id)]);
+  }
+
+  /* Sus puntos, en amarillo si es de los diez que más puntúan de su
+     demarcación. La misma marca que lleva en la chapa de la foto, para las
+     tablas donde los puntos van escritos y no encima de la cara. */
+  function puntosConTope(jugador) {
+    if (!jugador || jugador.points == null) return '<span class="sub">—</span>';
+    if (!entreLosDiezDeSuPuesto(jugador.id, puestoDe(jugador))) return String(jugador.points);
+    return '<span class="pts-top" title="De los diez que más puntúan de su demarcación">' +
+      jugador.points + '</span>';
   }
 
   function estadisticasDeTemporada(id) {
@@ -11747,6 +11838,31 @@
    * quedaba sin rankings, sin puntos y sin precios. Aquí, si falla, no se
    * entera nadie: lo único que pasa es que esos nombres tardan un día más.
    */
+  /* Cuándo terminó cada jornada, para poder decir el tiempo que ha ido primero
+     cada uno. El calendario de Biwenger no trae fechas —las jornadas pasadas
+     llegan sin `start` y sin partidos—, así que lo saca el proxy de los
+     partidos que ya tiene guardados. No le cuesta nada a nadie: es leer. */
+  function ensureFinDeJornadas() {
+    if (state.finJornadaPedido) return;
+    const config = loadSyncConfig();
+    if (!config.url || !config.key) return;
+    state.finJornadaPedido = true;
+
+    const guardado = cacheLeer('finJornadas');
+    if (guardado && guardado.fin) state.finJornada = guardado.fin;
+
+    fetch(config.url.replace(/\/+$/, '') + '/?key=' + encodeURIComponent(config.key) + '&fechas=1',
+      { headers: { 'accept': 'application/json' } })
+      .then(function (response) { return response.json(); })
+      .then(function (datos) {
+        if (!datos || !datos.fin) return;
+        state.finJornada = datos.fin;
+        cacheGuardar('finJornadas', datos);
+        renderEstadisticasDeLiga();
+      })
+      .catch(function () { /* sin esto el liderato sale en jornadas y ya */ });
+  }
+
   function ensureNombresIdos(vuelta) {
     if (!vuelta && state.nombresIdosPedido) return;
     const config = loadSyncConfig();
