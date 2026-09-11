@@ -223,7 +223,7 @@ const CDN = 'https://cf.biwenger.com/api/v2';
    navegador normal y las cabeceras que este mandaría. */
 /* Marca de versión: se sube en cada cambio y se consulta con ?version=1.
    Sirve para saber desde fuera si el despliegue ha entrado o no. */
-const VERSION = '2026-09-11 · deno 145';
+const VERSION = '2026-09-11 · deno 146';
 
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ' +
   '(KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36';
@@ -4072,6 +4072,7 @@ async function finDeCadaJornada(env) {
   calendario.forEach(function (j) { numeroDe[String(j.id)] = j.number; });
 
   const fin = {};
+  const inicio = {};
   Object.keys(rondas).forEach(function (id) {
     const partidos = (rondas[id] || {}).matches || [];
     /* Solo los jugados: un partido aplazado con fecha dentro de un mes diría
@@ -4085,9 +4086,12 @@ async function finDeCadaJornada(env) {
     if (numero == null) return;
     /* Dos horas después del comienzo del último: un partido dura eso. */
     fin[numero] = new Date(Math.max.apply(null, horas) + 2 * 60 * 60 * 1000).toISOString();
+    /* Y cuándo arrancó, que es lo que decide de qué mes es la jornada: una que
+       empieza el 30 de agosto y acaba el 1 de septiembre es de agosto. */
+    inicio[numero] = new Date(Math.min.apply(null, horas)).toISOString();
   });
 
-  return { fin: fin, jornadas: Object.keys(fin).length };
+  return { fin: fin, inicio: inicio, jornadas: Object.keys(fin).length };
 }
 
 async function partidosDeJugador(env, id) {
