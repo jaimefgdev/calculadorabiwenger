@@ -886,6 +886,7 @@
     syncForzada: false,     // la que espera turno, ¿tiene que saltarse la caché?
     finJornada: null,       // cuándo terminó cada jornada, para el liderato
     inicioJornada: null,    // y cuándo empezó, que es lo que le da su mes
+    mesEstadisticas: null,  // el mes que se está mirando en Estadísticas
     finJornadaPedido: false,
     syncFails: 0,          // fallos seguidos, para espaciar los reintentos
     nextSyncAt: 0,         // no se vuelve a intentar antes de este momento
@@ -6035,23 +6036,21 @@
     const dec = function (n) { return n.toFixed(2).replace('.', ','); };
     const dec1 = function (n) { return n.toFixed(1).replace('.', ','); };
     const jornadas = function (n) { return n + (n === 1 ? ' jornada' : ' jornadas'); };
+    const sinDato = '<span class="sub">—</span>';
 
     const gente = Object.keys(datos.totales).map(function (nombre) {
       const t = datos.totales[nombre];
       const p = datos.puestos[nombre];
-      const ms = (datos.tiempoAlMando || {})[nombre] || 0;
+      const c = (datos.clasif || {})[nombre];
       return {
         nombre: nombre,
         puntos: t.puntos,
         media: t.jugadas ? t.puntos / t.jugadas : 0,
         ganadas: datos.ganadas[nombre] || 0,
         lider: (datos.liderato || {})[nombre] || 0,
-        liderMs: ms,
+        liderMs: (datos.tiempoAlMando || {})[nombre] || 0,
         puesto: p && p.veces ? p.suma / p.veces : null,
-        clasif: (function () {
-          const c = (datos.clasif || {})[nombre];
-          return c && c.veces ? c.suma / c.veces : null;
-        })(),
+        clasif: c && c.veces ? c.suma / c.veces : null,
         mejor: datos.mejor[nombre] || null,
         peor: datos.peor[nombre] || null
       };
@@ -6062,7 +6061,6 @@
       return;
     }
 
-    const sinDato = '<span class="sub">—</span>';
     const conJornada = function (x) {
       if (!x) return sinDato;
       /* Entre paréntesis y en rojo, lo que hizo su once esa jornada y no le
@@ -6075,20 +6073,34 @@
         (x.jornada ? ' <span class="sub">J' + x.jornada + '</span>' : '');
     };
 
-    /* Cada bloque es UNA estadística con los ocho dentro, ordenados por ella.
-       Así se comparan de un vistazo, que es para lo que se mira esto; con una
-       caja por mánager había que ir saltando de una a otra para ver quién
-       tiene más de algo. `mejorAlto` dice si el primero es el que más tiene. */
+    /* Cada apartado se pinta como los de «Los mejores»: mismo cuadro, misma
+       lista numerada y el mismo aire para la fila que eres tú. Lo de las
+       tarjetas sueltas se leía corrido y no dejaba comparar de un vistazo. */
+    const cuadro = function (titulo, filas, cabecera) {
+      return '<div class="ranking">' +
+        (cabecera || '<h3 class="ranking__title">' + titulo + '</h3>') +
+        '<ol class="ranking__list">' + filas.map(function (fila) {
+          return '<li class="ranking__row' + claseMia(fila.nombre) + '">' +
+            '<span class="ranking__boton ranking__boton--fijo">' +
+              '<span class="ranking__quien"><span class="manager">' + avatar(fila.nombre) +
+                '<span class="manager__name">' + escapeHtml(fila.nombre) + '</span></span></span>' +
+              '<strong class="ranking__value">' + fila.valor + '</strong>' +
+            '</span>' +
+          '</li>';
+        }).join('') + '</ol>' +
+      '</div>';
+    };
+
     const bloques = [
       { titulo: 'Puntos', mejorAlto: true,
         valor: function (f) { return f.puntos; },
-        pinta: function (f) { return '<strong>' + f.puntos + '</strong>'; } },
+        pinta: function (f) { return String(f.puntos); } },
       { titulo: 'Media por jornada', mejorAlto: true,
         valor: function (f) { return f.media; },
         pinta: function (f) { return dec(f.media); } },
       { titulo: 'Jornadas ganadas', mejorAlto: true,
         valor: function (f) { return f.ganadas; },
-        pinta: function (f) { return f.ganadas || sinDato; } },
+        pinta: function (f) { return f.ganadas ? String(f.ganadas) : sinDato; } },
       { titulo: 'Liderato', mejorAlto: true,
         valor: function (f) { return f.liderMs || f.lider; },
         pinta: function (f) {
@@ -6116,47 +6128,52 @@
         pinta: function (f) { return conJornada(f.peor); } }
     ];
 
-    /* Y un bloque por mes, del más reciente al más antiguo: es lo que se mira
-       para saber quién está en racha ahora, no en agosto. Si no han llegado las
-       fechas de las jornadas no sale ninguno, que repartir meses a ojo sería
-       inventárselo. */
-    const porMeses = function () {
-      const meses = Object.keys(datos.porMes || {}).sort().reverse();
-      return meses.map(function (mes) {
-        const suyos = datos.porMes[mes];
-        const orden = Object.keys(suyos).sort(function (a, b) { return suyos[b] - suyos[a]; });
-        return '<section class="statgrupo">' +
-          '<h3 class="statgrupo__titulo">Puntos en ' + escapeHtml(comoSeLeeElMes(mes)) + '</h3>' +
-          '<div class="statboxes">' +
-          orden.map(function (nombre, i) {
-            return '<article class="statbox' + (i === 0 ? ' statbox--primero' : '') + '">' +
-              '<span class="statbox__puesto">' + (i + 1) + 'º</span>' +
-              '<span class="statbox__nombre">' + escapeHtml(nombre) + '</span>' +
-              '<span class="statbox__valor">' + suyos[nombre] + '</span>' +
-            '</article>';
-          }).join('') +
-          '</div></section>';
-      }).join('');
-    };
-
-    caja.innerHTML = bloques.map(function (bloque) {
+    const fijos = bloques.map(function (bloque) {
       const orden = gente.slice().sort(function (a, b) {
         const x = bloque.valor(a);
         const y = bloque.valor(b);
-        return bloque.mejorAlto ? (y - x) : (x - y);
+        return (bloque.mejorAlto ? (y - x) : (x - y)) ||
+          a.nombre.localeCompare(b.nombre, 'es');
       });
-      return '<section class="statgrupo">' +
-        '<h3 class="statgrupo__titulo">' + bloque.titulo + '</h3>' +
-        '<div class="statboxes">' +
-        orden.map(function (f, i) {
-          return '<article class="statbox' + (i === 0 ? ' statbox--primero' : '') + '">' +
-            '<span class="statbox__puesto">' + (i + 1) + 'º</span>' +
-            '<span class="statbox__nombre">' + escapeHtml(f.nombre) + '</span>' +
-            '<span class="statbox__valor">' + bloque.pinta(f) + '</span>' +
-          '</article>';
-        }).join('') +
-        '</div></section>';
-    }).join('') + porMeses();
+      return cuadro(bloque.titulo, orden.map(function (f) {
+        return { nombre: f.nombre, valor: bloque.pinta(f) };
+      }));
+    }).join('');
+
+    /* Y los puntos por mes, en UN apartado con su selector: doce cuadros, uno
+       por mes, ocuparían media pantalla para mirar siempre el mismo. */
+    const meses = Object.keys(datos.porMes || {}).sort().reverse();
+    let deMeses = '';
+    if (meses.length) {
+      if (meses.indexOf(state.mesEstadisticas) === -1) state.mesEstadisticas = meses[0];
+      const elegido = state.mesEstadisticas;
+      const suyos = datos.porMes[elegido] || {};
+      const orden = Object.keys(suyos).sort(function (a, b) {
+        return (suyos[b] - suyos[a]) || a.localeCompare(b, 'es');
+      });
+      const cabecera = '<div class="ranking__cab">' +
+        '<h3 class="ranking__title">Puntos por mes</h3>' +
+        '<select class="field field--mes" id="mes-estadisticas" aria-label="Mes">' +
+          meses.map(function (mes) {
+            return '<option value="' + escapeHtml(mes) + '"' +
+              (mes === elegido ? ' selected' : '') + '>' +
+              escapeHtml(comoSeLeeElMes(mes)) + '</option>';
+          }).join('') +
+        '</select></div>';
+      deMeses = cuadro('Puntos por mes', orden.map(function (nombre) {
+        return { nombre: nombre, valor: String(suyos[nombre]) };
+      }), cabecera);
+    }
+
+    caja.innerHTML = '<div class="rankings rankings--dos">' + fijos + deMeses + '</div>';
+
+    const selector = $('mes-estadisticas');
+    if (selector) {
+      selector.addEventListener('change', function () {
+        state.mesEstadisticas = selector.value;
+        renderEstadisticasDeLiga();
+      });
+    }
   }
 
   function renderTandasDeLiga() {
