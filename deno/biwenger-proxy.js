@@ -223,7 +223,7 @@ const CDN = 'https://cf.biwenger.com/api/v2';
    navegador normal y las cabeceras que este mandaría. */
 /* Marca de versión: se sube en cada cambio y se consulta con ?version=1.
    Sirve para saber desde fuera si el despliegue ha entrado o no. */
-const VERSION = '2026-09-12 · deno 152';
+const VERSION = '2026-09-12 · deno 153';
 
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ' +
   '(KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36';
@@ -3755,10 +3755,6 @@ async function roundDetail(roundId, score) {
      una vez cada media hora y punto. */
   const kvClave = 'detalle-v1-' + roundId + '-' + (score || '');
   const deKv = await leerDetalleKv(kvClave);
-  cache.detalleDeKv = deKv
-    ? { edadMin: Math.round((Date.now() - deKv.at) / 60000), vigenciaMin: Math.round(vigenciaDetalle(deKv.data) / 60000),
-        played: deKv.data && deKv.data.played, games: deKv.data && deKv.data.games }
-    : 'sin copia';
   if (deKv && Date.now() - deKv.at < vigenciaDetalle(deKv.data)) {
     cache.detalles[clave] = { data: deKv.data, at: deKv.at, vigencia: vigenciaDetalle(deKv.data) };
     return deKv.data;
@@ -3767,7 +3763,6 @@ async function roundDetail(roundId, score) {
   const response = await fetch(CDN + '/rounds/la-liga/' + encodeURIComponent(roundId) +
     '?lang=es' + (score ? '&score=' + encodeURIComponent(score) : ''),
     { headers: NAVEGADOR, cf: SIN_CACHE });
-  cache.ultimoDetalle = { id: roundId, status: response && response.status, at: Date.now() };
   /* Sin CDN se sirve lo último que se leyó, por viejo que sea: una jornada de
      hace un rato es infinitamente mejor que «no se han podido traer los
      partidos», que era lo que salía. */
@@ -4520,12 +4515,14 @@ async function roundBoard(env, headers, jornada, listaNombres) {
   const delParte = (detalle && detalle.puntos) || {};
   Object.keys(delParte).forEach(function (id) {
     if (delParte[id] == null) return;
-    /* Con la jornada EN JUEGO manda el parte por encima de todo. Las «notas de
-       verdad» que salen de la ficha del futbolista no existen todavia para esta
-       jornada: lo que se leia era la nota de la ANTERIOR, y se servia como si
-       fuera de hoy. Cerrada la jornada, la ficha si la tiene y vuelve a mandar
-       ella, que es la que cuadra con los ajustes de la liga. */
-    if (!cerrada || conNota[id] == null) base[id] = delParte[id];
+    /* SOLO donde no hay nota de verdad. La nota buena es la de la ficha del
+       futbolista, que es la que cuadra al punto con Biwenger; el parte del
+       partido NO vale para mandar sobre ella, porque el mismo futbolista en el
+       mismo partido acabado devuelve 9, 6 u 11 segun la peticion —medido—.
+       Aqui solo tapa el agujero de las primeras horas de la jornada, cuando la
+       ficha todavia no tiene la nota y lo que se colaba era la de la jornada
+       ANTERIOR. */
+    if (conNota[id] == null) base[id] = delParte[id];
   });
 
   /* En qué puesto jugó cada uno de verdad. De la ficha si la hemos leído; si
@@ -4783,16 +4780,6 @@ async function roundBoard(env, headers, jornada, listaNombres) {
        porque se adelantó un Real Sociedad-Celta. Con eso, la web la contaba
        entre las que «faltan por traer» y salía a pedirla para nada. */
     rounds: await calendarioConEstado(calendar, score),
-    diag: {
-      hayDetalle: !!detalle,
-      conPuntos: Object.keys((detalle && detalle.puntos) || {}).length,
-      partidos: ((detalle && detalle.matches) || []).length,
-      cerrada: cerrada,
-      score: score,
-      muestra: (detalle && detalle.puntos) ? detalle.puntos['38194'] : null,
-      ultimaBajada: cache.ultimoDetalle || null,
-      deKv: cache.detalleDeKv || null
-    },
     standings: standings,
     bestXi: once,
     /* Los importes que paga la liga, para poder explicarlos en la web sin
