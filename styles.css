@@ -905,6 +905,10 @@ code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft)
 .modo-app #squad-panel .table tbody tr.row-venta {
   border-color: var(--neg); background: var(--bg-surface);
 }
+/* En la tarjeta no hay banda: lo que marca es el contorno. */
+.modo-app #squad-panel .table tbody tr.row-titular {
+  border-color: var(--marca); background: var(--bg-surface);
+}
 
 /* Las celdas dejan de serlo: sin relleno, sin borde y sin alinear a la derecha,
    que es lo que empujaba todo fuera de la tarjeta. */
@@ -1411,6 +1415,12 @@ code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft)
 .table tbody tr.row-venta > td { background: var(--fila-venta); }
 .table tbody tr.row-venta > td:first-child {
   box-shadow: inset 3px 0 0 var(--neg);
+}
+/* Y amarilla en los que tienes puestos en el once. Va DESPUÉS de la roja a
+   propósito: a igualdad de peso manda la última, así que al que está en venta
+   y además alineado le gana la amarilla. Que siga en venta lo dice el fondo. */
+.table tbody tr.row-titular > td:first-child {
+  box-shadow: inset 3px 0 0 var(--marca);
 }
 
 /* Los años de cantera en la trayectoria: se ven, pero un punto por detrás de

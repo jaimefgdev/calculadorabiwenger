@@ -3653,6 +3653,9 @@
     $('lineup-count').textContent = titulares + ' de 11 titulares · ' + money(valor) + ' de valor en el campo';
 
     pintarAvisosDeAlineacion(titulares);
+    /* Y los puntos amarillos de Mi plantilla, que viven en otra tabla: si no se
+       repasan aquí se quedan señalando a quien acabas de sacar del once. */
+    renderPlantilla();
   }
 
   /**
@@ -3672,6 +3675,31 @@
   }
 
   /** «5h 12m» en negrita, solo cuando la jornada está encima. */
+  /* Cómo está un futbolista, para el aviso del once: el estado malo y el parte
+     de Biwenger, cogidos de donde estén igual que hace la ficha. */
+  function comoEsta(id) {
+    const clave = String(id);
+    const busca = function (lista) {
+      return (lista || []).filter(function (j) { return j && String(j.id) === clave; })[0];
+    };
+    let estado = null;
+    let parte = null;
+    [busca(mySquad()), busca(state.jugadores)].forEach(function (fuente) {
+      if (!fuente) return;
+      if (!estado && fuente.status && fuente.status !== 'ok') estado = fuente.status;
+      if (!parte && fuente.statusInfo) parte = fuente.statusInfo;
+    });
+    return estado ? { estado: estado, parte: parte } : null;
+  }
+
+  /* «Duda» no admite el «está» de los demás. */
+  const FRASE_ESTADO = {
+    injured:    'está lesionado',
+    sanctioned: 'está sancionado',
+    doubt:      'es duda',
+    discarded:  'está descartado'
+  };
+
   function rotuloCuentaAtras(cerca, round) {
     if (!cerca) return '';
     const queda = timeLeft(arranqueDeJornada(round));
@@ -3703,6 +3731,25 @@
       avisos.push('Te ' + (huecos === 1 ? 'falta 1 jugador' : 'faltan ' + huecos + ' jugadores') +
         ' en el once.' + rotuloCuentaAtras(cerca, round));
     }
+
+    /* Y quién de los que has puesto no está para jugar. La chapa ya sale en su
+       foto, pero es un circulito en una esquina y con once muñecos en el campo
+       se pasa por alto; un titular que no juega es un cero. Uno por línea, con
+       el parte de Biwenger, que es lo que de verdad dice si cambiarlo o
+       esperar. La cuenta atrás solo en el primero, que si no se repite. */
+    let primeroTocado = true;
+    Object.keys(state.xi.slots).forEach(function (hueco) {
+      const id = state.xi.slots[hueco];
+      if (!id) return;
+      const mal = comoEsta(id);
+      if (!mal) return;
+      const quien = playerById(id);
+      avisos.push(escapeHtml(comoSeLlama(quien) || 'Un titular') + ' es titular y ' +
+        (FRASE_ESTADO[mal.estado] || 'no está disponible') + '.' +
+        (mal.parte ? ' ' + escapeHtml(mal.parte) : '') +
+        (primeroTocado ? rotuloCuentaAtras(cerca, round) : ''));
+      primeroTocado = false;
+    });
 
     caja.hidden = avisos.length === 0;
     caja.innerHTML = avisos.map(function (texto) {
@@ -5898,6 +5945,16 @@
     return o.direction === 'in' && String(o.playerId) === String(id);
   }).sort(function (a, b) { return b.amount - a.amount; });
 
+  /* Si lo tienes puesto en el once. La plantilla y la alineación son dos
+     pantallas distintas, así que al mirar la lista no había forma de saber
+     quién está puesto sin ir a comprobarlo. */
+  function esTitular(id) {
+    const slots = (state.xi && state.xi.slots) || {};
+    return Object.keys(slots).some(function (hueco) {
+      return String(slots[hueco]) === String(id);
+    });
+  }
+
   function renderPlantilla() {
     const seccion = $('squad-panel');
     const cuerpo = $('squad-body');
@@ -5915,7 +5972,13 @@
       const mejor = ofertas[0];
       const sube = (jugador.increment || 0) > 0;
 
-      return '<tr' + (venta ? ' class="row-venta"' : '') + '>' +
+      /* La banda del margen dice de un vistazo qué pasa con esa fila: roja si
+         lo tienes en venta, amarilla si lo tienes puesto en el once. Manda la
+         amarilla cuando se juntan las dos —el fondo rojizo ya sigue diciendo
+         que está en venta—, que lo que se mira antes de una jornada es quién
+         juega. */
+      const clases = (venta ? ' row-venta' : '') + (esTitular(jugador.id) ? ' row-titular' : '');
+      return '<tr' + (clases ? ' class="' + clases.trim() + '"' : '') + '>' +
         '<td data-label="Futbolista"><span class="with-crest">' +
           playerName({ playerId: jugador.id, player: jugador.name,
             position: jugador.position, altPositions: jugador.altPositions }) +
