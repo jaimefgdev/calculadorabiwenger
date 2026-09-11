@@ -643,7 +643,7 @@ code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft)
 #panel-datos .ranking__row:nth-child(1) .ranking__boton::before,
 #panel-datos .ranking__row:nth-child(1) .ranking__value { color: #ffc94a; }
 #panel-datos .ranking__row:nth-child(2) .ranking__boton::before,
-#panel-datos .ranking__row:nth-child(2) .ranking__value { color: #cfd6dd; }
+#panel-datos .ranking__row:nth-child(2) .ranking__value { color: #9fb2c6; }
 #panel-datos .ranking__row:nth-child(3) .ranking__boton::before,
 #panel-datos .ranking__row:nth-child(3) .ranking__value { color: #d9914f; }
 /* El numero, ademas, con algo mas de peso: al lado de dos cifras grises, un
@@ -3425,6 +3425,18 @@ main.wrap { padding-top: 1.15rem; padding-bottom: 3.5rem; }
 /* Los puntos de un futbolista que esta entre los diez de su demarcacion, donde
    van escritos y no encima de la cara: mismo amarillo que la chapa. */
 .pts-top { color: var(--marca); font-weight: 700; }
+
+/* Los tres que mas puntos le han dado a un manager, en su desglose de puntos.
+   Mismos metales que el podio de Datos. */
+.pts-medalla { font-weight: 700; }
+.pts-medalla--oro    { color: #ffc94a; }
+.pts-medalla--plata  { color: #9fb2c6; }
+.pts-medalla--bronce { color: #d9914f; }
+@media (prefers-color-scheme: light) {
+  .pts-medalla--oro    { color: #b8860b; }
+  .pts-medalla--plata  { color: #7d8590; }
+  .pts-medalla--bronce { color: #a2673a; }
+}
 
 
 .versus__dato--mejor { color: var(--pos); }

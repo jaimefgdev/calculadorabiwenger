@@ -8655,9 +8655,18 @@
           '<th class="detail-rank">Pos.</th><th>Futbolista</th>' +
           '<th class="num">Puntos</th><th class="num">Partidos</th>' +
         '</tr></thead><tbody>' +
-        suyos.map(function (jugador) {
+        suyos.map(function (jugador, i) {
           const clave = 'plantilla:' + row.name + ':' + jugador.id;
           const abierto = state.puntosDetalle === clave;
+          /* Oro, plata y bronce para los tres que más le han dado. Aquí el
+             amarillo del top 10 de LaLiga no pintaba nada: esto es SU
+             plantilla, y lo que se mira es quién le sostiene el equipo, no si
+             además es de los mejores de la competición.
+             La lista ya viene ordenada de más a menos, así que el sitio en la
+             tabla es el puesto. Sin puntos no hay medalla, que un podio de
+             ceros no dice nada. */
+          const medalla = (jugador.points > 0 && i < 3)
+            ? ' pts-medalla pts-medalla--' + ['oro', 'plata', 'bronce'][i] : '';
           return '<tr class="fila-puntos' + (abierto ? ' row-open' : '') + '"' +
               ' data-puntos="' + escapeHtml(clave) + '">' +
             '<td class="detail-rank">' +
@@ -8666,7 +8675,8 @@
               playerName({ playerId: jugador.id, player: jugador.name,
                 position: jugador.position, altPositions: jugador.altPositions }) +
               crestOf(jugador, 'crest--badge') + '</span></td>' +
-            '<td class="num"><strong>' + puntosConTope(jugador) + '</strong></td>' +
+            '<td class="num"><strong class="' + medalla.trim() + '">' +
+              (jugador.points == null ? '<span class="sub">—</span>' : jugador.points) + '</strong></td>' +
             '<td class="num">' + jugador.played + '</td>' +
           '</tr>' +
           (abierto
