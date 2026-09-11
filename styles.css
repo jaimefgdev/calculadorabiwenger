@@ -3697,6 +3697,16 @@ main.wrap { padding-top: 1.15rem; padding-bottom: 3.5rem; }
    color antes que la forma. */
 .juega--casa .juega__donde { color: #000; }
 .juega--fuera .juega__donde { color: #fff; }
+/* Y cada uno perfilado del color contrario, para que ninguno se pierda: la
+   casa negra sobre una foto oscura y el avion blanco sobre un escudo claro.
+   `paint-order: stroke fill` pinta el trazo PRIMERO y el relleno encima, asi
+   que el borde queda por fuera del dibujo en vez de comerselo. */
+.juega__donde svg path {
+  paint-order: stroke fill;
+  stroke-width: 2.6; stroke-linejoin: round;
+}
+.juega--casa .juega__donde svg path { stroke: #fff; }
+.juega--fuera .juega__donde svg path { stroke: #000; }
 .juega__rival {
   display: block; width: 16px; height: 16px; flex: none;
   background: center / contain no-repeat;
