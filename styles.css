@@ -1208,7 +1208,12 @@ code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft)
   width: 100%; height: auto; aspect-ratio: 1;
   box-shadow: none; background-color: rgba(0,0,0,.35);
 }
-.pic-player.pitch__face--empty { border: 2px dashed rgba(255, 255, 255, .45); box-shadow: none; }
+/* El hueco sin cubrir, en rojo: cuesta cuatro puntos, y con el aro blanco se
+   confundia con una foto que no habia llegado a cargar. */
+.pic-player.pitch__face--empty {
+  border: 2px dashed var(--neg); box-shadow: none;
+  background-color: var(--neg-soft);
+}
 .pitch__name {
   font-size: .7rem; font-weight: 600; color: #fff; text-align: center;
   max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;

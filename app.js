@@ -3706,6 +3706,9 @@
     return queda ? ' <strong>' + escapeHtml(queda.text) + '</strong>' : '';
   }
 
+  /* Lo que resta Biwenger por cada sitio del once que dejes sin cubrir. */
+  const PENA_HUECO = 4;
+
   function pintarAvisosDeAlineacion(titulares) {
     const caja = $('lineup-avisos');
     if (!caja) return;
@@ -3728,8 +3731,11 @@
 
     if (titulares < 11) {
       const huecos = 11 - titulares;
-      avisos.push('Te ' + (huecos === 1 ? 'falta 1 jugador' : 'faltan ' + huecos + ' jugadores') +
-        ' en el once.' + rotuloCuentaAtras(cerca, round));
+      /* Lo que importa no es cuántos faltan, es lo que cuesta: decir los puntos
+         que pierdes es lo que hace levantarse a taparlo. */
+      avisos.push((huecos === 1 ? '1 posición vacía' : huecos + ' posiciones vacías') +
+        ' en el once: ' + (huecos * PENA_HUECO) + ' puntos menos.' +
+        rotuloCuentaAtras(cerca, round));
     }
 
     /* Y quién de los que has puesto no está para jugar. La chapa ya sale en su
