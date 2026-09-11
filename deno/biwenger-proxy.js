@@ -223,7 +223,7 @@ const CDN = 'https://cf.biwenger.com/api/v2';
    navegador normal y las cabeceras que este mandaría. */
 /* Marca de versión: se sube en cada cambio y se consulta con ?version=1.
    Sirve para saber desde fuera si el despliegue ha entrado o no. */
-const VERSION = '2026-09-12 · deno 150';
+const VERSION = '2026-09-12 · deno 151';
 
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ' +
   '(KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36';
@@ -4778,6 +4778,14 @@ async function roundBoard(env, headers, jornada, listaNombres) {
        porque se adelantó un Real Sociedad-Celta. Con eso, la web la contaba
        entre las que «faltan por traer» y salía a pedirla para nada. */
     rounds: await calendarioConEstado(calendar, score),
+    diag: {
+      hayDetalle: !!detalle,
+      conPuntos: Object.keys((detalle && detalle.puntos) || {}).length,
+      partidos: ((detalle && detalle.matches) || []).length,
+      cerrada: cerrada,
+      score: score,
+      muestra: (detalle && detalle.puntos) ? detalle.puntos['38194'] : null
+    },
     standings: standings,
     bestXi: once,
     /* Los importes que paga la liga, para poder explicarlos en la web sin
