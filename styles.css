@@ -3687,12 +3687,7 @@ main.wrap { padding-top: 1.15rem; padding-bottom: 3.5rem; }
   display: inline-flex; align-items: center; gap: 2px;
   line-height: 0;
 }
-.partido__donde {
-  display: block; width: 11px; height: 11px;
-  /* Sin pastilla detras, lo que los despega del fondo es la sombra: el dibujo
-     tiene que leerse igual sobre el cesped que sobre la tarjeta oscura. */
-  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, .9));
-}
+.partido__donde { display: block; width: 14px; height: 14px; }
 .partido__donde svg { display: block; width: 100%; height: 100%; }
 /* En casa en verde y fuera en naranja: de un vistazo se ve donde juega sin
    tener que distinguir el dibujo a once pixeles. Tonos CLAROS, que los
@@ -3701,9 +3696,8 @@ main.wrap { padding-top: 1.15rem; padding-bottom: 3.5rem; }
 .partido--casa .partido__donde { color: #5ee79b; }
 .partido--fuera .partido__donde { color: #ffab52; }
 .partido__rival {
-  display: block; width: 13px; height: 13px; flex: none;
+  display: block; width: 16px; height: 16px; flex: none;
   background: center / contain no-repeat;
-  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, .9));
 }
 /* En la cara, pegada a la esquina y sin comerse los clics. */
 .partido--esquina {
@@ -3711,8 +3705,11 @@ main.wrap { padding-top: 1.15rem; padding-bottom: 3.5rem; }
   transform: translate(26%, -8%);
   pointer-events: none;
 }
-/* En la tabla va suelta, sin esquina que valga. */
-.partido--fila { position: static; transform: none; }
+/* En la tabla va suelta, sin esquina que valga, y mas grande: ahi no compite
+   con la cara ni con las otras chapas, y hay sitio de sobra. */
+.partido--fila { position: static; transform: none; gap: 4px; }
+.partido--fila .partido__donde { width: 19px; height: 19px; }
+.partido--fila .partido__rival { width: 22px; height: 22px; }
 .partido-cell { white-space: nowrap; }
 
 /* Cómo llegó cada futbolista a la plantilla: procedencia en pequeño e importe
