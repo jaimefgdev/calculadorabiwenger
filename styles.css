@@ -3719,7 +3719,10 @@ main.wrap { padding-top: 1.15rem; padding-bottom: 3.5rem; }
 /* En la cara, pegada a la esquina y sin comerse los clics. */
 .juega--esquina {
   position: absolute; z-index: 3; bottom: 0; right: 0;
-  transform: translate(26%, -8%);
+  /* Sacada hacia fuera para que no se coma la cara. No mas: la ficha del
+     banquillo recorta a los 14 px de margen que tiene, y pasado el 45 % el
+     escudo empieza a quedarse fuera. */
+  transform: translate(45%, -8%);
   pointer-events: none;
 }
 /* En la tabla va suelta, sin esquina que valga, y mas grande: ahi no compite
