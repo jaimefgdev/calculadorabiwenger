@@ -632,6 +632,36 @@ code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft)
   padding-left: 26px;   /* alineado con el nombre, bajo la foto */
 }
 .ranking__value { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
+
+/* ---------- El podio de los rankings de Datos ----------
+   Oro, plata y bronce en los tres primeros: el numero del puesto y el dato, que
+   es lo que se mira. Se hace SOLO con CSS, por el orden en que van las filas:
+   las listas siempre empiezan por el primero —lo que despliega «ver mas» son
+   filas por debajo—, asi que `nth-child` es exactamente el puesto.
+   Solo en Datos. En «Los mejores» de Liga las listas son de manager y ahi el
+   podio no significa lo mismo. */
+#panel-datos .ranking__row:nth-child(1) .ranking__boton::before,
+#panel-datos .ranking__row:nth-child(1) .ranking__value { color: #ffc94a; }
+#panel-datos .ranking__row:nth-child(2) .ranking__boton::before,
+#panel-datos .ranking__row:nth-child(2) .ranking__value { color: #cfd6dd; }
+#panel-datos .ranking__row:nth-child(3) .ranking__boton::before,
+#panel-datos .ranking__row:nth-child(3) .ranking__value { color: #d9914f; }
+/* El numero, ademas, con algo mas de peso: al lado de dos cifras grises, un
+   color solo se pierde. */
+#panel-datos .ranking__row:nth-child(-n+3) .ranking__boton::before { font-weight: 700; }
+/* Lo de debajo del dato («4 partidos») se queda gris: no es el dato. */
+#panel-datos .ranking__row:nth-child(-n+3) .ranking__sub { color: var(--text-faint); }
+
+/* En claro, el oro y la plata se pierden sobre blanco: mismos metales, mas
+   apagados. Como el resto del fichero, por `prefers-color-scheme`. */
+@media (prefers-color-scheme: light) {
+  #panel-datos .ranking__row:nth-child(1) .ranking__boton::before,
+  #panel-datos .ranking__row:nth-child(1) .ranking__value { color: #b8860b; }
+  #panel-datos .ranking__row:nth-child(2) .ranking__boton::before,
+  #panel-datos .ranking__row:nth-child(2) .ranking__value { color: #7d8590; }
+  #panel-datos .ranking__row:nth-child(3) .ranking__boton::before,
+  #panel-datos .ranking__row:nth-child(3) .ranking__value { color: #a2673a; }
+}
 .ranking__sub { display: block; font-size: .66rem; font-weight: 400; color: var(--text-faint); }
 
 /* La fila entera es pulsable: abre el gráfico por jornada. */

@@ -10660,7 +10660,7 @@
               playerName({ playerId: player.id, player: player.name }) +
               crestOf(player, 'crest--badge') + '</span></td>' +
             '<td class="estado-cell">' + statusCell(player) + '</td>' +
-            '<td class="num">' + (player.points == null ? '<span class="sub">—</span>' : player.points) + '</td>' +
+            '<td class="num">' + puntosConTope(player) + '</td>' +
             '<td class="detail-date">' + shortDay(player.since) + '</td>' +
             '<td class="metodo">' + (function () {
               /* Cómo llegó a la plantilla y por cuánto. El importe, siempre en el
