@@ -5706,10 +5706,14 @@
         suyo.ultimo = puesto;
       });
 
-      /* Los puntos de cada uno, para el total y la media. */
-      filas.forEach(function (fila) {
+      /* Los puntos de cada uno, para el total y la media. Se recorren TODOS, no
+         solo los que puntuaron: al que empezó la jornada en negativo le cuenta
+         como un cero, no como «no jugó». Omitiéndola, su media salía mejor
+         justo por haber estado en números rojos. */
+      (jornada.standings || []).forEach(function (fila) {
+        if (fila.points == null) return;
         const suyo = totales[fila.name] || (totales[fila.name] = { puntos: 0, jugadas: 0 });
-        suyo.puntos += fila.points;
+        suyo.puntos += fila.counts === false ? 0 : fila.points;
         suyo.jugadas += 1;
       });
 
@@ -5736,11 +5740,17 @@
       const cual = (jornada.round && jornada.round.number) || null;
       (jornada.standings || []).forEach(function (fila) {
         if (fila.points == null) return;
-        const suya = { puntos: fila.points, jornada: cual };
+        /* Al que empezó la jornada en negativo, Biwenger no le da los puntos
+           (`counts: false`). Esa jornada es un CERO suyo, no «no jugó»: cuenta
+           como su peor jornada igual que si la hubiera hecho a cero. Se guarda
+           aparte lo que sí sumó su once, que es la parte que duele. */
+        const anulada = fila.counts === false;
+        const vale = anulada ? 0 : fila.points;
+        const suya = { puntos: vale, jornada: cual, anulados: anulada ? fila.points : null };
         const mejorHasta = mejor[fila.name];
         const peorHasta = peor[fila.name];
-        if (!mejorHasta || fila.points > mejorHasta.puntos) mejor[fila.name] = suya;
-        if (!peorHasta || fila.points < peorHasta.puntos) peor[fila.name] = suya;
+        if (!mejorHasta || vale > mejorHasta.puntos) mejor[fila.name] = suya;
+        if (!peorHasta || vale < peorHasta.puntos) peor[fila.name] = suya;
       });
     });
 
@@ -5994,7 +6004,14 @@
     const sinDato = '<span class="sub">—</span>';
     const conJornada = function (x) {
       if (!x) return sinDato;
-      return x.puntos + (x.jornada ? ' <span class="sub">J' + x.jornada + '</span>' : '');
+      /* Entre paréntesis y en rojo, lo que hizo su once esa jornada y no le
+         contó por estar en negativo. */
+      return x.puntos +
+        (x.anulados != null
+          ? ' <span class="statbox__anulados" title="Lo que sumó su once, pero no le contó por empezar la jornada en negativo">(' +
+            x.anulados + ')</span>'
+          : '') +
+        (x.jornada ? ' <span class="sub">J' + x.jornada + '</span>' : '');
     };
 
     /* Cada bloque es UNA estadística con los ocho dentro, ordenados por ella.
@@ -6026,8 +6043,10 @@
       { titulo: 'Mejor jornada', mejorAlto: true,
         valor: function (f) { return f.mejor ? f.mejor.puntos : -Infinity; },
         pinta: function (f) { return conJornada(f.mejor); } },
-      { titulo: 'Peor jornada', mejorAlto: true,
-        valor: function (f) { return f.peor ? f.peor.puntos : -Infinity; },
+      /* De menos a más: aquí el primero es el que peor lo pasó, no el que menos
+         mal. Es la lista de los batacazos. */
+      { titulo: 'Peor jornada', mejorAlto: false,
+        valor: function (f) { return f.peor ? f.peor.puntos : Infinity; },
         pinta: function (f) { return conJornada(f.peor); } }
     ];
 

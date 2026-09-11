@@ -3441,6 +3441,8 @@ main.wrap { padding-top: 1.15rem; padding-bottom: 3.5rem; }
 }
 /* El liderato en amarillo: es el dato que se busca al abrir esto. */
 .statbox__lider { color: var(--marca); }
+/* Lo que sumo su once y no le conto por empezar la jornada en negativo. */
+.statbox__anulados { color: var(--neg); font-weight: 600; }
 
 /* Los puntos de un futbolista que esta entre los diez de su demarcacion, donde
    van escritos y no encima de la cara: mismo amarillo que la chapa. */
