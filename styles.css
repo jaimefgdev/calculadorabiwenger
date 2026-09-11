@@ -1045,7 +1045,12 @@ code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft)
      no se toquen. */
   width: min(100%, 540px);
   aspect-ratio: 68 / 96;
-  margin: 0 auto;
+  /* Tumbado, el campo ocupa menos alto del que mide su caja, y esa diferencia
+     se quedaba como un hueco muerto encima. Se sube con un margen negativo
+     medido en el ANCHO del envoltorio (`cqw`), que es de lo que depende: son
+     19 puntos de ese ancho, medidos en el navegador.
+     Abajo NO se toca: ese hueco es el que ocupa la tierra. */
+  margin: -19cqw auto 0;
   /* Más aire arriba y abajo: los de las puntas de cada línea van adelantados
      (el escalonado de Biwenger), y en un 3-2-5 el que más sube se salía por el
      borde de arriba. */
@@ -1080,11 +1085,24 @@ code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft)
     0 14px 0 #55381f,
     0 17px 0 #3a2614,
     0 26px 26px rgba(0, 0, 0, .5);
-  overflow: hidden;
+  /* Tumbado, como se ve un campo desde la grada.
+     El `scale` no es un capricho: al tumbarlo, el borde de abajo se acerca a la
+     camara y CRECE, asi que el campo proyectado se salia por abajo y por los
+     lados de su sitio. Con el 88 % vuelve a caber entero. */
+  transform: rotateX(24deg) scale(.88);
+  /* Los munecos son hijos suyos y tienen que vivir en el MISMO espacio de tres
+     dimensiones para poder enderezarse; si no, se aplastarian con el campo. */
+  transform-style: preserve-3d;
+  /* Sin `overflow: hidden`: aplana el espacio 3D y se lleva por delante el
+     enderezado de los munecos. La marca de agua no se sale igualmente —esta
+     medida en `cqw` y centrada—, asi que no hacia falta para esto. */
   /* La marca de agua se mezcla con el césped, y sin esto la mezcla se saldría
      del campo a buscar el fondo de la página. */
   isolation: isolate;
 }
+/* El 3D tiene que llegar hasta el muneco: cada capa de por medio que no lo
+   conserve aplana lo que lleva dentro. */
+.pitch__line { transform-style: preserve-3d; }
 /* Línea de medio campo y círculo central. */
 .pitch::before {
   content: '';
@@ -1189,8 +1207,13 @@ code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft)
      por el borde de arriba: pasaba con cinco delanteros y con seis medios. Va
      en la MISMA transformada para que el escalonado no cambie, solo se deslice
      el bloque entero. */
+  /* El escalonado de siempre, y detras el enderezado: se gira lo mismo que se
+     ha tumbado el campo, pero al reves, asi que el muneco queda de pie sobre
+     el cesped en vez de tumbado con el. Por los pies, que es por donde pisa. */
   transform: translate(calc(var(--desx, 0) * 1%),
-                       calc(var(--rango, 0) * -42% + var(--baja, 0) * 1%));
+                       calc(var(--rango, 0) * -42% + var(--baja, 0) * 1%))
+             rotateX(-24deg);
+  transform-origin: 50% 100%;
   position: relative; display: flex; flex-direction: column; align-items: center;
   gap: .2rem; min-width: 0;
   /* Se reparten la línea a partes iguales, con tope: hasta cinco quedan al
@@ -1307,6 +1330,10 @@ code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft)
 .pitch-wrap {
   position: relative; width: min(100%, 460px); margin: 0 auto;
   container-type: inline-size;
+  /* La camara. Cuanto mas lejos, menos deformacion; 1100 px deja el campo
+     tumbado como el de Biwenger sin que el fondo se estreche de mas. Mirando
+     al centro, que es como se ve un campo desde la grada de enfrente. */
+  perspective: 1100px;
 }
 .picker { position: absolute; inset: 0; z-index: 5; display: grid; place-items: center; padding: .5rem; }
 .picker__backdrop { position: absolute; inset: 0; background: rgba(0, 0, 0, .55); border-radius: 6px; }

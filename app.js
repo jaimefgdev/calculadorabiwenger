@@ -3531,8 +3531,13 @@
         (quien ? escapeHtml(comoSeLlama(quien)) : '') + '</span>';
     /* Del ancho de un hueco del campo, que es la referencia. Si no hubiera
        ninguno a mano, el del sitio de donde salió. */
+    /* `offsetWidth` y no `getBoundingClientRect()`: con el campo en perspectiva
+       el segundo devuelve el ancho PROYECTADO, que es distinto en cada linea
+       —los de arriba estan mas lejos y salen mas pequeños—, y el muñeco
+       cambiaba de tamaño segun de donde lo cogieras. `offsetWidth` da el de la
+       maquetacion, que es el mismo para todos. */
     const enElCampo = document.querySelector('#pitch .pitch__slot');
-    const ancho = enElCampo ? enElCampo.getBoundingClientRect().width : rect.width;
+    const ancho = (enElCampo && enElCampo.offsetWidth) || rect.width;
     fantasma.style.width = ancho + 'px';
     /* Los huecos del campo tienen tope de ancho en % —del campo, cuando están
        dentro—. Colgando del `body` ese % se mediría contra la pantalla entera,
