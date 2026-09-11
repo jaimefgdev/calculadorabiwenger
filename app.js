@@ -3398,6 +3398,18 @@
   function renderPicker() {
     const box = $('lineup-picker');
     const open = state.picker;
+
+    /* El envoltorio del campo se levanta por encima de la barra de arriba
+       mientras el diálogo está abierto, y vuelve a su sitio al cerrarlo.
+       Hace falta porque el diálogo vive DENTRO de `.pitch-wrap`, que es un
+       contexto de apilado propio (se lo da `container-type`), asi que por muy
+       alto que se le ponga el z-index al diálogo nunca sube por encima de la
+       barra: sube la caja entera o no sube nadie. Y con la barra encima, era
+       ella la que se comía los clics —ni se podía elegir sistema ni cambiar un
+       jugador— según dónde cayera el diálogo al desplazar la página. */
+    const envoltorio = box.parentElement;
+    if (envoltorio) envoltorio.classList.toggle('pitch-wrap--encima', !!(open && state.xi));
+
     if (!open || !state.xi) { box.hidden = true; box.innerHTML = ''; return; }
 
     if (open.kind === 'formation') {

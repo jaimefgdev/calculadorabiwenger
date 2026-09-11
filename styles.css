@@ -1295,6 +1295,10 @@ code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft)
   position: relative; width: min(100%, 460px); margin: 0 auto;
   container-type: inline-size;
 }
+/* Con el dialogo abierto, el campo entero se pone por encima de la barra de
+   arriba. Solo entonces: el resto del tiempo la barra tiene que seguir tapando
+   el campo al desplazar la pagina. */
+.pitch-wrap--encima { z-index: 30; }
 .picker { position: absolute; inset: 0; z-index: 5; display: grid; place-items: center; padding: .5rem; }
 .picker__backdrop { position: absolute; inset: 0; background: rgba(0, 0, 0, .55); border-radius: 6px; }
 .picker__card {
