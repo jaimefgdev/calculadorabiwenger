@@ -924,7 +924,7 @@ code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft)
   grid-template-areas:
     'venta venta venta venta  venta   ofertas'
     'quien quien quien quien  quien   acciones'
-    '.     valor hoy   pts    estado  acciones';
+    'part  valor hoy   pts    estado  acciones';
   gap: .15rem .5rem; align-items: center; width: 100%;
   margin: 0 0 .5rem; padding: .55rem .7rem;
   background: var(--bg-surface);
@@ -960,6 +960,8 @@ code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft)
 .modo-app #squad-panel td[data-label='Hoy']        { grid-area: hoy; }
 .modo-app #squad-panel td[data-label='Puntos']     { grid-area: pts; }
 .modo-app #squad-panel td[data-label='Estado']     { grid-area: estado; }
+/* El partido ocupa el hueco que quedaba libre bajo la cara. */
+.modo-app #squad-panel td[data-label='Partido']    { grid-area: part; justify-self: center; }
 .modo-app #squad-panel td[data-label='Ofertas']    { grid-area: ofertas; justify-self: end; }
 .modo-app #squad-panel td.col-pujar                { grid-area: acciones; }
 
@@ -3675,6 +3677,37 @@ main.wrap { padding-top: 1.15rem; padding-bottom: 3.5rem; }
    Sale en el campo, en el banquillo y en la lista: donde hay veinte caras de
    golpe es donde de verdad sirve. */
 .pts--top { background: var(--marca); box-shadow: 0 1px 4px rgba(0, 0, 0, .55); }
+
+/* ---------- Contra quien juega esta jornada ----------
+   Una pastilla blanca con la casita o el avion y, al lado, el escudo del
+   rival. Va en la esquina de abajo a la derecha de la cara, que era el unico
+   rincon libre: arriba a la izquierda esta la demarcacion, a la izquierda la
+   marca de lesionado y abajo a la izquierda los puntos. */
+.partido {
+  display: inline-flex; align-items: center; gap: 2px;
+  padding: 2px 3px; line-height: 0;
+  background: #fff; border-radius: 100px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, .5);
+}
+.partido__donde { display: block; width: 10px; height: 10px; }
+.partido__donde svg { display: block; width: 100%; height: 100%; }
+/* En casa en verde y fuera en naranja: de un vistazo se ve donde juega sin
+   tener que distinguir el dibujo a diez pixeles. */
+.partido--casa .partido__donde { color: #0a7d3c; }
+.partido--fuera .partido__donde { color: #c2610a; }
+.partido__rival {
+  display: block; width: 12px; height: 12px; flex: none;
+  background: center / contain no-repeat;
+}
+/* En la cara, pegada a la esquina y sin comerse los clics. */
+.partido--esquina {
+  position: absolute; z-index: 3; bottom: 0; right: 0;
+  transform: translate(26%, -8%);
+  pointer-events: none;
+}
+/* En la tabla va suelta, sin esquina que valga. */
+.partido--fila { position: static; transform: none; }
+.partido-cell { white-space: nowrap; }
 
 /* Cómo llegó cada futbolista a la plantilla: procedencia en pequeño e importe
    al tamaño normal, en una sola línea. */

@@ -3255,6 +3255,65 @@
       '">' + player.points + '</span>';
   }
 
+  /* ---------- Contra quién juega esta jornada ----------
+     Sale del calendario que ya viene con la sincronía: por cada partido se
+     apuntan los dos clubes, cada uno con su rival y si juega en casa. Se
+     calcula una vez por jornada y se guarda; se llama una vez por futbolista
+     y son treinta por pantalla. */
+  let rivalPorClub = null;
+  let rivalDeRonda = null;
+
+  function partidoDeClub(equipo) {
+    const ronda = state.round;
+    if (!ronda || equipo == null || !(ronda.matches || []).length) return null;
+    if (rivalDeRonda !== ronda) {
+      rivalDeRonda = ronda;
+      rivalPorClub = {};
+      (ronda.matches || []).forEach(function (juego) {
+        if (juego.homeId != null) {
+          rivalPorClub[String(juego.homeId)] =
+            { rival: juego.awayId, nombre: juego.away, casa: true };
+        }
+        if (juego.awayId != null) {
+          rivalPorClub[String(juego.awayId)] =
+            { rival: juego.homeId, nombre: juego.home, casa: false };
+        }
+      });
+    }
+    return rivalPorClub[String(equipo)] || null;
+  }
+
+  /* Dibujados y no con emojis: un emoji cambia de forma y de altura según el
+     aparato, y aquí van a 10 px dentro de un círculo. */
+  const CASITA = '<svg viewBox="0 0 24 24" aria-hidden="true">' +
+    '<path fill="currentColor" d="M12 3 2.5 11h3v9h5v-5.5h3V20h5v-9h3z"/></svg>';
+  const AVION = '<svg viewBox="0 0 24 24" aria-hidden="true">' +
+    '<path fill="currentColor" d="M21 15.5 13.5 11V4.2a1.5 1.5 0 0 0-3 0V11L3 15.5V18l7.5-2.2v4L8 21.4V23l4-1 4 1v-1.6l-2.5-1.6v-4L21 18z"/></svg>';
+
+  /**
+   * El partido que le toca: dónde juega y contra quién.
+   *
+   * Un círculo con la casita o el avión, y al lado el escudo del rival. Es el
+   * dato que decide si lo alineas, y estaba a tres pantallas de distancia.
+   */
+  function chapaDePartido(jugador, extra) {
+    const juego = partidoDeClub(jugador && jugador.team);
+    if (!juego) return '';
+    const donde = juego.casa ? 'En casa' : 'Fuera';
+    const contra = juego.nombre ? ' contra ' + juego.nombre : '';
+    return '<span class="partido ' + (extra || '') +
+      (juego.casa ? ' partido--casa' : ' partido--fuera') + '"' +
+      ' title="' + escapeHtml(donde + contra) + '"' +
+      ' aria-label="' + escapeHtml(donde + contra) + '">' +
+      '<span class="partido__donde" aria-hidden="true">' +
+        (juego.casa ? CASITA : AVION) + '</span>' +
+      (juego.rival != null
+        ? '<span class="partido__rival" aria-hidden="true" style="background-image:url(\'' +
+          crestUrl(juego.rival) + '\')"></span>'
+        : '') +
+    '</span>';
+  }
+
   /** Escudo del club del futbolista. `extra` decide si va como marca de agua. */
   function crestOf(player, extra) {
     if (!player || player.team == null) return '';
@@ -3307,6 +3366,7 @@
       '<span class="face-box">' + face +
         chapaDePuesto(player && player.position, 'puesto--esquina', otrosPuestosDe(player)) +
         statusMark(player, 'mark--esquina') + pointsBadge(player, 'pts--esquina') +
+        chapaDePartido(player, 'partido--esquina') +
       '</span>' +
       /* Sin nombre en el hueco vacío: el guion no decía nada que no dijera ya
          el círculo rojo, y encima parecía que ahí había alguien sin nombre. */
@@ -6375,6 +6435,8 @@
             position: jugador.position, altPositions: jugador.altPositions }) +
           crestOf(jugador, 'crest--badge') + '</span></td>' +
         '<td class="num" data-label="Puntos">' + puntosConTope(jugador) + '</td>' +
+        '<td class="partido-cell" data-label="Partido">' +
+          (chapaDePartido(jugador, 'partido--fila') || '<span class="sub">—</span>') + '</td>' +
         '<td class="estado-cell" data-label="Estado">' + statusCell(jugador) + '</td>' +
         '<td class="num" data-label="Valor"><strong>' + money(jugador.marketValue || 0) + '</strong></td>' +
         '<td class="num" data-label="Hoy">' + (jugador.increment
@@ -7425,6 +7487,8 @@
     return '<span class="face-box">' + faceOf(jugador.id, claseCara) +
       chapaDePuesto(jugador.position, 'puesto--esquina', otrosPuestosDe(jugador)) +
       statusMark(jugador, 'mark--esquina') + pointsBadge(jugador, 'pts--esquina') +
+      /* Abajo a la derecha, el único rincón que quedaba libre. */
+      chapaDePartido(jugador, 'partido--esquina') +
     '</span>';
   }
 
