@@ -1212,7 +1212,11 @@ code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft)
    confundia con una foto que no habia llegado a cargar. */
 .pic-player.pitch__face--empty {
   border: 2px dashed var(--neg); box-shadow: none;
-  background-color: var(--neg-soft);
+  /* Relleno rojo pero translucido, que se siga viendo el cesped por debajo:
+     opaco parecia una ficha mas y no un sitio sin cubrir. Al 32 % sobre el
+     verde salia un marron y al 80 un disco opaco; el 65 se lee rojo y deja
+     pasar la hierba. */
+  background-color: color-mix(in srgb, var(--neg) 65%, transparent);
 }
 .pitch__name {
   font-size: .7rem; font-weight: 600; color: #fff; text-align: center;

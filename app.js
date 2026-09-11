@@ -3722,12 +3722,9 @@
     }
 
     if (titulares < 11) {
-      const huecos = 11 - titulares;
-      /* Lo que importa no es cuántos faltan, es lo que cuesta: decir los puntos
-         que pierdes es lo que hace levantarse a taparlo. */
-      avisos.push((huecos === 1 ? '1 posición vacía' : huecos + ' posiciones vacías') +
-        ' en el once: ' + (huecos * PENA_HUECO) + ' puntos menos.' +
-        rotuloCuentaAtras(cerca, round));
+      /* Lo que cuesta, y ya. Cuántos huecos hay se ve en el campo, que es donde
+         están marcados en rojo. */
+      avisos.push(PENA_HUECO + ' puntos menos por posición vacía');
     }
 
     /* Y quién de los que has puesto no está para jugar. La chapa ya sale en su
