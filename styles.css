@@ -2027,6 +2027,10 @@ html.con-ficha { scrollbar-gutter: stable; }
   background: url('biwenger.svg?v=411') center / contain no-repeat;
   opacity: .05;
 }
+/* Plegada la calculadora, su marca de agua se va con ella. */
+#budget-panel.panel--plegado::before,
+#budget-panel.panel--plegado::after { content: none; }
+
 #budget-panel::after {
   content: 'jaimefgdev';
   transform: translate(-50%, 12cqw);

@@ -11597,6 +11597,11 @@
     if (!cuerpo || !boton) return;
     cuerpo.hidden = oculto;
     if (pie) pie.hidden = oculto;
+    /* Y la marca de agua se pliega con ella. El escudo se mide contra el ANCHO
+       del panel, no contra su alto, así que plegado —solo la cabecera— seguía
+       saliendo a tamaño completo y se desbordaba por arriba y por abajo. */
+    const panel = $('budget-panel');
+    if (panel) panel.classList.toggle('panel--plegado', oculto);
     boton.textContent = oculto ? 'Mostrar' : 'Ocultar';
     boton.setAttribute('aria-expanded', oculto ? 'false' : 'true');
   }
