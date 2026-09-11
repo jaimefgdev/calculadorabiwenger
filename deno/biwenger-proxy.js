@@ -223,7 +223,7 @@ const CDN = 'https://cf.biwenger.com/api/v2';
    navegador normal y las cabeceras que este mandaría. */
 /* Marca de versión: se sube en cada cambio y se consulta con ?version=1.
    Sirve para saber desde fuera si el despliegue ha entrado o no. */
-const VERSION = '2026-09-11 · deno 148';
+const VERSION = '2026-09-11 · deno 149';
 
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ' +
   '(KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36';
@@ -4510,7 +4510,13 @@ async function roundBoard(env, headers, jornada, listaNombres) {
      que sí la tienen, esto no cambia absolutamente nada. */
   const delParte = (detalle && detalle.puntos) || {};
   Object.keys(delParte).forEach(function (id) {
-    if (conNota[id] == null && delParte[id] != null) base[id] = delParte[id];
+    if (delParte[id] == null) return;
+    /* Con la jornada EN JUEGO manda el parte por encima de todo. Las «notas de
+       verdad» que salen de la ficha del futbolista no existen todavia para esta
+       jornada: lo que se leia era la nota de la ANTERIOR, y se servia como si
+       fuera de hoy. Cerrada la jornada, la ficha si la tiene y vuelve a mandar
+       ella, que es la que cuadra con los ajustes de la liga. */
+    if (!cerrada || conNota[id] == null) base[id] = delParte[id];
   });
 
   /* En qué puesto jugó cada uno de verdad. De la ficha si la hemos leído; si
