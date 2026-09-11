@@ -3637,9 +3637,14 @@
     const bench = mySquad().filter(function (player) { return !inXi[player.id]; })
       .sort(porPuntos);
 
+    /* Sin suplentes no se pone nada: que el hueco esté vacío ya lo dice, y un
+       «Sin suplentes» era escribir lo que se ve. Mientras carga sí se avisa,
+       que ahí el hueco vacío significa otra cosa.
+       El `#bench` se queda igualmente: vacío o no, es donde se sueltan los
+       titulares que sacas del campo. */
     $('bench').innerHTML = bench.length === 0
-      ? '<p class="muted">' + (state.squads && state.squads.status === 'loading'
-          ? 'Cargando la plantilla…' : 'Sin suplentes.') + '</p>'
+      ? (state.squads && state.squads.status === 'loading'
+          ? '<p class="muted">Cargando la plantilla…</p>' : '')
       : bench.map(function (player) {
           return '<div class="bench__player" data-lleva="' + escapeHtml(String(player.id)) + '">' +
             crestOf(player, 'crest--ghost') +
