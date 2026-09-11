@@ -6773,7 +6773,10 @@
        desplegaba correcciones que no se veían—. Una vez por sesión no cuesta
        nada y garantiza que lo desplegado acabe llegando. */
     if (guardada && !forzar) {
-      state.jornadaVista = cual;
+      /* «actual» no es una jornada: es un encargo. Clavarlo aqui dejaba
+         `jornadaVista` valiendo la cadena 'actual' y la vista sin seguir a la
+         jornada que toca. */
+      if (cual !== 'actual') state.jornadaVista = cual;
       if (!state.jornadasRefrescadas) state.jornadasRefrescadas = {};
       /* Una jornada CERRADA calculada con la version que hay desplegada no
          puede dar otros numeros: no se vuelve a pedir. Antes se refrescaba una
@@ -6819,10 +6822,12 @@
            mano. Pasaba una sola vez —la de la sincronización que estuviera en
            vuelo— y había que volver a elegir. Ahora «actual» solo coloca la
            vista si todavía no has elegido ninguna. */
-        if (id != null) {
-          if (String(cual) === String(id)) state.jornadaVista = id;
-          else if (String(cual) === 'actual' && state.jornadaVista == null) state.jornadaVista = id;
-        }
+        /* Solo se fija la vista cuando has pedido UNA jornada concreta. Antes,
+           la respuesta a «actual» tambien la clavaba, y a partir de ahi la
+           pestaña se quedaba en esa para siempre: abrias Jornadas con la nueva
+           ya en marcha y seguia enseñandote la anterior. Sin clavarla,
+           `jornadaVistaId` sigue sola a la que toca. */
+        if (id != null && String(cual) === String(id)) state.jornadaVista = id;
         renderJornadas();
         /* La jornada llega después de la sincronización, y con ella los puntos
            que se suman a la clasificación y las clasificaciones de futbolistas:
@@ -6880,6 +6885,28 @@
       });
   }
 
+  /* Cuantas horas antes de su primer partido una jornada pasa a ser «la de
+     ahora». Doce: la vispera ya se mira para decidir el once. */
+  const HORAS_ANTES = 12;
+
+  /**
+   * La jornada que toca enseñar si no has elegido otra.
+   *
+   * No es la que el proxy llama «actual» —esa es la última TERMINADA, y entre
+   * semana es la que interesa, pero en cuanto se acerca la siguiente ya no—,
+   * sino la que se está jugando o la que está a punto de empezar. Al abrir
+   * Jornadas se quedaba en la anterior con la nueva ya en marcha.
+   */
+  function jornadaDeAhora() {
+    const round = state.round;
+    const acabada = state.jornadas.actual;
+    if (!round || round.id == null) return acabada;
+    if (round.live) return round.id;
+    const arranca = Date.parse(arranqueDeJornada(round) || '');
+    if (!isNaN(arranca) && arranca - Date.now() <= HORAS_ANTES * 3600e3) return round.id;
+    return acabada;
+  }
+
   /** La jornada que se está mirando, ya sea recién traída o guardada. */
   function jornadaActiva() {
     const id = jornadaVistaId();
@@ -6888,8 +6915,9 @@
 
   /** Qué jornada se está mirando, se haya descargado o no su clasificación. */
   function jornadaVistaId() {
-    const elegida = state.jornadaVista != null ? state.jornadaVista : state.jornadas.actual;
-    return jornadaDelFuturo(elegida) ? state.jornadas.actual : elegida;
+    const porDefecto = jornadaDeAhora();
+    const elegida = state.jornadaVista != null ? state.jornadaVista : porDefecto;
+    return jornadaDelFuturo(elegida) ? porDefecto : elegida;
   }
 
   /**
@@ -12337,7 +12365,11 @@
        el filtro de «sin club» se llevaría por delante a los que SÍ tiene
        alguien. Con el sello puesto no cuesta una consulta si nada ha cambiado. */
     if (name === 'jugadores') { ensureJugadores(); ensureSquads(); renderJugadores(); }
-    if (name === 'jornadas') { ensureJornada(state.jornadaVista || 'actual'); renderJornadas(); }
+    if (name === 'jornadas') {
+      /* La que estuvieras viendo; si no, la que toca ahora. */
+      ensureJornada(state.jornadaVista || jornadaDeAhora() || 'actual');
+      renderJornadas();
+    }
   }
 
   function renderWarnings() {
