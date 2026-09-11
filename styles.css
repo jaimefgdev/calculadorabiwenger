@@ -1089,7 +1089,7 @@ code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft)
      El `scale` no es un capricho: al tumbarlo, el borde de abajo se acerca a la
      camara y CRECE, asi que el campo proyectado se salia por abajo y por los
      lados de su sitio. Con el 88 % vuelve a caber entero. */
-  transform: rotateX(24deg) scale(.88);
+  transform: perspective(1100px) rotateX(24deg) scale(.88);
   /* Los munecos son hijos suyos y tienen que vivir en el MISMO espacio de tres
      dimensiones para poder enderezarse; si no, se aplastarian con el campo. */
   transform-style: preserve-3d;
@@ -1330,10 +1330,12 @@ code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft)
 .pitch-wrap {
   position: relative; width: min(100%, 460px); margin: 0 auto;
   container-type: inline-size;
-  /* La camara. Cuanto mas lejos, menos deformacion; 1100 px deja el campo
-     tumbado como el de Biwenger sin que el fondo se estreche de mas. Mirando
-     al centro, que es como se ve un campo desde la grada de enfrente. */
-  perspective: 1100px;
+  /* OJO: la camara NO va aqui.
+     Con `perspective` en el envoltorio, sus hijos se ordenan en 3D entre si, y
+     el campo, al estar tumbado, tiene media superficie POR DELANTE del plano
+     cero: tapaba el selector de sistema y el de cambios, que son hermanos
+     suyos. Se dejaban de poder pulsar. La camara va dentro del propio
+     `transform` del campo, que hace lo mismo sin arrastrar a los hermanos. */
 }
 .picker { position: absolute; inset: 0; z-index: 5; display: grid; place-items: center; padding: .5rem; }
 .picker__backdrop { position: absolute; inset: 0; background: rgba(0, 0, 0, .55); border-radius: 6px; }
