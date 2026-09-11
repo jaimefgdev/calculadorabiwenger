@@ -1066,7 +1066,20 @@ code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft)
     repeating-linear-gradient(180deg,
       #1e8350 0 10%, #1a7548 10% 12.5%,
       #166a41 12.5% 22.5%, #1a7548 22.5% 25%);
-  box-shadow: inset 0 0 0 3px var(--linea), 0 10px 26px rgba(0, 0, 0, .35);
+  /* El campo como un TEPE: un bloque de cesped con su tierra debajo, como en
+     la app de Biwenger. Son capas de sombra apiladas hacia abajo —no hay
+     elemento nuevo ni cambia la maquetacion—: primero la raya del corte, luego
+     tres tonos de tierra de mas claro a mas oscuro para que el canto tenga
+     volumen, y al final la sombra sobre el suelo.
+     Las sombras exteriores no las recorta el `overflow: hidden`, asi que el
+     bloque se ve entero. */
+  box-shadow:
+    inset 0 0 0 3px var(--linea),
+    0 3px 0 #3c2d1b,
+    0 9px 0 #6b4a2a,
+    0 14px 0 #55381f,
+    0 17px 0 #3a2614,
+    0 26px 26px rgba(0, 0, 0, .5);
   overflow: hidden;
   /* La marca de agua se mezcla con el césped, y sin esto la mezcla se saldría
      del campo a buscar el fondo de la página. */
@@ -3147,7 +3160,7 @@ input[type="search"]::-webkit-search-cancel-button:hover { opacity: .75; }
 
 /* ---------- Respiración ----------
    El campo iba pegado a la cabecera y la página terminaba en seco. */
-.pitch-wrap { margin-top: .9rem; }
+.pitch-wrap { margin-top: .9rem; margin-bottom: 1.4rem; }   /* aire para la tierra */
 .lineup-bench { margin-top: .2rem; }
 /* La barra de arriba es pegajosa: sin este aire, la primera tarjeta de cada
    pestaña queda pegada al menú y parece que se mete debajo. */
