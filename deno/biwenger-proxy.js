@@ -223,7 +223,7 @@ const CDN = 'https://cf.biwenger.com/api/v2';
    navegador normal y las cabeceras que este mandaría. */
 /* Marca de versión: se sube en cada cambio y se consulta con ?version=1.
    Sirve para saber desde fuera si el despliegue ha entrado o no. */
-const VERSION = '2026-09-12 · deno 154';
+const VERSION = '2026-09-12 · deno 155';
 
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ' +
   '(KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36';
@@ -614,6 +614,12 @@ const app = {
           enFrio: enFrio,
           copiaKv: copia,
           cortado: cdnCortado(),
+          /* Hasta cuando nos tiene cortados Biwenger, si es que nos tiene. Se
+             mira aqui porque es la unica forma de saberlo sin llamarle. */
+          freno: await (async function () {
+            const hasta = await frenoGuardado().catch(function () { return 0; });
+            return hasta > Date.now() ? new Date(hasta).toISOString() : null;
+          })(),
           kv: !!JORNADAS,
           /* Escrituras de ESTA instancia: si una peticion normal deja esto en
              mas de un puñado, hay algo escribiendo de mas. */
@@ -845,8 +851,18 @@ const app = {
 
         if (!guardada) throw error;
         guardada.stale = true;
+        /* Y hasta cuando dura. El castigo tiene fecha —se la pone `apuntarFreno`
+           y vive en el KV—, asi que en vez de un «no responde» a secas se dice a
+           partir de cuando se vuelve a intentar. Las dos fechas van en ISO a
+           proposito: las pasa a hora local la web, que el proxy no sabe donde
+           esta quien mira. */
+        const freno = await frenoGuardado().catch(function () { return 0; });
+        guardada.reintentaEn = freno > Date.now() ? new Date(freno).toISOString() : null;
         guardada.warning = 'Biwenger no responde ahora mismo; estos datos son de ' +
-          (guardada.updatedAt || 'antes') + '.';
+          (guardada.updatedAt || 'antes') + '.' +
+          (guardada.reintentaEn
+            ? ' Se vuelve a intentar a partir de ' + guardada.reintentaEn + '.'
+            : '');
         return new Response(JSON.stringify(guardada), {
           headers: Object.assign({ 'content-type': 'application/json; charset=utf-8' }, cors(origin))
         });
