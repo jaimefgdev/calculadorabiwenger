@@ -309,8 +309,6 @@ code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft)
 @media (max-width: 720px) {
   .market-grid > #listings-panel { grid-column: auto; }
 }
-/* Y en modo app la rejilla tambien es de una sola columna, a cualquier ancho. */
-.modo-app .market-grid > #listings-panel { grid-column: auto; }
 
 /* La rejilla le quita el margen a sus paneles: hay que reponerlo abajo o el
    bloque siguiente queda pegado. */
@@ -749,302 +747,6 @@ code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft)
 .puntos-toggle[aria-expanded="true"] { color: var(--accent); border-bottom-color: var(--accent); }
 
 
-/* ---------- El interruptor de Ajustes ---------- */
-.source--vista { margin-bottom: 1rem; }
-.interruptor {
-  display: flex; align-items: flex-start; gap: .75rem;
-  cursor: pointer; padding: .4rem 0;
-}
-.interruptor input { position: absolute; opacity: 0; width: 0; height: 0; }
-/* La palanca. 44 px de ancho no es capricho: es lo que hace que se pueda dar
-   con el pulgar sin apuntar. */
-.interruptor__palanca {
-  position: relative; flex: none; width: 44px; height: 26px; margin-top: .1rem;
-  background: var(--bg-surface); border: 1px solid var(--border);
-  border-radius: 100px; transition: background .15s ease, border-color .15s ease;
-}
-.interruptor__palanca::after {
-  content: ''; position: absolute; top: 3px; left: 3px;
-  width: 18px; height: 18px; border-radius: 50%;
-  background: var(--text-faint); transition: transform .15s ease, background .15s ease;
-}
-.interruptor input:checked + .interruptor__palanca {
-  background: var(--accent-soft); border-color: var(--accent);
-}
-.interruptor input:checked + .interruptor__palanca::after {
-  transform: translateX(18px); background: var(--accent);
-}
-.interruptor input:focus-visible + .interruptor__palanca {
-  outline: 2px solid var(--accent); outline-offset: 2px;
-}
-.interruptor__texto { display: flex; flex-direction: column; gap: .15rem; font-size: .84rem; }
-.interruptor__texto .muted { font-size: .78rem; line-height: 1.35; }
-
-/* ---------- Modo app ----------
-   Con el ancho real del teléfono, la vista apilada que ya existe entra sola por
-   sus `@media`. Lo de aquí es lo que la hace parecer una aplicación y no una
-   web encogida: nada de tamaños que se estiran, y todo lo que se toca con el
-   dedo por encima de los 44 px que recomienda Apple.
-   `.modo-app` va en el `<html>`, que es donde lo pone `index.html` antes de
-   pintar; así no hay un salto al arrancar. */
-.modo-app body { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
-
-/* Las pestañas, abajo y fijas, como en la app de Biwenger. Es lo que más
-   cambia la sensación: el pulgar llega sin estirarse. */
-.modo-app #tabs {
-  position: fixed; left: 0; right: 0; bottom: 0; z-index: 40;
-  display: flex; justify-content: space-between; gap: 0;
-  margin: 0; padding: .3rem .2rem calc(.3rem + env(safe-area-inset-bottom));
-  background: var(--bg-elev); border-top: 1px solid var(--border);
-  overflow-x: auto; scrollbar-width: none;
-}
-.modo-app #tabs::-webkit-scrollbar { display: none; }
-.modo-app #tabs .tab {
-  flex: 1 0 auto; min-height: 44px; padding: .5rem .6rem;
-  font-size: .74rem; white-space: nowrap; border-radius: var(--radius-sm);
-}
-/* Hueco para que la barra no tape el final de la página. */
-.modo-app main { padding-bottom: calc(64px + env(safe-area-inset-bottom)); }
-
-/* ---------- Las tablas, tablas ----------
-   La vista apilada —una fila por dato— gasta media pantalla en ocho cifras: en
-   la tabla del presupuesto son DIEZ líneas por mánager. La app de Biwenger no
-   hace eso: mantiene la tabla y la desliza de lado. Se hace igual.
-
-   Esto deshace, solo en modo app, el apilado que la hoja aplica por debajo de
-   940 px. Va con `!important` porque aquella regla vive en una `@media` y no
-   hay forma de ganarle por especificidad desde fuera. */
-.modo-app .table,
-.modo-app .table thead,
-.modo-app .table tbody,
-.modo-app .table tfoot,
-.modo-app .table tr,
-.modo-app .table th,
-.modo-app .table td { display: revert !important; }
-.modo-app .table { display: table !important; width: max-content; min-width: 100%; }
-.modo-app .table thead { display: table-header-group !important; }
-.modo-app .table tbody { display: table-row-group !important; }
-.modo-app .table tfoot { display: table-footer-group !important; }
-.modo-app .table tr { display: table-row !important; border: 0 !important; margin: 0 !important; padding: 0 !important; }
-.modo-app .table th,
-.modo-app .table td {
-  display: table-cell !important;
-  white-space: nowrap; vertical-align: middle;
-  padding: .5rem .55rem !important;
-}
-/* Y sin el rótulo de cada celda: la cabecera vuelve a decirlo una sola vez. */
-.modo-app .table td::before { content: none !important; }
-.modo-app .table td.col-rank { display: table-cell !important; }
-
-/* El deslizamiento lateral, con inercia. */
-.modo-app .table-scroll {
-  overflow-x: auto !important; overflow-y: hidden;
-  -webkit-overflow-scrolling: touch;
-  overscroll-behavior-x: contain;
-}
-
-/* SIN columna fija. Lo probé con el nombre pegado a la izquierda y es peor: se
-   come un tercio del ancho y tapa justo las cifras que vas a mirar al deslizar.
-   La app de Biwenger tampoco lo hace. Se desliza la fila entera. */
-
-/* ---------- Lo que no cabe en una columna de teléfono ----------
-   Todo lo que está pensado en dos o más columnas se pone en una. Y lo que no
-   tiene sentido en una —los rankings, los que suben y bajan, las dos
-   alineaciones de un partido— se desliza de lado, como las tablas: así se ve
-   entero sin encogerlo hasta lo ilegible. */
-.modo-app .market-grid,
-.modo-app .lineup-grid,
-.modo-app .sources,
-.modo-app .sync-fields,
-.modo-app .onces { grid-template-columns: minmax(0, 1fr) !important; }
-
-/* En fila y deslizables. `grid-auto-flow: column` los pone uno tras otro y
-   `scroll-snap` hace que se paren en su sitio, como el carrusel de la app de
-   Biwenger. */
-/* OJO A CUÁL SE PONE AQUÍ. Estas son las que llevan TARJETAS dentro. El
-   contenedor `.rankings` de Datos NO: dentro lleva FILAS («Más puntos / Mejor
-   media / Mejor racha» es una, y las tres peores otra), y ponerlo aquí dejaba
-   las dos filas una al lado de la otra, todo apelotonado en un mismo carrusel.
-   Cada fila se desliza por su cuenta, como en Rankings. */
-.modo-app .rankings--dos,
-.modo-app .rankings--tres,
-.modo-app .rankings-fila,
-.modo-app .movers,
-.modo-app .alineaciones {
-  display: grid !important;
-  grid-auto-flow: column;
-  grid-template-columns: none !important;
-  grid-auto-columns: minmax(15rem, 78%);
-  overflow-x: auto; overscroll-behavior-x: contain;
-  scroll-snap-type: x mandatory;
-  -webkit-overflow-scrolling: touch;
-  padding-bottom: .4rem;
-}
-.modo-app .rankings--dos > *,
-.modo-app .rankings--tres > *,
-.modo-app .rankings-fila > *,
-.modo-app .movers > *,
-.modo-app .alineaciones > * { scroll-snap-align: start; }
-
-/* Las ocho pastillas del gráfico de puntos, en una fila, dejan celdas de
-   treinta píxeles. Dos filas de cuatro. */
-.modo-app .viz-block .chips { grid-template-columns: repeat(4, minmax(0, 1fr)) !important; }
-
-/* El contenedor de Datos, en bloque: sus filas una debajo de otra, y cada una
-   deslizable por dentro. */
-/* Solo el contenedor pelado. `#liga-tandas` lleva las dos clases —`rankings`
-   y `rankings--dos`— y ese SI es un carrusel: dentro lleva tarjetas. */
-.modo-app .rankings:not(.rankings--dos):not(.rankings--tres):not(.rankings-fila) {
-  display: block !important; grid-template-columns: none !important;
-}
-.modo-app .rankings > .rankings--tres + .rankings--tres { margin-top: 1rem; }
-
-/* Y las tarjetas de la liga, con su reparto de columnas anulado: en modo app
-   van en fila, no repartidas. */
-.modo-app .rankings-fila {
-  grid-template-columns: none !important;
-  grid-auto-columns: minmax(15rem, 78%);
-}
-.modo-app .rankings-fila > .ranking,
-.modo-app .rankings-fila--2 > .ranking:first-child { grid-column: auto !important; }
-
-/* El campo, a lo ancho de la pantalla: en el móvil no hay nada a su lado. */
-.modo-app .pitch-wrap { width: 100%; }
-
-/* La ficha de un futbolista ocupa casi toda la pantalla, como en Biwenger. */
-.modo-app .picker--modal .picker__card { max-height: 82vh; }
-.modo-app .ficha__wrap { width: 100%; }
-
-/* ---------- Mi plantilla, en tarjetas ----------
-   Calcada a la de la app de Biwenger: arriba «En venta por X»; debajo la cara
-   grande a la izquierda y, a su derecha, el nombre en grande con el valor y la
-   subida del día justo debajo, alineados con él; y el botón a la derecha del
-   todo.
-
-   Se hace desde el CSS, colocando cada celda por su `data-label`: en el
-   ordenador sigue siendo una tabla y no hay dos versiones del mismo listado. */
-.modo-app #squad-panel .table,
-.modo-app #squad-panel .table tbody { display: block !important; width: auto !important; }
-.modo-app #squad-panel .table thead { display: none !important; }
-.modo-app #squad-panel .table-scroll { overflow-x: visible !important; }
-
-.modo-app #squad-panel .table tbody tr {
-  display: grid !important;
-  /* Un bloque liso, no una franja por celda. */
-  overflow: hidden;
-  /* La primera columna mide lo que la cara: así el valor cae justo debajo del
-     nombre, no debajo de la foto. `minmax(0, auto)` y no `auto` a secas porque
-     una columna `auto` NUNCA encoge por debajo de su contenido, y con «En venta
-     por 95.700.000 €» la tarjeta se salía llevándose los botones fuera. */
-  grid-template-columns: 3.4rem minmax(0, auto) minmax(0, auto) minmax(0, auto) minmax(0, 1fr) minmax(0, auto);
-  grid-template-areas:
-    'venta venta venta venta  venta   ofertas'
-    'quien quien quien quien  quien   acciones'
-    'part  valor hoy   pts    estado  acciones';
-  gap: .15rem .5rem; align-items: center; width: 100%;
-  margin: 0 0 .5rem; padding: .55rem .7rem;
-  background: var(--bg-surface);
-  border: 1px solid var(--border); border-radius: var(--radius-sm);
-}
-/* En venta: solo el contorno rojo, como en su app. El fondo rojo en toda la
-   tarjeta tapaba las cifras y dejaba la lista pareciendo una alarma. */
-.modo-app #squad-panel .table tbody tr.row-venta {
-  border-color: var(--neg); background: var(--bg-surface);
-}
-/* En la tarjeta no hay banda: lo que marca es el contorno. */
-.modo-app #squad-panel .table tbody tr.row-titular {
-  border-color: var(--marca); background: var(--bg-surface);
-}
-
-/* Las celdas dejan de serlo: sin relleno, sin borde y sin alinear a la derecha,
-   que es lo que empujaba todo fuera de la tarjeta. */
-.modo-app #squad-panel .table tbody td {
-  display: block !important;
-  padding: 0 !important; border: 0 !important;
-  text-align: left !important; white-space: nowrap;
-  min-width: 0; overflow: hidden; text-overflow: ellipsis;
-  /* SIN FONDO. Las celdas seguían pintando el suyo y la tarjeta salía a
-     franjas horizontales, que es lo que la hacía no parecerse en nada a la de
-     Biwenger: allí es un bloque liso con el contorno rojo. */
-  background: transparent !important;
-}
-.modo-app #squad-panel .table tbody td::before { content: none !important; }
-
-.modo-app #squad-panel td[data-label='Futbolista'] { grid-area: quien; white-space: normal; }
-.modo-app #squad-panel td[data-label='En venta']   { grid-area: venta; }
-.modo-app #squad-panel td[data-label='Valor']      { grid-area: valor; }
-.modo-app #squad-panel td[data-label='Hoy']        { grid-area: hoy; }
-.modo-app #squad-panel td[data-label='Puntos']     { grid-area: pts; }
-.modo-app #squad-panel td[data-label='Estado']     { grid-area: estado; }
-/* El partido ocupa el hueco que quedaba libre bajo la cara. */
-.modo-app #squad-panel td[data-label='Partido']    { grid-area: part; justify-self: center; }
-.modo-app #squad-panel td[data-label='Ofertas']    { grid-area: ofertas; justify-self: end; }
-.modo-app #squad-panel td.col-pujar                { grid-area: acciones; }
-
-/* El escudo a la izquierda, luego la cara grande y luego el nombre —ese es el
-   orden de su app—. En el HTML el escudo va DETRÁS del nombre, así que se
-   adelanta con `order` en vez de tocar el JS. */
-.modo-app #squad-panel td[data-label='Futbolista'] .with-crest {
-  display: flex; align-items: center; gap: .5rem; min-width: 0;
-}
-.modo-app #squad-panel td[data-label='Futbolista'] .crest {
-  order: -1; flex: none; width: 1.5rem; height: 1.5rem;
-}
-.modo-app #squad-panel td[data-label='Futbolista'] .player {
-  display: flex; align-items: center; gap: .5rem; min-width: 0;
-}
-.modo-app #squad-panel td[data-label='Futbolista'] .pic-player {
-  width: 3.2rem; height: 3.2rem; flex: none;
-}
-.modo-app #squad-panel td[data-label='Futbolista'] .player-name {
-  font-size: 1.05rem; font-weight: 700; min-width: 0;
-}
-/* Las chapas de demarcación, pegadas a la cara como allí. */
-.modo-app #squad-panel td[data-label='Futbolista'] .pos { flex: none; }
-
-/* El valor, con el mismo peso que allí; y «pts» detrás del número, que sin
-   cabecera un 61 suelto no dice nada. */
-.modo-app #squad-panel td[data-label='Valor'] { font-weight: 700; font-size: .92rem; }
-.modo-app #squad-panel td[data-label='Hoy'] { font-size: .82rem; }
-.modo-app #squad-panel td[data-label='Puntos'] { font-size: .8rem; color: var(--text-soft); }
-.modo-app #squad-panel td[data-label='Puntos']::after { content: ' pts'; color: var(--text-faint); }
-.modo-app #squad-panel td[data-label='En venta'] { font-size: .8rem; color: var(--text-soft); }
-.modo-app #squad-panel td[data-label='En venta'] strong::before {
-  content: 'En venta por '; font-weight: 400; color: var(--text-faint);
-}
-/* Al que no está en venta ese hueco le sobra, igual que el guion de ofertas. */
-.modo-app #squad-panel td[data-label='En venta']:has(.sub),
-.modo-app #squad-panel td[data-label='Ofertas']:has(.sub) { display: none !important; }
-
-/* Los botones, en fila a la derecha. Apilados estiraban la tarjeta a tres
-   alturas por futbolista, que es justo lo que se quería quitar. */
-.modo-app #squad-panel td.col-pujar .acciones {
-  display: flex; flex-direction: row; gap: .25rem; align-items: center;
-}
-.modo-app #squad-panel td.col-pujar .btn {
-  min-width: 2.2rem; min-height: 36px; padding-inline: .45rem;
-}
-.modo-app #squad-panel td.col-pujar .ambito { min-height: 36px; }
-
-/* Todo lo que se pulsa, del tamaño de un dedo. */
-.modo-app .btn,
-.modo-app .ambito,
-.modo-app .row-toggle,
-.modo-app .sortable { min-height: 44px; }
-.modo-app .btn--sm { min-height: 38px; }
-.modo-app .field,
-.modo-app input,
-.modo-app select,
-.modo-app textarea {
-  /* 16 px justos: por debajo, Safari hace zoom solo al escribir. */
-  font-size: 16px; min-height: 44px;
-}
-
-/* Y los tamaños, fijos. Los `clamp` de la vista de ordenador encogen con el
-   ancho, y en un teléfono dejaban letra de seis píxeles. */
-.modo-app .ranking__ficha .personal { font-size: 11px; }
-.modo-app .panel { padding: .9rem; margin-bottom: 1rem; }
-.modo-app .table td { padding: .5rem .75rem; }
 
 /* ---------- El campo ---------- */
 .field-label { display: flex; align-items: center; gap: .5rem; font-size: .8rem; color: var(--text-soft); }
@@ -1288,7 +990,13 @@ code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft)
 
 .pitch__name {
   font-size: .79rem; font-weight: 600; color: #fff; text-align: center;
-  max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  /* SIN tope de ancho: la caja mide lo que mide el nombre y el `align-items:
+     center` del hueco la centra. Con `max-width: 100%` la caja se quedaba en
+     los 79 px del hueco, y un nombre mas largo —«Sergio Martinez» mide 95—
+     desbordaba SOLO POR LA DERECHA, porque la linea arranca en el borde
+     izquierdo de la caja: quedaba ocho pixeles descentrado respecto a su cara
+     y se metia encima del nombre del de al lado. */
+  max-width: none; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
   text-shadow: 0 1px 3px rgba(0, 0, 0, .8);
 }
 /* Toda la ficha del campo es el botón que abre el selector: va por encima de
@@ -1442,7 +1150,9 @@ code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft)
   box-shadow: none;
 }
 .bench__name {
-  font-size: .86rem; font-weight: 560; max-width: 100%;
+  /* Mismo caso que el del campo: sin tope, para que un nombre largo desborde
+     a los dos lados y no solo por la derecha. */
+  font-size: .86rem; font-weight: 560; max-width: none;
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 

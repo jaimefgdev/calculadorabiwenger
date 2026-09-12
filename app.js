@@ -14117,20 +14117,6 @@
       header.click();
     });
 
-    /* El interruptor del modo app. El ancho de la página lo decide `index.html`
-       antes de pintar —cambiarlo en caliente hace que todo salte—, así que aquí
-       solo se guarda la preferencia y se recarga. */
-    const modoApp = $('modo-app');
-    if (modoApp) {
-      try { modoApp.checked = localStorage.getItem('biwenger-calc-movil') === '1'; }
-      catch (error) { /* sin memoria, apagado */ }
-      modoApp.addEventListener('change', function () {
-        try {
-          localStorage.setItem('biwenger-calc-movil', modoApp.checked ? '1' : '0');
-        } catch (error) { /* sin memoria no se puede recordar */ }
-        location.reload();
-      });
-    }
 
     $('btn-toggle-input').addEventListener('click', function () {
       const panel = $('input-panel');
