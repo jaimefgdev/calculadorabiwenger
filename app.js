@@ -3449,7 +3449,9 @@
       '</span>' +
       /* Sin nombre en el hueco vacío: el guion no decía nada que no dijera ya
          el círculo rojo, y encima parecía que ahí había alguien sin nombre. */
-      (player ? '<span class="pitch__name">' + escapeHtml(comoSeLlama(player)) + '</span>' : '') +
+      /* El partido va con el NOMBRE y no encima de la cara: ahi tapaba la foto. */
+      (player ? '<span class="pitch__name">' + escapeHtml(comoSeLlama(player)) +
+        chapaDePartido(player, 'juega--nombre') + '</span>' : '') +
       '<button type="button" class="pitch__pick" data-slot="' + key + '" data-position="' + position + '"' +
         ' aria-label="Cambiar el ' + POSITION_NAMES[position] +
         (player ? ': ahora ' + escapeHtml(player.name) : '') + '"></button>' +
@@ -3829,7 +3831,8 @@
           return '<div class="bench__player" data-lleva="' + escapeHtml(String(player.id)) + '">' +
             crestOf(player, 'crest--ghost') +
             caraConChapas(player, 'bench__face') +
-            '<span class="bench__name">' + escapeHtml(comoSeLlama(player)) + '</span>' +
+            '<span class="bench__name">' + escapeHtml(comoSeLlama(player)) +
+              chapaDePartido(player, 'juega--nombre') + '</span>' +
           '</div>';
         }).join('');
 

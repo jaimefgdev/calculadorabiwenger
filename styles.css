@@ -3741,6 +3741,18 @@ main.wrap { padding-top: 1.15rem; padding-bottom: 3.5rem; }
   transform: translate(50%, -8%);
   pointer-events: none;
 }
+/* Pegada al nombre, en el campo y en el banquillo. Encima de la cara tapaba la
+   foto; aqui va en la misma linea, detras del nombre. */
+.juega--nombre {
+  display: inline-flex; vertical-align: middle;
+  margin-left: 4px; gap: 2px;
+}
+.juega--nombre .juega__donde { width: 12px; height: 12px; }
+.juega--nombre .juega__rival { width: 13px; height: 13px; }
+/* Y el nombre deja de recortarse por su cuenta: con `ellipsis` se comia la
+   chapa antes de cortar una sola letra. */
+.pitch__name, .bench__name { overflow: visible; text-overflow: clip; }
+
 /* En la tabla va suelta, sin esquina que valga, y mas grande: ahi no compite
    con la cara ni con las otras chapas, y hay sitio de sobra. */
 .juega--fila { position: static; transform: none; gap: 4px; }
