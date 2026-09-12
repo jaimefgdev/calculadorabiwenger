@@ -903,6 +903,7 @@
     finJornada: null,       // cuándo terminó cada jornada, para el liderato
     inicioJornada: null,    // y cuándo empezó, que es lo que le da su mes
     proximoPartido: null,   // el próximo partido de cada club, por su id
+    jornadaViva: 0,         // cuándo se pidió por última vez la jornada en juego
     mesEstadisticas: null,  // el mes que se está mirando en Estadísticas
     selloMercado: null,     // con qué jornada y tablón se trajo el mercado
     finJornadaPedido: false,
@@ -6942,8 +6943,15 @@
        estás mirando —que por defecto es esa—. Resultado: con la jornada en
        marcha, los puntos se quedaban clavados hasta que cambiabas de pestaña. */
     const enJuego = jornadaDeAhora();
-    if (enJuego != null && cuales.indexOf(enJuego) === -1 &&
+    /* Pero NO en cada sincronización. La web sincroniza cada minuto, y pedir la
+       jornada en juego cada vez sale caro de verdad: por debajo lee la ficha de
+       cada futbolista alineado para sacar su nota, y esa ráfaga contra Biwenger
+       es la que acaba en un 429 y deja la app con datos viejos durante horas.
+       Cada tres minutos se ve igual de en directo y no nos corta. */
+    const ahora = Date.now();
+    if (enJuego != null && (!state.jornadaViva || ahora - state.jornadaViva > 3 * 60 * 1000) &&
         !cuales.some(function (id) { return String(id) === String(enJuego); })) {
+      state.jornadaViva = ahora;
       cuales.push(enJuego);
     }
 
