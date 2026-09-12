@@ -902,6 +902,7 @@
     syncForzada: false,     // la que espera turno, ¿tiene que saltarse la caché?
     finJornada: null,       // cuándo terminó cada jornada, para el liderato
     inicioJornada: null,    // y cuándo empezó, que es lo que le da su mes
+    proximoPartido: null,   // el próximo partido de cada club, por su id
     mesEstadisticas: null,  // el mes que se está mirando en Estadísticas
     selloMercado: null,     // con qué jornada y tablón se trajo el mercado
     finJornadaPedido: false,
@@ -3330,8 +3331,20 @@
   let rivalDeRonda = null;
 
   function partidoDeClub(equipo) {
+    if (equipo == null) return null;
+    /* El PROXIMO partido suyo, que es el que importa para decidir el once.
+       Antes salia de la jornada en curso, asi que al que ya habia jugado se le
+       seguia enseñando el partido de ayer. Lo calcula el proxy del calendario
+       que ya tiene guardado, asi que no cuesta nada. */
+    const proximos = state.proximoPartido;
+    const suyo = proximos && proximos[String(equipo)];
+    if (suyo) {
+      return { rival: suyo.rival, nombre: suyo.nombre, casa: !!suyo.casa };
+    }
+
+    /* Y si todavia no ha llegado esa lista, lo de la jornada en curso. */
     const ronda = state.round;
-    if (!ronda || equipo == null || !(ronda.matches || []).length) return null;
+    if (!ronda || !(ronda.matches || []).length) return null;
     if (rivalDeRonda !== ronda) {
       rivalDeRonda = ronda;
       rivalPorClub = {};
@@ -12163,6 +12176,7 @@
     if (guardado && guardado.fin) {
       state.finJornada = guardado.fin;
       state.inicioJornada = guardado.inicio || null;
+      state.proximoPartido = guardado.proximo || null;
     }
 
     fetch(config.url.replace(/\/+$/, '') + '/?key=' + encodeURIComponent(config.key) + '&fechas=1',
@@ -12172,6 +12186,7 @@
         if (!datos || !datos.fin) return;
         state.finJornada = datos.fin;
         state.inicioJornada = datos.inicio || null;
+        state.proximoPartido = datos.proximo || null;
         cacheGuardar('finJornadas', datos);
         renderEstadisticasDeLiga();
       })
@@ -12469,6 +12484,9 @@
     ensureJugadores();
     /* Y las jornadas ya jugadas que falten, o la general sale corta. */
     ensureJornadasJugadas();
+    /* El próximo partido de cada club: lo usa la chapa de Mi plantilla y la del
+       campo, así que se pide al arrancar y no solo al abrir Estadísticas. */
+    ensureFinDeJornadas();
 
     const rows = budgetRows();
     state.kpi = kpiValues(rows);   // los usa la pestaña Datos
