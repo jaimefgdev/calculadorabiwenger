@@ -2504,42 +2504,45 @@
    * terminó.
    */
   function cuandoSeEntrega() {
+    /* El fin de la ultima jornada TERMINADA. Cada candidata se mira entera: si
+       le queda un partido por jugar no cuenta NADA suyo, ni siquiera los que ya
+       se han jugado.
+
+       Aqui estaba el fallo: se llevaba por un lado la fecha del partido acabado
+       mas reciente —de la jornada que fuera— y por otro un «hay alguna jornada
+       completa», y se juntaban los dos. Con la 4 repartida y la 5 rodando, el
+       «completa» lo ponia la 4 y la fecha la ponia el viernes de la 5, asi que
+       el sabado de madrugada anunciaba la entrega para esa misma tarde con siete
+       partidos de la jornada aun por jugar. */
     let ultimo = null;
-
-    /* Lo normal es que lo diga el proxy: él tiene el calendario entero y sabe
-       cuándo acabó la última jornada TERMINADA. En la portada la web no puede
-       saberlo sola —solo tiene la jornada que viene, y la que acaba de terminar
-       ya no está por ningún lado—, y por eso el aviso no salía ahí. */
-    const delProxy = state.round && state.round.finDeLaAnterior;
-    if (delProxy) {
-      const t = Date.parse(delProxy);
-      if (!isNaN(t)) ultimo = t;
-    }
-
-    const mirar = function (round) {
-      (round && round.matches || []).forEach(function (partido) {
-        /* Solo los acabados: con uno por jugar, la jornada no ha terminado. */
-        if (partido.status !== 'finished') return;
-        const fin = Date.parse(partido.start);
-        if (!isNaN(fin) && (ultimo == null || fin > ultimo)) ultimo = fin;
-      });
-      /* Y si le queda algún partido por jugar, esa jornada no cuenta. */
-      return (round && round.matches || []).every(function (p) {
-        return p.status === 'finished';
-      });
+    const apunta = function (t) {
+      if (t != null && !isNaN(t) && (ultimo == null || t > ultimo)) ultimo = t;
     };
 
-    /* Y si no viniera, se busca entre las jornadas que se hayan descargado, que
-       es lo que vale en la pestaña de Jornadas. */
-    let completa = ultimo != null;
+    /* Lo normal es que lo diga el proxy: el tiene el calendario entero y ya le
+       aplica esa misma regla. En la portada la web no puede saberlo sola —solo
+       tiene la jornada que viene, y la que acaba de terminar ya no esta por
+       ningun lado—, y por eso el aviso no salia ahi. */
+    const delProxy = state.round && state.round.finDeLaAnterior;
+    if (delProxy) apunta(Date.parse(delProxy));
+
+    const mirar = function (round) {
+      const partidos = (round && round.matches) || [];
+      if (!partidos.length) return;
+      if (!partidos.every(function (p) { return p.status === 'finished'; })) return;
+      partidos.forEach(function (p) { apunta(Date.parse(p.start)); });
+    };
+
+    /* Y las jornadas que se hayan descargado, que es lo que vale en su pestana. */
     Object.keys(state.jornadas.datos || {}).forEach(function (id) {
       const j = state.jornadas.datos[id];
-      if (j && j.round && mirar(j.round)) completa = true;
+      if (j) mirar(j.round);
     });
-    if (state.round && mirar(state.round)) completa = true;
-    if (!completa || ultimo == null) return null;
+    mirar(state.round);
 
-    /* Las 17:00 del día siguiente, en la hora de aquí. Al último partido se le
+    if (ultimo == null) return null;
+
+    /* Las 17:00 del dia siguiente, en la hora de aqui. Al ultimo partido se le
        dan dos horas de margen: `start` es cuando EMPIEZA. */
     const cuando = new Date(ultimo + 2 * 60 * 60 * 1000);
     cuando.setDate(cuando.getDate() + 1);
