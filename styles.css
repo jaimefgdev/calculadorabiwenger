@@ -1637,11 +1637,14 @@ code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft)
   /* Medidas fijas y ancladas al centro de la cara, no al ancho de la ficha:
      el hueco del campo es más estrecho que la ficha del banquillo y, en
      porcentaje, el escudo salía más pequeño y más a la izquierda. */
-  top: 50%; left: calc(50% - 9px); width: 63px; height: 62px;
+  /* Asoma por la IZQUIERDA de la cara. Antes salia por la derecha; se mueve
+     cambiando de donde cuelga y hacia donde se desvanece, NO con un `scaleX`,
+     que le daria la vuelta al escudo. */
+  top: 50%; left: calc(50% - 54px); width: 63px; height: 62px;
   transform: translateY(-58%);
   opacity: .6; filter: blur(.4px);
-  -webkit-mask-image: linear-gradient(to right, #000 0 45%, transparent 96%);
-  mask-image: linear-gradient(to right, #000 0 45%, transparent 96%);
+  -webkit-mask-image: linear-gradient(to left, #000 0 45%, transparent 96%);
+  mask-image: linear-gradient(to left, #000 0 45%, transparent 96%);
 }
 /* La cara del campo mide 62 px y la del banquillo 56, así que el centro cae
    2 px más arriba: se compensa para que el escudo quede exactamente igual.
@@ -2767,7 +2770,7 @@ input[type="search"]::-webkit-search-cancel-button:hover { opacity: .75; }
 .jugador-card .pic-player { position: relative; z-index: 1; }
 /* El escudo crece con la cara, en la misma proporción, para que la marca de
    agua siga cuadrando detrás en vez de quedarse pequeña y descentrada. */
-.jugador-card .crest--ghost { width: 106px; height: 105px; left: calc(50% - 15px); }
+.jugador-card .crest--ghost { width: 106px; height: 105px; left: calc(50% - 91px); }
 /* Demarcación, arriba a la izquierda de la ficha y con su color. */
 .puesto {
   /* Metida hacia dentro: la ficha tiene las esquinas redondeadas y recorta lo
