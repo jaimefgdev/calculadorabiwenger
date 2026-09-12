@@ -11,7 +11,7 @@
 
 /* Se sube en cada publicación: al cambiar, el navegador tira lo guardado y se
    baja los archivos nuevos. Sin esto, un cambio en app.js podría no llegar. */
-const VERSION = 'calc-v95';
+const VERSION = 'calc-v96';
 
 /* Lo que hace falta para pintar la app aunque no haya red. */
 const BASICOS = [
