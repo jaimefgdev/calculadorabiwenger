@@ -3989,7 +3989,8 @@
         state.marketState = '';
         /* Puede venir del respaldo, si Biwenger estaba de tregua: se enseña
            igual, pero diciendo que no es de ahora mismo. */
-        state.marketError = payload.stale ? (payload.warning || 'Datos de hace un rato.') : '';
+        state.marketError = payload.stale
+          ? (avisoEnCristiano(payload.warning) || 'Datos de hace un rato.') : '';
         state.marketViejo = !!payload.stale;
         if (!payload.stale) {
           state.marketIntentos = 0;
@@ -12650,6 +12651,33 @@
   const dayFormat = new Intl.DateTimeFormat('es-ES', { weekday: 'long', day: 'numeric', month: 'long' });
   const timeFormat = new Intl.DateTimeFormat('es-ES', { hour: '2-digit', minute: '2-digit' });
 
+  /**
+   * Los avisos, con las fechas en cristiano.
+   *
+   * Cuando Biwenger corta, el proxy devuelve lo ultimo bueno que tenia y avisa
+   * pegando el `updatedAt` TAL CUAL: «estos datos son de
+   * 2026-09-12T01:13:50.679Z». Aparte de ilegible, esa hora va en UTC, asi que
+   * a las 03:25 de Madrid ponia la 01:13 y parecia que los datos fueran de dos
+   * horas antes de lo que eran. La hora de aqui solo la sabe el navegador, asi
+   * que la traduccion se hace en este lado y no en el proxy.
+   */
+  function avisoEnCristiano(texto) {
+    if (!texto) return texto;
+    return String(texto).replace(/\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z/g, function (iso) {
+      const cuando = new Date(iso);
+      if (isNaN(cuando.getTime())) return iso;
+      const hoy = new Date().toDateString() === cuando.toDateString();
+      const hora = hoy ? 'las ' + timeFormat.format(cuando) : dateFormat.format(cuando);
+      /* Y cuanto hace, que es lo que de verdad se quiere saber: si son de hace
+         diez minutos da igual, y si son de hace seis horas ya no valen. */
+      const minutos = Math.round((Date.now() - cuando.getTime()) / 60000);
+      if (minutos < 2) return hora;
+      return hora + ' (hace ' + (minutos < 60
+        ? minutos + ' min'
+        : Math.round(minutos / 60) + ' h') + ')';
+    });
+  }
+
   /* El proxy se mudó de Cloudflare a Deno porque las operadoras españolas
      bloquean rangos de Cloudflare durante los partidos de LaLiga. La dirección
      se guarda en cada navegador por separado, así que el móvil (o cualquier
@@ -13075,7 +13103,7 @@
       };
     });
 
-    if (payload.warning) warnings.push(payload.warning);
+    if (payload.warning) warnings.push(avisoEnCristiano(payload.warning));
 
     Object.keys(unknown).forEach(function (name) {
       warnings.push('Participante no reconocido: «' + name + '». Revisa la lista MANAGERS de app.js.');
