@@ -3445,11 +3445,10 @@
       '<span class="face-box">' + face +
         chapaDePuesto(player && player.position, 'puesto--esquina', otrosPuestosDe(player)) +
         statusMark(player, 'mark--esquina') + pointsBadge(player, 'pts--esquina') +
-        chapaDePartido(player, 'juega--esquina') +
       '</span>' +
       /* Sin nombre en el hueco vacío: el guion no decía nada que no dijera ya
-         el círculo rojo, y encima parecía que ahí había alguien sin nombre. */
-      /* El partido va con el NOMBRE y no encima de la cara: ahi tapaba la foto. */
+         el círculo rojo, y encima parecía que ahí había alguien sin nombre.
+         Y el partido va con el NOMBRE, no encima de la cara: ahí tapaba la foto. */
       (player ? '<span class="pitch__name">' + escapeHtml(comoSeLlama(player)) +
         chapaDePartido(player, 'juega--nombre') + '</span>' : '') +
       '<button type="button" class="pitch__pick" data-slot="' + key + '" data-position="' + position + '"' +
@@ -7618,8 +7617,6 @@
     return '<span class="face-box">' + faceOf(jugador.id, claseCara) +
       chapaDePuesto(jugador.position, 'puesto--esquina', otrosPuestosDe(jugador)) +
       statusMark(jugador, 'mark--esquina') + pointsBadge(jugador, 'pts--esquina') +
-      /* Abajo a la derecha, el único rincón que quedaba libre. */
-      chapaDePartido(jugador, 'juega--esquina') +
     '</span>';
   }
 
