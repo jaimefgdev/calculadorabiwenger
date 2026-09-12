@@ -223,7 +223,7 @@ const CDN = 'https://cf.biwenger.com/api/v2';
    navegador normal y las cabeceras que este mandaría. */
 /* Marca de versión: se sube en cada cambio y se consulta con ?version=1.
    Sirve para saber desde fuera si el despliegue ha entrado o no. */
-const VERSION = '2026-09-12 · deno 153';
+const VERSION = '2026-09-12 · deno 154';
 
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ' +
   '(KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36';
@@ -4138,7 +4138,45 @@ async function finDeCadaJornada(env) {
     inicio[numero] = new Date(Math.min.apply(null, horas)).toISOString();
   });
 
-  return { fin: fin, inicio: inicio, jornadas: Object.keys(fin).length };
+  /* Y el PROXIMO partido de cada club: el primero suyo que no se haya jugado
+     todavia. Hace falta para la columna «Partido» de Mi plantilla: antes se
+     sacaba de la jornada en curso, asi que al que ya habia jugado se le seguia
+     enseñando el partido de ayer en vez del que le toca. */
+  const proximo = {};
+  const todos = [];
+  Object.keys(rondas).forEach(function (id) {
+    const numero = numeroDe[String(id)];
+    ((rondas[id] || {}).matches || []).forEach(function (m) {
+      if (!m || !m.start) return;
+      const t = Date.parse(m.start);
+      if (isNaN(t)) return;
+      todos.push({ t: t, jornada: numero, m: m });
+    });
+  });
+  todos.sort(function (a, b) { return a.t - b.t; });
+  todos.forEach(function (x) {
+    const m = x.m;
+    if (m.status === 'finished') return;
+    [[m.homeId, m.away, true], [m.awayId, m.home, false]].forEach(function (par) {
+      const club = par[0];
+      if (club == null || proximo[club]) return;
+      proximo[club] = { rival: null, nombre: par[1] || null, casa: par[2],
+        cuando: m.start, jornada: x.jornada };
+    });
+  });
+  /* El id del rival, que es lo que pinta su escudo. */
+  todos.forEach(function (x) {
+    const m = x.m;
+    if (m.status === 'finished') return;
+    if (proximo[m.homeId] && proximo[m.homeId].rival == null && proximo[m.homeId].cuando === m.start) {
+      proximo[m.homeId].rival = m.awayId;
+    }
+    if (proximo[m.awayId] && proximo[m.awayId].rival == null && proximo[m.awayId].cuando === m.start) {
+      proximo[m.awayId].rival = m.homeId;
+    }
+  });
+
+  return { fin: fin, inicio: inicio, proximo: proximo, jornadas: Object.keys(fin).length };
 }
 
 async function partidosDeJugador(env, id) {
