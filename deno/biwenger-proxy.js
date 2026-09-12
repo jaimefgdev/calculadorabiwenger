@@ -223,7 +223,7 @@ const CDN = 'https://cf.biwenger.com/api/v2';
    navegador normal y las cabeceras que este mandaría. */
 /* Marca de versión: se sube en cada cambio y se consulta con ?version=1.
    Sirve para saber desde fuera si el despliegue ha entrado o no. */
-const VERSION = '2026-09-12 · deno 155';
+const VERSION = '2026-09-12 · deno 156';
 
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ' +
   '(KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36';
@@ -261,7 +261,7 @@ const NAVEGADOR = {
    Cloudflare recicla el proceso, se vuelve a hacer login solo. */
 let cache = { token: null, account: null, players: null, playersAt: 0, prices: {},
   round: null, roundAt: 0, tv: null, tvAt: 0, calendar: null, calendarAt: 0,
-  board: null, boardAt: 0, limitedUntil: 0, lastGood: null, forzar: false,
+  board: null, boardAt: 0, limitedUntil: 0, ultimaSonda: 0, lastGood: null, forzar: false,
   primas: null,
   /* El calendario de partidos de las 38 jornadas, uno para toda la liga. */
   fixtures: null, fixturesScore: null, fixturesAt: 0 };
@@ -941,26 +941,70 @@ async function frenoGuardado() {
   if (!JORNADAS) return 0;
   try {
     const crudo = await JORNADAS.get('freno-api');
-    const hasta = Number(crudo) || 0;
+    /* Dos numeros separados por «|»: hasta cuando dura y cuando fue la ultima
+       sonda. Se guarda el viejo formato —un numero pelado— por si queda alguno
+       escrito de antes. */
+    const trozos = String(crudo == null ? '' : crudo).split('|');
+    const hasta = Number(trozos[0]) || 0;
+    const sonda = Number(trozos[1]) || 0;
     if (hasta > cache.limitedUntil) cache.limitedUntil = hasta;
+    if (sonda > cache.ultimaSonda) cache.ultimaSonda = sonda;
     return cache.limitedUntil;
   } catch (error) { return cache.limitedUntil; }
 }
 
 async function apuntarFreno(ms) {
   cache.limitedUntil = Date.now() + ms;
+  cache.ultimaSonda = Date.now();
   if (!JORNADAS) return;
-  try { await JORNADAS.put('freno-api', String(cache.limitedUntil)); }
-  catch (error) { /* al menos vale para esta instancia */ }
+  try {
+    await JORNADAS.put('freno-api', cache.limitedUntil + '|' + cache.ultimaSonda);
+  } catch (error) { /* al menos vale para esta instancia */ }
 }
+
+/**
+ * Se levanta el castigo: Biwenger ha vuelto a contestar.
+ *
+ * Solo se escribe si habia freno puesto, que si no seria un borrado en cada
+ * peticion.
+ */
+async function quitarFreno() {
+  if (!cache.limitedUntil) return;
+  cache.limitedUntil = 0;
+  cache.ultimaSonda = 0;
+  if (!JORNADAS) return;
+  try { await JORNADAS.delete('freno-api'); } catch (error) { /* da igual */ }
+}
+
+/* Cada cuanto se prueba si Biwenger ya ha vuelto, estando castigados. */
+const CADA_SONDA = 10 * 60 * 1000;
 
 async function api(env, path, extra) {
   /* Si Biwenger ya nos ha cortado, no se le vuelve a llamar hasta que pase el
-     castigo: seguir insistiendo alarga el bloqueo. */
+     castigo: seguir insistiendo alarga el bloqueo.
+
+     Pero el castigo no se aguanta a ciegas hasta el final. Cuando contesta
+     «vuelva en unas horas» nos callamos dos horas enteras, y si Biwenger se
+     recupera a la media hora —que es lo que pasa casi siempre— la web se queda
+     otra hora y media sirviendo datos viejos sin motivo. Asi que cada diez
+     minutos se deja pasar UNA llamada para ver si ya contesta: si va bien se
+     levanta el castigo entero, y si vuelve el 429 se renueva. Una cada diez
+     minutos no es lo que nos gano el bloqueo; lo que lo ganaba eran cuarenta
+     por hora. */
   if (!cache.forzar) await frenoGuardado();
-  if (cache.limitedUntil && Date.now() < cache.limitedUntil && !cache.forzar) {
+  const castigado = cache.limitedUntil && Date.now() < cache.limitedUntil;
+  const tocaSondear = castigado && Date.now() - cache.ultimaSonda >= CADA_SONDA;
+  if (castigado && !tocaSondear && !cache.forzar) {
     const quedan = Math.ceil((cache.limitedUntil - Date.now()) / 1000);
     throw new Error('Biwenger ha limitado las consultas. Se reintenta en ' + quedan + ' s.');
+  }
+  if (tocaSondear) {
+    cache.ultimaSonda = Date.now();
+    if (JORNADAS) {
+      try {
+        await JORNADAS.put('freno-api', cache.limitedUntil + '|' + cache.ultimaSonda);
+      } catch (error) { /* al menos vale para esta instancia */ }
+    }
   }
 
   const token = cache.token || await login(env);
@@ -1002,6 +1046,12 @@ async function api(env, path, extra) {
     response = await call(await login(env));
   }
   if (!response.ok) throw new Error('Biwenger ' + response.status + ' en ' + path);
+
+  /* Ha contestado: si quedaba castigo puesto, se levanta. Biwenger se recupera
+     casi siempre antes de las dos horas que pide, y sin esto la web seguia
+     sirviendo datos viejos hasta que se cumplia el plazo entero aunque la sonda
+     acabara de demostrar que ya responde. */
+  await quitarFreno();
 
   const body = await response.json();
   return body.data === undefined ? body : body.data;
