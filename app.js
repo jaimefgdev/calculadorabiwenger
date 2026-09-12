@@ -5426,6 +5426,21 @@
       };
     }
 
+    /* Retirar la puja: fuera de la pantalla en cuanto Biwenger diga que sí, sin
+       esperar a la sincronización. La fila del mercado se quedaba un par de
+       segundos largos en amarillo, con su importe y su aspa, como si no se
+       hubiera retirado nada. El diálogo de puja ya lo hacía así; el aspa
+       de la fila, no. Lo que llegue luego manda. */
+    if (opPendiente.accion === 'retirar') {
+      const retirada = opPendiente.id;
+      trasOperarLimpia = function () {
+        state.offers = (state.offers || []).filter(function (o) {
+          return String(o.id) !== String(retirada);
+        });
+        render();
+      };
+    }
+
     if (opPendiente.accion === 'devolver') {
       lanzarOperacion({ accion: 'devolver', player: opPendiente.playerId, price: opPendiente.importe },
         opPendiente.hecho);
