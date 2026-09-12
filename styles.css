@@ -1177,7 +1177,7 @@ code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft)
      en la MISMA transformada para que el escalonado no cambie, solo se deslice
      el bloque entero. */
   transform: translate(calc(var(--desx, 0) * 1%),
-                       calc(var(--rango, 0) * -42% + var(--baja, 0) * 1%));
+                       calc(var(--rango, 0) * -28% + var(--baja, 0) * 1%));
   position: relative; display: flex; flex-direction: column; align-items: center;
   gap: .2rem; min-width: 0;
   /* Se reparten la línea a partes iguales, con tope: hasta cinco quedan al

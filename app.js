@@ -1122,8 +1122,12 @@
   }
 
   /* Lo que sube cada escalón, en % de la casilla. Tiene que ser el mismo número
-     que hay en el `transform` de `.pitch__slot`. */
-  const ESCALON = 42;
+     que hay en el `transform` de `.pitch__slot`.
+     Era 42 y quedaba mal: con ese escalón el de en medio de cada línea caía
+     tanto que se metía entre los de la línea de abajo —Marc Casadó parecía un
+     defensa— y las puntas subían por encima de la línea de arriba. Con 28 se
+     sigue viendo el arco de Biwenger y cada línea se lee como una línea. */
+  const ESCALON = 28;
   /* Y lo más que se permite subir a nadie. Media casilla deja la cara entera
      dentro del césped con el aire de arriba que hay. */
   const TECHO = 50;
