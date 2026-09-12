@@ -3369,9 +3369,18 @@
 
   /* Dibujados y no con emojis: un emoji cambia de forma y de altura según el
      aparato, y aquí van a 10 px dentro de un círculo. */
-  const CASITA = '<svg viewBox="0 0 24 24" aria-hidden="true">' +
+  /* Los dos recuadros NO son «0 0 24 24»: cada dibujo se encuadra en el suyo,
+     centrado en su propio centro y del mismo tamaño que el otro.
+
+     Con el recuadro de 24 compartido los dos quedaban descolocados y, sobre
+     todo, distintos: la casa ocupa 19 x 17 y su centro cae en la y 11,5, y el
+     avion ocupa 18 x 20,3 con el centro en la 12,85. O sea, la casa salia
+     pequena y un pelin alta y el avion grande y bajo, asi que al cambiar de
+     casa a fuera el icono pegaba un salto. Ahora los dos pintan 15,9 de 17 y
+     comparten centro exacto. */
+  const CASITA = '<svg viewBox="0.5 0 23 23" aria-hidden="true">' +
     '<path fill="currentColor" d="M12 3 2.5 11h3v9h5v-5.5h3V20h5v-9h3z"/></svg>';
-  const AVION = '<svg viewBox="0 0 24 24" aria-hidden="true">' +
+  const AVION = '<svg viewBox="-0.3 0.55 24.6 24.6" aria-hidden="true">' +
     '<path fill="currentColor" d="M21 15.5 13.5 11V4.2a1.5 1.5 0 0 0-3 0V11L3 15.5V18l7.5-2.2v4L8 21.4V23l4-1 4 1v-1.6l-2.5-1.6v-4L21 18z"/></svg>';
 
   /**

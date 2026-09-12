@@ -3706,7 +3706,7 @@ main.wrap { padding-top: 1.15rem; padding-bottom: 3.5rem; }
   display: inline-flex; align-items: center; gap: 2px;
   line-height: 0;
 }
-.juega__donde { display: block; width: 14px; height: 14px; }
+.juega__donde { display: block; width: 16px; height: 16px; }
 .juega__donde svg { display: block; width: 100%; height: 100%; }
 /* La casa negra y el avion blanco. Los dos se leen sobre el cesped y sobre la
    foto, y no hace falta distinguir el dibujo para saber cual es: cambia el
@@ -3719,10 +3719,13 @@ main.wrap { padding-top: 1.15rem; padding-bottom: 3.5rem; }
    que el borde queda por fuera del dibujo en vez de comerselo. */
 .juega__donde svg path {
   paint-order: stroke fill;
-  stroke-width: 2.6; stroke-linejoin: round;
+  stroke-linejoin: round;
 }
-.juega--casa .juega__donde svg path { stroke: #fff; }
-.juega--fuera .juega__donde svg path { stroke: #000; }
+/* El grosor va por separado porque cada recuadro mide distinto —23 el de
+   la casa, 24,6 el del avion—, y un 2,6 para los dos pintaria el avion
+   mas fino. Asi los dos trazos salen a 1,85 px en pantalla. */
+.juega--casa .juega__donde svg path { stroke: #fff; stroke-width: 2.5; }
+.juega--fuera .juega__donde svg path { stroke: #000; stroke-width: 2.7; }
 .juega__rival {
   display: block; width: 16px; height: 16px; flex: none;
   background: center / contain no-repeat;
@@ -3741,8 +3744,14 @@ main.wrap { padding-top: 1.15rem; padding-bottom: 3.5rem; }
 .juega--nombre {
   display: inline-flex; vertical-align: middle;
   margin-left: 4px; gap: 2px;
+  /* Y un pelin arriba. `vertical-align: middle` centra la chapa en la mitad de
+     la altura de la equis, y la chapa mide mas que el propio texto: quedaba
+     colgando por debajo de la linea de los nombres. Con 0,08 em el escudo
+     apoya justo en ella. En em, que asi vale igual para el campo y para el
+     banquillo, que no tienen el mismo cuerpo. */
+  position: relative; top: -.08em;
 }
-.juega--nombre .juega__donde { width: 16px; height: 16px; }
+.juega--nombre .juega__donde { width: 17px; height: 17px; }
 .juega--nombre .juega__rival { width: 17px; height: 17px; }
 /* Y el nombre deja de recortarse por su cuenta: con `ellipsis` se comia la
    chapa antes de cortar una sola letra. */
@@ -3751,7 +3760,7 @@ main.wrap { padding-top: 1.15rem; padding-bottom: 3.5rem; }
 /* En la tabla va suelta, sin esquina que valga, y mas grande: ahi no compite
    con la cara ni con las otras chapas, y hay sitio de sobra. */
 .juega--fila { position: static; transform: none; gap: 4px; }
-.juega--fila .juega__donde { width: 19px; height: 19px; }
+.juega--fila .juega__donde { width: 22px; height: 22px; }
 .juega--fila .juega__rival { width: 22px; height: 22px; }
 
 .juega-cell { white-space: nowrap; }
