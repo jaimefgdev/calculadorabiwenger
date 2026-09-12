@@ -3546,15 +3546,6 @@ main.wrap { padding-top: 1.15rem; padding-bottom: 3.5rem; }
 .table td.col-pujar, .table th.col-pujar { text-align: center; }
 .table td.col-pujar > * { vertical-align: middle; }
 .table td.col-pujar .btn + .btn { margin-left: .25rem; }
-/* En el mercado, esa columna va pegada a la DERECHA.
-
-   La columna mide lo que mida su fila mas ancha —una con puja puesta lleva el
-   importe, «Cambiar» y el aspa—, y con el contenido centrado las demas
-   quedaban flotando en medio: lo que vendes tu, que son tres botones
-   pequenos, cambiaba de sitio segun hubiera pujas en la tabla o no. Pegado a
-   la derecha esta siempre donde estaba, haya pujas u ofertas o no las haya. */
-.table--market td.col-pujar, .table--market th.col-pujar { text-align: right; }
-.table--market td.col-pujar .acciones { justify-content: flex-end; }
 /* Pujar es la acción de la fila: el reborde en rojo la señala entre tanta
    píldora gris. Las letras se quedan como estaban. */
 .ambito--pujar {
