@@ -296,6 +296,22 @@ code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft)
 @media (max-width: 720px) {
   .market-grid { grid-template-columns: 1fr; }
 }
+/* «Mis jugadores en venta» se queda SIEMPRE en la columna de la derecha.
+
+   «Mis pujas y ofertas» va oculto casi todo el tiempo —solo sale cuando
+   tienes algo puesto—, y entonces la rejilla subia la tabla de ventas al hueco
+   de la izquierda: cambiaba de lado sola segun tuvieras pujas o no. Clavada en
+   la segunda columna esta siempre en el mismo sitio.
+
+   Abajo de 720 la rejilla es de UNA columna y ahi hay que soltarla: pedir la
+   segunda le inventaria una columna vacia a la izquierda. */
+.market-grid > #listings-panel { grid-column: 2; }
+@media (max-width: 720px) {
+  .market-grid > #listings-panel { grid-column: auto; }
+}
+/* Y en modo app la rejilla tambien es de una sola columna, a cualquier ancho. */
+.modo-app .market-grid > #listings-panel { grid-column: auto; }
+
 /* La rejilla le quita el margen a sus paneles: hay que reponerlo abajo o el
    bloque siguiente queda pegado. */
 .market-grid .panel { margin-bottom: 0; }
