@@ -223,7 +223,7 @@ const CDN = 'https://cf.biwenger.com/api/v2';
    navegador normal y las cabeceras que este mandaría. */
 /* Marca de versión: se sube en cada cambio y se consulta con ?version=1.
    Sirve para saber desde fuera si el despliegue ha entrado o no. */
-const VERSION = '2026-09-12 · deno 156';
+const VERSION = '2026-09-12 · deno 157';
 
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ' +
   '(KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36';
@@ -3212,9 +3212,25 @@ function conCorrecciones(marcador, numero) {
   return marcador;
 }
 
-/* Lo que vale un gol según la línea en la que juegas: 6 de portero, 5 de
-   defensa, 4 de medio y 3 de delantero. */
-const VALOR_GOL = { 1: 6, 2: 5, 3: 4, 4: 3 };
+/* Lo que vale un gol según la línea en la que te alinean. Aquí solo importan
+   las DIFERENCIAS: esta función nunca usa el número suelto.
+
+   Medido contra Biwenger, tres casos:
+
+     · Sucic (J1 y J4) juega de MEDIO y Bella lo alinea de DELANTERO.
+       Su ficha da 8; Biwenger le pone 7 en ese once. Un punto menos.
+     · Pablo García (J1 y J4) juega de DELANTERO y gijonudo lo alinea de
+       MEDIO. Un punto más, el mismo escalón al revés.
+     · Juan Iglesias (J5) juega de DEFENSA y CoZoKe lo alinea de MEDIO.
+       Biwenger le deja los 15 CLAVADOS: ahí no hay escalón.
+
+   O sea que el gol de defensa y el de medio valen LO MISMO, y el escalón
+   solo aparece al pasar a delantero. Antes la tabla les daba 5 y 4, y por eso
+   a CoZoKe le quitábamos un punto de la jornada 5 que Biwenger no quita.
+   El de portero se queda a un escalón por encima: no hay ningún caso medido
+   —hace falta un portero que marque y que lo alineen fuera de la portería—,
+   así que se deja como estaba en vez de inventar. */
+const VALOR_GOL = { 1: 5, 2: 4, 3: 4, 4: 3 };
 
 /**
  * Recoloca el gol del que está alineado fuera de su puesto.
