@@ -130,12 +130,17 @@
     return 'j' + r.id + ':' + (r.played != null ? r.played : '?') + ':' + (r.live ? 1 : 0);
   }
 
-  /* Y lo que cambia las plantillas: que alguien fiche o venda. El tablón viene
-     con la sincronización normal, que es rápida, así que sale gratis. */
+  /* Y lo que cambia las plantillas: que alguien fiche o venda —eso cambia QUIÉN
+     está—, y que se juegue un partido —eso cambia sus PUNTOS—.
+     Lo segundo faltaba, y por eso los puntos de Mi plantilla y de las plantillas
+     de la liga se quedaban en los de antes hasta que alguien ficha o hasta que
+     recargas: la copia guardada se daba por buena porque el tablón no había
+     cambiado. El tablón y la jornada vienen los dos con la sincronización
+     normal, así que comprobarlo no cuesta una consulta. */
   function selloDeMovimientos() {
     const lista = state.movements || [];
     if (!lista.length) return null;
-    return 'm' + lista.length + ':' + (lista[0].date || '');
+    return 'm' + lista.length + ':' + (lista[0].date || '') + '|' + (selloDeJornada() || '');
   }
 
   /**
@@ -167,6 +172,17 @@
       state.selloSquads = null;
       state.squads = null;
       ensureSquads();
+    }
+
+    /* Y el mercado. Se pedía UNA vez por sesión: los precios y los puntos de los
+       que están en venta se quedaban clavados en los de cuando abriste la app,
+       y solo se arreglaban recargando. Ahora se vuelve a pedir cuando se ha
+       jugado algo o cuando alguien ha fichado, que es lo que los mueve. */
+    if (m && state.selloMercado && state.selloMercado !== m) {
+      state.selloMercado = m;
+      ensureMarket(true);
+    } else if (m && !state.selloMercado) {
+      state.selloMercado = m;
     }
   }
 
@@ -887,6 +903,7 @@
     finJornada: null,       // cuándo terminó cada jornada, para el liderato
     inicioJornada: null,    // y cuándo empezó, que es lo que le da su mes
     mesEstadisticas: null,  // el mes que se está mirando en Estadísticas
+    selloMercado: null,     // con qué jornada y tablón se trajo el mercado
     finJornadaPedido: false,
     syncFails: 0,          // fallos seguidos, para espaciar los reintentos
     nextSyncAt: 0,         // no se vuelve a intentar antes de este momento
