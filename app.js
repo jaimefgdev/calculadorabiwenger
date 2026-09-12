@@ -1159,6 +1159,38 @@
     return nombreConocido[String(jugador.id)] || guardado;
   }
 
+  /* El índice de futbolistas, por id, para poder preguntar por uno sin recorrer
+     los quinientos. Se rehace solo cuando cambia la lista. */
+  let indiceLista = null;
+  let indicePorId = null;
+
+  function delIndice(id) {
+    const lista = state.jugadores || [];
+    if (!lista.length || id == null) return null;
+    if (indiceLista !== lista) {
+      indiceLista = lista;
+      indicePorId = {};
+      lista.forEach(function (j) { if (j && j.id != null) indicePorId[String(j.id)] = j; });
+    }
+    return indicePorId[String(id)] || null;
+  }
+
+  /**
+   * Sus puntos de la temporada, del índice si lo tenemos.
+   *
+   * El índice es el MISMO sitio del que salen los puntos de su ficha, así que
+   * Mi plantilla y la ficha dicen lo mismo en el mismo momento. La plantilla
+   * guardada solo se vuelve a pedir cuando alguien ficha o cuando acaba un
+   * partido, y entre medias se quedaba con los puntos de antes mientras la
+   * ficha ya los tenía sumados.
+   */
+  function puntosActuales(jugador) {
+    if (!jugador) return null;
+    const suyo = delIndice(jugador.id);
+    if (suyo && suyo.points != null) return suyo.points;
+    return jugador.points != null ? jugador.points : null;
+  }
+
   /** Su demarcación, venga en el objeto o guardada de cuando se supo. */
   function puestoDe(jugador, id) {
     if (jugador && jugador.position != null) return jugador.position;
@@ -2767,7 +2799,8 @@
      Sin puntos —recién fichado— va al final de los suyos, no al principio:
      un `null` no es un cero, es que todavía no ha jugado. */
   function puntosPara(jugador) {
-    return jugador.points == null ? -Infinity : jugador.points;
+    const p = puntosActuales(jugador);
+    return p == null ? -Infinity : p;
   }
 
   function porPuntos(a, b) {
@@ -3271,7 +3304,11 @@
 
   /** Puntos del futbolista, en su círculo abajo a la izquierda de la foto. */
   function pointsBadge(player, extra) {
-    if (!player || player.points == null) return '';
+    if (!player) return '';
+    /* Del índice si lo tenemos, que es de donde salen los de su ficha. */
+    const puntos = puntosActuales(player);
+    if (puntos == null) return '';
+    player = Object.assign({}, player, { points: puntos });
     /* En amarillo si es de los diez que más puntúan de su demarcación. El mismo
        aviso que en la ficha, pero aquí es donde de verdad sirve: en el campo,
        en el banquillo y en la lista se ven veinte caras de golpe y así se
@@ -9577,10 +9614,11 @@
      demarcación. La misma marca que lleva en la chapa de la foto, para las
      tablas donde los puntos van escritos y no encima de la cara. */
   function puntosConTope(jugador) {
-    if (!jugador || jugador.points == null) return '<span class="sub">—</span>';
-    if (!entreLosDiezDeSuPuesto(jugador.id, puestoDe(jugador))) return String(jugador.points);
+    const puntos = puntosActuales(jugador);
+    if (puntos == null) return '<span class="sub">—</span>';
+    if (!entreLosDiezDeSuPuesto(jugador.id, puestoDe(jugador))) return String(puntos);
     return '<span class="pts-top" title="De los diez que más puntúan de su demarcación">' +
-      jugador.points + '</span>';
+      puntos + '</span>';
   }
 
   function estadisticasDeTemporada(id) {
