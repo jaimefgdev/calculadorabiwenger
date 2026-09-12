@@ -6249,13 +6249,15 @@
 
     const conJornada = function (x) {
       if (!x) return sinDato;
-      /* Entre paréntesis y en rojo, lo que hizo su once esa jornada y no le
-         contó por estar en negativo. */
-      return x.puntos +
-        (x.anulados != null
-          ? ' <span class="statbox__anulados" title="Lo que sumó su once, pero no le contó por empezar la jornada en negativo">(' +
-            x.anulados + ')</span>'
+      /* En rojo, DELANTE, lo que hizo su once esa jornada y no le contó por
+         estar en negativo. Iba detrás y quedaba enterrado entre el cero y la
+         jornada; delante se lee antes que el cero, que es el orden en el que
+         importa: primero cuánto hizo, luego que no le valió. */
+      return (x.anulados != null
+          ? '<span class="statbox__anulados" title="Lo que sumó su once, pero no le contó por empezar la jornada en negativo">(' +
+            x.anulados + ')</span> '
           : '') +
+        x.puntos +
         (x.jornada ? ' <span class="sub">J' + x.jornada + '</span>' : '');
     };
 
