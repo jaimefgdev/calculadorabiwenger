@@ -223,7 +223,7 @@ const CDN = 'https://cf.biwenger.com/api/v2';
    navegador normal y las cabeceras que este mandaría. */
 /* Marca de versión: se sube en cada cambio y se consulta con ?version=1.
    Sirve para saber desde fuera si el despliegue ha entrado o no. */
-const VERSION = '2026-09-13 · deno 160';
+const VERSION = '2026-09-13 · deno 161';
 
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ' +
   '(KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36';
@@ -4683,6 +4683,9 @@ async function roundBoard(env, headers, jornada, listaNombres) {
 
   /* Y ahora sí: la Súper Pica de esta liga y las correcciones, encima de las
      notas buenas. */
+  /* La nota SIN la Super Pica: la pica es un extra de esta liga y no deberia
+     decidir cosas de toda la competicion, como quien es el mejor de la jornada. */
+  const baseSinPica = Object.assign({}, base);
   const marcador = conCorrecciones(conSuperPica(base, detalle, primas), numeroJornada);
 
   const standings = (((data && data.league) || {}).standings || []).filter(Boolean).map(function (row) {
@@ -4919,6 +4922,13 @@ async function roundBoard(env, headers, jornada, listaNombres) {
     rounds: await calendarioConEstado(calendar, score),
     standings: standings,
     bestXi: once,
+    /* Los MEJORES DE CADA PARTIDO, con su nota. De aqui sale el MVP de la
+       jornada, asi que conviene poder mirarlo desde fuera cuando no cuadra. */
+    mvps: Object.keys((detalle && detalle.mvps) || {}).map(function (id) {
+      return { id: id, nombre: names[id] || null,
+               nota: typeof marcador[id] === 'number' ? marcador[id] : null,
+               historial: typeof baseSinPica[id] === 'number' ? baseSinPica[id] : null };
+    }),
     /* Los importes que paga la liga, para poder explicarlos en la web sin
        repetirlos allí: si se cambian en Biwenger, cambian aquí solos. */
     primas: primas,
