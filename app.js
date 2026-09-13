@@ -8285,17 +8285,12 @@
             const marca = vivo
               ? vivo.homeScore + '–' + vivo.awayScore
               : juego.home.score + '–' + juego.away.score;
-            /* Biwenger no publica las alineaciones de todos a la vez: el
-               Getafe-Deportivo seguia sin ninguna a doce minutos del pitido
-               inicial, con los otros dos de ese dia ya puestos. Antes eso dejaba
-               la fila MUERTA —el boton iba `disabled`— y desde fuera no se
-               distingue de que la web este rota. Ahora se abre igual y lo dice. */
-            const hayAlineacion = juego.home.xi.length > 0 || juego.away.xi.length > 0;
+            const hayAlineacion = juego.home.xi.length > 0;
 
             return '<div class="partido' + (abierto ? ' partido--abierto' : '') + '">' +
               '<button type="button" class="partido__cab" data-partido="' + juego.id + '"' +
                 ' aria-expanded="' + (abierto ? 'true' : 'false') + '"' +
-                '>' +
+                (hayAlineacion ? '' : ' disabled') + '>' +
                 /* Cuándo se juega, a la izquierda. Solo con hora de verdad: los
                    que aún no tienen horario confirmado se quedan en blanco en
                    vez de enseñar una hora inventada. */
@@ -8345,28 +8340,19 @@
                               : '<strong class="round__minuto">' + escapeHtml(vivo.reloj) + '</strong>') +
                             '</p>'
                           : '') +
-                        /* Sin alineaciones no se pone nada aqui: lo dice, y con
-                           mas detalle, el parrafo de debajo. Dos avisos seguidos
-                           diciendo lo mismo sobraban. */
-                        (jugado || !hayAlineacion ? ''
+                        (jugado ? ''
                           : '<p class="muted alin__aviso">' +
                             (juego.confirmadas ? 'Alineaciones confirmadas.' : 'Alineaciones probables.') +
                             '</p>') +
-                        /* Sin alineaciones no hay nada que cambiar de vista. */
-                        (hayAlineacion
-                          ? '<button type="button" class="ambito ambito--marco" data-vista="' + otra + '">' +
-                            (ahora === 'campo' ? 'Campo' : 'Tabla') + '</button>'
-                          : '') +
+                        '<button type="button" class="ambito ambito--marco" data-vista="' + otra + '">' +
+                          (ahora === 'campo' ? 'Campo' : 'Tabla') + '</button>' +
                       '</div>';
                     })() +
-                    (hayAlineacion
-                      ? '<div class="alineaciones">' +
-                        (state.vistaPartido === 'campo'
-                          ? campoDePartido(juego.home, juego.home.name) + campoDePartido(juego.away, juego.away.name)
-                          : once(juego.home, juego.home.name) + once(juego.away, juego.away.name)) +
-                        '</div>'
-                      : '<p class="muted partido__sinonce">Biwenger todavía no ha publicado ' +
-                        'las alineaciones de este partido.</p>') +
+                    '<div class="alineaciones">' +
+                      (state.vistaPartido === 'campo'
+                        ? campoDePartido(juego.home, juego.home.name) + campoDePartido(juego.away, juego.away.name)
+                        : once(juego.home, juego.home.name) + once(juego.away, juego.away.name)) +
+                    '</div>' +
                   '</div>'
                 : '') +
             '</div>';
