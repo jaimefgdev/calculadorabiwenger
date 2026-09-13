@@ -53,6 +53,10 @@
      lo que destaca ahí. Vive aquí, y no repetido en cada regla, para que
      cambiarlo lo cambie en toda la app de una vez. */
   --fila-mia:      rgba(255, 255, 255, .045);
+  /* Y el mismo blanco, para la aureola de los tuyos en Jugadores: alli el velo
+     al 4,5 % no se veria, asi que se guarda el COLOR y cada sombra pone su
+     transparencia. En el tema claro se oscurece, igual que el velo. */
+  --aureola:       #fff;
   /* En venta: rojo, el color de la marca.
      Con el velo de «es la tuya» no se distinguían. */
   --fila-venta:    rgba(255, 0, 51, .12);
@@ -87,6 +91,7 @@
 
     --accent-soft:   rgba(255, 0, 51, .08);
     --fila-mia:      rgba(0, 0, 0, .05);
+    --aureola:       #111;
     --fila-venta:    rgba(255, 0, 51, .10);
 
     --pos:           #0a8f56;
@@ -120,6 +125,7 @@
   --accent-rgb:    255, 0, 51;
   --accent-soft:   rgba(255, 0, 51, .08);
   --fila-mia:      rgba(0, 0, 0, .05);
+  --aureola:       #111;
   --fila-venta:    rgba(255, 0, 51, .10);
 
   --pos:           #0a8f56;
@@ -164,6 +170,7 @@
   --accent-rgb:    255, 0, 51;
   --accent-soft:   rgba(255, 0, 51, .1);
   --fila-mia:      rgba(255, 255, 255, .045);
+  --aureola:       #fff;
   --fila-venta:    rgba(255, 0, 51, .12);
 
   --pos:           #00d68f;
@@ -2489,29 +2496,30 @@ input[type="search"]::-webkit-search-cancel-button:hover { opacity: .75; }
 /* Los de tu plantilla, con aureola. Entre quinientos y pico, dar con los
    tuyos leyendo nombres no habia quien.
 
-   Va en la cara y no en la tarjeta: alrededor del circulo se lee como un
-   resplandor, y un recuadro alrededor de la tarjeta se leia como una caja mas.
-   Tres sombras encadenadas —aro fino, resplandor y halo— para que se apague
-   poco a poco en vez de cortarse de golpe.
+   NO va en la cara. Ahi la sombra se pinta encima del escudo difuminado —la
+   cara esta en `z-index: 1` y el escudo en el 0— y le cruzaba un aro por
+   delante. Va en un `::before` de la tarjeta, que es lo PRIMERO que se pinta
+   de todo lo que lleva dentro: asi el escudo cae por encima y el halo se le
+   mete por debajo en vez de pisarlo.
 
-   El amarillo es el mismo con el que ya se marca lo tuyo en el resto de la web
-   —la banda de Mi plantilla, los titulares—, asi que no hay color nuevo que
-   aprenderse.
+   Blanco translucido, el mismo color con el que se marca tu fila en las
+   clasificaciones. Alli basta un velo al 4,5 %; aqui hay que verlo a un metro,
+   asi que se guarda el COLOR en `--aureola` —que se oscurece solo en el tema
+   claro— y cada sombra pone su propia transparencia.
 
-   Y la tarjeta deja de recortar: la cara tiene 3 px por arriba y 4 por abajo,
-   asi que con `overflow: hidden` el halo se cortaba en seco. Medido que el
-   escudo difuminado del fondo cabe entero dentro de la tarjeta (106 x 105 en
-   una de 276 x 131), o sea que no habia nada que recortar. */
+   La medida se saca igual que la caja de la cara (`min(90%, 104px)`) en vez de
+   clavar los 104 px: la tarjeta encoge con el ancho y el halo tiene que
+   encoger con ella. */
 .jugador-card--mio { overflow: visible; }
-.jugador-card--mio .pic-player {
-  /* Sin `color-mix`, aro y resplandor planos: se pierde el degradado, no la marca. */
-  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, .18),
-              0 0 0 2px var(--marca),
-              0 0 14px 3px var(--marca);
-  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, .18),
-              0 0 0 2px color-mix(in srgb, var(--marca) 88%, transparent),
-              0 0 10px 2px color-mix(in srgb, var(--marca) 52%, transparent),
-              0 0 22px 7px color-mix(in srgb, var(--marca) 26%, transparent);
+.jugador-card--mio::before {
+  content: ''; position: absolute; z-index: 0; pointer-events: none;
+  top: .2rem; left: 50%; transform: translateX(-50%);
+  width: min(90%, 104px); aspect-ratio: 1; border-radius: 50%;
+  /* Sin `color-mix`, un resplandor plano: se pierde el degradado, no la marca. */
+  box-shadow: 0 0 16px 5px rgba(255, 255, 255, .45);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--aureola) 30%, transparent),
+              0 0 16px 5px color-mix(in srgb, var(--aureola) 42%, transparent),
+              0 0 34px 14px color-mix(in srgb, var(--aureola) 18%, transparent);
 }
 /* La medida la lleva la caja de la cara, igual que en el campo, pero aquí hay
    sitio de sobra: caras más grandes y menos futbolistas por fila. Al pasar de
