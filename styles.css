@@ -2756,7 +2756,15 @@ input[type="search"]::-webkit-search-cancel-button:hover { opacity: .75; }
    partido entero, no de la columna de la izquierda— y a la altura de la
    pildora Campo/Tabla, que es con quien comparte fila. Sin margen propio: la
    fila ya lo lleva. */
-.alin__aviso { grid-column: 2; margin: 0; text-align: center; }
+.alin__aviso {
+  grid-column: 2; margin: 0; text-align: center;
+  /* En NEGRITA. El cuerpo ya era el mismo que el de «En juego» —13,76 px los
+     dos, medido—, pero aquel va en 700 y en mayusculas y este iba en 400: al
+     lado parecia mucho mas pequeno. Mismo peso y se leen igual de grandes.
+     El color se queda apagado a proposito: «En juego» es rojo porque hay algo
+     pasando ahora mismo, y esto es solo un apunte. */
+  font-weight: 700;
+}
 .alineaciones { display: grid; gap: 1rem; grid-template-columns: repeat(2, minmax(0, 1fr)); }
 @media (max-width: 620px) { .alineaciones { grid-template-columns: 1fr; } }
 .alin__titulo { font-size: .8rem; font-weight: 650; margin-bottom: .25rem; }
