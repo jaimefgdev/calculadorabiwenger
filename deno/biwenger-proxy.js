@@ -223,7 +223,7 @@ const CDN = 'https://cf.biwenger.com/api/v2';
    navegador normal y las cabeceras que este mandaría. */
 /* Marca de versión: se sube en cada cambio y se consulta con ?version=1.
    Sirve para saber desde fuera si el despliegue ha entrado o no. */
-const VERSION = '2026-09-13 · deno 159';
+const VERSION = '2026-09-13 · deno 160';
 
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ' +
   '(KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36';
@@ -3200,6 +3200,23 @@ async function playerStats(id, names, score, env) {
    delantero, donde lo correcto son 10. */
 const CORRECCIONES = {
   // jornada -> { id de futbolista: puntos }
+
+  /* 13-09-2026. Jornada 5: a Inaki Williams (1995) le anularon el gol y paso
+     de 7 a 4. Lo que enseña Biwenger en su app es 4.
+
+     Su FICHA sigue dando 7 horas despues —y el total de la temporada, 19,
+     cuenta con ese 7—, y de la ficha es de donde salen las notas. Su historial
+     del indice si esta corregido: da 4 y suma 16, los tres puntos menos.
+
+     Se probo a darle la vuelta a la precedencia —que con el partido acabado
+     mandase el historial— y NO VALE: el historial hay que alinearlo a mano con
+     `salto` y con la jornada 1 partida en dos eso se tuerce. Medido, movia
+     doce marcadores de las jornadas 1 y 2, que estan cerradas desde hace
+     semanas: CoZoKe pasaba de 21 a 13 y Maccabi de 44 a 51. Asi que la ficha
+     se queda mandando y esto se apaña a mano, que es un caso y acotado.
+
+     QUITAR esta linea si Biwenger le devuelve el gol. */
+  5: { 1995: 4 }
 };
 
 function conCorrecciones(marcador, numero) {
@@ -4612,9 +4629,6 @@ async function roundBoard(env, headers, jornada, listaNombres) {
     !!detalle && (detalle.played || 0) >= (detalle.games || 0) && (detalle.games || 0) > 0;
   const buenas = await notasDeLaJornada(env, Object.keys(alineados), names, score,
     numeroJornada, cerrada, partidoDe).catch(function () { return null; });
-  /* Lo que decia el historial del indice ANTES de que la ficha lo pise: hace
-     falta mas abajo para desempatar. */
-  const delHistorial = Object.assign({}, base);
   if (buenas && buenas.notas) {
     Object.keys(buenas.notas).forEach(function (id) { base[id] = buenas.notas[id]; });
   }
@@ -4648,31 +4662,6 @@ async function roundBoard(env, headers, jornada, listaNombres) {
     if (conNota[id] == null) base[id] = delParte[id];
   });
 
-  /* CON EL PARTIDO ACABADO manda el historial del indice, no la ficha.
-
-     Las dos fuentes tienen su motivo. La ficha dice a que jornada pertenece
-     cada nota, y por eso mandaba: el historial hay que alinearlo a mano con
-     `salto` y se tuerce cuando un equipo arrastra aplazados. Pero la ficha va
-     ATRASADA cuando Biwenger corrige una jugada.
-
-     Medido con Inaki Williams: le anularon el gol de la jornada 5 y paso de 7
-     a 4. Horas despues su ficha seguia dando 7 —y el total de la temporada,
-     19, contaba con ese 7—, mientras su historial ya daba 4 y sumaba 16, los
-     tres puntos menos.
-
-     Solo con el partido acabado: mientras se juega, el historial todavia trae
-     la nota de la jornada ANTERIOR y es la ficha la que acierta.
-
-     Repasados los 45 alineados de la jornada 5 que tienen nota en el
-     historial: 44 dan lo mismo por los dos caminos y solo cambia el de Inaki
-     Williams. */
-  Object.keys(conNota).forEach(function (id) {
-    const historial = delHistorial[id];
-    if (historial == null || historial === conNota[id]) return;
-    const equipo = names[id + ':team'];
-    if (equipo == null || partidoDe[equipo] !== 'finished') return;
-    base[id] = historial;
-  });
   /* En qué puesto jugó cada uno de verdad. De la ficha si la hemos leído; si
      no, su demarcación de siempre, que es la que acierta casi siempre. */
   const posReales = {};
