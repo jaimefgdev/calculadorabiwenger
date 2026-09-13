@@ -223,7 +223,7 @@ const CDN = 'https://cf.biwenger.com/api/v2';
    navegador normal y las cabeceras que este mandaría. */
 /* Marca de versión: se sube en cada cambio y se consulta con ?version=1.
    Sirve para saber desde fuera si el despliegue ha entrado o no. */
-const VERSION = '2026-09-13 · deno 162';
+const VERSION = '2026-09-14 · deno 163';
 
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ' +
   '(KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36';
@@ -1438,7 +1438,17 @@ async function players(score) {
      de aqui, no del parte del partido— se quedaban clavados. Con la copia del
      KV se sabe de verdad si hay algo rodando; leer no cuesta. */
   const rodando = !!(cache.round && cache.round.live) || await hayJornadaRodando();
-  const vigencia = rodando ? 10 * 60 * 1000 : 60 * 60 * 1000;
+  /* CON ALGO RODANDO SE MIRA SIEMPRE. Antes se esperaban diez minutos, y como
+     los puntos de la jornada salen de aqui —no del parte del partido— la web
+     podia estar diez minutos enseñando una nota vieja. Ahora se pregunta en
+     cada peticion, pero preguntando BARATO: el CDN admite `If-None-Match` y
+     contesta 304 sin cuerpo cuando no ha cambiado nada. Medido: un 200 son
+     232 KB y 0,36 s; un 304, CERO bytes y 0,15 s. Los veinte segundos de suelo
+     son solo para que varias pestañas a la vez no repitan la misma pregunta.
+
+     Fuera de los partidos los puntos no se mueven en horas, asi que ahi se
+     sigue con una hora y no se molesta a nadie. */
+  const vigencia = rodando ? 20 * 1000 : 60 * 60 * 1000;
   const fresh = cache.players && cache.playersScore === sistema &&
     Date.now() - cache.playersAt < vigencia;
   if (fresh) return cache.players;
@@ -1476,14 +1486,40 @@ async function players(score) {
      una vez —el fallo típico es un límite de consultas momentáneo de
      Biwenger— y, si tampoco, se sirve el último bueno aunque esté pasado: un
      índice de hace una hora es infinitamente mejor que ninguno. */
-  let response = await fetch(CDN + '/competitions/la-liga/data?lang=es&score=' +
-    encodeURIComponent(sistema), { headers: NAVEGADOR, cf: SIN_CACHE })
+  /* El sello de la ultima copia. Con el, la pregunta al CDN sale gratis cuando
+     no ha cambiado nada: contesta 304 y no manda cuerpo. */
+  const sello = JORNADAS
+    ? await JORNADAS.get('indice-sello-' + sistema).catch(function () { return null; })
+    : null;
+  const cabeceras = sello
+    ? Object.assign({}, NAVEGADOR, { 'if-none-match': sello })
+    : NAVEGADOR;
+
+  const url = CDN + '/competitions/la-liga/data?lang=es&score=' + encodeURIComponent(sistema);
+  let response = await fetch(url, { headers: cabeceras, cf: SIN_CACHE })
     .catch(function () { return null; });
   apuntarCorteDelCdn(response);
+
+  /* 304: no ha cambiado nada desde la copia, asi que la copia ES lo ultimo.
+     Ni se descarga ni se reescribe: se devuelve lo guardado y listo. */
+  if (response && response.status === 304) {
+    const igual = (cache.players && cache.playersScore === sistema && cache.players) ||
+      await indiceDeReserva(sistema);
+    if (igual && Object.keys(igual).length) {
+      cache.players = igual;
+      cache.playersScore = sistema;
+      cache.playersAt = Date.now();
+      return igual;
+    }
+    /* Sin copia que servir, el 304 no vale de nada: se pide entera. */
+    response = await fetch(url, { headers: NAVEGADOR, cf: SIN_CACHE })
+      .catch(function () { return null; });
+    apuntarCorteDelCdn(response);
+  }
+
   if (!response || !response.ok) {
     await new Promise(function (listo) { setTimeout(listo, 1500); });
-    response = await fetch(CDN + '/competitions/la-liga/data?lang=es&score=' +
-      encodeURIComponent(sistema), { headers: NAVEGADOR, cf: SIN_CACHE })
+    response = await fetch(url, { headers: NAVEGADOR, cf: SIN_CACHE })
       .catch(function () { return null; });
   }
   /* Ni con el reintento: se tira de lo que haya, primero de memoria y luego de
@@ -1507,6 +1543,17 @@ async function players(score) {
      contesta Biwenger cuando corta las consultas, y guardarla dejaba la web sin
      nombres durante una hora entera. */
   if (!Object.keys(source).length) return await deReserva();
+
+  /* Y tampoco vale una foto A MEDIAS. Preguntando en cada peticion se pilla a
+     Biwenger recalculando mucho mas a menudo, y en ese rato contesta un indice
+     recortado: medido, una respuesta con 570 fichas donde Jonathan David salia
+     a 0 y a Giuliano Simeone le faltaba una jornada del historial. Guardarla
+     seria tirar a la basura la buena. Si trae bastantes menos fichas que la que
+     ya tenemos, se ignora y se reintenta a la siguiente. */
+  const anterior = (cache.players && cache.playersScore === sistema) ? cache.players : null;
+  const cuantasAntes = anterior
+    ? Object.keys(anterior).filter(function (k) { return k.indexOf(':') === -1; }).length : 0;
+  if (cuantasAntes && Object.keys(source).length < cuantasAntes * 0.9) return await deReserva();
   const names = {};
   Object.keys(source).forEach(function (id) {
     names[id] = source[id].name;
@@ -1591,6 +1638,13 @@ async function players(score) {
     try {
       await JORNADAS.put('indice-' + sistema, JSON.stringify(names));
       await JORNADAS.put('indice-fecha-' + sistema, String(Date.now()));
+      /* El sello de ESTA copia, para poder preguntar gratis la proxima vez. Si
+         no viniera se borra el que hubiera: un sello que no corresponde con lo
+         guardado daria un 304 y serviriamos una copia vieja como si fuera
+         nueva. */
+      const nuevoSello = response.headers.get('etag');
+      if (nuevoSello) await JORNADAS.put('indice-sello-' + sistema, nuevoSello);
+      else await JORNADAS.delete('indice-sello-' + sistema);
     } catch (error) { /* sin copia esta vez; se reintenta en la siguiente */ }
   }
   return names;
