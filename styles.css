@@ -2515,11 +2515,13 @@ input[type="search"]::-webkit-search-cancel-button:hover { opacity: .75; }
   content: ''; position: absolute; z-index: 0; pointer-events: none;
   top: .2rem; left: 50%; transform: translateX(-50%);
   width: min(90%, 104px); aspect-ratio: 1; border-radius: 50%;
+  /* Solo resplandor: NADA de aro. Un aro, por fino que sea, se lee como un
+     reborde, que es justo lo que no se queria. Dos sombras encadenadas y sin
+     desplazar, para que se apague poco a poco desde el borde de la cara. */
   /* Sin `color-mix`, un resplandor plano: se pierde el degradado, no la marca. */
-  box-shadow: 0 0 16px 5px rgba(255, 255, 255, .45);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--aureola) 30%, transparent),
-              0 0 16px 5px color-mix(in srgb, var(--aureola) 42%, transparent),
-              0 0 34px 14px color-mix(in srgb, var(--aureola) 18%, transparent);
+  box-shadow: 0 0 14px 4px rgba(255, 255, 255, .4);
+  box-shadow: 0 0 14px 3px color-mix(in srgb, var(--aureola) 46%, transparent),
+              0 0 30px 12px color-mix(in srgb, var(--aureola) 20%, transparent);
 }
 /* La medida la lleva la caja de la cara, igual que en el campo, pero aquí hay
    sitio de sobra: caras más grandes y menos futbolistas por fila. Al pasar de
