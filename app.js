@@ -3863,7 +3863,11 @@
           return '<div class="bench__player" data-lleva="' + escapeHtml(String(player.id)) + '">' +
             crestOf(player, 'crest--ghost') +
             caraConChapas(player, 'bench__face') +
-            '<span class="bench__name">' + escapeHtml(comoSeLlama(player)) +
+            /* El nombre va en su propia caja para que, cuando ni encogiendo
+               quepa, se corte con puntos suspensivos y la chapa de casa/fuera
+               se vea SIEMPRE entera: antes se cortaban los dos de golpe. */
+            '<span class="bench__name"><span class="bench__texto">' +
+              escapeHtml(comoSeLlama(player)) + '</span>' +
               chapaDePartido(player, 'juega--nombre') + '</span>' +
           '</div>';
         }).join('');
@@ -3881,6 +3885,7 @@
     renderPlantilla();
     /* Con cinco o seis en una linea los nombres no caben en su hueco. */
     apretarNombresDelCampo(section);
+    apretarNombresDelBanquillo(section);
   }
 
   /**
@@ -7237,7 +7242,8 @@
           return '<div class="bench__player">' +
             crestOf(jugador, 'crest--ghost') +
             caraDeAlineacion(jugador, 'bench__face') +
-            '<span class="bench__name">' + escapeHtml(comoSeLlama(jugador)) + '</span>' +
+            '<span class="bench__name"><span class="bench__texto">' +
+              escapeHtml(comoSeLlama(jugador)) + '</span></span>' +
           '</div>';
         }).join('') + '</div>';
 
@@ -7397,6 +7403,44 @@
     });
   }
 
+  /**
+   * Y los del banquillo, que tienen su propio problema.
+   *
+   * La ficha del suplente recorta lo que se sale —hace falta para que el escudo
+   * de marca de agua no se desborde— y el nombre lleva pegada la chapa de
+   * casa/fuera con el escudo del rival. En el movil la columna baja a unos
+   * setenta pixeles y se cortaban los dos: el nombre a media letra y la chapa
+   * entera.
+   *
+   * Se mide el bloque ENTERO —nombre mas chapa— contra el ancho util de la
+   * ficha y se le baja el cuerpo hasta que quepa. La chapa va en `em`, asi que
+   * encoge con la letra en vez de quedarse igual de grande.
+   */
+  function apretarNombresDelBanquillo(raiz) {
+    const donde = raiz || document;
+    Array.prototype.forEach.call(donde.querySelectorAll('.bench__player'), function (ficha) {
+      const nombre = ficha.querySelector('.bench__name');
+      const texto = ficha.querySelector('.bench__texto');
+      if (!nombre || !texto) return;
+      nombre.style.fontSize = '';
+      let cuerpo = parseFloat(window.getComputedStyle(nombre).fontSize) || 0;
+      if (!cuerpo) return;
+      /* Encoger es mejor que cortar: «Facundo Gonzalez» entero y pequeno se lee,
+         y «Facundo Gonz...» no dice quien es. La pregunta es justo si el texto
+         esta recortado —lo que ocupa contra lo que se ve—, asi que se mide eso y
+         se baja el cuerpo hasta que deje de estarlo. Si ni al minimo cabe,
+         entonces si se corta, pero el nombre solo: la chapa no se toca. */
+      while (cuerpo > NOMBRE_APRETADO_MIN &&
+             texto.scrollWidth > texto.clientWidth + 1) {
+        cuerpo -= 0.5;
+        nombre.style.fontSize = cuerpo + 'px';
+        /* Leer una medida obliga al navegador a recalcular, que es lo que hace
+           falta para que la vuelta siguiente mire el tamano nuevo. */
+        void texto.offsetWidth;
+      }
+    });
+  }
+
   /** Todos los nombres de mánager que puedan quedarse cortos. */
   function ajustarNombres() {
     Array.prototype.forEach.call(document.querySelectorAll('.chip__label'), function (el) {
@@ -7417,6 +7461,7 @@
       ajustarAlAncho(el, 10.2, 7);
     });
     apretarNombresDelCampo();
+    apretarNombresDelBanquillo();
   }
 
   /* La liga son 38 jornadas: los ejes se plantean enteros desde el principio. */
@@ -8302,7 +8347,8 @@
           '<div class="bench">' + equipo.bench.map(function (jugador) {
             return '<div class="bench__player">' +
               caraDeAlineacion(jugador, 'bench__face', true) +
-              '<span class="bench__name">' + escapeHtml(comoSeLlama(jugador)) + '</span>' +
+              '<span class="bench__name"><span class="bench__texto">' +
+              escapeHtml(comoSeLlama(jugador)) + '</span></span>' +
               (jugador.events && jugador.events.length
                 ? '<span class="bench__lances">' + lancesDe(jugador) + '</span>' : '') +
             '</div>';
@@ -8583,6 +8629,7 @@
       campo('Once ideal de mi liga', nuestro, true) +
     '</div>';
     apretarNombresDelCampo(caja);
+    apretarNombresDelBanquillo(caja);
   }
 
   function renderJornadas() {
@@ -8669,6 +8716,7 @@
     /* Los campos de los once desplegados: con cinco o seis en una linea los
        nombres no caben en su hueco y hay que encogerlos. */
     apretarNombresDelCampo();
+    apretarNombresDelBanquillo();
   }
 
   /**

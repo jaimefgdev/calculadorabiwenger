@@ -1165,12 +1165,22 @@ code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft)
   background-color: rgba(0, 0, 0, .35);
   box-shadow: none;
 }
+/* Nombre y chapa de casa/fuera, en una linea que no se pasa del ancho de la
+   ficha. La ficha recorta lo que se sale —hace falta para que el escudo de
+   marca de agua no se desborde— y en el movil la columna baja a unos noventa
+   pixeles: antes se cortaban los DOS, el nombre a media letra y la chapa
+   entera. Ahora el que cede es solo el nombre, y con puntos suspensivos. */
 .bench__name {
-  /* Mismo caso que el del campo: sin tope, para que un nombre largo desborde
-     a los dos lados y no solo por la derecha. */
-  font-size: .86rem; font-weight: 560; max-width: none;
-  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  display: inline-flex; align-items: center; justify-content: center;
+  max-width: 100%; min-width: 0;
+  font-size: .86rem; font-weight: 560;
 }
+/* El texto es lo unico que se recorta. */
+.bench__texto {
+  min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+/* Y la chapa no encoge ni se corta nunca: es el dato que se mira. */
+.bench__name > .juega { flex: none; }
 
 /* ---------- Ficha de mánager ---------- */
 .row-open { background: var(--accent-soft) !important; }
@@ -3548,8 +3558,12 @@ main.wrap { padding-top: 1.15rem; padding-bottom: 3.5rem; }
      banquillo, que no tienen el mismo cuerpo. */
   position: relative; top: -.08em;
 }
-.juega--nombre .juega__donde { width: 17px; height: 17px; }
-.juega--nombre .juega__rival { width: 17px; height: 17px; }
+/* En `em`, no en pixeles: en el banquillo del movil el nombre se encoge para
+   caber en su columna, y con medidas fijas la casita y el escudo se quedaban
+   igual de grandes y seguian sin entrar. Asi bajan con la letra. 1,25 em son
+   los mismos 17 px al tamano normal. */
+.juega--nombre .juega__donde { width: 1.25em; height: 1.25em; }
+.juega--nombre .juega__rival { width: 1.25em; height: 1.25em; }
 /* Y el nombre deja de recortarse por su cuenta: con `ellipsis` se comia la
    chapa antes de cortar una sola letra. */
 .pitch__name, .bench__name { overflow: visible; text-overflow: clip; }
