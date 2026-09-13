@@ -8328,7 +8328,7 @@
                       : '') +
                     (jugado ? ''
                       : '<p class="muted alin__aviso">' +
-                        (juego.confirmadas ? 'Alineación confirmada.' : 'Alineaciones probables.') +
+                        (juego.confirmadas ? 'Alineaciones confirmadas.' : 'Alineaciones probables.') +
                         '</p>') +
                     (function () {
                       /* La píldora dice en qué vista estás, no a cuál irías
