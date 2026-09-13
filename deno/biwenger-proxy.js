@@ -223,7 +223,7 @@ const CDN = 'https://cf.biwenger.com/api/v2';
    navegador normal y las cabeceras que este mandaría. */
 /* Marca de versión: se sube en cada cambio y se consulta con ?version=1.
    Sirve para saber desde fuera si el despliegue ha entrado o no. */
-const VERSION = '2026-09-13 · deno 158';
+const VERSION = '2026-09-13 · deno 159';
 
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ' +
   '(KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36';
@@ -4648,31 +4648,31 @@ async function roundBoard(env, headers, jornada, listaNombres) {
     if (conNota[id] == null) base[id] = delParte[id];
   });
 
-  /* DOS CONTRA UNO. Cuando Biwenger corrige una jugada, la correccion llega
-     antes al parte del partido y al historial del indice que a la ficha del
-     futbolista, y la ficha es la que mandaba aqui.
+  /* CON EL PARTIDO ACABADO manda el historial del indice, no la ficha.
+
+     Las dos fuentes tienen su motivo. La ficha dice a que jornada pertenece
+     cada nota, y por eso mandaba: el historial hay que alinearlo a mano con
+     `salto` y se tuerce cuando un equipo arrastra aplazados. Pero la ficha va
+     ATRASADA cuando Biwenger corrige una jugada.
 
      Medido con Inaki Williams: le anularon el gol de la jornada 5 y paso de 7
-     a 4. Horas despues, su ficha seguia dando 7 —y el total de la temporada,
-     19, contaba con ese 7—, mientras el parte daba 4 y su historial del indice
-     daba 4 y sumaba 16, o sea los tres puntos menos.
+     a 4. Horas despues su ficha seguia dando 7 —y el total de la temporada,
+     19, contaba con ese 7—, mientras su historial ya daba 4 y sumaba 16, los
+     tres puntos menos.
 
-     Asi que la ficha se queda mandando, PERO si las otras dos coinciden entre
-     ellas y discrepan de ella, gana la mayoria. Solo entonces: con una sola
-     discrepando no se toca nada, porque el parte a secas no vale —el mismo
-     futbolista en el mismo partido acabado ha llegado a dar 9, 6 y 11— y el
-     historial se desalinea cuando un equipo lleva jornadas aplazadas.
+     Solo con el partido acabado: mientras se juega, el historial todavia trae
+     la nota de la jornada ANTERIOR y es la ficha la que acierta.
 
-     Comprobado con los seis descuadres que habia esta jornada: solo cambia el
-     de Inaki Williams. En los otros cinco el parte iba atrasado y la ficha y el
-     historial ya coincidian, asi que se quedan como estaban. */
+     Repasados los 45 alineados de la jornada 5 que tienen nota en el
+     historial: 44 dan lo mismo por los dos caminos y solo cambia el de Inaki
+     Williams. */
   Object.keys(conNota).forEach(function (id) {
-    const parte = delParte[id];
     const historial = delHistorial[id];
-    if (parte == null || historial == null) return;
-    if (parte === historial && parte !== conNota[id]) base[id] = parte;
+    if (historial == null || historial === conNota[id]) return;
+    const equipo = names[id + ':team'];
+    if (equipo == null || partidoDe[equipo] !== 'finished') return;
+    base[id] = historial;
   });
-
   /* En qué puesto jugó cada uno de verdad. De la ficha si la hemos leído; si
      no, su demarcación de siempre, que es la que acierta casi siempre. */
   const posReales = {};
