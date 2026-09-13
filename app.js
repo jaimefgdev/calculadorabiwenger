@@ -8326,18 +8326,23 @@
                           : '<strong class="round__minuto">' + escapeHtml(vivo.reloj) + '</strong>') +
                         '</p>'
                       : '') +
-                    (jugado ? ''
-                      : '<p class="muted alin__aviso">' +
-                        (juego.confirmadas ? 'Alineaciones confirmadas.' : 'Alineaciones probables.') +
-                        '</p>') +
                     (function () {
                       /* La píldora dice en qué vista estás, no a cuál irías
                          —igual que las de Mi liga y LaLiga—, y al pulsarla
                          cambian el rótulo y lo de debajo. Siempre a la
-                         derecha: antes saltaba de lado según la vista. */
+                         derecha: antes saltaba de lado según la vista.
+
+                         Y el aviso de si las alineaciones son las buenas o las
+                         que se supone va DENTRO de esta misma fila, centrado:
+                         suelto encima quedaba pegado al borde de arriba de la
+                         tarjeta. Aqui los dos van a la misma altura. */
                       const ahora = state.vistaPartido === 'campo' ? 'campo' : 'tabla';
                       const otra = ahora === 'campo' ? 'tabla' : 'campo';
                       return '<div class="vistas">' +
+                        (jugado ? ''
+                          : '<p class="muted alin__aviso">' +
+                            (juego.confirmadas ? 'Alineaciones confirmadas.' : 'Alineaciones probables.') +
+                            '</p>') +
                         '<button type="button" class="ambito ambito--marco" data-vista="' + otra + '">' +
                           (ahora === 'campo' ? 'Campo' : 'Tabla') + '</button>' +
                       '</div>';
