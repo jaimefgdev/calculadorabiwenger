@@ -223,7 +223,7 @@ const CDN = 'https://cf.biwenger.com/api/v2';
    navegador normal y las cabeceras que este mandaría. */
 /* Marca de versión: se sube en cada cambio y se consulta con ?version=1.
    Sirve para saber desde fuera si el despliegue ha entrado o no. */
-const VERSION = '2026-09-14 · deno 163';
+const VERSION = '2026-09-14 · deno 164';
 
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ' +
   '(KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36';
@@ -3913,9 +3913,29 @@ async function roundDetail(roundId, score) {
     return deKv.data;
   }
 
-  const response = await fetch(CDN + '/rounds/la-liga/' + encodeURIComponent(roundId) +
-    '?lang=es' + (score ? '&score=' + encodeURIComponent(score) : ''),
-    { headers: NAVEGADOR, cf: SIN_CACHE });
+  /* Igual que con el indice: se pregunta con el sello de lo guardado y el CDN
+     contesta 304 sin cuerpo si no se ha movido nada. Medido en este mismo feed,
+     un 200 son 82 KB y un 304 cero. Asi la jornada en juego se puede mirar en
+     cada peticion en vez de cada dos minutos. */
+  const urlRonda = CDN + '/rounds/la-liga/' + encodeURIComponent(roundId) +
+    '?lang=es' + (score ? '&score=' + encodeURIComponent(score) : '');
+  const selloRonda = JORNADAS
+    ? await JORNADAS.get(kvClave + '-sello').catch(function () { return null; })
+    : null;
+  let response = await fetch(urlRonda, {
+    headers: (selloRonda && deKv)
+      ? Object.assign({}, NAVEGADOR, { 'if-none-match': selloRonda })
+      : NAVEGADOR,
+    cf: SIN_CACHE
+  });
+  if (response.status === 304 && deKv) {
+    cache.detalles[clave] = { data: deKv.data, at: Date.now(), vigencia: vigenciaDetalle(deKv.data) };
+    return deKv.data;
+  }
+  if (response.status === 304) {
+    /* Sello sin copia: no sirve de nada, se pide entera. */
+    response = await fetch(urlRonda, { headers: NAVEGADOR, cf: SIN_CACHE });
+  }
   /* Sin CDN se sirve lo último que se leyó, por viejo que sea: una jornada de
      hace un rato es infinitamente mejor que «no se han podido traer los
      partidos», que era lo que salía. */
@@ -4053,6 +4073,16 @@ async function roundDetail(roundId, score) {
   if (!deKv || JSON.stringify(deKv.data) !== JSON.stringify(detalle)) {
     await guardarDetalleKv(kvClave, detalle);
   }
+  /* Y el sello de lo que se acaba de guardar, para la proxima. Si no viniera se
+     borra el viejo: un sello que no corresponde con la copia daria un 304 y
+     serviriamos lo de antes como si fuera lo de ahora. */
+  if (JORNADAS) {
+    try {
+      const selloNuevo = response.headers.get('etag');
+      if (selloNuevo) await JORNADAS.put(kvClave + '-sello', selloNuevo);
+      else await JORNADAS.delete(kvClave + '-sello');
+    } catch (error) { /* sin sello, la proxima se baja entera */ }
+  }
   return detalle;
 }
 
@@ -4103,12 +4133,16 @@ function vigenciaDetalle(detalle) {
      media hora se volvía a bajar y a guardar cuarenta y ocho veces al día, por
      cada una de las jornadas jugadas, para reescribir exactamente lo mismo. */
   if (detalle.games > 0 && detalle.played >= detalle.games) return 12 * 60 * 60 * 1000;
-  /* Y TODO lo demas, dos minutos. Antes eran treinta salvo que la jornada
-     estuviera marcada `live` o `pronto`, y esa foto se tomaba ANTES de que
-     empezara el primer partido: sin partes todavia, `puntos` salia vacio, y esa
-     copia vacia se servia media hora. Con ella, los puntos de la jornada no se
-     movian del sitio. Una jornada a medias se vuelve a pedir y punto. */
-  return 2 * 60 * 1000;
+  /* Y una jornada a medias, VEINTE SEGUNDOS. Eran dos minutos, y antes treinta,
+     y esa foto se tomaba ANTES de que empezara el primer partido: sin partes
+     todavia, `puntos` salia vacio, y esa copia vacia se servia media hora. Con
+     ella, los puntos de la jornada no se movian del sitio.
+
+     Ahora se puede bajar tanto porque preguntar sale gratis: se pregunta con el
+     sello y el CDN contesta 304 sin cuerpo si no ha cambiado nada. El suelo de
+     veinte segundos es solo para que varias pestañas a la vez no repitan la
+     misma pregunta. */
+  return 20 * 1000;
 }
 
 async function leerDetalleKv(clave) {
