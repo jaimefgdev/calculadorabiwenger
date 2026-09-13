@@ -1088,16 +1088,28 @@
        normal son 48. */
     if (n === 6) {
       const orden = [3, 1, 0, 5, 2, 4];       // D B A F C E
-      const rangos = [2, 1, 0, 2.4, 1, 2];
+      /* El 2,4 de arriba salio medido con el escalon en 42. Al bajarlo a 28
+         —para que el centro de cada linea dejara de meterse en la de abajo— las
+         dos casillas del centro, que COMPARTEN columna, se quedaron a 67 % una
+         de otra y el nombre de la de abajo cayo encima de la cara de la de
+         arriba: medido en el 4-6-0, «Hugo Alvarez» pisaba 50 px de la cara de
+         Buonanotte. Con 3,6 vuelven a estar a 100 %, que es la separacion que
+         habia antes. */
+      const rangos = [2, 1, 0, 3.6, 1, 2];
       /* Medido sobre su 4-6-0, con los bordes del césped a la altura del medio
          campo (x 272 a 580): los seis van de 0,114 a 0,841 del ancho, o sea el
          73 %, mientras que seis columnas iguales ocupan el 83 %. Estos son los
          desplazamientos que llevan cada columna a su sitio, en % del ancho de
          una casilla, simétricos: +32/+37/+39 y sus negativos. */
       const desx = [32, 37, 39, -39, -37, -32];
+      /* Y con SU techo. El general deja subir media casilla, y aqui el de
+         arriba tiene que subir el doble: es el unico que va solo ahi arriba, y
+         con el tope normal la linea entera bajaba 83 % para compensar y se
+         metia en la de abajo. Comprobado que a 83 no se sale del cesped ni toca
+         la linea siguiente. */
       return conTecho(orden.map(function (cual, i) {
         return { jugador: linea[cual], rango: rangos[i], desx: desx[i] };
-      }));
+      }), TECHO_SEIS);
     }
 
     const huecos = new Array(n);
@@ -1131,6 +1143,9 @@
   /* Y lo más que se permite subir a nadie. Media casilla deja la cara entera
      dentro del césped con el aire de arriba que hay. */
   const TECHO = 50;
+  /* El de la linea de seis, donde el de arriba va solo en la columna central y
+     puede subir el doble sin salirse ni tapar a nadie. */
+  const TECHO_SEIS = 83;
 
   /**
    * Baja la línea entera si su más adelantado se sale por arriba.
@@ -1144,11 +1159,12 @@
    * Con cuatro o menos nadie pasa de un escalón, sale cero y no se toca nada:
    * las alineaciones que ya se veían bien se quedan exactamente igual.
    */
-  function conTecho(puestos) {
+  function conTecho(puestos, techo) {
+    const tope = techo == null ? TECHO : techo;
     const masAlto = puestos.reduce(function (top, p) {
       return Math.max(top, p.rango || 0);
     }, 0);
-    const baja = Math.max(0, masAlto * ESCALON - TECHO);
+    const baja = Math.max(0, masAlto * ESCALON - tope);
     if (!baja) return puestos;
     return puestos.map(function (p) { return Object.assign({}, p, { baja: baja }); });
   }
@@ -3863,6 +3879,8 @@
     /* Y los puntos amarillos de Mi plantilla, que viven en otra tabla: si no se
        repasan aquí se quedan señalando a quien acabas de sacar del once. */
     renderPlantilla();
+    /* Con cinco o seis en una linea los nombres no caben en su hueco. */
+    apretarNombresDelCampo(section);
   }
 
   /**
@@ -7340,6 +7358,45 @@
     }
   }
 
+  /**
+   * Los nombres de una linea apretada del campo, encogidos hasta caber.
+   *
+   * Con CINCO o SEIS en la misma linea el hueco baja de los 79 px de una de
+   * cuatro a poco mas de sesenta, y un «Roberto Fernandez» mide 120: se metia
+   * encima de la cara y de la chapa de puntos del de al lado. Medido en el
+   * 4-6-0 de Jose Mario: «Hugo Alvarez» pisaba 50 px de la cara de Buonanotte.
+   *
+   * Se le baja el cuerpo de medio en medio hasta que quepa, con un suelo para
+   * que no acabe ilegible; se le deja un poco de alero porque los vecinos van
+   * escalonados y ese trozo cae en hueco. Las lineas de cuatro o menos no se
+   * tocan: ahi sobra sitio y encogerlas seria empeorarlas.
+   */
+  const NOMBRE_APRETADO_MIN = 9;
+  const NOMBRE_ALERO = 10;
+
+  function apretarNombresDelCampo(raiz) {
+    const donde = raiz || document;
+    Array.prototype.forEach.call(donde.querySelectorAll('.pitch__line'), function (linea) {
+      const huecos = linea.querySelectorAll('.pitch__slot');
+      if (huecos.length < 5) return;
+      Array.prototype.forEach.call(huecos, function (hueco) {
+        const nombre = hueco.querySelector('.pitch__name');
+        if (!nombre) return;
+        /* Se parte del tamano de la hoja de estilos: si no, al repintar se iria
+           encogiendo un poco mas cada vez. */
+        nombre.style.fontSize = '';
+        const sitio = hueco.getBoundingClientRect().width + NOMBRE_ALERO;
+        let cuerpo = parseFloat(window.getComputedStyle(nombre).fontSize) || 0;
+        if (!cuerpo) return;
+        while (cuerpo > NOMBRE_APRETADO_MIN &&
+               nombre.getBoundingClientRect().width > sitio) {
+          cuerpo -= 0.5;
+          nombre.style.fontSize = cuerpo + 'px';
+        }
+      });
+    });
+  }
+
   /** Todos los nombres de mánager que puedan quedarse cortos. */
   function ajustarNombres() {
     Array.prototype.forEach.call(document.querySelectorAll('.chip__label'), function (el) {
@@ -7359,6 +7416,7 @@
     Array.prototype.forEach.call(document.querySelectorAll('.stat__label'), function (el) {
       ajustarAlAncho(el, 10.2, 7);
     });
+    apretarNombresDelCampo();
   }
 
   /* La liga son 38 jornadas: los ejes se plantean enteros desde el principio. */
@@ -8524,6 +8582,7 @@
       campo('Once ideal', once, true) +
       campo('Once ideal de mi liga', nuestro, true) +
     '</div>';
+    apretarNombresDelCampo(caja);
   }
 
   function renderJornadas() {
@@ -8607,6 +8666,9 @@
 
     updateRoundHeaders();
     renderJornadaChart();
+    /* Los campos de los once desplegados: con cinco o seis en una linea los
+       nombres no caben en su hueco y hay que encogerlos. */
+    apretarNombresDelCampo();
   }
 
   /**
