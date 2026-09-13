@@ -8316,16 +8316,6 @@
               '</button>' +
               (abierto
                 ? '<div class="partido__detalle">' +
-                    /* Con el partido rodando, el minuto debajo del marcador: es
-                       lo primero que se busca al abrirlo, y arriba solo estaba
-                       escondido en el título del marcador. */
-                    (!acabado && vivo && vivo.reloj
-                      ? '<p class="partido__reloj"><span class="round__live">' +
-                        (vivo.descanso ? 'Descanso' : 'En juego') + '</span>' +
-                        (vivo.descanso ? ''
-                          : '<strong class="round__minuto">' + escapeHtml(vivo.reloj) + '</strong>') +
-                        '</p>'
-                      : '') +
                     (function () {
                       /* La píldora dice en qué vista estás, no a cuál irías
                          —igual que las de Mi liga y LaLiga—, y al pulsarla
@@ -8339,6 +8329,17 @@
                       const ahora = state.vistaPartido === 'campo' ? 'campo' : 'tabla';
                       const otra = ahora === 'campo' ? 'tabla' : 'campo';
                       return '<div class="vistas">' +
+                        /* Con el partido rodando, el minuto; si no, si las
+                           alineaciones son las buenas o las que se supone.
+                           Nunca los dos: en cuanto hay marcador en vivo
+                           `jugado` ya es cierto y el aviso no sale. */
+                        (!acabado && vivo && vivo.reloj
+                          ? '<p class="partido__reloj"><span class="round__live">' +
+                            (vivo.descanso ? 'Descanso' : 'En juego') + '</span>' +
+                            (vivo.descanso ? ''
+                              : '<strong class="round__minuto">' + escapeHtml(vivo.reloj) + '</strong>') +
+                            '</p>'
+                          : '') +
                         (jugado ? ''
                           : '<p class="muted alin__aviso">' +
                             (juego.confirmadas ? 'Alineaciones confirmadas.' : 'Alineaciones probables.') +

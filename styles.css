@@ -466,13 +466,22 @@ code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft)
 /* El minuto, pegado al marcador y con su mismo peso. */
 .round__minuto { font-family: var(--mono); font-weight: 700; color: var(--marca); }
 
-/* El minuto del partido, centrado bajo el marcador al desplegarlo. Reaprovecha
-   el rótulo «En juego» y el reloj de la tarjeta de inicio, para que el mismo
-   dato se lea igual en los dos sitios. */
+/* El minuto del partido, a la altura de la pildora Campo/Tabla y centrado en la
+   tarjeta: comparte sitio —y columna— con el aviso de las alineaciones, que
+   nunca salen los dos a la vez. Reaprovecha el rotulo «En juego» y el reloj de
+   la tarjeta de inicio, para que el mismo dato se lea igual en los dos sitios. */
 .partido__reloj {
+  grid-column: 2;
   display: flex; align-items: center; justify-content: center; gap: .45rem;
-  margin: 0 0 .6rem;
+  margin: 0;
 }
+/* Los tres al MISMO tamano —el aviso, «En juego» y el minuto—: ocupan el mismo
+   sitio de la fila, uno u otro segun el partido, y con cuerpos distintos la
+   linea parecia cambiar de altura al empezar a rodar. Un punto por encima del
+   0,72 rem de antes, que en la fila de la pildora hay sitio de sobra. */
+.alin__aviso,
+.partido__reloj .round__live,
+.partido__reloj .round__minuto { font-size: .86rem; }
 /* En la lista de partidos el distintivo va como el de la cabecera, pero sin
    mayúsculas forzadas: ahí conviven con los nombres de los canales. */
 .round__live--fila { text-transform: none; letter-spacing: 0; gap: .3rem; }
@@ -2747,7 +2756,7 @@ input[type="search"]::-webkit-search-cancel-button:hover { opacity: .75; }
    partido entero, no de la columna de la izquierda— y a la altura de la
    pildora Campo/Tabla, que es con quien comparte fila. Sin margen propio: la
    fila ya lo lleva. */
-.alin__aviso { grid-column: 2; margin: 0; font-size: .8rem; text-align: center; }
+.alin__aviso { grid-column: 2; margin: 0; text-align: center; }
 .alineaciones { display: grid; gap: 1rem; grid-template-columns: repeat(2, minmax(0, 1fr)); }
 @media (max-width: 620px) { .alineaciones { grid-template-columns: 1fr; } }
 .alin__titulo { font-size: .8rem; font-weight: 650; margin-bottom: .25rem; }
@@ -2783,7 +2792,7 @@ input[type="search"]::-webkit-search-cancel-button:hover { opacity: .75; }
    lineas para dejarle sitio a la pildora. */
 @media (max-width: 620px) {
   .vistas { grid-template-columns: 1fr; }
-  .alin__aviso, .vistas .ambito { grid-column: 1; }
+  .alin__aviso, .partido__reloj, .vistas .ambito { grid-column: 1; }
 }
 
 /* El parte de la lesión o la sanción, bajo el nombre de la ficha. Rojo por
