@@ -223,7 +223,7 @@ const CDN = 'https://cf.biwenger.com/api/v2';
    navegador normal y las cabeceras que este mandaría. */
 /* Marca de versión: se sube en cada cambio y se consulta con ?version=1.
    Sirve para saber desde fuera si el despliegue ha entrado o no. */
-const VERSION = '2026-09-13 · deno 161';
+const VERSION = '2026-09-13 · deno 162';
 
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ' +
   '(KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36';
@@ -3852,7 +3852,7 @@ async function roundDetail(roundId, score) {
      429 —y con el CDN cortado no había jornada que enseñar, porque no había
      nada guardado en ningún sitio. Con el respaldo en KV la descarga se hace
      una vez cada media hora y punto. */
-  const kvClave = 'detalle-v1-' + roundId + '-' + (score || '');
+  const kvClave = 'detalle-v2-' + roundId + '-' + (score || '');
   const deKv = await leerDetalleKv(kvClave);
   if (deKv && Date.now() - deKv.at < vigenciaDetalle(deKv.data)) {
     cache.detalles[clave] = { data: deKv.data, at: deKv.at, vigencia: vigenciaDetalle(deKv.data) };
@@ -3960,6 +3960,15 @@ async function roundDetail(roundId, score) {
     puntos: puntos,
     fichas: fichas,
     mvps: mvps,
+    /* El MEJOR DE LA JORNADA lo dice el propio feed, en `mvp` de la ronda.
+       Antes se deducia: el que mas puntuaba de los que habian sido mejores de
+       su partido. Y fallaba por dos motivos a la vez —esa nota lleva la Super
+       Pica, que es un extra de esta liga y no pinta nada en un premio de toda
+       la competicion, y al que no tiene manager no se le lee la ficha y se le
+       quedaba la nota desalineada del historial—: Zabiri salia con 19 (17 mas
+       2 de pica) y Mbappe con 13 en vez de 17. */
+    mvpJornada: (data.mvp && data.mvp.id != null)
+      ? { id: String(data.mvp.id), nombre: data.mvp.name || null } : null,
     picas: picas,
     lances: lances,
     matches: partidos,
@@ -4841,14 +4850,19 @@ async function roundBoard(env, headers, jornada, listaNombres) {
     });
     const mvps = (detalle && detalle.mvps) || {};
 
-    /* El MVP de la jornada es el que más puntúa de todos los que sí fueron el
-       mejor de su partido. Sin jornada cerrada todavía puede moverse. */
-    let mejor = null;
-    Object.keys(mvps).forEach(function (id) {
-      const nota = marcador[id];
-      if (typeof nota !== 'number') return;
-      if (!mejor || nota > mejor.nota) mejor = { id: id, nota: nota };
-    });
+    /* El MVP de la jornada lo dice Biwenger en el feed de la ronda: es SU dato,
+       no una deduccion nuestra. Sin la jornada cerrada todavia puede moverse.
+       Si no viniera, se cae al metodo de antes. */
+    const deBiwenger = detalle && detalle.mvpJornada;
+    let mejor = (deBiwenger && deBiwenger.id)
+      ? { id: String(deBiwenger.id), nota: marcador[String(deBiwenger.id)] } : null;
+    if (!mejor) {
+      Object.keys(mvps).forEach(function (id) {
+        const nota = marcador[id];
+        if (typeof nota !== 'number') return;
+        if (!mejor || nota > mejor.nota) mejor = { id: id, nota: nota };
+      });
+    }
 
     standings.forEach(function (fila) {
       let ideales = 0, mejores = 0, deJornada = 0;
@@ -4924,6 +4938,7 @@ async function roundBoard(env, headers, jornada, listaNombres) {
     bestXi: once,
     /* Los MEJORES DE CADA PARTIDO, con su nota. De aqui sale el MVP de la
        jornada, asi que conviene poder mirarlo desde fuera cuando no cuadra. */
+    mvpJornada: (detalle && detalle.mvpJornada) || null,
     mvps: Object.keys((detalle && detalle.mvps) || {}).map(function (id) {
       return { id: id, nombre: names[id] || null,
                nota: typeof marcador[id] === 'number' ? marcador[id] : null,
