@@ -7734,9 +7734,17 @@
 
     /* Misma ficha que en el campo: escudo difuminado detr\u00e1s, estado arriba a la
        izquierda, puntos abajo, y el nombre debajo de la cara. */
+    /* Los tuyos, con reborde. Entre quinientos y pico, encontrar a los
+       dieciocho que son tuyos a base de leer nombres no habia quien. */
+    const mios = {};
+    mySquad().forEach(function (jugador) { mios[String(jugador.id)] = true; });
+
     caja.innerHTML = lista.map(function (jugador) {
-      return '<button type="button" class="jugador-card" data-player-id="' +
-          escapeHtml(String(jugador.id)) + '">' +
+      const mio = !!mios[String(jugador.id)];
+      return '<button type="button" class="jugador-card' +
+          (mio ? ' jugador-card--mio' : '') + '"' +
+          (mio ? ' title="En tu plantilla"' : '') +
+          ' data-player-id="' + escapeHtml(String(jugador.id)) + '">' +
         crestOf(jugador, 'crest--ghost') +
         caraConChapas(jugador, 'pitch__face') +
         '<span class="jugador-card__nombre player-name">' + escapeHtml(comoSeLlama(jugador)) + '</span>' +

@@ -2486,6 +2486,33 @@ input[type="search"]::-webkit-search-cancel-button:hover { opacity: .75; }
 .jugador-card:hover { background: var(--bg-surface); }
 .jugador-card:hover .jugador-card__nombre { color: var(--accent); }
 .jugador-card:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+/* Los de tu plantilla, con aureola. Entre quinientos y pico, dar con los
+   tuyos leyendo nombres no habia quien.
+
+   Va en la cara y no en la tarjeta: alrededor del circulo se lee como un
+   resplandor, y un recuadro alrededor de la tarjeta se leia como una caja mas.
+   Tres sombras encadenadas —aro fino, resplandor y halo— para que se apague
+   poco a poco en vez de cortarse de golpe.
+
+   El amarillo es el mismo con el que ya se marca lo tuyo en el resto de la web
+   —la banda de Mi plantilla, los titulares—, asi que no hay color nuevo que
+   aprenderse.
+
+   Y la tarjeta deja de recortar: la cara tiene 3 px por arriba y 4 por abajo,
+   asi que con `overflow: hidden` el halo se cortaba en seco. Medido que el
+   escudo difuminado del fondo cabe entero dentro de la tarjeta (106 x 105 en
+   una de 276 x 131), o sea que no habia nada que recortar. */
+.jugador-card--mio { overflow: visible; }
+.jugador-card--mio .pic-player {
+  /* Sin `color-mix`, aro y resplandor planos: se pierde el degradado, no la marca. */
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, .18),
+              0 0 0 2px var(--marca),
+              0 0 14px 3px var(--marca);
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, .18),
+              0 0 0 2px color-mix(in srgb, var(--marca) 88%, transparent),
+              0 0 10px 2px color-mix(in srgb, var(--marca) 52%, transparent),
+              0 0 22px 7px color-mix(in srgb, var(--marca) 26%, transparent);
+}
 /* La medida la lleva la caja de la cara, igual que en el campo, pero aquí hay
    sitio de sobra: caras más grandes y menos futbolistas por fila. Al pasar de
    cinco a cuatro, cada hueco es un cuarto más ancho y el tope sube con él. */
