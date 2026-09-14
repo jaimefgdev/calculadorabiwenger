@@ -223,7 +223,7 @@ const CDN = 'https://cf.biwenger.com/api/v2';
    navegador normal y las cabeceras que este mandaría. */
 /* Marca de versión: se sube en cada cambio y se consulta con ?version=1.
    Sirve para saber desde fuera si el despliegue ha entrado o no. */
-const VERSION = '2026-09-14 · deno 165';
+const VERSION = '2026-09-14 · deno 166';
 
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ' +
   '(KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36';
@@ -1937,10 +1937,22 @@ async function jornadaEnJuego() {
 
      Lo que no engaña es el recuento: la jornada en juego es la más antigua que
      ha empezado y no ha terminado. */
-  const candidatas = calendario
+  const conPartidos = calendario
     .filter(function (r) { return (r.part || 1) === 1 && r.status !== 'pending'; })
-    .sort(function (a, b) { return (a.number || 0) - (b.number || 0); })
-    .slice(0, 4);
+    .sort(function (a, b) { return (a.number || 0) - (b.number || 0); });
+
+  /* LAS CUATRO ULTIMAS, no las cuatro primeras.
+
+     El tope existe para no pedir treinta y ocho jornadas en cada arranque,
+     pero estaba cogiendo `.slice(0, 4)`: las cuatro MAS ANTIGUAS del
+     calendario. En agosto daba igual, porque las cuatro primeras eran las
+     unicas empezadas. En cuanto la liga paso de cuatro jornadas, la que de
+     verdad esta rodando dejo de mirarse nunca.
+
+     Medido el 14 de septiembre: habia SEIS jornadas empezadas y solo se
+     miraban la 1, la 2, la 3 y la 4 —las cuatro terminadas—, asi que esto
+     devolvia null teniendo la 6 con un partido jugado de diez. */
+  const candidatas = conPartidos.slice(-4);
 
   let ficha = null;
   let detalle = null;
@@ -2010,7 +2022,34 @@ async function proximaJornada() {
   const response = await fetch(url, { headers: NAVEGADOR, cf: SIN_CACHE });
   if (!response.ok) return null;
 
-  const data = (await response.json()).data || {};
+  let data = (await response.json()).data || {};
+
+  /* Y NUNCA una aplazada. `/rounds/la-liga/next` devuelve la ronda que tiene el
+     proximo partido, y eso puede ser la SEGUNDA MITAD de una jornada partida:
+     el 14 de septiembre devolvia la «Jornada 6 (aplazada)», id 5125, part 2.
+
+     Esas rondas repiten los mismos diez partidos que su mitad de part 1, pero
+     llegan con la clasificacion A CERO. Toda la web las deja fuera justo por
+     eso —el selector, los recuentos, las sumas—, asi que al colarse aqui la
+     pestana de Jornadas abria en una jornada 6 con los ocho manager a cero,
+     mientras los puntos de verdad estaban en la id 4904 sin que se vieran.
+
+     Si viene una aplazada se pide su hermana de part 1, que es la que lleva
+     las notas. Si tampoco se puede, se deja lo que haya. */
+  if ((data.part || 1) !== 1) {
+    const suNumero = Number(String(data.short || '').replace(/\D/g, '')) || null;
+    const hermana = calendario.filter(function (r) {
+      return (r.part || 1) === 1 && r.number === suNumero;
+    })[0];
+    if (hermana) {
+      const otra = await fetch(CDN + '/rounds/la-liga/' + encodeURIComponent(hermana.id) + '?lang=es',
+        { headers: NAVEGADOR, cf: SIN_CACHE }).catch(function () { return null; });
+      if (otra && otra.ok) {
+        const cuerpo = (await otra.json().catch(function () { return {}; })).data;
+        if (cuerpo && cuerpo.id != null) data = cuerpo;
+      }
+    }
+  }
   const guide = await tvGuide().catch(function () { return []; });
 
   const matches = (data.games || [])
