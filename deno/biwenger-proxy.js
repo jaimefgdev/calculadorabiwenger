@@ -223,7 +223,7 @@ const CDN = 'https://cf.biwenger.com/api/v2';
    navegador normal y las cabeceras que este mandaría. */
 /* Marca de versión: se sube en cada cambio y se consulta con ?version=1.
    Sirve para saber desde fuera si el despliegue ha entrado o no. */
-const VERSION = '2026-09-14 · deno 166';
+const VERSION = '2026-09-14 · deno 167';
 
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ' +
   '(KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36';
@@ -3400,7 +3400,27 @@ function puntosDeLaJornada(names, salto) {
        trae nota de los que jugó ÉL: quien se perdió alguno tiene menos casillas
        que partidos su club. Sin este tope se pedía una casilla que no existe y
        el futbolista se quedaba sin nota. */
-    const atras = Math.min(saltos[names[id + ':team']] || 0, notas.length - 1);
+    const equipo = names[id + ':team'];
+
+    /* Y ANTES DE NADA: que el historial llegue hasta esta jornada.
+
+       Biwenger publica las notas de un partido un buen rato despues del pitido
+       final, y hasta entonces el equipo tiene un partido jugado de mas que
+       casillas en el historial. Cogiendo la ultima igual, lo que se servia era
+       la nota de la jornada ANTERIOR con la etiqueta de esta.
+
+       Medido el 14 de septiembre a las 23:30, con el Villarreal-Betis recien
+       acabado: Villarreal y Betis llevaban cinco partidos y solo cuatro
+       casillas, mientras Barcelona y Sevilla tenian cinco y cinco. A Bartra se
+       le daban los 8 de la jornada 4 como si fueran de la 5, y asi con los seis
+       futbolistas de ese partido.
+
+       Sin casilla no hay nota: ya la rellena el parte del partido, que al menos
+       es del partido que toca. */
+    const jugados = (saltos.hasta || {})[equipo];
+    if (jugados != null && notas.length < jugados) return;
+
+    const atras = Math.min(saltos[equipo] || 0, notas.length - 1);
     const nota = notas[notas.length - 1 - atras];
     if (typeof nota === 'number') mapa[id] = nota;
   });
@@ -3599,8 +3619,24 @@ async function jornadaZanjada(numero, score) {
  * repite los mismos partidos que ya están en la suya, con su fecha real, y
  * contando las dos el aplazado se contaba dos veces.
  */
+/**
+ * Cuantos partidos ha jugado cada equipo DESPUES del suyo de esta jornada, y
+ * cuantos lleva contando el de esta.
+ *
+ * El primero (`saltos`) sirve para alinear el historial del indice: sus notas
+ * van de mas vieja a mas nueva, y hay que retroceder tantas casillas como
+ * partidos haya jugado el equipo por delante.
+ *
+ * El segundo (`hasta`) es para saber si el historial LLEGA a esta jornada.
+ * Biwenger publica las notas de un partido un rato despues de acabarlo, asi
+ * que entre medias el equipo tiene un partido jugado de mas que notas. Sin
+ * esto se cogia la ultima casilla igual y se servia la nota de la jornada
+ * anterior como si fuera la de esta.
+ */
 async function saltoPorEquipo(numero, score, ronda) {
   const saltos = {};
+  const hasta = {};
+  saltos.hasta = hasta;
   if (numero == null) return saltos;
 
   const calendario = await seasonRounds().catch(function () { return []; });
@@ -3615,6 +3651,11 @@ async function saltoPorEquipo(numero, score, ronda) {
     if (isNaN(dia)) return;
     if (partido.homeId != null) cuando[partido.homeId] = dia;
     if (partido.awayId != null) cuando[partido.awayId] = dia;
+    /* El de esta jornada cuenta en cuanto se juega. */
+    if (partido.status !== 'finished') return;
+    [partido.homeId, partido.awayId].forEach(function (equipo) {
+      if (equipo != null) hasta[equipo] = (hasta[equipo] || 0) + 1;
+    });
   });
 
   const jugadas = calendario.filter(function (r) {
@@ -3634,6 +3675,7 @@ async function saltoPorEquipo(numero, score, ronda) {
         /* Sin fecha de referencia se cae a lo de antes: por número de jornada. */
         const despues = suyo != null ? dia > suyo : (jugadas[i].number || 0) > numero;
         if (despues) saltos[equipo] = (saltos[equipo] || 0) + 1;
+        else hasta[equipo] = (hasta[equipo] || 0) + 1;
       });
     });
   }
@@ -4171,7 +4213,24 @@ function vigenciaDetalle(detalle) {
   /* Con TODOS sus partidos acabados, esa jornada ya no va a cambiar nunca. Con
      media hora se volvía a bajar y a guardar cuarenta y ocho veces al día, por
      cada una de las jornadas jugadas, para reescribir exactamente lo mismo. */
-  if (detalle.games > 0 && detalle.played >= detalle.games) return 12 * 60 * 60 * 1000;
+  if (detalle.games > 0 && detalle.played >= detalle.games) {
+    /* PERO no en caliente. Biwenger publica las notas de cada partido un buen
+       rato despues del pitido final, asi que la foto tomada al acabar el ultimo
+       todavia no las tiene, y congelarla doce horas deja la jornada a medias
+       hasta el dia siguiente —justo cuando mas se mira—.
+
+       Se espera a que hayan pasado tres horas desde el ultimo pitido. Mientras
+       tanto, veinte segundos como cualquier jornada a medias; y preguntar sale
+       gratis, que el CDN contesta 304 sin cuerpo si no ha cambiado nada. */
+    const ultimo = (detalle.matches || []).reduce(function (top, partido) {
+      const dia = Date.parse(partido.start);
+      return isNaN(dia) ? top : Math.max(top, dia);
+    }, 0);
+    /* +2 h de partido y 3 h de margen. Sin fechas, se da por asentada. */
+    const asentada = !ultimo || Date.now() - ultimo > 5 * 60 * 60 * 1000;
+    if (asentada) return 12 * 60 * 60 * 1000;
+    return 20 * 1000;
+  }
   /* Y una jornada a medias, VEINTE SEGUNDOS. Eran dos minutos, y antes treinta,
      y esa foto se tomaba ANTES de que empezara el primer partido: sin partes
      todavia, `puntos` salia vacio, y esa copia vacia se servia media hora. Con
