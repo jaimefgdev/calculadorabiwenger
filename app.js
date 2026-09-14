@@ -6702,7 +6702,15 @@
        al instante. Calcularlo aquí obliga a esperar a la lista de futbolistas,
        que es otra descarga, y los dos cuadros tardaban en aparecer. */
     const delProxy = state.movers && (state.movers.up || []).length ? state.movers : null;
-    const datos = delProxy || calcularMovers() || { up: [], down: [] };
+    const crudo = delProxy || calcularMovers() || { up: [], down: [] };
+    /* Y se repasa el signo aqui tambien. El proxy ya los separa bien, pero la
+       copia de seguridad del KV y la que guarda el navegador pueden ser de
+       antes del arreglo, y con ellas volvian a colarse los que bajan en «los
+       que mas suben». Filtrar dos veces no cuesta nada. */
+    const datos = {
+      up: (crudo.up || []).filter(function (j) { return j && j.increment > 0; }),
+      down: (crudo.down || []).filter(function (j) { return j && j.increment < 0; })
+    };
 
     const pinta = function (id, lista) {
       const abierto = !!state.moversAbiertos[id];

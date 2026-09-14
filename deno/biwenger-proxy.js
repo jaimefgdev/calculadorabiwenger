@@ -223,7 +223,7 @@ const CDN = 'https://cf.biwenger.com/api/v2';
    navegador normal y las cabeceras que este mandaría. */
 /* Marca de versión: se sube en cada cambio y se consulta con ?version=1.
    Sirve para saber desde fuera si el despliegue ha entrado o no. */
-const VERSION = '2026-09-14 · deno 164';
+const VERSION = '2026-09-14 · deno 165';
 
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ' +
   '(KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36';
@@ -5121,9 +5121,19 @@ function movers(names, cuantos) {
   });
 
   lista.sort(function (a, b) { return b.increment - a.increment; });
+  /* CADA UNO POR SU LADO, y filtrando por el signo ANTES de cortar.
+
+     `up` era `lista.slice(0, cuantos)` a secas, sobre la lista entera ordenada
+     de mas a menos. Mientras suben mas de 150 no se nota, pero en cuanto suben
+     menos la cola se rellenaba con los que BAJAN: en «los que mas suben»
+     salian los ultimos con el precio en rojo. */
+  const suben = lista.filter(function (p) { return p.increment > 0; });
+  const bajan = lista.filter(function (p) { return p.increment < 0; });
   return {
-    up: lista.slice(0, cuantos),
-    down: lista.slice(-cuantos).reverse().filter(function (p) { return p.increment < 0; })
+    up: suben.slice(0, cuantos),
+    /* Del que mas cae al que menos: la lista viene de mas a menos, asi que los
+       negativos estan al reves de como se quieren leer. */
+    down: bajan.reverse().slice(0, cuantos)
   };
 }
 
