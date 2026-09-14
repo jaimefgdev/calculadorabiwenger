@@ -223,7 +223,7 @@ const CDN = 'https://cf.biwenger.com/api/v2';
    navegador normal y las cabeceras que este mandaría. */
 /* Marca de versión: se sube en cada cambio y se consulta con ?version=1.
    Sirve para saber desde fuera si el despliegue ha entrado o no. */
-const VERSION = '2026-09-14 · deno 167';
+const VERSION = '2026-09-14 · deno 168';
 
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ' +
   '(KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36';
@@ -4854,7 +4854,27 @@ async function roundBoard(env, headers, jornada, listaNombres) {
        Aqui solo tapa el agujero de las primeras horas de la jornada, cuando la
        ficha todavia no tiene la nota y lo que se colaba era la de la jornada
        ANTERIOR. */
-    if (conNota[id] == null) base[id] = delParte[id];
+    if (conNota[id] != null) return;
+
+    /* Y SOLO si el parte es de fiar. Sus notas se recalculan en caliente: del
+       Villarreal-Betis del 14 de septiembre, el mismo futbolista daba a las
+       23:44 Gueye 4, Pepe 7 y Mikautadze 1, y a las 23:54 Gueye 2, Pepe 2 y
+       Mikautadze -2. Biwenger, en su app, tenia 3, 4 y 2.
+
+       Se nota en que el historial del indice no ha llegado todavia a esta
+       jornada para ese equipo: mientras eso pasa, Biwenger esta recalculando y
+       cualquier numero que de es provisional. Antes que inventarse uno se deja
+       PENDIENTE, que es lo que de verdad es: la web pinta una interrogacion y
+       en cuanto Biwenger publique la nota entra sola y cuadra.
+
+       Si el historial ya llego, el parte si vale: ahi solo tapa el hueco del
+       que no tiene ficha leida. */
+    const suEquipo = names[id + ':team'];
+    const casillas = ((names[id + ':fit'] || []).length) || 0;
+    const jugados = (salto.hasta || {})[suEquipo];
+    if (jugados != null && casillas < jugados) return;
+
+    base[id] = delParte[id];
   });
 
   /* En qué puesto jugó cada uno de verdad. De la ficha si la hemos leído; si
