@@ -2525,11 +2525,16 @@
   }
 
   /** Actualiza el reloj; se llama cada segundo. */
-  /* Biwenger reparte los puntos y el dinero de la jornada a las 17:00 del día
-     SIGUIENTE al último partido. No lo publica en ninguna respuesta —del
-     `round` solo llegan id, nombre, estado y si está en juego—, así que se
-     calcula. Es una estimación, y la web lo dice con esas palabras. */
-  const HORA_ENTREGA = 17;
+  /* Biwenger reparte los puntos y el dinero de la jornada a las 13:00 del día
+     SIGUIENTE al último partido.
+
+     No lo publica en NINGUNA respuesta: ni el `round` ni el calendario traen
+     un solo campo que hable de pagos o de cierre —buscado uno a uno—, asi que
+     el numero vive aqui y no hay de donde sacarlo. Es una estimacion, y la web
+     lo dice con esas palabras al pasar por encima.
+
+     Estaba en 17:00 y son las 13:00. Si algun dia cambia, se cambia aqui. */
+  const HORA_ENTREGA = 13;
 
   /**
    * Cuándo se entregan los puntos y el abono de la última jornada acabada.
@@ -2597,8 +2602,8 @@
     /* Sin la coletilla de «estimado: 17:00 del día siguiente»: partía el rótulo
        en dos líneas y lo que se mira es el tiempo que queda. Que es una
        estimación se dice al pasar por encima. */
-    caja.title = 'Estimado: Biwenger reparte a las 17:00 del día siguiente al ' +
-      'último partido de la jornada.';
+    caja.title = 'Estimado: Biwenger reparte a las ' + HORA_ENTREGA + ':00 del día ' +
+      'siguiente al último partido de la jornada.';
     caja.innerHTML = 'Entrega de puntos y abonos ' +
       (queda ? 'en <strong>' + escapeHtml(queda.text) + '</strong>' : 'ya mismo');
   }
