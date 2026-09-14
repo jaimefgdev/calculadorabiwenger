@@ -942,7 +942,7 @@
 
   /* ---------- Render ---------- */
 
-  const AVATAR_COLORS = ['#c90800', '#ff7a00', '#c99700', '#00b37a', '#0091b3', '#7c5cff', '#ff3d9a', '#6b7785'];
+  const AVATAR_COLORS = ['#ff0033', '#ff7a00', '#c99700', '#00b37a', '#0091b3', '#7c5cff', '#ff3d9a', '#6b7785'];
 
   /* Biwenger devuelve 404 en el avatar de esta cuenta —está roto en su CDN—,
      así que se sustituye por otra imagen para no dejar el hueco. */
