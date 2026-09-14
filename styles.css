@@ -2082,6 +2082,103 @@ html.con-ficha { scrollbar-gutter: stable; }
 .col-rank--primero { color: var(--marca, #e3a417); font-weight: 700; }
 .col-rank--cola { color: var(--neg); font-weight: 700; }
 
+/* ---------- Clasificacion, en filas ----------
+   La forma de Biwenger: una fila alta por manager con el puesto a la
+   izquierda, la cara y el nombre en el medio, los puntos GRANDES a la derecha
+   y el resto de cifras en una segunda linea pequena debajo. Nada de nueve
+   columnas con su cabecera.
+
+   Se hace solo con estilos, sin tocar el HTML ni el render: la tabla sigue
+   siendo una tabla por dentro, asi que las cabeceras ordenables, los paneles
+   que se despliegan y el resaltado de tu fila siguen funcionando igual. Lo
+   unico que cambia es como se colocan las celdas.
+
+   Y la cabecera no se esconde: se convierte en una tira de pildoras de
+   ordenar. Biwenger no tiene, pero quitarla seria perder el poder ordenar. */
+.table--managers { display: block; }
+.table--managers thead { display: block; }
+.table--managers thead tr {
+  display: flex; flex-wrap: wrap; align-items: center; gap: .3rem;
+  padding: 0 0 .7rem;
+}
+/* El «#» y «Dif.» no se ordenan: fuera de la tira. */
+.table--managers thead th:not(.sortable) { display: none; }
+.table--managers thead th.sortable {
+  position: static; display: inline-block;
+  border: 1px solid var(--btn-borde); border-radius: var(--radius-pill);
+  background: var(--btn-bg); color: var(--text-soft);
+  padding: 4px 10px; font-size: 11px; font-weight: 700;
+  text-transform: none; letter-spacing: 0; white-space: nowrap;
+}
+.table--managers thead th.sortable:hover { background: var(--btn-bg-hover); color: var(--text); }
+/* La que ordena ahora mismo, en rojo lleno, como sus pildoras activas. */
+.table--managers thead th.sortable:not([aria-sort="none"]) {
+  background: var(--accent); border-color: var(--accent); color: #fff;
+}
+
+.table--managers tbody { display: block; }
+.table--managers tbody tr {
+  display: block; position: relative;
+  padding: .5rem .7rem .5rem 2.5rem;
+  border-top: 1px solid var(--border);
+}
+.table--managers tbody tr:first-child { border-top: none; }
+.table--managers tbody td {
+  display: inline; border: none; padding: 0; white-space: nowrap;
+}
+/* El puesto, a la izquierda y centrado en la fila entera. */
+.table--managers tbody td.col-rank {
+  position: absolute; left: 0; top: 50%; transform: translateY(-50%);
+  display: block; width: 2.2rem; text-align: center; font-size: 13px;
+}
+/* La cara y el nombre, en su propia linea y sin pisar los puntos. */
+.table--managers tbody td[data-label="Futbolista"] {
+  display: block; padding-right: 4.5rem;
+}
+.table--managers tbody td[data-label="Futbolista"] .manager__name {
+  font-size: 14px; font-weight: 600;
+}
+/* Los puntos, grandes y a la derecha, como en su clasificacion. */
+.table--managers tbody td[data-label="Puntos"] {
+  position: absolute; right: .7rem; top: 50%; transform: translateY(-50%);
+  display: block; text-align: right;
+}
+.table--managers tbody td[data-label="Puntos"] strong {
+  font-size: 20px; font-weight: 800; line-height: 1;
+}
+/* Y todo lo demas, en una segunda linea chica debajo del nombre. */
+.table--managers tbody td[data-label="Dif."],
+.table--managers tbody td[data-label="Valor equipo"],
+.table--managers tbody td[data-label="Jug."],
+.table--managers tbody td[data-label="Saldo"],
+.table--managers tbody td[data-label="Puja máxima"],
+.table--managers tbody td[data-label="Última conexión"] {
+  font-size: 11px; color: var(--text-faint);
+}
+/* Separados por un punto, que es como encadena el las cifras pequenas. */
+.table--managers tbody td[data-label="Valor equipo"]::after,
+.table--managers tbody td[data-label="Jug."]::after,
+.table--managers tbody td[data-label="Saldo"]::after,
+.table--managers tbody td[data-label="Puja máxima"]::after {
+  content: '  b7 '; color: var(--border-hover);
+}
+/* La primera de la segunda linea arranca debajo del nombre, no pegada al
+   puesto. La `Dif.` va justo detras de los puntos, arriba. */
+.table--managers tbody td[data-label="Valor equipo"] { margin-left: 0; }
+.table--managers tbody td[data-label="Dif."] {
+  position: absolute; right: .7rem; top: 50%; margin-top: .75rem;
+  display: block; font-size: 10px;
+}
+/* Las cifras de la segunda linea pierden el color fuerte: ahi mandan los
+   puntos, y con el saldo en rojo y la puja en ambar la fila se volvia un
+   semaforo. Solo el saldo en negativo se queda marcado. */
+.table--managers tbody td[data-label="Puja máxima"] strong { color: inherit; font-weight: 600; }
+.table--managers tbody td[data-label="Saldo"] .money-neg { color: var(--neg); }
+
+/* Los paneles que se despliegan siguen ocupando la fila entera. */
+.table--managers tbody tr.detail-row { padding: 0; border-top: none; }
+.table--managers tbody tr.detail-row .detail-cell { display: block; }
+
 /* ---------- Cabeceras ordenables ---------- */
 .table th.sortable {
   cursor: pointer;
