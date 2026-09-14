@@ -2124,8 +2124,21 @@
           '<span class="sub">' + escapeHtml(offer.other || 'Mercado') +
             (esCesion(offer) && jornadasDeCesion(offer)
               ? ' · ' + jornadasDeCesion(offer) : '') + '</span></td>' +
+        /* Y al lado, cuanto se va de lo que vale. Es el dato que decide si una
+           oferta es buena o si una puja se te esta yendo de las manos, y aqui
+           no salia en ninguna: habia que abrir el dialogo para verlo. Si no se
+           sabe lo que vale, no se pone nada en vez de inventar una comparacion. */
         '<td class="num" data-label="Importe"><strong class="' + (out ? 'money-neg' : 'money-pos') + '">' +
-          (out ? '−' : '+') + money(offer.amount) + '</strong></td>' +
+          (out ? '−' : '+') + money(offer.amount) + '</strong>' +
+          (function () {
+            const valor = valorDeMercadoDe(offer.playerId, miVentaDe(offer.playerId));
+            if (valor == null) return '';
+            const diff = offer.amount - valor;
+            if (!diff) return '';
+            return ' <span class="delta ' + (diff > 0 ? 'delta--up' : 'delta--down') + '"' +
+              ' title="Sobre su valor de mercado, ' + escapeHtml(money(valor)) + '">' +
+              (diff > 0 ? '▲ +' : '▼ −') + money(Math.abs(diff)) + '</span>';
+          })() + '</td>' +
         '<td data-label="Queda">' + deadlineCell(offer.until) + '</td>' +
         '<td data-label="Simular">' + simToggle(offer.id, on, out ? 'out' : 'in') + '</td>' +
       '</tr>';
@@ -2259,6 +2272,24 @@
   /* Valor de mercado del jugador; si Biwenger no lo diera, se cae al precio
      que pediste por él. */
   const listingValue = (item) => (item.marketValue != null ? item.marketValue : item.price);
+
+  /**
+   * Lo que vale de verdad ese futbolista, venga de donde venga el dato.
+   *
+   * `listingValue` cae al PRECIO QUE PIDES cuando la venta no trae valor de
+   * mercado, y eso vale para simular pero no para comparar: con Raphinha
+   * puesto a 99 millones, una oferta de 20,5 saldria como «baja 78,8 millones»
+   * cuando en realidad esta por encima de lo que vale.
+   *
+   * Y si no esta en tus ventas tampoco hay que rendirse: se busca en su ficha,
+   * que es donde esta el valor de todas formas. Solo cuando no se sabe se
+   * devuelve nulo, y entonces no se ensena comparacion ninguna.
+   */
+  function valorDeMercadoDe(playerId, item) {
+    if (item && item.marketValue != null) return item.marketValue;
+    const ficha = playerInfo(playerId) || {};
+    return ficha.marketValue != null ? ficha.marketValue : null;
+  }
   const marketSaleId = (item) => 'mkt:' + (item.playerId || item.player);
 
   /** Venta al valor de mercado de los que no tienen oferta, para simularla. */
@@ -2285,17 +2316,7 @@
     if (!list || list.length === 0) { section.hidden = true; return; }
     section.hidden = false;
 
-    /* El valor de mercado DE VERDAD. `listingValue` cae al precio de venta
-       cuando falta, y eso vale para simular pero NO para enseñarlo: la columna
-       «Valor» y la simulación «sin ofertas» son las dos valor de mercado, y con
-       ese apaño pasaban a enseñar lo que has pedido por él haciéndose pasar por
-       lo que vale. Si en la ficha no viene, se busca en el índice; y si tampoco
-       está, se dice que no se sabe en vez de inventarlo. */
-    const valorDeMercado = function (item) {
-      if (item.marketValue != null) return item.marketValue;
-      const ficha = playerInfo(item.playerId) || {};
-      return ficha.marketValue != null ? ficha.marketValue : null;
-    };
+    const valorDeMercado = function (item) { return valorDeMercadoDe(item.playerId, item); };
 
     $('listings-body').innerHTML = list.map(function (item) {
       const valor = valorDeMercado(item);
@@ -5211,7 +5232,10 @@
 
     const filaRecibida = function (oferta) {
       const suya = enVentaDe(oferta.playerId);
-      const valor = suya ? listingValue(suya) : null;
+      /* Contra lo que VALE, no contra lo que pides por el, y tambien cuando no
+         lo tienes puesto en venta: Biwenger deja ofertar por cualquiera de tu
+         plantilla, y en esos la comparacion no salia. */
+      const valor = valorDeMercadoDe(oferta.playerId, suya);
       const diferencia = valor == null ? null : oferta.amount - valor;
       return '<div class="op-oferta">' +
         '<div class="op-oferta__quien">' +
