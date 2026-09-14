@@ -223,7 +223,7 @@ const CDN = 'https://cf.biwenger.com/api/v2';
    navegador normal y las cabeceras que este mandaría. */
 /* Marca de versión: se sube en cada cambio y se consulta con ?version=1.
    Sirve para saber desde fuera si el despliegue ha entrado o no. */
-const VERSION = '2026-09-14 · deno 169';
+const VERSION = '2026-09-15 · deno 170';
 
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ' +
   '(KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36';
@@ -4824,8 +4824,29 @@ async function roundBoard(env, headers, jornada, listaNombres) {
     !!detalle && (detalle.played || 0) >= (detalle.games || 0) && (detalle.games || 0) > 0;
   const buenas = await notasDeLaJornada(env, Object.keys(alineados), names, score,
     numeroJornada, cerrada, partidoDe).catch(function () { return null; });
+  /* Al que se le ha LEIDO la ficha y NO trae nota de esta jornada, es que no
+     tiene: no jugo. Se apunta para no dejar que el historial ni el parte le
+     inventen una.
+
+     Este era el descuadre de fondo. `base` sale del historial del indice, que
+     es una lista sin etiquetas y hay que alinearla a mano contando partidos;
+     cuando el futbolista se salto alguno, la cuenta se desplaza y le mete la
+     nota de otra jornada. Bartra en la jornada 1: su ficha dice que no jugo, y
+     nosotros le dabamos 5, que es su jornada 2. Doce puntos de mas para
+     Atletico Jordaan en la general, que son exactamente los doce que nos
+     separaban de Biwenger.
+
+     La ficha es la unica fuente que dice a que jornada pertenece cada nota, y
+     por eso manda: si la hemos leido entera y esta jornada no sale, no sale. */
+  const sinNota = {};
   if (buenas && buenas.notas) {
     Object.keys(buenas.notas).forEach(function (id) { base[id] = buenas.notas[id]; });
+    (buenas.vistos || []).forEach(function (id) {
+      if (buenas.notas[String(id)] == null) {
+        sinNota[String(id)] = true;
+        delete base[String(id)];
+      }
+    });
   }
   /* Quiénes tienen una nota leída de su ficha PARA ESTA JORNADA. Solo esos y
      los que la traen en la alineación puntúan si ya se fueron de LaLiga. */
@@ -4855,6 +4876,8 @@ async function roundBoard(env, headers, jornada, listaNombres) {
        ficha todavia no tiene la nota y lo que se colaba era la de la jornada
        ANTERIOR. */
     if (conNota[id] != null) return;
+    /* Ni al que su ficha dice que no jugo. */
+    if (sinNota[id]) return;
 
     /* Y SOLO si el parte es de fiar. Sus notas se recalculan en caliente: del
        Villarreal-Betis del 14 de septiembre, el mismo futbolista daba a las
