@@ -9679,7 +9679,7 @@
          El nombre entero se queda en el título, al pasar por encima. */
       const pais = bio.countryName || nombreDePais(bio.country);
       partes.push({ que: 'Nacionalidad',
-        crudo: banderaDe(bio.country, pais) +
+        crudo: banderaDe(bio.country, pais, bio.country3) +
           (bio.country3
             ? '<span class="personal__iso" title="' + escapeHtml(pais) + '">' +
               escapeHtml(bio.country3) + '</span>'
@@ -9937,17 +9937,35 @@
    * —«Do República Dominicana»— en vez del dibujo. Se usa la imagen de la propia
    * web de LaLiga, que es de donde sale el resto de la ficha y las tiene todas.
    */
-  function banderaDe(codigo, titulo) {
-    const dos = String(codigo || '').toLowerCase();
-    if (!/^[a-z]{2}$/.test(dos)) return '';
+  /* Las cuatro britanicas, que no son paises para la ISO pero si selecciones.
+
+     Va por el codigo de TRES letras a proposito. El de dos que manda SofaScore
+     para estas no es ISO y encima choca con paises de verdad:
+
+       ENG  su «EN»  no existe en la ISO      -> bandera rota
+       WAL  su «WA»  no existe en la ISO      -> bandera rota
+       SCO  su «SC»  en la ISO es SEYCHELLES  -> bandera equivocada, y sin avisar
+       NIR  su «NI»  en la ISO es NICARAGUA   -> bandera equivocada, y sin avisar
+
+     Las dos ultimas son las malas: cargaban perfectamente y ensenaban otra
+     cosa. Comprobado una por una contra flagcdn. */
+  const BANDERAS_BRITANICAS = { ENG: 'gb-eng', SCO: 'gb-sct', WAL: 'gb-wls', NIR: 'gb-nir' };
+
+  function banderaDe(codigo, titulo, tres) {
+    const suya = BANDERAS_BRITANICAS[String(tres || '').toUpperCase()];
+    const cual = suya || String(codigo || '').toLowerCase();
+    if (!suya && !/^[a-z]{2}$/.test(cual)) return '';
     const nombre = titulo || String(codigo).toUpperCase();
     /* No se usan las de LaLiga: las publica con proporciones distintas —España
        cuadrada 16×16, Brasil 1.43, Argentina 1.60—, así que o se deformaban o
        había que recortarlas, y a España el recorte le comía las franjas rojas.
        Estas vienen cada una con su proporción oficial. */
+    /* Y si alguna no cargara, se quita en vez de dejar el icono de imagen rota:
+       al lado ya va el codigo de tres letras, que dice lo mismo. */
     return '<img class="bandera" loading="lazy" alt="' + escapeHtml(nombre) +
-      '" title="' + escapeHtml(nombre) + '" src="' +
-      'https://flagcdn.com/w80/' + dos + '.png">';
+      '" title="' + escapeHtml(nombre) + '"' +
+      ' onerror="this.remove()" src="' +
+      'https://flagcdn.com/w80/' + cual + '.png">';
   }
 
   /* ---------- SofaScore ----------
