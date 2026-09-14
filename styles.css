@@ -2160,7 +2160,7 @@ html.con-ficha { scrollbar-gutter: stable; }
 .table--managers tbody td[data-label="Jug."]::after,
 .table--managers tbody td[data-label="Saldo"]::after,
 .table--managers tbody td[data-label="Puja máxima"]::after {
-  content: '  b7 '; color: var(--border-hover);
+  content: ' · '; color: var(--border-hover);
 }
 /* La primera de la segunda linea arranca debajo del nombre, no pegada al
    puesto. La `Dif.` va justo detras de los puntos, arriba. */
