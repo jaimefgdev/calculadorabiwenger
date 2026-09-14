@@ -1859,31 +1859,31 @@
             '<span class="manager">' + avatar(row.name) +
               '<span class="manager__name">' + escapeHtml(row.name) + '</span></span>' +
           '</button></td>' +
-        '<td class="num segunda" data-label="Fichajes">' +
+        '<td class="num" data-label="Fichajes">' +
           (row.buys ? '<strong>' + row.buys + '</strong>' : '<span class="zero">0</span>') + '</td>' +
-        '<td class="num segunda" data-label="Ventas">' +
+        '<td class="num" data-label="Ventas">' +
           (row.sells ? '<strong>' + row.sells + '</strong>' : '<span class="zero">0</span>') + '</td>' +
-        '<td class="num segunda" data-label="Gastado">' +
+        '<td class="num" data-label="Gastado">' +
           (row.spent ? '<span class="money-neg">−' + money(row.spent) + '</span>' : '<span class="zero">' + money(0) + '</span>') + '</td>' +
-        '<td class="num segunda" data-label="Ingresado">' +
+        '<td class="num" data-label="Ingresado">' +
           (row.earned ? '<span class="money-pos">+' + money(row.earned) + '</span>' : '<span class="zero">' + money(0) + '</span>') + '</td>' +
-        '<td class="num segunda" data-label="Valor equipo">' +
+        '<td class="num" data-label="Valor equipo">' +
           (row.teamValue == null ? '<span class="unknown">—</span>' : money(row.teamValue)) + '</td>' +
         /* Menos de once no da ni para alinear: se avisa en rojo. */
-        '<td class="num segunda" data-label="Jug.">' +
+        '<td class="num" data-label="Jug.">' +
           (row.players == null ? '<span class="unknown">—</span>'
             : '<span class="' + (row.players < 11 ? 'money-neg' : '') + '"' +
               (row.players < 11 ? ' title="No llega a once: no puede completar la alineación"' : '') +
               '>' + row.players + '</span>') + '</td>' +
         /* El saldo, pegado a la puja máxima: son las dos cifras que se miran
            juntas para saber hasta dónde puedes llegar. */
-        '<td class="num segunda" data-label="Saldo"><strong>' +
+        '<td class="num" data-label="Saldo"><strong>' +
           '<span class="' + tonoDeSaldo(row.balance) + '">' + money(row.balance) + '</span></strong>' +
           (row.officialBalance != null && row.officialBalance !== row.balance
             ? '<span class="mismatch" title="Biwenger dice ' + money(row.officialBalance) +
               '. La diferencia sale de movimientos que el tablón no detalla: cesiones, bonus de jornada o cláusulas.">≠</span>'
             : '') + '</td>' +
-        '<td class="num col-bid dato-grande" data-label="Puja máxima">' +
+        '<td class="num col-bid" data-label="Puja máxima">' +
           (row.maxBid == null ? '<span class="unknown">—</span>' : '<strong>' + signedCell(row.maxBid) + '</strong>') + '</td>' +
       '</tr>' + (expanded ? managerDetail(row.name) : '');
     }).join('');
@@ -8939,7 +8939,7 @@
             '<span class="manager">' + avatar(row.name) +
               '<span class="manager__name">' + escapeHtml(row.name) + '</span></span>' +
           '</button></td>' +
-        '<td class="num dato-grande" data-label="Puntos">' +
+        '<td class="num" data-label="Puntos">' +
           '<button type="button" class="puntos-toggle" data-manager-points="' + escapeHtml(row.name) + '"' +
             ' aria-expanded="' + (abiertoPuntos ? 'true' : 'false') + '"' +
             ' title="Ver los puntos de cada futbolista">' +
@@ -8947,21 +8947,21 @@
           '</button></td>' +
         /* Cuánto le falta para el primero. Al líder, un guion: decir «0» daría
            a entender que le faltan puntos para alcanzarse a sí mismo. */
-        '<td class="num segunda" data-label="Dif.">' + (function () {
+        '<td class="num" data-label="Dif.">' + (function () {
           if (row.points == null || lider == null) return '<span class="sub">—</span>';
           const dif = row.points - lider;
           return dif === 0
             ? '<span class="sub">—</span>'
             : '<span class="dif-lider">' + dif + '</span>';
         })() + '</td>' +
-        '<td class="num segunda" data-label="Valor equipo">' +
+        '<td class="num" data-label="Valor equipo">' +
           (row.teamValue == null ? '<span class="unknown">—</span>' : money(row.teamValue)) + '</td>' +
-        '<td class="num segunda" data-label="Jug.">' + (row.players == null ? '—' : row.players) + '</td>' +
-        '<td class="num segunda" data-label="Saldo"><span class="' + (row.balance < 0 ? 'money-neg' : '') + '">' +
+        '<td class="num" data-label="Jug.">' + (row.players == null ? '—' : row.players) + '</td>' +
+        '<td class="num" data-label="Saldo"><span class="' + (row.balance < 0 ? 'money-neg' : '') + '">' +
           money(row.balance) + '</span></td>' +
-        '<td class="num segunda" data-label="Puja máxima"><strong class="bid-amount">' +
+        '<td class="num" data-label="Puja máxima"><strong class="bid-amount">' +
           (row.maxBid == null ? '—' : money(row.maxBid)) + '</strong></td>' +
-        '<td class="segunda" data-label="Última conexión">' + sinceCell(row.lastAccess) + '</td>' +
+        '<td data-label="Última conexión">' + sinceCell(row.lastAccess) + '</td>' +
       '</tr>' + (abiertoPuntos ? panelDePuntos(row) : '') + (open ? managerPanel(row) : '');
     }).join('');
   }
@@ -11226,17 +11226,16 @@
         }).join('') + '</tbody></table></div></td></tr>';
 
       return '<tr class="' + (open ? 'row-open' : '') + claseMia(squad.name) + '">' +
-        /* Con etiqueta, que es por donde la coge la vista en filas. */
-        '<td data-label="Jugador">' +
+        '<td>' +
           '<button type="button" class="row-toggle" data-squad="' + escapeHtml(squad.id) + '"' +
             ' aria-expanded="' + (open ? 'true' : 'false') + '">' +
             '<span class="row-toggle__icon" aria-hidden="true">▸</span>' +
             '<span class="manager">' + avatar(squad.name) +
               '<span class="manager__name">' + escapeHtml(squad.name) + '</span></span>' +
           '</button></td>' +
-        '<td class="num segunda" data-label="Jugadores">' + squad.players.length + '</td>' +
-        '<td class="num segunda" data-label="Pagado">' + (paid ? money(paid) : '<span class="sub">—</span>') + '</td>' +
-        '<td class="num dato-grande" data-label="Valor de mercado"><strong>' + money(value) + '</strong>' +
+        '<td class="num" data-label="Jugadores">' + squad.players.length + '</td>' +
+        '<td class="num" data-label="Pagado">' + (paid ? money(paid) : '<span class="sub">—</span>') + '</td>' +
+        '<td class="num" data-label="Valor de mercado"><strong>' + money(value) + '</strong>' +
           /* Debajo del valor, no al lado: la columna es estrecha y en línea
              empujaba el importe. Sin movimiento no se pinta nada, que un cero
              en verde o rojo confunde. */
