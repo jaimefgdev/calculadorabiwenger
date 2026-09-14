@@ -25,9 +25,13 @@
 <link rel="dns-prefetch" href="https://cdn.biwenger.com">
 <!-- El ?v= se sube en cada publicación: obliga al navegador a bajar el archivo
      nuevo en vez de reutilizar el que tenga en caché. -->
-<link rel="stylesheet" href="styles.css?v=518">
-<!-- La tipografia se pide ya, sin esperar a que el CSS termine de leerse. -->
-<link rel="preload" href="GoogleSans-Regular.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="styles.css?v=522">
+<!-- Open Sans, la de Biwenger. Se pide aqui y no desde el CSS para que salga
+     en cuanto el navegador lee la cabecera, sin esperar a la hoja de estilos.
+     Los pesos son los mismos que carga su app. -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Open+Sans:ital,wght@0,300;0,400;0,600;0,700;0,800;1,400;1,700&display=swap">
 <!-- El escudo de Biwenger, el mismo que el del boton de Inicio. -->
 <link rel="icon" type="image/svg+xml" href="biwenger.svg?v=411">
 <link rel="apple-touch-icon" href="icono-192.png?v=418">
