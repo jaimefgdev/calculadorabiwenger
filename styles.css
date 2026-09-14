@@ -32,6 +32,13 @@
   --bg-elev:       #1a1c21;
   --bg-surface:    #1f2127;   /* su --card-color */
   --card-light:    #262931;   /* su --card-light-color, un paso mas claro */
+  /* El fondo del boton. No puede ser el de la tarjeta como en Biwenger: alli
+     los botones estan sobre la pagina BLANCA y el gris destaca; aqui estan
+     dentro de paneles que YA son ese gris, y desaparecian. Se pone un paso
+     mas lejos del panel, que es lo que ellos consiguen con `.btn.white`. */
+  --btn-bg:        #2a2d34;
+  --btn-bg-hover:  #343842;
+  --btn-borde:     transparent;
   --border:        #2a2d34;
   --border-strong: #343842;
   --border-hover:  #444954;
@@ -87,6 +94,9 @@
     --bg-elev:       #ffffff;
     --bg-surface:    #ececec;
     --card-light:    #f6f6f6;
+    --btn-bg:        #ffffff;
+    --btn-bg-hover:  #f6f6f6;
+    --btn-borde:     #d0dde9;
     --border:        #dedede;
     --border-strong: #d0dde9;
     --border-hover:  #bbbbbb;
@@ -120,6 +130,9 @@
   --bg-elev:       #ffffff;
   --bg-surface:    #ececec;
   --card-light:    #f6f6f6;
+  --btn-bg:        #ffffff;
+  --btn-bg-hover:  #f6f6f6;
+  --btn-borde:     #d0dde9;
   --border:        #dedede;
   --border-strong: #d0dde9;
   --border-hover:  #bbbbbb;
@@ -165,6 +178,9 @@
   --bg-elev:       #1a1c21;
   --bg-surface:    #1f2127;
   --card-light:    #262931;
+  --btn-bg:        #2a2d34;
+  --btn-bg-hover:  #343842;
+  --btn-borde:     transparent;
   --border:        #2a2d34;
   --border-strong: #343842;
   --border-hover:  #444954;
@@ -606,15 +622,15 @@ code { font-family: var(--mono); font-size: .9em; background: var(--accent-soft)
 .ambito {
   font: inherit; font-size: 12px; font-weight: 700; line-height: 15px;
   padding: 5px 9px;
-  color: var(--text-soft); background: var(--card-light);
-  border: none; border-radius: var(--radius-pill);
+  color: var(--text-soft); background: var(--btn-bg);
+  border: 1px solid var(--btn-borde); border-radius: var(--radius-pill);
   cursor: pointer;
   transition: all .1s linear;
 }
-.ambito:hover { background: var(--border); color: var(--text); }
+.ambito:hover { background: var(--btn-bg-hover); color: var(--text); border-color: var(--border-hover); }
 /* La elegida, en rojo lleno: es como marcan ellos lo activo. */
 .ambito[aria-pressed="true"] {
-  color: #fff; background: var(--accent);
+  color: #fff; background: var(--accent); border-color: var(--accent);
 }
 .ambito:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
@@ -1834,14 +1850,14 @@ html.con-ficha { scrollbar-gutter: stable; }
 .btn {
   font: inherit; font-size: 12.5px; font-weight: 700; line-height: 15px;
   color: var(--text-soft);
-  background: var(--bg-surface);
-  border: none;
+  background: var(--btn-bg);
+  border: 1px solid var(--btn-borde);
   border-radius: var(--radius-pill);
   padding: 9px 14px;
   cursor: pointer;
   transition: all .1s linear;
 }
-.btn:hover { background: var(--border); color: var(--text); }
+.btn:hover { background: var(--btn-bg-hover); color: var(--text); border-color: var(--border-hover); }
 .btn:active { transform: translateY(1px); }
 /* Su `.btn.primary`: rojo lleno y letra blanca. */
 .btn--primary { background: var(--accent); color: #fff; }
