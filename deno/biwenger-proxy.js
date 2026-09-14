@@ -4868,11 +4868,17 @@ async function roundBoard(env, headers, jornada, listaNombres) {
        en cuanto Biwenger publique la nota entra sola y cuadra.
 
        Si el historial ya llego, el parte si vale: ahi solo tapa el hueco del
-       que no tiene ficha leida. */
+       que no tiene ficha leida.
+
+       Y SIN HISTORIAL no se sabe nada, asi que no se bloquea: al que no tiene
+       ni una casilla —los que se fueron de LaLiga, sobre todo— el parte es lo
+       unico que le queda, y quitarselo movia tres jornadas CERRADAS: Jordaan
+       pasaba de 35 a 42 en la 1 y de 31 a 28 en la 4, y Eneko de 33 a 31 en la
+       3. El bloqueo es para el que va por detras, no para el que no tiene. */
     const suEquipo = names[id + ':team'];
     const casillas = ((names[id + ':fit'] || []).length) || 0;
     const jugados = (salto.hasta || {})[suEquipo];
-    if (jugados != null && casillas < jugados) return;
+    if (casillas > 0 && jugados != null && casillas < jugados) return;
 
     base[id] = delParte[id];
   });
