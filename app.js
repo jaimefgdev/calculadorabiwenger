@@ -8864,7 +8864,8 @@
         xi: [],
         bench: [],
         xiValue: 0,
-        abono: null,
+        /* Lo que cobro por esa jornada, tal cual lo pago la liga. */
+        abono: { total: abono.amount, texto: abono.detail || null },
         sinDetalle: true
       });
     });
@@ -8888,7 +8889,7 @@
     /* Solo el desglose: lo de «jornada cerrada / previsión» se ha quitado también
        de aquí, para que el globo diga lo mismo que la ficha de más abajo. */
     return '<span class="' + (abono.total < 0 ? 'money-neg' : 'money-pos') +
-      '" title="' + escapeHtml(partes.join(' + ') || 'Sin abono') + '">' +
+      '" title="' + escapeHtml(abono.texto || partes.join(' + ') || 'Sin abono') + '">' +
       (abono.total > 0 ? '+' : '') + money(abono.total) + '</span>';
   }
 
