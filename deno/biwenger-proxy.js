@@ -223,7 +223,7 @@ const CDN = 'https://cf.biwenger.com/api/v2';
    navegador normal y las cabeceras que este mandaría. */
 /* Marca de versión: se sube en cada cambio y se consulta con ?version=1.
    Sirve para saber desde fuera si el despliegue ha entrado o no. */
-const VERSION = '2026-09-16 · deno 172';
+const VERSION = '2026-09-16 · deno 173';
 
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ' +
   '(KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36';
@@ -2799,7 +2799,8 @@ async function matchDay(roundId, score, names, primas) {
          corners, fueras de juego, entradas, regates, duelos aereos, palos,
          pases y su precision. No cuesta ni una peticion mas. */
       stats: lado.stats || null,
-      coach: (lado.coach && (lado.coach.name || lado.coach)) || null,
+      coach: typeof lado.coach === 'string' ? lado.coach
+        : ((lado.coach && lado.coach.player && lado.coach.player.name) || null),
       xi: once,
       bench: banquillo
     };
@@ -3993,7 +3994,11 @@ async function roundDetail(roundId, score) {
      429 —y con el CDN cortado no había jornada que enseñar, porque no había
      nada guardado en ningún sitio. Con el respaldo en KV la descarga se hace
      una vez cada media hora y punto. */
-  const kvClave = 'detalle-v2-' + roundId + '-' + (score || '');
+  /* v3: la copia de v2 se guardo antes de que aqui se conservaran las
+     estadisticas del partido, y como la vigencia manda antes de preguntar al
+     CDN, se seguia sirviendo lo viejo —con `stats` a null— hasta doce horas
+     despues, incluso pidiendo con force. Subir la clave la tira de una vez. */
+  const kvClave = 'detalle-v3-' + roundId + '-' + (score || '');
   const deKv = await leerDetalleKv(kvClave);
   if (deKv && Date.now() - deKv.at < vigenciaDetalle(deKv.data)) {
     cache.detalles[clave] = { data: deKv.data, at: deKv.at, vigencia: vigenciaDetalle(deKv.data) };
@@ -4186,7 +4191,9 @@ function crudoLigero(games) {
          trece numeros y un nombre por equipo, y sin ellos `matchDay` los
          servia a null porque lee los partidos de AQUI, no del CDN. */
       stats: e.stats || null,
-      coach: (e.coach && (e.coach.name || e.coach)) || null,
+      /* El entrenador llega anidado —{player:{name}}—, no como un nombre a
+         secas: cogiendo `e.coach` tal cual se pintaba «[object Object]». */
+      coach: (e.coach && e.coach.player && e.coach.player.name) || null,
       reports: (e.reports || []).map(function (informe) {
         const j = informe.player || {};
         return {
