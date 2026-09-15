@@ -8438,6 +8438,196 @@
     '</div>';
   }
 
+  /* ---------- La clasificacion de LaLiga ----------
+     Biwenger no la publica: de su CDN solo salen futbolistas, precios y
+     jornadas. ESPN si, y con CORS abierto, asi que se pide DESDE EL NAVEGADOR:
+     no pasa por el proxy, no gasta su almacen y no suma peticiones a la IP de
+     Deno, que es la que Biwenger nos limita. SofaScore no sirve para esto:
+     contesta 403 igual desde casa que desde Deno. */
+  const ESPN_TABLA = 'https://site.api.espn.com/apis/v2/sports/soccer/esp.1/standings';
+
+  /* Media hora: una clasificacion solo cambia cuando acaba un partido. */
+  const VIGENCIA_TABLA = 30 * 60 * 1000;
+
+  function filasDeEspn(cuerpo) {
+    const grupos = (cuerpo && cuerpo.children) || [];
+    const entradas = grupos.length
+      ? grupos.reduce(function (todas, g) {
+          return todas.concat(((g.standings || {}).entries) || []);
+        }, [])
+      : ((((cuerpo || {}).standings) || {}).entries || []);
+
+    /* ESPN nombra las columnas a la americana: `pointsFor` son goles a favor
+       y `points` los puntos de la clasificacion. */
+    const numero = function (stats, nombre) {
+      const suyo = (stats || []).filter(function (x) { return x.name === nombre; })[0];
+      if (!suyo) return null;
+      const valor = suyo.value != null
+        ? suyo.value
+        : Number(String(suyo.displayValue || '').replace('+', ''));
+      return isNaN(valor) ? null : valor;
+    };
+
+    return entradas.map(function (fila) {
+      const equipo = fila.team || {};
+      const stats = fila.stats || [];
+      return {
+        nombre: equipo.shortDisplayName || equipo.displayName || '',
+        completo: equipo.displayName || equipo.shortDisplayName || '',
+        jugados: numero(stats, 'gamesPlayed'),
+        ganados: numero(stats, 'wins'),
+        empatados: numero(stats, 'ties'),
+        perdidos: numero(stats, 'losses'),
+        favor: numero(stats, 'pointsFor'),
+        contra: numero(stats, 'pointsAgainst'),
+        diferencia: numero(stats, 'pointDifferential'),
+        puntos: numero(stats, 'points')
+      };
+    }).sort(function (a, b) {
+      return (b.puntos - a.puntos) || (b.diferencia - a.diferencia) || (b.favor - a.favor);
+    });
+  }
+
+  /* El escudo sale del indice de Biwenger, que ya tiene las imagenes: se
+     empareja por nombre. Comprobado que los veinte encajan. */
+  let escudosPorEquipo = null;
+  function idDeEquipo(nombre) {
+    if (!escudosPorEquipo || !Object.keys(escudosPorEquipo).length) {
+      escudosPorEquipo = {};
+      (state.laliga || []).forEach(function (j) {
+        if (j.teamName && j.team != null) escudosPorEquipo[llano(j.teamName)] = j.team;
+      });
+    }
+    const clave = llano(nombre);
+    if (escudosPorEquipo[clave] != null) return escudosPorEquipo[clave];
+    /* «Real Madrid» contra «Madrid»: solo vale si no hay duda. */
+    const parecidos = Object.keys(escudosPorEquipo).filter(function (k) {
+      return k && (clave.indexOf(k) !== -1 || k.indexOf(clave) !== -1);
+    });
+    return parecidos.length === 1 ? escudosPorEquipo[parecidos[0]] : null;
+  }
+
+  function ensureTablaLaLiga(forzar) {
+    if (state.tablaCargando) return;
+    if (!state.tabla) {
+      const guardado = cacheLeer('laliga-tabla');
+      if (guardado && guardado.length) state.tabla = guardado;
+    }
+    if (!forzar && state.tabla && Date.now() - (state.tablaAt || 0) < VIGENCIA_TABLA) return;
+
+    state.tablaCargando = true;
+    fetch(ESPN_TABLA, { headers: { 'accept': 'application/json' } })
+      .then(function (respuesta) {
+        if (!respuesta.ok) throw new Error('ESPN ' + respuesta.status);
+        return respuesta.json();
+      })
+      .then(function (cuerpo) {
+        const filas = filasDeEspn(cuerpo);
+        state.tablaCargando = false;
+        /* Una tabla vacia no se guarda: seria dejar la pestana en blanco
+           tambien la proxima vez, y sin saber por que. */
+        if (!filas.length) throw new Error('sin equipos');
+        state.tabla = filas;
+        state.tablaAt = Date.now();
+        state.tablaFallo = false;
+        cacheGuardar('laliga-tabla', filas);
+        renderTablaLaLiga();
+      })
+      .catch(function () {
+        state.tablaCargando = false;
+        state.tablaFallo = true;
+        renderTablaLaLiga();
+      });
+  }
+
+  function renderTablaLaLiga() {
+    const cuerpo = $('laliga-tabla-body');
+    if (!cuerpo) return;
+    const filas = state.tabla || [];
+    if (!filas.length) {
+      cuerpo.innerHTML = '<tr><td colspan="10" class="muted">' +
+        (state.tablaFallo
+          ? 'No se ha podido traer la clasificaci\u00f3n.'
+          : 'Cargando la clasificaci\u00f3n\u2026') +
+        '</td></tr>';
+      return;
+    }
+
+    cuerpo.innerHTML = filas.map(function (f, i) {
+      /* Las plazas europeas y el descenso, marcados como en cualquier tabla. */
+      const zona = i < 4 ? ' zona--campeones'
+        : (i === 4 ? ' zona--europa'
+          : (i >= filas.length - 3 ? ' zona--descenso' : ''));
+      const cifra = function (v) {
+        return '<td class="num">' + (v == null ? '\u2014' : v) + '</td>';
+      };
+      return '<tr>' +
+        '<td class="col-rank' + zona + '">' + (i + 1) + '</td>' +
+        '<td data-label="Equipo"><span class="with-crest">' +
+          crestOf({ team: idDeEquipo(f.completo), teamName: f.completo }, 'crest--badge') +
+          escapeHtml(f.nombre) + '</span></td>' +
+        '<td class="num" data-label="Pts"><strong>' +
+          (f.puntos == null ? '\u2014' : f.puntos) + '</strong></td>' +
+        cifra(f.jugados) + cifra(f.ganados) + cifra(f.empatados) + cifra(f.perdidos) +
+        cifra(f.favor) + cifra(f.contra) +
+        '<td class="num">' + (f.diferencia == null ? '\u2014'
+          : (f.diferencia > 0 ? '+' + f.diferencia : f.diferencia)) + '</td>' +
+      '</tr>';
+    }).join('');
+  }
+
+  /* ---------- Las estadisticas de un partido ----------
+     Vienen de Biwenger, en la misma descarga que las alineaciones. */
+  const STATS_PARTIDO = [
+    { campo: 'possession', titulo: 'Posesi\u00f3n', sufijo: '%' },
+    { campo: 'shots', titulo: 'Tiros' },
+    { campo: 'goalShots', titulo: 'Tiros a puerta' },
+    { campo: 'corners', titulo: 'C\u00f3rners' },
+    { campo: 'offsides', titulo: 'Fueras de juego' },
+    { campo: 'tackles', titulo: 'Entradas' },
+    { campo: 'dribbles', titulo: 'Regates' },
+    { campo: 'aerialsWon', titulo: 'Duelos a\u00e9reos', sufijo: '%' },
+    { campo: 'passes', titulo: 'Pases' },
+    { campo: 'passesAccuracy', titulo: 'Precisi\u00f3n de pase', sufijo: '%' }
+  ];
+
+  function estadisticasDePartido(juego) {
+    const casa = (juego.home || {}).stats;
+    const visita = (juego.away || {}).stats;
+    if (!casa || !visita) return '';
+
+    const filas = STATS_PARTIDO.map(function (dato) {
+      const a = casa[dato.campo];
+      const b = visita[dato.campo];
+      if (a == null && b == null) return '';
+      /* La barra reparte el total entre los dos; a cero, mitad y mitad. */
+      const total = (a || 0) + (b || 0);
+      const parte = total ? Math.round(((a || 0) / total) * 100) : 50;
+      const pinta = function (v) { return v == null ? '\u2014' : v + (dato.sufijo || ''); };
+      return '<div class="estad__fila">' +
+        '<span class="estad__val">' + pinta(a) + '</span>' +
+        '<span class="estad__medio">' +
+          '<span class="estad__titulo">' + dato.titulo + '</span>' +
+          '<span class="estad__barra"><span class="estad__parte" style="width:' + parte + '%"></span></span>' +
+        '</span>' +
+        '<span class="estad__val">' + pinta(b) + '</span>' +
+      '</div>';
+    }).join('');
+    if (!filas) return '';
+
+    const tecnicos = (juego.home.coach || juego.away.coach)
+      ? '<div class="estad__fila estad__fila--tecnicos">' +
+        '<span class="estad__val estad__val--nombre">' +
+          escapeHtml(juego.home.coach || '\u2014') + '</span>' +
+        '<span class="estad__medio"><span class="estad__titulo">Entrenador</span></span>' +
+        '<span class="estad__val estad__val--nombre">' +
+          escapeHtml(juego.away.coach || '\u2014') + '</span>' +
+        '</div>'
+      : '';
+
+    return '<div class="estad">' + filas + tecnicos + '</div>';
+  }
+
   function renderPartidos() {
     const caja = $('jornada-partidos');
     if (!caja) return;
@@ -8533,6 +8723,7 @@
                           (ahora === 'campo' ? 'Campo' : 'Tabla') + '</button>' +
                       '</div>';
                     })() +
+                    estadisticasDePartido(juego) +
                     '<div class="alineaciones">' +
                       (state.vistaPartido === 'campo'
                         ? campoDePartido(juego.home, juego.home.name) + campoDePartido(juego.away, juego.away.name)
@@ -12747,7 +12938,8 @@
     }
     if (name === 'datos') {
       ensureSquads(); ensureLaLiga(); ensureRecuento(); ensureJugadores();
-      renderRankings(); renderRankingsTemporada(); renderCaros();
+      ensureTablaLaLiga();
+      renderRankings(); renderRankingsTemporada(); renderCaros(); renderTablaLaLiga();
     }
     /* `ensureJugadores` porque de esa lista salen ahora los que más se mueven:
        sin ella los dos cuadros saldrían vacíos hasta el siguiente repintado. */

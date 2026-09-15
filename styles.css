@@ -4102,3 +4102,33 @@ main.wrap { padding-top: 1.15rem; padding-bottom: 3.5rem; }
   font-size: .68em; font-weight: 600; line-height: 1.3; white-space: nowrap;
   color: var(--text-faint);
 }
+
+/* ---------- Estadisticas de un partido ----------
+   Barras enfrentadas: el numero de cada equipo a los lados y el reparto en
+   medio, que es como se leen de un vistazo. */
+.estad { display: grid; gap: .35rem; margin: 0 0 .8rem; }
+.estad__fila {
+  display: grid; grid-template-columns: 3.4rem 1fr 3.4rem;
+  align-items: center; gap: .5rem;
+}
+.estad__val {
+  font-size: .78rem; font-weight: 700; text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+.estad__val--nombre { font-size: .7rem; font-weight: 600; color: var(--text-soft); }
+.estad__medio { display: grid; gap: .18rem; justify-items: center; }
+.estad__titulo { font-size: .66rem; color: var(--text-faint); text-align: center; }
+.estad__barra {
+  width: 100%; height: 5px; border-radius: 100px;
+  background: var(--neg); overflow: hidden;
+}
+/* La parte del local se pinta encima; lo que queda al aire es del visitante. */
+.estad__parte { display: block; height: 100%; background: var(--pos); }
+.estad__fila--tecnicos { margin-top: .25rem; }
+
+/* ---------- Clasificacion de LaLiga ----------
+   Las zonas de la tabla, con una linea de color a la izquierda del puesto. */
+.table--laliga .zona--campeones { box-shadow: inset 3px 0 0 #2563eb; }
+.table--laliga .zona--europa { box-shadow: inset 3px 0 0 var(--pos); }
+.table--laliga .zona--descenso { box-shadow: inset 3px 0 0 var(--neg); }
+.table--laliga .with-crest { gap: .4rem; }
