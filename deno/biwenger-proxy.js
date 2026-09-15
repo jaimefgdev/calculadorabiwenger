@@ -223,7 +223,7 @@ const CDN = 'https://cf.biwenger.com/api/v2';
    navegador normal y las cabeceras que este mandaría. */
 /* Marca de versión: se sube en cada cambio y se consulta con ?version=1.
    Sirve para saber desde fuera si el despliegue ha entrado o no. */
-const VERSION = '2026-09-15 · deno 170';
+const VERSION = '2026-09-16 · deno 171';
 
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ' +
   '(KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36';
@@ -2794,6 +2794,12 @@ async function matchDay(roundId, score, names, primas) {
       id: lado.id != null ? lado.id : null,
       name: lado.name || '',
       score: lado.score != null ? lado.score : null,
+      /* Las estadisticas del partido, que Biwenger ya manda en ESTA misma
+         descarga y se estaban tirando: posesion, tiros, tiros a puerta,
+         corners, fueras de juego, entradas, regates, duelos aereos, palos,
+         pases y su precision. No cuesta ni una peticion mas. */
+      stats: lado.stats || null,
+      coach: (lado.coach && (lado.coach.name || lado.coach)) || null,
       xi: once,
       bench: banquillo
     };
