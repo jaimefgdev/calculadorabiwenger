@@ -4094,3 +4094,11 @@ main.wrap { padding-top: 1.15rem; padding-bottom: 3.5rem; }
 /* Desplegado: la lista entera, sin tope ni barra propia. Se estira la página,
    que es justo lo que se quiere al pedir más nombres. */
 .ranking--desplegado .ranking__list { max-height: none; overflow: visible; }
+
+/* Quien ha abandonado la liga: sigue en las listas con lo que hizo, marcado. */
+.abandono {
+  display: inline-block; margin-left: .45em; vertical-align: middle;
+  padding: .08em .5em; border: 1px solid var(--border-strong); border-radius: 100px;
+  font-size: .68em; font-weight: 600; line-height: 1.3; white-space: nowrap;
+  color: var(--text-faint);
+}

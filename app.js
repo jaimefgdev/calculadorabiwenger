@@ -236,6 +236,29 @@
 
   const MANAGER_KEYS = MANAGERS.map((name) => ({ name, key: normalize(name) }));
 
+  /* ---------- Quien ha abandonado la liga ----------
+     Esta en MANAGERS pero Biwenger ya no lo trae entre los participantes. Se
+     queda sin plantilla y sin dinero, pero lo que hizo mientras estuvo
+     —fichajes, ventas y abonos de puntos— sigue en el tablon y se ensena.
+     Biwenger le borra el nombre ahi: sus movimientos salen firmados por
+     «Usuario». */
+  function abandonados() {
+    const equipos = state.teams || {};
+    /* Sin participantes cargados no se sabe nada: nadie se ha ido. */
+    if (!Object.keys(equipos).length) return [];
+    return MANAGERS.filter(function (nombre) { return !equipos[nombre]; });
+  }
+
+  function haAbandonado(nombre) {
+    return !!nombre && abandonados().indexOf(nombre) !== -1;
+  }
+
+  function etiquetaDeAbandono(nombre) {
+    return haAbandonado(nombre)
+      ? '<span class="abandono" title="Sin plantilla ni saldo: solo quedan sus movimientos y sus puntos">Ha abandonado la liga</span>'
+      : '';
+  }
+
   /**
    * "2.087.300" → 2087300 · "1,5" → 1.5
    * Formato español: el punto separa miles y la coma decimales.
@@ -642,6 +665,15 @@
          contraste (ver la marca ≠ en la tabla). */
       row.balance = row.initial - row.spent + row.earned;
       row.maxBid = row.teamValue == null ? null : row.balance + row.teamValue * TEAM_VALUE_SHARE;
+      /* Se fue: ni plantilla ni dinero ni puja. Sus fichajes, ventas y abonos
+         siguen contados arriba, que es lo que queda de el. */
+      if (haAbandonado(row.name)) {
+        row.abandonado = true;
+        row.balance = 0;
+        row.maxBid = null;
+        row.teamValue = null;
+        row.players = 0;
+      }
     });
 
     return rows;
@@ -1851,13 +1883,14 @@
       const negative = row.balance < 0;
       const expanded = state.expanded[row.name] === true;
       return '<tr class="' + (negative ? 'row-neg' : '') + claseMia(row.name) + '">' +
-        '<td class="col-rank">' + (index + 1) + '</td>' +
+        '<td class="col-rank">' + (row.abandonado ? '—' : index + 1) + '</td>' +
         '<td data-label="Futbolista">' +
           '<button type="button" class="row-toggle" data-manager="' + escapeHtml(row.name) + '"' +
             ' aria-expanded="' + (expanded ? 'true' : 'false') + '">' +
             '<span class="row-toggle__icon" aria-hidden="true">▸</span>' +
             '<span class="manager">' + avatar(row.name) +
               '<span class="manager__name">' + escapeHtml(row.name) + '</span></span>' +
+            etiquetaDeAbandono(row.name) +
           '</button></td>' +
         '<td class="num" data-label="Fichajes">' +
           (row.buys ? '<strong>' + row.buys + '</strong>' : '<span class="zero">0</span>') + '</td>' +
@@ -6868,6 +6901,17 @@
       };
     });
 
+    /* Quien abandona la liga desaparece de todas las jornadas de Biwenger,
+       tambien de las cerradas. Su fila guardada no se tira: esos puntos los
+       hizo de verdad. Solo si puntuo, para no colarlo a cero en jornadas que
+       ya no va a jugar. */
+    if (previo) {
+      (previo.standings || []).forEach(function (guardada) {
+        const sigue = filas.some(function (f) { return f.id === guardada.id; });
+        if (!sigue && guardada.points) filas.push(guardada);
+      });
+    }
+
     (payload.standings || []).forEach(function (fila) {
       /* Del once NO se aprende la demarcación: ahí `position` es la línea en la
          que lo alineó el mánager, no de qué juega. Guardándola se le quedaba a
@@ -8701,14 +8745,15 @@
       return;
     }
 
-    const filas = sortJornada(jornada.standings || []);
+    const filas = sortJornada(conLosQueSeFueron(jornada));
     if (filas.length === 0) {
       cuerpo.innerHTML = '<tr><td colspan="6" class="muted">Esta jornada todavía no tiene clasificación.</td></tr>';
       return;
     }
 
     cuerpo.innerHTML = filas.map(function (fila, indice) {
-      const abierta = state.jornadaAbierta === fila.id;
+      /* La fila rehecha de quien se fue no tiene once que desplegar. */
+      const abierta = state.jornadaAbierta === fila.id && !fila.sinDetalle;
       const detalle = !abierta ? '' :
         '<tr class="detail-row"><td class="detail-cell" colspan="7"><div class="detail">' +
           jornadaDetalle(fila) + '</div></td></tr>';
@@ -8722,6 +8767,7 @@
             '<span class="row-toggle__icon" aria-hidden="true">▸</span>' +
             '<span class="manager">' + avatar(fila.name) +
               '<span class="manager__name">' + escapeHtml(fila.name) + '</span></span>' +
+            etiquetaDeAbandono(findManager(fila.name || '', null)) +
           '</button></td>' +
         /* Con saldo negativo al empezar la jornada, esos puntos no le cuentan:
            se enseñan igual (como hace Biwenger) pero en rojo y avisando. */
@@ -8782,6 +8828,47 @@
     const vacio = !nuevo.motivo && !nuevo.total && !nuevo.fija && !nuevo.puntos;
     if (vacio && viejo) return viejo;
     return nuevo;
+  }
+
+  /**
+   * La clasificacion de una jornada, con quien ha abandonado la liga dentro.
+   *
+   * Biwenger lo borra de TODAS sus jornadas en cuanto se va, tambien de las
+   * cerradas. Su fila se rehace con lo unico suyo que queda: el abono de
+   * puntos del tablon, que dice de que jornada era y cuantos puntos hizo. La
+   * alineacion ya no se puede saber, asi que no se despliega.
+   */
+  function conLosQueSeFueron(jornada) {
+    const filas = (jornada && jornada.standings) || [];
+    const fuera = abandonados();
+    if (!fuera.length || !jornada.round) return filas;
+    const numero = jornada.round.number != null ? jornada.round.number
+      : (Number(String(jornada.round.name || '').replace(/\D/g, '')) || null);
+    if (numero == null) return filas;
+
+    const extra = [];
+    fuera.forEach(function (nombre) {
+      const ya = filas.some(function (f) { return findManager(f.name || '', null) === nombre; });
+      if (ya) return;
+      /* «Jornada 1 (aplazada)» tambien es la 1: se compara el numero. */
+      const abono = (state.movements || []).filter(function (m) {
+        return m.type === 'bonus' && m.manager === nombre && m.roundPoints != null &&
+          Number(String(m.otro || '').replace(/\D/g, '')) === numero;
+      })[0];
+      if (!abono) return;
+      extra.push({
+        id: 'fuera-' + nombre,
+        name: nombre,
+        points: abono.roundPoints,
+        played: null,
+        xi: [],
+        bench: [],
+        xiValue: 0,
+        abono: null,
+        sinDetalle: true
+      });
+    });
+    return extra.length ? filas.concat(extra) : filas;
   }
 
   function celdaAbono(fila) {
@@ -8923,6 +9010,8 @@
     updateSortHeaders('managers', state.sort.managers);
 
     const filas = managerRows();
+    /* Quien se fue no ocupa puesto: la zona roja es la del ultimo que sigue. */
+    const activos = filas.filter(function (f) { return !f.abandonado; }).length;
     /* El líder por PUNTOS, no el primero de la tabla: se puede ordenar por
        saldo o por valor de equipo, y la diferencia siempre es con quien más
        puntos lleva. */
@@ -8935,14 +9024,15 @@
       const open = state.expandedManager === row.name;
       const abiertoPuntos = state.expandedPoints === row.name;
       return '<tr class="' + (open || abiertoPuntos ? 'row-open' : '') + claseMia(row.name) + '">' +
-        '<td class="col-rank' + claseDePuesto(index, filas.length) + '">' +
-          (index + 1) + '</td>' +
+        '<td class="col-rank' + (row.abandonado ? '' : claseDePuesto(index, activos)) + '">' +
+          (row.abandonado ? '—' : index + 1) + '</td>' +
         '<td data-label="Futbolista">' +
           '<button type="button" class="row-toggle" data-manager-card="' + escapeHtml(row.name) + '"' +
             ' aria-expanded="' + (open ? 'true' : 'false') + '">' +
             '<span class="row-toggle__icon" aria-hidden="true">▸</span>' +
             '<span class="manager">' + avatar(row.name) +
               '<span class="manager__name">' + escapeHtml(row.name) + '</span></span>' +
+            etiquetaDeAbandono(row.name) +
           '</button></td>' +
         '<td class="num" data-label="Puntos">' +
           '<button type="button" class="puntos-toggle" data-manager-points="' + escapeHtml(row.name) + '"' +
@@ -13240,8 +13330,26 @@
     const warnings = [];
     const unknown = {};
 
+    /* Quien falta entre los participantes que manda Biwenger se ha ido de la
+       liga, y sus movimientos llegan firmados por «Usuario». Con UNO solo
+       fuera no hay duda de quien es; con varios no se puede saber y se
+       quedan sin dueno, como antes. */
+    const presentes = {};
+    (payload.managers || []).forEach(function (item) {
+      const suyo = findManager(item.name || '', null);
+      if (suyo) presentes[suyo] = true;
+    });
+    const fuera = Object.keys(presentes).length
+      ? MANAGERS.filter(function (nombre) { return !presentes[nombre]; })
+      : [];
+    const quien = function (texto) {
+      const suyo = findManager(texto || '', null);
+      if (suyo) return suyo;
+      return fuera.length === 1 && /^usuario$/i.test(String(texto || '').trim()) ? fuera[0] : null;
+    };
+
     const movements = (payload.movements || []).map(function (item) {
-      const manager = findManager(item.manager || '', null);
+      const manager = quien(item.manager);
       if (!manager && item.manager) unknown[item.manager] = true;
       const time = item.date ? Date.parse(item.date) : NaN;
       return {
@@ -13255,7 +13363,7 @@
         roundPoints: item.roundPoints != null ? item.roundPoints : null,
         detail: item.detail || null,
         /* Con quién se hizo la operación: otro mánager, o el mercado. */
-        otro: item.otro ? (findManager(item.otro, null) || item.otro) : null,
+        otro: item.otro ? (quien(item.otro) || item.otro) : null,
         amount: Math.round(item.amount || 0),
         date: isNaN(time) ? '' : dateFormat.format(new Date(time)),
         timestamp: isNaN(time) ? null : time,
