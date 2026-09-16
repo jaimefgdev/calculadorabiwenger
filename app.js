@@ -7851,12 +7851,6 @@
   /** Enciende o apaga cada filtro de demarcacion segun lo marcado. */
   function pintarFiltrosDePuesto() {
     const puestos = state.puestosJugadores || [];
-    const chollos = $('jugadores-chollos');
-    if (chollos) {
-      chollos.setAttribute('aria-pressed', state.soloChollos ? 'true' : 'false');
-      chollos.classList.toggle('is-on', !!state.soloChollos);
-    }
-
     Array.prototype.forEach.call(document.querySelectorAll('[data-puesto-filtro]'), function (boton) {
       const cual = Number(boton.getAttribute('data-puesto-filtro'));
       /* «Todos» se enciende justo cuando no hay ninguna marcada. */
@@ -7864,36 +7858,6 @@
       boton.classList.toggle('is-on', on);
       boton.setAttribute('aria-pressed', on ? 'true' : 'false');
     });
-  }
-
-  /* ---------- La suerte de cada futbolista ----------
-     Sus goles de verdad menos los esperados. En negativo le deben goles y
-     deberia subir de precio; en positivo ha metido mas de lo que merecia, y eso
-     rara vez se mantiene.
-
-     Los goles salen del recuento de la temporada —el mismo que alimenta los
-     rankings de Datos— y los esperados de FotMob. */
-  let golesMemo = null;
-  let golesDe = null;
-  function golesReales(id) {
-    if (golesMemo !== state.recuento) {
-      golesMemo = state.recuento;
-      golesDe = {};
-      (state.recuento || []).forEach(function (j) { golesDe[String(j.id)] = j.goals || 0; });
-    }
-    const suyo = golesDe[String(id)];
-    return suyo == null ? null : suyo;
-  }
-
-  /* A partir de aqui la diferencia dice algo; por debajo es ruido. */
-  const SUERTE_MINIMA = 0.75;
-
-  function suerteDe(id) {
-    const esperado = xgDe(id);
-    if (!esperado || esperado.xg == null) return null;
-    const goles = golesReales(id);
-    if (goles == null) return null;
-    return goles - esperado.xg;
   }
 
   function renderJugadores() {
@@ -7934,7 +7898,7 @@
        más que esconder a uno de tu plantilla. */
     const deQuien = duenosDeFutbolistas();
     const seSabeDeQuien = squadList().length > 0;
-    let lista = state.jugadores.filter(function (jugador) {
+    const lista = state.jugadores.filter(function (jugador) {
       if (seSabeDeQuien &&
           jugador.team == null &&
           !deQuien[String(jugador.id)] &&
@@ -7960,19 +7924,6 @@
        dieciocho que son tuyos a base de leer nombres no habia quien. */
     const mios = {};
     mySquad().forEach(function (jugador) { mios[String(jugador.id)] = true; });
-
-    /* Con «Chollos» puesto, los que mas goles se les deben primero: es el orden
-       en que se buscan fichajes. Los que no tienen el dato quedan al final. */
-    if (state.soloChollos) {
-      lista = lista.slice().sort(function (a, b) {
-        const sa = suerteDe(a.id);
-        const sb = suerteDe(b.id);
-        if (sa == null && sb == null) return 0;
-        if (sa == null) return 1;
-        if (sb == null) return -1;
-        return sa - sb;
-      });
-    }
 
     caja.innerHTML = lista.map(function (jugador) {
       const mio = !!mios[String(jugador.id)];
@@ -8638,7 +8589,6 @@
            que cambiaras de pestaña. */
         if (state.priceModal) renderPriceModal();
         if (state.tab === 'mercado') { renderMarket(); renderOffers(); }
-        if (state.tab === 'jugadores') renderJugadores();
         if (state.tab === 'datos') renderRankingsTemporada();
       })
       .catch(function () { state.xgCargando = false; });
@@ -13544,13 +13494,7 @@
     /* `ensureSquads` porque de ahí sale de quién es cada futbolista, y sin eso
        el filtro de «sin club» se llevaría por delante a los que SÍ tiene
        alguien. Con el sello puesto no cuesta una consulta si nada ha cambiado. */
-    if (name === 'jugadores') {
-      ensureJugadores(); ensureSquads();
-      /* Para la suerte: los goles de verdad los trae el recuento y los esperados
-         FotMob. Los dos se guardan, asi que esto casi nunca pide nada. */
-      ensureRecuento(); ensureXg();
-      renderJugadores();
-    }
+    if (name === 'jugadores') { ensureJugadores(); ensureSquads(); renderJugadores(); }
     if (name === 'jornadas') {
       /* La que estuvieras viendo; si no, la que toca ahora. */
       ensureJornada(state.jornadaVista || jornadaDeAhora() || 'actual');
@@ -14792,20 +14736,6 @@
     /* Los filtros por demarcacion. Se marcan de una a cuatro; «Todos» no es una
        mas, es la ausencia de filtro: al pulsarla se apagan las demas, y al
        marcar cualquiera se apaga ella sola. */
-    const botonChollos = $('jugadores-chollos');
-    if (botonChollos) {
-      botonChollos.addEventListener('click', function () {
-        state.soloChollos = !state.soloChollos;
-        /* El boton se pinta encendido AQUI. Antes solo lo hacia la funcion que
-           repasa los filtros de demarcacion, que no corre al pulsar este: el
-           orden cambiaba pero el boton se quedaba apagado, y eso se lee como
-           que no ha funcionado. */
-        botonChollos.setAttribute('aria-pressed', state.soloChollos ? 'true' : 'false');
-        botonChollos.classList.toggle('is-on', !!state.soloChollos);
-        renderJugadores();
-      });
-    }
-
     Array.prototype.forEach.call(document.querySelectorAll('[data-puesto-filtro]'), function (boton) {
       boton.addEventListener('click', function () {
         const cual = Number(boton.getAttribute('data-puesto-filtro'));

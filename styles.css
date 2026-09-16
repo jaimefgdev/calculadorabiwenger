@@ -4246,26 +4246,7 @@ main.wrap { padding-top: 1.15rem; padding-bottom: 3.5rem; }
 .xg__dato--bajo strong { color: var(--pos); }
 
 
-/* ---------- La suerte, en la tarjeta del futbolista ----------
-   Una linea mas dentro de la tarjeta, que es un flex en columna: no descuadra
-   la rejilla. Solo sale cuando la diferencia dice algo (a partir de 0,75). */
-.suerte {
-  font-size: .62rem; font-weight: 700; line-height: 1;
-  padding: .1em .4em; border-radius: 100px;
-  font-variant-numeric: tabular-nums;
-}
-/* Le deben goles: candidato a subir de precio. */
-.suerte--debe { color: #fff; background: var(--pos); }
-/* Ha metido mas de lo esperado: aviso, no premio. */
-.suerte--sobra { color: #1a1a1a; background: var(--marca); }
 
-/* El boton de los chollos, del ancho de su texto y sin pisar a los puestos. */
-.puesto-filtro--chollos { margin-left: .35rem; }
-.puesto-filtro--chollos.is-on { background: var(--pos); color: #fff; border-color: var(--pos); }
-
-/* La suerte dentro de una tabla: pegada a su cifra y sin estirar la fila. */
-.table .suerte { margin-left: .35em; vertical-align: middle; }
-.with-crest .suerte { margin-left: .4em; }
 
 /* ---------- Mapa de remates ----------
    Medio campo: la linea del medio a la izquierda y la porteria a la derecha.
