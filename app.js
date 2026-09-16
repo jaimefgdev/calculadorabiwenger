@@ -8430,19 +8430,16 @@
     if (juego.mvp) {
       trozos.push('<span class="marca marca--mvp" title="Mejor del partido">MVP</span>');
     }
-    if (juego.assists) {
-      trozos.push('<span class="marca marca--asis" title="' + juego.assists +
-        (juego.assists === 1 ? ' asistencia' : ' asistencias') + '">' +
-        (juego.assists > 1 ? juego.assists + '\u00d7' : '') + '\u21b3</span>');
-    }
+    /* Las asistencias NO van aqui: el lance de Biwenger ya las pinta, y con su
+       minuto. Comprobado con Mbappe, cuyas jornadas 5 y 6 traen a la vez
+       `assists: 1` y lance de tipo 3, asi que salian dos veces. */
     /* Solo a porteros y defensas: al delantero la porteria a cero no le dice
        nada, y llenaba la ficha de chapas sin significado. */
     if (juego.cleanSheet && juego.minutes && (puesto === 1 || puesto === 2)) {
       trozos.push('<span class="marca marca--cero" title="Porteria a cero">0</span>');
     }
-    if (juego.penaltiFallado) {
-      trozos.push('<span class="marca marca--fallo" title="Penalti fallado">P\u2717</span>');
-    }
+    /* Y el penalti fallado tampoco: es el lance 11, y el 17 en la tanda. La
+       misma duplicidad, vista en su jornada 4. */
     if (juego.sofascore != null) {
       /* Su escala es sobre 10, con un decimal. */
       trozos.push('<span class="marca marca--sofa" title="Nota de SofaScore">' +
