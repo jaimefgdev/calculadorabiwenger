@@ -223,7 +223,7 @@ const CDN = 'https://cf.biwenger.com/api/v2';
    navegador normal y las cabeceras que este mandaría. */
 /* Marca de versión: se sube en cada cambio y se consulta con ?version=1.
    Sirve para saber desde fuera si el despliegue ha entrado o no. */
-const VERSION = '2026-09-16 · deno 176';
+const VERSION = '2026-09-16 · deno 177';
 
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ' +
   '(KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36';
@@ -354,6 +354,33 @@ const app = {
          aqui se prueba con otra IP y con cabeceras de navegador; si tambien nos
          corta, la web tiene los datos de Biwenger como respaldo.
          Solo se dejan pasar las rutas que se usan, no cualquier cosa. */
+      /* ?fotmob=<ruta> reenvia una consulta a FotMob.
+         De ahi salen el xG, el xA y la nota de cada futbolista, que ni Biwenger
+         ni ESPN publican. No abre CORS, asi que la web no puede pedirselo
+         directamente y tiene que pasar por aqui.
+         Solo se dejan pasar las rutas que se usan, no cualquier cosa. */
+      const fotmob = url.searchParams.get('fotmob');
+      if (fotmob) {
+        const vale = /^\/(api\/data\/(leagues|matches|matchDetails)|stats\/)/.test(fotmob);
+        if (!vale) return fail(400, 'Ruta no permitida.', origin);
+        /* Los rankings cuelgan de data.fotmob.com y el resto de www. */
+        const base = fotmob.indexOf('/stats/') === 0
+          ? 'https://data.fotmob.com' : 'https://www.fotmob.com';
+        const r = await fetch(base + fotmob, {
+          headers: {
+            'user-agent': UA,
+            'accept': 'application/json',
+            'accept-language': 'es-ES,es;q=0.9,en;q=0.8',
+            'referer': 'https://www.fotmob.com/'
+          }
+        }).catch(function () { return null; });
+        if (!r || !r.ok) return fail(502, 'FotMob no responde (' + (r ? r.status : 'sin red') + ').', origin);
+        const texto = await r.text();
+        return new Response(texto, {
+          headers: Object.assign({ 'content-type': 'application/json; charset=utf-8' }, cors(origin))
+        });
+      }
+
       const sofa = url.searchParams.get('sofa');
       if (sofa) {
         const permitida = /^\/(search\/all\?q=|player\/\d+)/.test(sofa);
