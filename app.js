@@ -13016,13 +13016,21 @@
       '</div>';
     });
 
-    /* Por temas y no en una parrilla suelta: goles, disciplina, participación
-       y portería. Cada fila lleva las que pediste (3-2-3-2). */
+    /* Por temas y no en una parrilla suelta: goles, ocasiones, disciplina,
+       participación, portería y rendimiento.
+
+       ESTA LISTA MANDA. Las tarjetas se calculan todas, pero solo se pintan las
+       que aparecen aquí: los rankings nuevos se estaban construyendo y
+       tirándose porque no los había añadido. */
     const FILAS = [
-      ['goals', 'minutesPerGoal', 'assists'],
+      ['goals', 'golesMasAsistencias', 'assists'],
+      ['minutesPerGoal', 'falladas', 'creadas'],
       ['yellow', 'red'],
       ['minutes', 'subsOut', 'subsIn'],
-      ['cleanSheets', 'conceded']
+      /* Portería: lo de Biwenger y lo que solo tiene FotMob. */
+      ['cleanSheets', 'conceded'],
+      ['paradas', 'paradasPorcentaje', 'golesEvitados'],
+      ['nota', 'pointsPerMillion']
     ];
 
     caja.innerHTML = FILAS.map(function (fila) {
