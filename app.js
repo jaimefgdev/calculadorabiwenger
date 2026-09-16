@@ -8664,8 +8664,12 @@
         state.xg = payload.jugadores;
         state.xgAt = Date.now();
         cacheGuardar('xg', payload);
-        /* Si la ficha esta abierta, se repinta con el dato ya puesto. */
+        /* Y se repinta lo que ya estuviera en pantalla: el dato llega despues
+           de pintar, asi que sin esto las filas se quedaban sin su marca hasta
+           que cambiaras de pestaña. */
         if (state.priceModal) renderPriceModal();
+        if (state.tab === 'mercado') { renderMarket(); renderOffers(); }
+        if (state.tab === 'jugadores') renderJugadores();
       })
       .catch(function () { state.xgCargando = false; });
   }
