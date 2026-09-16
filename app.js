@@ -14625,6 +14625,12 @@
     if (botonChollos) {
       botonChollos.addEventListener('click', function () {
         state.soloChollos = !state.soloChollos;
+        /* El boton se pinta encendido AQUI. Antes solo lo hacia la funcion que
+           repasa los filtros de demarcacion, que no corre al pulsar este: el
+           orden cambiaba pero el boton se quedaba apagado, y eso se lee como
+           que no ha funcionado. */
+        botonChollos.setAttribute('aria-pressed', state.soloChollos ? 'true' : 'false');
+        botonChollos.classList.toggle('is-on', !!state.soloChollos);
         renderJugadores();
       });
     }
