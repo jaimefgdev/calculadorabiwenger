@@ -4209,3 +4209,15 @@ main.wrap { padding-top: 1.15rem; padding-bottom: 3.5rem; }
   margin: 0 0 .1rem; text-align: center;
   font-size: .68rem; font-weight: 600; color: var(--text-faint);
 }
+
+/* Casa o fuera, en los proximos rivales de la ficha de equipo.
+   El icono de «En juego» va negro o blanco porque se pinta sobre el cesped o
+   sobre una foto; aqui esta sobre la tarjeta, asi que toma la tinta del texto
+   y no lleva el perfilado de contraste. */
+.proximo__quien { display: inline-flex; align-items: center; gap: .25em; }
+.proximo__donde {
+  display: inline-block; width: 1em; height: 1em; flex: none;
+  color: var(--text-faint);
+}
+.proximo__donde svg { display: block; width: 100%; height: 100%; }
+.proximo__donde svg path { stroke: none; }

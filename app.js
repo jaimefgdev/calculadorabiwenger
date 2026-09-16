@@ -8733,7 +8733,15 @@
             return '<span class="proximo' + claseDeRival(puesto) + '"' +
               ' title="' + escapeHtml((puesto ? puesto + '\u00ba de la tabla' : 'sin puesto')) + '">' +
               '<span class="proximo__dia">' + (cuando ? escapeHtml(diaSinAno.format(cuando)) : '') + '</span>' +
-              '<span class="proximo__quien">' + (enCasa ? '' : 'en ') + escapeHtml(rival.nombre) + '</span>' +
+              /* Donde juega, con el mismo icono que usa «En juego»: la casita
+                 si es en casa y el avion si sale fuera. Antes ponia «en» y el
+                 nombre, que se leia peor y ademas descuadraba las tarjetas. */
+              '<span class="proximo__quien">' +
+                '<span class="proximo__donde" title="' + (enCasa ? 'En casa' : 'Fuera') + '"' +
+                  ' aria-label="' + (enCasa ? 'En casa' : 'Fuera') + '">' +
+                  (enCasa ? CASITA : AVION) + '</span>' +
+                escapeHtml(rival.nombre) +
+              '</span>' +
               (puesto ? '<span class="proximo__puesto">' + puesto + '\u00ba</span>' : '') +
             '</span>';
           }).join('') + '</div>';
