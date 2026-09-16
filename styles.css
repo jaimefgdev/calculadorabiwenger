@@ -4221,3 +4221,27 @@ main.wrap { padding-top: 1.15rem; padding-bottom: 3.5rem; }
 }
 .proximo__donde svg { display: block; width: 100%; height: 100%; }
 .proximo__donde svg path { stroke: none; }
+
+/* ---------- Goles y asistencias esperadas (xG y xA) ----------
+   Van al final de los numeros de la temporada, en su propia fila: son de otra
+   fuente y conviene que se vea que no salen de Biwenger. */
+.xg {
+  display: flex; align-items: stretch; gap: .4rem; flex-wrap: wrap;
+  margin-top: .5rem; padding-top: .5rem;
+  border-top: 1px solid var(--border);
+}
+.xg__dato {
+  display: grid; gap: .1rem; justify-items: center;
+  padding: .3rem .6rem; border-radius: var(--radius-sm);
+  background: var(--bg-surface); min-width: 4.2rem;
+}
+.xg__dato strong { font-size: .95rem; font-variant-numeric: tabular-nums; }
+.xg__rotulo { font-size: .62rem; color: var(--text-faint); text-transform: uppercase; letter-spacing: .04em; }
+/* Mas goles de los esperados: rara vez se mantiene, asi que es un aviso. */
+.xg__dato--alto strong { color: var(--marca); }
+/* Le deben goles: candidato a subir. */
+.xg__dato--bajo strong { color: var(--pos); }
+.xg__fuente {
+  align-self: center; margin-left: auto;
+  font-size: .6rem; color: var(--text-faint);
+}

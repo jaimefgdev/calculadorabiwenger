@@ -8555,6 +8555,90 @@
     return parecidos.length === 1 ? escudosPorEquipo[parecidos[0]] : null;
   }
 
+  /* ---------- Goles y asistencias esperadas ----------
+     Los xG dicen si alguien puntua porque juega bien o porque tuvo suerte: un
+     delantero con cinco goles y 2.0 de xG va a bajar, y uno con un gol y 4.0 de
+     xG es un chollo antes de que suba de precio.
+
+     No los publica Biwenger: los da FotMob, y el proxy los sirve ya emparejados
+     con el id de cada futbolista —22 KB, guardados por dia— porque FotMob no
+     abre CORS y ademas hay que cruzar nombre a nombre. */
+  function ensureXg() {
+    const config = loadSyncConfig();
+    if (!config.url || !config.key) return;
+    if (state.xgCargando) return;
+
+    if (!state.xg) {
+      const guardado = cacheLeer('xg');
+      if (guardado && guardado.jugadores) state.xg = guardado.jugadores;
+    }
+    /* Cambia cuando se juega, asi que con lo de hoy basta. */
+    if (state.xg && Date.now() - (state.xgAt || 0) < 6 * 3600e3) return;
+
+    state.xgCargando = true;
+    fetch(config.url.replace(/\/+$/, '') + '/?key=' + encodeURIComponent(config.key) + '&xg=1',
+      { headers: { 'accept': 'application/json' } })
+      .then(function (respuesta) { return respuesta.json(); })
+      .then(function (payload) {
+        state.xgCargando = false;
+        if (!payload || payload.error || !payload.jugadores) return;
+        state.xg = payload.jugadores;
+        state.xgAt = Date.now();
+        cacheGuardar('xg', payload);
+        /* Si la ficha esta abierta, se repinta con el dato ya puesto. */
+        if (state.priceModal) renderPriceModal();
+      })
+      .catch(function () { state.xgCargando = false; });
+  }
+
+  /** Los xG de ese futbolista, si FotMob lo tiene emparejado. */
+  function xgDe(id) {
+    return (state.xg || {})[String(id)] || null;
+  }
+
+  /**
+   * Sus goles y asistencias esperadas, y la SUERTE que ha tenido.
+   *
+   * La suerte son los goles de verdad menos los esperados. En positivo ha metido
+   * mas de lo que se esperaba —y eso rara vez se sostiene—; en negativo le deben
+   * goles y es candidato a subir.
+   */
+  function bloqueDeXg(id, golesDeVerdad) {
+    const suyo = xgDe(id);
+    if (!suyo || (suyo.xg == null && suyo.xa == null)) return '';
+
+    const cifra = function (v) { return v == null ? '\u2014' : v.toFixed(2).replace('.', ','); };
+    const celdas = [
+      { rotulo: 'xG', valor: cifra(suyo.xg), ayuda: 'Goles esperados por la calidad de sus remates' },
+      { rotulo: 'xA', valor: cifra(suyo.xa), ayuda: 'Asistencias esperadas por los pases que da' }
+    ];
+
+    if (suyo.xg != null && golesDeVerdad != null) {
+      const suerte = golesDeVerdad - suyo.xg;
+      const signo = suerte > 0 ? '+' : '';
+      celdas.push({
+        rotulo: 'Suerte',
+        valor: signo + suerte.toFixed(2).replace('.', ','),
+        clase: suerte >= 0.75 ? ' xg__dato--alto' : (suerte <= -0.75 ? ' xg__dato--bajo' : ''),
+        ayuda: suerte >= 0.75
+          ? 'Ha metido mas de lo esperado: ojo, eso rara vez se mantiene'
+          : (suerte <= -0.75
+            ? 'Le deben goles: si sigue remantando asi, deberia subir'
+            : 'Marca mas o menos lo que se espera de sus remates')
+      });
+    }
+
+    return '<div class="xg">' +
+      celdas.map(function (c) {
+        return '<span class="xg__dato' + (c.clase || '') + '" title="' + escapeHtml(c.ayuda) + '">' +
+          '<strong>' + c.valor + '</strong>' +
+          '<span class="xg__rotulo">' + c.rotulo + '</span>' +
+        '</span>';
+      }).join('') +
+      '<span class="xg__fuente" title="Lo mide FotMob; Biwenger no publica estos datos">FotMob</span>' +
+    '</div>';
+  }
+
   function ensureTablaLaLiga(forzar) {
     if (state.tablaCargando) return;
     if (!state.tabla) {
@@ -10470,7 +10554,10 @@
           celda('Súper Picas', numero(datos.superPicas)) +
         '</div>' +
       '</div>' +
-    '</div>';
+    '</div>' +
+    /* Y los goles esperados, al final de sus numeros. Al portero no se le
+       calcula la suerte: sus goles son cero y el dato no dice nada de el. */
+    bloqueDeXg(id, portero ? null : numero(datos.goals));
   }
 
   /** Pide las estad\u00edsticas de un futbolista; se guardan mientras dure la sesi\u00f3n. */
@@ -10488,6 +10575,8 @@
       name: nombre ? nombre.textContent : ''
     };
     ensurePriceSeries([state.priceModal.id], renderPriceModal);
+    /* Los goles esperados: se guardan por dia, asi que esto casi nunca pide nada. */
+    ensureXg();
     ensureEstadisticas(state.priceModal.id);
     renderPriceModal();
     return true;
