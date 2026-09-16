@@ -8572,6 +8572,10 @@
         state.tablaFallo = false;
         cacheGuardar('laliga-tabla', filas);
         renderTablaLaLiga();
+        /* De aqui sale la dificultad de cada cruce: si llega con Jornadas
+           abierta, hay que repintarla o se queda sin chapas hasta que cambies
+           de pestaña. */
+        if (state.tab === 'jornadas') renderPartidos();
       })
       .catch(function () {
         state.tablaCargando = false;
@@ -8833,11 +8837,36 @@
   /* ---------- La dificultad de un rival ----------
      El puesto de cada equipo sale de la clasificacion de LaLiga, que ya esta
      descargada. Se mide por id de Biwenger, que es el que traen los partidos. */
-  function puestosPorEquipo() {
+  /* Se empareja con los nombres e ids que traen LOS PROPIOS PARTIDOS.
+
+     Antes se usaba `idDeEquipo`, que saca el id del indice de futbolistas, y
+     ese indice SOLO se pide al entrar en Datos: abriendo la app directamente
+     en Jornadas el mapa salia vacio y no se pintaba ni una chapa. Medido: 0
+     chapas al arrancar, las 20 despues de pasar por Datos. */
+  function puestosPorEquipo(partidos) {
     const filas = state.tabla || [];
+    if (!filas.length) return {};
+
+    const equipos = {};
+    (partidos || []).forEach(function (juego) {
+      [juego.home, juego.away].forEach(function (lado) {
+        if (lado && lado.id != null && lado.name) equipos[llano(lado.name)] = lado.id;
+      });
+    });
+
     const mapa = {};
     filas.forEach(function (f, i) {
-      const id = idDeEquipo(f.completo);
+      const suyo = llano(f.completo);
+      const corto = llano(f.nombre);
+      let id = equipos[suyo] != null ? equipos[suyo] : equipos[corto];
+      if (id == null) {
+        /* «Real Madrid» contra «Madrid»: solo vale si no hay duda. */
+        const parecidos = Object.keys(equipos).filter(function (k) {
+          return k && (suyo.indexOf(k) !== -1 || k.indexOf(suyo) !== -1 ||
+            corto.indexOf(k) !== -1 || k.indexOf(corto) !== -1);
+        });
+        if (parecidos.length === 1) id = equipos[parecidos[0]];
+      }
       if (id != null) mapa[String(id)] = i + 1;
     });
     return mapa;
@@ -8872,7 +8901,7 @@
 
     const partidos = datos.games || [];
     /* Una sola vez por pintada, no una por equipo. */
-    const puestos = puestosPorEquipo();
+    const puestos = puestosPorEquipo(partidos);
     caja.innerHTML = '<div class="panel__head"><h2>Partidos</h2></div>' +
       (partidos.length === 0
         ? '<p class="muted">Esta jornada todav\u00eda no tiene calendario.</p>'
