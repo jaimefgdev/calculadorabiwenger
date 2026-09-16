@@ -2146,9 +2146,7 @@
       const out = offer.direction === 'out';
       const on = !!state.sim[offer.id];
       return '<tr class="' + (on ? 'row-sim' : '') + '">' +
-        /* Aqui no hay columna de puntos, asi que la suerte va pegada al nombre. */
         '<td data-label="Futbolista"><span class="with-crest">' + playerName(offer) +
-          marcaDeSuerteDe(offer.playerId) +
           crestOf(offer, 'crest--badge') + '</span></td>' +
         /* La flecha y el color no cambian —sale dinero en rojo, entra en
            verde—; lo que cambia es cómo se llama, porque una cesión no es una
@@ -4240,9 +4238,7 @@
         '<td class="estado-cell" data-label="Estado">' + statusCell(venta) + '</td>' +
         '<td class="num" data-label="Puntos">' +
           (venta.points == null ? '<span class="sub">\u2014</span>' : venta.points) +
-          /* La suerte va DENTRO de esta celda, no en una columna nueva: asi no
-             hay que tocar cabeceras ni colspan, que es donde se descuadra. */
-          marcaDeSuerteDe(venta.playerId) + '</td>' +
+          '</td>' +
         '<td class="num" data-label="Valor">' + money(venta.marketValue || 0) +
           (venta.increment ? ' <span class="delta ' + (sube ? 'delta--up' : 'delta--down') + '">' +
             (sube ? '\u25b2' : '\u25bc') + '</span>' : '') + '</td>' +
@@ -7902,13 +7898,6 @@
 
   /* La marca de la tarjeta. Solo cuando la diferencia es de verdad: con
      quinientas y pico tarjetas, marcarlas todas seria no marcar ninguna. */
-  /* La misma marca, para donde no se sabe la demarcacion de antemano: la saca
-     del indice. Se usa en el mercado y en las ofertas, que no la traen. */
-  function marcaDeSuerteDe(id) {
-    const ficha = playerInfo(id) || {};
-    return marcaDeSuerte(id, ficha.position);
-  }
-
   function marcaDeSuerte(id, puesto) {
     /* Al portero no se le mide: sus goles son cero y el dato no dice nada. */
     if (puesto === 1) return '';
