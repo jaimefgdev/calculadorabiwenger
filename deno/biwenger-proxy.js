@@ -223,7 +223,7 @@ const CDN = 'https://cf.biwenger.com/api/v2';
    navegador normal y las cabeceras que este mandaría. */
 /* Marca de versión: se sube en cada cambio y se consulta con ?version=1.
    Sirve para saber desde fuera si el despliegue ha entrado o no. */
-const VERSION = '2026-09-16 · deno 175';
+const VERSION = '2026-09-16 · deno 176';
 
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ' +
   '(KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36';
@@ -410,7 +410,7 @@ const app = {
       if (partidos) {
         const sistema = await sistemaDeLaLiga(env);
         const data = await matchDay(partidos, sistema, await players(sistema),
-          await primasDeLaLiga(env).catch(function () { return null; }));
+          await primasDeLaLiga(env).catch(function () { return null; }), env);
         if (!data) return fail(502, 'No se ha podido leer esa jornada.', origin);
         return new Response(JSON.stringify(data), {
           headers: Object.assign({ 'content-type': 'application/json; charset=utf-8' }, cors(origin))
@@ -2739,7 +2739,7 @@ async function globalRanking(env) {
  * Quien no tiene un «entra» es que salió de inicio: así se parte el once del
  * banquillo sin que Biwenger lo diga en ningún sitio.
  */
-async function matchDay(roundId, score, names, primas) {
+async function matchDay(roundId, score, names, primas, env) {
   const detalle = await roundDetail(roundId, score);
   if (!detalle) return null;
 
@@ -2758,6 +2758,47 @@ async function matchDay(roundId, score, names, primas) {
   const delIndice = conCorrecciones(
     conSuperPica(puntosDeLaJornada(names, salto),
       detalle, primas), detalle.number);
+
+  /* Y LAS FICHAS MANDAN, igual que en la clasificacion de la jornada.
+
+     Aqui solo se miraba el historial del indice, y ese historial es una lista
+     sin etiquetas que se bloquea cuando el equipo tiene mas partidos jugados
+     que casillas —lo que pasa durante horas, mientras Biwenger publica—. Medido
+     el 16 de septiembre: el Rayo-Espanyol, el Alaves-Valencia y el Elche-Real
+     Madrid, jugados la vispera, salian con UNA nota de 22, mientras que el
+     Real Sociedad-Celta, de trece dias antes, tenia 21 de 22.
+
+     Y no era que faltara el dato: la ficha de Alemao ya traia su J6 con 3
+     puntos. La ficha es la unica fuente que dice a que jornada pertenece cada
+     nota, asi que se usa la misma que ya usa `roundBoard`, con su copia en el
+     KV: pedirla aqui no cuesta una consulta nueva. */
+  const partidoDe = {};
+  ((detalle && detalle.matches) || []).forEach(function (partido) {
+    if (partido.homeId != null) partidoDe[partido.homeId] = partido.status;
+    if (partido.awayId != null) partidoDe[partido.awayId] = partido.status;
+  });
+
+  const alineados = {};
+  (data.games || []).forEach(function (juego) {
+    ['home', 'away'].forEach(function (cual) {
+      (((juego[cual] || {}).reports) || []).forEach(function (informe) {
+        const j = (informe && informe.player) || {};
+        if (j.id != null) alineados[String(j.id)] = true;
+      });
+    });
+  });
+
+  const cerradaJornada = (detalle.played || 0) >= (detalle.games || 0) && (detalle.games || 0) > 0;
+  const deFicha = await notasDeLaJornada(env, Object.keys(alineados), names, score,
+    detalle.number, cerradaJornada, partidoDe).catch(function () { return null; });
+  if (deFicha && deFicha.notas) {
+    Object.keys(deFicha.notas).forEach(function (id) { delIndice[id] = deFicha.notas[id]; });
+    /* Al que se le ha leido la ficha entera y no trae esta jornada, es que no
+       jugo: no se le deja al historial inventarle una. */
+    (deFicha.vistos || []).forEach(function (id) {
+      if (deFicha.notas[String(id)] == null) delete delIndice[String(id)];
+    });
+  }
 
   const equipo = function (lado, estadoPartido) {
     const once = [];
