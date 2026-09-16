@@ -4166,3 +4166,27 @@ main.wrap { padding-top: 1.15rem; padding-bottom: 3.5rem; }
 .rival--duro { border-left-color: var(--neg); }
 .rival--medio { border-left-color: var(--marca); }
 .rival--facil { border-left-color: var(--pos); }
+
+/* ---------- El puesto del rival, en los partidos de la jornada ---------- */
+.puesto-mini {
+  display: inline-block; margin: 0 .35em; padding: .05em .4em;
+  border-radius: 100px; border: 1px solid var(--border);
+  border-left-width: 3px;
+  font-size: .6rem; font-weight: 700; color: var(--text-faint);
+  vertical-align: middle;
+}
+
+/* ---------- Marcas de cada partido en la ficha del futbolista ---------- */
+.marcas { display: inline-flex; gap: .2rem; align-items: center; justify-content: flex-end; }
+.marca {
+  display: inline-block; padding: .05em .35em; border-radius: var(--radius-sm);
+  font-size: .6rem; font-weight: 700; line-height: 1.5;
+}
+.marca--mvp { background: var(--marca); color: #1a1a1a; }
+.marca--asis { background: var(--bg-surface); color: var(--text-soft); }
+.marca--cero { background: var(--pos); color: #fff; }
+.marca--fallo { background: var(--neg); color: #fff; }
+.marca--sofa {
+  background: transparent; border: 1px solid var(--border-strong);
+  color: var(--text-soft); font-variant-numeric: tabular-nums;
+}

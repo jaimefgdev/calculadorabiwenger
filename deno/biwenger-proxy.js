@@ -223,7 +223,7 @@ const CDN = 'https://cf.biwenger.com/api/v2';
    navegador normal y las cabeceras que este mandaría. */
 /* Marca de versión: se sube en cada cambio y se consulta con ?version=1.
    Sirve para saber desde fuera si el despliegue ha entrado o no. */
-const VERSION = '2026-09-16 · deno 173';
+const VERSION = '2026-09-16 · deno 174';
 
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ' +
   '(KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36';
@@ -4594,6 +4594,19 @@ async function partidosDeJugador(env, id) {
       points: puntos,
       alineado: true,
       minutes: bruto.minutesPlayed != null ? bruto.minutesPlayed : null,
+      /* Lo que Biwenger mide de cada partido y estabamos tirando: viene en el
+         mismo `rawStats` del que ya se sacaban los minutos. La nota de
+         SofaScore la da EL, no SofaScore —que nos contesta 403 desde cualquier
+         sitio—, asi que es la unica forma de tenerla. */
+      assists: bruto.assists != null ? bruto.assists : null,
+      mvp: !!bruto.mvp,
+      cleanSheet: !!bruto.cleanSheet,
+      picas: bruto.picas != null ? bruto.picas : null,
+      sofascore: bruto.sofascore != null ? bruto.sofascore : null,
+      penaltis: bruto.goalsPenalty != null ? bruto.goalsPenalty : null,
+      penaltiFallado: !!bruto.penaltyMissed,
+      /* Ganado, empatado o perdido, sin tener que compararlo a mano. */
+      resultado: bruto.win ? 'gano' : (bruto.lost ? 'perdio' : 'empato'),
       events: (informe.events || []).map(function (lance) {
         return { type: lance.type, minute: lance.metadata != null ? lance.metadata : null };
       })
@@ -4630,7 +4643,11 @@ async function partidosDeJugador(env, id) {
       homeScore: juego.homeScore, awayScore: juego.awayScore,
       start: juego.start || null, status: juego.status || null,
       enCasa: String(juego.homeId) === String(suEquipo),
-      points: null, alineado: false, minutes: null, events: []
+      points: null, alineado: false, minutes: null, events: [],
+      /* Los mismos campos a null, para que la web no tenga que distinguir
+         entre «no jugo» y «este dato no vino». */
+      assists: null, mvp: false, cleanSheet: false, picas: null,
+      sofascore: null, penaltis: null, penaltiFallado: false, resultado: null
     });
   }
 

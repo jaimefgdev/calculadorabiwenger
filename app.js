@@ -8347,6 +8347,43 @@
    * La nota de un partido, en su pastilla de color: azul de 10 para arriba,
    * verde de 6 a 9, naranja de 1 a 5, gris el cero y rojo los negativos.
    */
+  /**
+   * Lo que Biwenger mide de cada partido y no se estaba enseñando: su nota de
+   * SofaScore, si fue el mejor, si dio asistencias y si dejo la porteria a
+   * cero. Todo viene en el mismo sitio que los minutos.
+   *
+   * La nota de SofaScore la da BIWENGER, no SofaScore: a nosotros nos contesta
+   * 403 desde cualquier sitio, asi que esta es la unica forma de tenerla.
+   */
+  function marcasDePartido(juego, puesto) {
+    if (!juego || !juego.alineado) return '<span class="marcas"></span>';
+    const trozos = [];
+
+    if (juego.mvp) {
+      trozos.push('<span class="marca marca--mvp" title="Mejor del partido">MVP</span>');
+    }
+    if (juego.assists) {
+      trozos.push('<span class="marca marca--asis" title="' + juego.assists +
+        (juego.assists === 1 ? ' asistencia' : ' asistencias') + '">' +
+        (juego.assists > 1 ? juego.assists + '\u00d7' : '') + '\u21b3</span>');
+    }
+    /* Solo a porteros y defensas: al delantero la porteria a cero no le dice
+       nada, y llenaba la ficha de chapas sin significado. */
+    if (juego.cleanSheet && juego.minutes && (puesto === 1 || puesto === 2)) {
+      trozos.push('<span class="marca marca--cero" title="Porteria a cero">0</span>');
+    }
+    if (juego.penaltiFallado) {
+      trozos.push('<span class="marca marca--fallo" title="Penalti fallado">P\u2717</span>');
+    }
+    if (juego.sofascore != null) {
+      /* Su escala es sobre 10, con un decimal. */
+      trozos.push('<span class="marca marca--sofa" title="Nota de SofaScore">' +
+        juego.sofascore.toFixed(1) + '</span>');
+    }
+
+    return '<span class="marcas">' + trozos.join('') + '</span>';
+  }
+
   function notaDePartido(puntos) {
     if (puntos == null) return '<span class="nota nota--sin">–</span>';
     const clase = puntos >= 10 ? 'nota--azul'
@@ -8793,6 +8830,27 @@
     return '<div class="estad">' + filas + tecnicos + '</div>';
   }
 
+  /* ---------- La dificultad de un rival ----------
+     El puesto de cada equipo sale de la clasificacion de LaLiga, que ya esta
+     descargada. Se mide por id de Biwenger, que es el que traen los partidos. */
+  function puestosPorEquipo() {
+    const filas = state.tabla || [];
+    const mapa = {};
+    filas.forEach(function (f, i) {
+      const id = idDeEquipo(f.completo);
+      if (id != null) mapa[String(id)] = i + 1;
+    });
+    return mapa;
+  }
+
+  /* Una chapita con el puesto, del color de lo dificil que es ese rival. */
+  function chapaDeRival(idEquipo, puestos) {
+    const puesto = puestos[String(idEquipo)];
+    if (!puesto) return '';
+    return '<span class="puesto-mini' + claseDeRival(puesto) + '" title="' + puesto +
+      '\u00ba de LaLiga">' + puesto + '\u00ba</span>';
+  }
+
   function renderPartidos() {
     const caja = $('jornada-partidos');
     if (!caja) return;
@@ -8813,6 +8871,8 @@
     }
 
     const partidos = datos.games || [];
+    /* Una sola vez por pintada, no una por equipo. */
+    const puestos = puestosPorEquipo();
     caja.innerHTML = '<div class="panel__head"><h2>Partidos</h2></div>' +
       (partidos.length === 0
         ? '<p class="muted">Esta jornada todav\u00eda no tiene calendario.</p>'
@@ -8842,6 +8902,7 @@
                     '<span class="partido__hora">' + escapeHtml(timeFormat.format(d)) + '</span>';
                 })() + '</span>' +
                 '<span class="partido__equipo partido__equipo--local">' +
+                  chapaDeRival(juego.home.id, puestos) +
                   escapeHtml(juego.home.name) + crestOf({ team: juego.home.id, teamName: juego.home.name }, 'crest--badge') +
                 '</span>' +
                 '<span class="partido__marcador' + (acabado ? '' : ' partido__marcador--vivo') + '"' +
@@ -8850,6 +8911,7 @@
                 '<span class="partido__equipo">' +
                   crestOf({ team: juego.away.id, teamName: juego.away.name }, 'crest--badge') +
                   escapeHtml(juego.away.name) +
+                  chapaDeRival(juego.away.id, puestos) +
                 '</span>' +
                 /* Y por dónde se ve, a la derecha. */
                 '<span class="partido__tv">' + (juego.tv ? escapeHtml(juego.tv) : '') + '</span>' +
@@ -11130,6 +11192,10 @@
       return '<p class="muted">Todavía no hay partidos suyos esta temporada.</p>';
     }
 
+    /* La porteria a cero solo se marca a porteros y defensas, y la demarcacion
+       no viene con los partidos: se saca del indice una sola vez. */
+    const suPuesto = (playerInfo(id) || {}).position;
+
     /* De la primera jornada a la última, en orden. */
     const filas = datos.matches.slice().map(function (juego) {
       const jugado = juego.homeScore != null && juego.awayScore != null;
@@ -11153,6 +11219,7 @@
         '<span class="partido-jug__lances">' + (juego.alineado ? lancesDe(juego) : '') + '</span>' +
         '<span class="partido-jug__min">' +
           (juego.minutes ? juego.minutes + "'" : '–') + '</span>' +
+        marcasDePartido(juego, suPuesto) +
         (juego.alineado ? notaDePartido(juego.points) : notaDePartido(null)) +
       '</div>';
     }).join('');
@@ -13116,6 +13183,9 @@
     if (name === 'jornadas') {
       /* La que estuvieras viendo; si no, la que toca ahora. */
       ensureJornada(state.jornadaVista || jornadaDeAhora() || 'actual');
+      /* La clasificacion de LaLiga, que es de donde sale la dificultad de cada
+         cruce: sin pasar por Datos no estaria cargada. */
+      ensureTablaLaLiga();
       renderJornadas();
     }
   }
