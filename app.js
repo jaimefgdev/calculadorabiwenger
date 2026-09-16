@@ -8416,6 +8416,10 @@
     };
 
     return '<div class="alin">' +
+      /* El entrenador va ARRIBA, centrado sobre el nombre del equipo y su
+         plantilla. Antes estaba en una fila al final de las estadisticas,
+         donde no pintaba nada. El dato ya viene con cada equipo. */
+      (equipo.coach ? '<p class="alin__tecnico">' + escapeHtml(equipo.coach) + '</p>' : '') +
       '<h4 class="alin__titulo">' + escapeHtml(titulo) + '</h4>' +
       porPuesto(equipo.xi).map(fila).join('') +
       (equipo.bench.length
@@ -8453,6 +8457,10 @@
     }).join('');
 
     return '<div class="alin">' +
+      /* El entrenador va ARRIBA, centrado sobre el nombre del equipo y su
+         plantilla. Antes estaba en una fila al final de las estadisticas,
+         donde no pintaba nada. El dato ya viene con cada equipo. */
+      (equipo.coach ? '<p class="alin__tecnico">' + escapeHtml(equipo.coach) + '</p>' : '') +
       '<h4 class="alin__titulo">' + escapeHtml(titulo) + '</h4>' +
       '<div class="pitch-wrap"><div class="pitch pitch--static">' +
         '<span class="pitch__area pitch__area--top" aria-hidden="true"></span>' +
@@ -8821,17 +8829,9 @@
     }).join('');
     if (!filas) return '';
 
-    const tecnicos = (juego.home.coach || juego.away.coach)
-      ? '<div class="estad__fila estad__fila--tecnicos">' +
-        '<span class="estad__val estad__val--nombre">' +
-          escapeHtml(juego.home.coach || '\u2014') + '</span>' +
-        '<span class="estad__medio"><span class="estad__titulo">Entrenador</span></span>' +
-        '<span class="estad__val estad__val--nombre">' +
-          escapeHtml(juego.away.coach || '\u2014') + '</span>' +
-        '</div>'
-      : '';
-
-    return '<div class="estad">' + filas + tecnicos + '</div>';
+    /* El entrenador ya no va aqui: se pinta centrado encima de cada
+       alineacion, que es donde se busca. */
+    return '<div class="estad">' + filas + '</div>';
   }
 
   /* ---------- La dificultad de un rival ----------

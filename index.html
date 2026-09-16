@@ -25,7 +25,7 @@
 <link rel="dns-prefetch" href="https://cdn.biwenger.com">
 <!-- El ?v= se sube en cada publicación: obliga al navegador a bajar el archivo
      nuevo en vez de reutilizar el que tenga en caché. -->
-<link rel="stylesheet" href="styles.css?v=537">
+<link rel="stylesheet" href="styles.css?v=538">
 <!-- La tipografia se pide ya, sin esperar a que el CSS termine de leerse. -->
 <link rel="preload" href="GoogleSans-Regular.woff2" as="font" type="font/woff2" crossorigin>
 <!-- El escudo de Biwenger, el mismo que el del boton de Inicio. -->
@@ -421,33 +421,8 @@
     <!-- Lo realizado y lo latente, que son cosas distintas y se tapan si se suman. -->
     <section id="mercadeo" class="panel"></section>
 
-    <section class="panel">
-      <div class="panel__head">
-        <h2>Clasificación de LaLiga</h2>
-        <p class="muted">La de la competición, no la de tu liga. La sirve ESPN: Biwenger no la publica.</p>
-      </div>
-      <div class="table-scroll">
-        <table class="table table--laliga">
-          <thead>
-            <tr>
-              <th class="col-rank">#</th>
-              <th>Equipo</th>
-              <th class="num">Pts</th>
-              <th class="num" title="Partidos jugados">PJ</th>
-              <th class="num" title="Ganados">G</th>
-              <th class="num" title="Empatados">E</th>
-              <th class="num" title="Perdidos">P</th>
-              <th class="num" title="Goles a favor">GF</th>
-              <th class="num" title="Goles en contra">GC</th>
-              <th class="num" title="Diferencia de goles">DG</th>
-            </tr>
-          </thead>
-          <tbody id="laliga-tabla-body"></tbody>
-        </table>
-      </div>
-    </section>
 
-  </div><!-- /panel-datos -->
+  </div><!-- /panel-fichajes -->
 
   <!-- ============================================================
        PESTAÑA · MERCADO
@@ -629,6 +604,32 @@
       <div id="caros-pie"></div>
     </section>
 
+    <section class="panel">
+      <div class="panel__head">
+        <h2>Clasificación de LaLiga</h2>
+        <p class="muted">La de la competición, no la de tu liga. La sirve ESPN: Biwenger no la publica.</p>
+      </div>
+      <div class="table-scroll">
+        <table class="table table--laliga">
+          <thead>
+            <tr>
+              <th class="col-rank">#</th>
+              <th>Equipo</th>
+              <th class="num">Pts</th>
+              <th class="num" title="Partidos jugados">PJ</th>
+              <th class="num" title="Ganados">G</th>
+              <th class="num" title="Empatados">E</th>
+              <th class="num" title="Perdidos">P</th>
+              <th class="num" title="Goles a favor">GF</th>
+              <th class="num" title="Goles en contra">GC</th>
+              <th class="num" title="Diferencia de goles">DG</th>
+            </tr>
+          </thead>
+          <tbody id="laliga-tabla-body"></tbody>
+        </table>
+      </div>
+    </section>
+
   </div><!-- /panel-datos -->
 
 
@@ -716,7 +717,7 @@
 
 </main>
 
-<script src="app.js?v=536"></script>
+<script src="app.js?v=538"></script>
 <script>
   /* El service worker solo cachea los archivos de la app, nunca los datos.
      Se registra al final para que no compita con la primera carga.

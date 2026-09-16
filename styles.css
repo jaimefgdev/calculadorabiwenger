@@ -4203,3 +4203,9 @@ main.wrap { padding-top: 1.15rem; padding-bottom: 3.5rem; }
 /* En el lado derecho las chapas tambien van en espejo, para que la nota
    quede siempre pegada a su borde de fuera. */
 .versus-part__fila > .versus-part__lado:last-child .marcas { flex-direction: row-reverse; }
+
+/* El entrenador, encima del nombre de su equipo y de su plantilla. */
+.alin__tecnico {
+  margin: 0 0 .1rem; text-align: center;
+  font-size: .68rem; font-weight: 600; color: var(--text-faint);
+}
