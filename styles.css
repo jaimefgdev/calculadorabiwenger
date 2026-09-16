@@ -4262,3 +4262,7 @@ main.wrap { padding-top: 1.15rem; padding-bottom: 3.5rem; }
 /* El boton de los chollos, del ancho de su texto y sin pisar a los puestos. */
 .puesto-filtro--chollos { margin-left: .35rem; }
 .puesto-filtro--chollos.is-on { background: var(--pos); color: #fff; border-color: var(--pos); }
+
+/* La suerte dentro de una tabla: pegada a su cifra y sin estirar la fila. */
+.table .suerte { margin-left: .35em; vertical-align: middle; }
+.with-crest .suerte { margin-left: .4em; }
