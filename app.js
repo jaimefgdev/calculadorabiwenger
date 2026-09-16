@@ -8639,6 +8639,7 @@
         if (state.priceModal) renderPriceModal();
         if (state.tab === 'mercado') { renderMarket(); renderOffers(); }
         if (state.tab === 'jugadores') renderJugadores();
+        if (state.tab === 'datos') renderRankingsTemporada();
       })
       .catch(function () { state.xgCargando = false; });
   }
@@ -12696,6 +12697,9 @@
      cada futbolista uno a uno. */
   const RANKINGS = [
     { titulo: 'M\u00e1s goles',          campo: 'goals',        sufijo: '' },
+    /* En cuantos goles interviene: los suyos mas los que da. Sale de sumar dos
+       campos del recuento, asi que no cuesta ninguna consulta. */
+    { titulo: 'Interviene en m\u00e1s goles', campo: 'golesMasAsistencias', sufijo: '' },
     /* Por minuto en vez de por partido: mide mejor a quien juega a ratos. Va en
        minutos por gol («1 cada 33'»), que es como se dice; y ordenado al revés,
        porque aquí gana el que menos tarda. */
@@ -12708,7 +12712,20 @@
     { titulo: 'M\u00e1s sustituciones',  campo: 'subsOut',      sufijo: '' },
     { titulo: 'M\u00e1s veces suplente', campo: 'subsIn',       sufijo: '' },
     { titulo: 'Porter\u00edas a cero',   campo: 'cleanSheets',  sufijo: '', porteros: true },
-    { titulo: 'Menos goles encajados', campo: 'conceded',   sufijo: '', porteros: true, menor: true }
+    { titulo: 'Menos goles encajados', campo: 'conceded',   sufijo: '', porteros: true, menor: true },
+
+    /* Y los de FotMob, que Biwenger no publica. Llegan pegados al recuento
+       en `aplicaDatosDeFotmob`, asi que se pintan igual que los demas. */
+    { titulo: 'M\u00e1s paradas por partido', campo: 'paradas', sufijo: '', porteros: true, decimal: true },
+    { titulo: '% de paradas',        campo: 'paradasPorcentaje', sufijo: ' %', porteros: true, decimal: true },
+    /* Los que le habrian metido segun la calidad de los remates, menos los que
+       le metieron: en positivo, salva a su equipo. */
+    { titulo: 'Goles evitados',      campo: 'golesEvitados', sufijo: '', porteros: true, decimal: true },
+    { titulo: 'M\u00e1s ocasiones claras falladas', campo: 'falladas', sufijo: '' },
+    { titulo: 'M\u00e1s ocasiones claras creadas',  campo: 'creadas',  sufijo: '' },
+    { titulo: 'Mejor nota media',    campo: 'nota',    sufijo: '', decimal: true, minimo: 3 },
+    /* Cuanto rinde por lo que cuesta. Lo trae el propio recuento. */
+    { titulo: 'Puntos por mill\u00f3n',  campo: 'pointsPerMillion', sufijo: '', decimal: true, minimo: 2 }
   ];
 
   /** El recuento del ámbito que se esté mirando. */
@@ -12855,6 +12872,29 @@
     return String(a.name).localeCompare(String(b.name), 'es');
   }
 
+  /**
+   * Pega al recuento lo que Biwenger no publica.
+   *
+   * Los rankings se pintan todos igual: cada uno lee UN campo de cada
+   * futbolista. Asi que en vez de tratar aparte los de FotMob, se le anaden sus
+   * campos a cada uno y el pintado no se entera de nada.
+   */
+  function aplicaDatosDeFotmob(lista) {
+    if (!lista) return lista;
+    const suyos = state.xg || {};
+    lista.forEach(function (j) {
+      /* Goles mas asistencias: de Biwenger, que es quien los cuenta bien. */
+      j.golesMasAsistencias = (j.goals || 0) + (j.assists || 0);
+      const extra = suyos[String(j.id)];
+      if (!extra) return;
+      ['paradas', 'paradasPorcentaje', 'golesEvitados', 'falladas', 'creadas', 'nota']
+        .forEach(function (campo) {
+          if (extra[campo] != null) j[campo] = extra[campo];
+        });
+    });
+    return lista;
+  }
+
   function renderRankingsTemporada() {
     const caja = $('rankings-temporada');
     if (!caja) return;
@@ -12868,7 +12908,7 @@
       boton.setAttribute('aria-pressed', deLaLiga ? 'true' : 'false');
       boton.classList.toggle('ambito--on', deLaLiga);
     }
-    const todos = recuentoActivo();
+    const todos = aplicaDatosDeFotmob(recuentoActivo());
     if (!todos) {
       /* Un «cargando» y ya: lo de «repasando jornada a jornada» contaba las
          tripas del asunto y encima parecía que se había atascado. */
@@ -13488,6 +13528,10 @@
     if (name === 'datos') {
       ensureSquads(); ensureLaLiga(); ensureRecuento(); ensureJugadores();
       ensureTablaLaLiga();
+      /* Las paradas, los goles evitados y las ocasiones claras son de FotMob:
+         sin pedirlos aqui, esos rankings saldrian vacios hasta pasar por otra
+         pestaña. Se guardan por dia, asi que casi nunca cuesta nada. */
+      ensureXg();
       renderRankings(); renderRankingsTemporada(); renderCaros(); renderTablaLaLiga();
     }
     /* `ensureJugadores` porque de esa lista salen ahora los que más se mueven:

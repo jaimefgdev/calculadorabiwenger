@@ -223,7 +223,7 @@ const CDN = 'https://cf.biwenger.com/api/v2';
    navegador normal y las cabeceras que este mandaría. */
 /* Marca de versión: se sube en cada cambio y se consulta con ?version=1.
    Sirve para saber desde fuera si el despliegue ha entrado o no. */
-const VERSION = '2026-09-16 · deno 179';
+const VERSION = '2026-09-16 · deno 180';
 
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ' +
   '(KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36';
@@ -2190,7 +2190,10 @@ async function golesEsperados(env, names) {
      la clave seria la misma para todas las jornadas y se quedaria sirviendo una
      foto vieja para siempre. Por dia caduca sola y FotMob recibe dos consultas
      diarias como mucho. */
-  const clave = 'xg-v1-' + new Date().toISOString().slice(0, 10);
+  /* v2: la copia de v1 solo lleva xG y xA. Sin cambiar la clave seguiria
+     sirviendose el resto del dia, y las paradas y las ocasiones no llegarian.
+     Ya paso con el detalle de jornada; no se repite. */
+  const clave = 'xg-v2-' + new Date().toISOString().slice(0, 10);
 
   if (JORNADAS) {
     try {
@@ -2199,11 +2202,20 @@ async function golesEsperados(env, names) {
     } catch (error) { /* se arma abajo */ }
   }
 
-  const [deXg, deXa] = await Promise.all([
-    rankingDeFotmob('expected_goals'),
-    rankingDeFotmob('expected_assists')
-  ]);
-  if (!deXg.length && !deXa.length) return null;
+  /* Siete listas de una vez. Cada una es un fichero suyo, pero esto se hace
+     una vez al dia y se guarda: al navegador le llega una sola respuesta. */
+  const [deXg, deXa, deParadas, dePorcentaje, deEvitados, deFalladas, deCreadas, deNota] =
+    await Promise.all([
+      rankingDeFotmob('expected_goals'),
+      rankingDeFotmob('expected_assists'),
+      rankingDeFotmob('saves'),
+      rankingDeFotmob('_save_percentage'),
+      rankingDeFotmob('_goals_prevented'),
+      rankingDeFotmob('big_chance_missed'),
+      rankingDeFotmob('big_chance_created'),
+      rankingDeFotmob('rating')
+    ]);
+  if (!deXg.length && !deXa.length && !deNota.length) return null;
 
   /* La plantilla de cada equipo y el indice por slug, del indice de Biwenger. */
   const equiposBiw = {};
@@ -2252,6 +2264,15 @@ async function golesEsperados(env, names) {
   };
   meter(deXg, 'xg');
   meter(deXa, 'xa');
+  /* Las de porteros van por noventa minutos, que es como se comparan. */
+  meter(deParadas, 'paradas');
+  meter(dePorcentaje, 'paradasPorcentaje');
+  /* Goles evitados: los que le habrian metido segun la calidad de los remates
+     menos los que le metieron. Es el mejor dato que hay para un portero. */
+  meter(deEvitados, 'golesEvitados');
+  meter(deFalladas, 'falladas');
+  meter(deCreadas, 'creadas');
+  meter(deNota, 'nota');
 
   const datos = { jugadores: salida, updatedAt: new Date().toISOString() };
   if (JORNADAS) {
