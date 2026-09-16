@@ -223,7 +223,7 @@ const CDN = 'https://cf.biwenger.com/api/v2';
    navegador normal y las cabeceras que este mandaría. */
 /* Marca de versión: se sube en cada cambio y se consulta con ?version=1.
    Sirve para saber desde fuera si el despliegue ha entrado o no. */
-const VERSION = '2026-09-16 · deno 177';
+const VERSION = '2026-09-16 · deno 178';
 
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ' +
   '(KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36';
@@ -354,6 +354,17 @@ const app = {
          aqui se prueba con otra IP y con cabeceras de navegador; si tambien nos
          corta, la web tiene los datos de Biwenger como respaldo.
          Solo se dejan pasar las rutas que se usan, no cualquier cosa. */
+      /* ?xg=1 devuelve los goles y las asistencias esperadas de la temporada,
+         ya emparejados con el id de cada futbolista de Biwenger. */
+      if (url.searchParams.get('xg')) {
+        const sistema = await sistemaDeLaLiga(env);
+        const data = await golesEsperados(env, await players(sistema));
+        if (!data) return fail(502, 'FotMob no ha contestado.', origin);
+        return new Response(JSON.stringify(data), {
+          headers: Object.assign({ 'content-type': 'application/json; charset=utf-8' }, cors(origin))
+        });
+      }
+
       /* ?fotmob=<ruta> reenvia una consulta a FotMob.
          De ahi salen el xG, el xA y la nota de cada futbolista, que ni Biwenger
          ni ESPN publican. No abre CORS, asi que la web no puede pedirselo
@@ -2013,6 +2024,233 @@ async function jornadaEnJuego() {
     live: true,
     matches: matches
   };
+}
+
+/* ============================================================
+   xG y xA: lo que NI Biwenger NI ESPN publican
+   ============================================================
+   FotMob da, por futbolista y temporada, los goles esperados (xG) y las
+   asistencias esperadas (xA). Es el dato que dice si alguien puntua porque
+   juega bien o porque tuvo suerte: un delantero con cinco goles y 2.0 de xG va
+   a bajar, y uno con un gol y 4.0 de xG es un chollo antes de que suba.
+
+   Se pide DESDE AQUI y no desde el navegador porque FotMob no abre CORS.
+   Comprobado el 16 de septiembre que si deja entrar desde la IP de Deno, al
+   contrario que SofaScore, que contesta 502.
+
+   Sus dos ficheros pesan 160 y 223 KB y traen nombres, no ids de Biwenger, asi
+   que aqui se recortan y se emparejan: la web recibe una lista pequena ya
+   pegada al id de cada futbolista. */
+const FOTMOB_DATOS = 'https://data.fotmob.com';
+/* 87 es LaLiga y 38843 su temporada 26/27 en su numeracion. */
+const FOTMOB_LIGA = 87;
+const FOTMOB_TEMPORADA = 38843;
+
+/* Sin tildes, sin puntuacion y en palabras: asi se comparan los nombres de las
+   dos webs, que los escriben distinto. */
+function enPalabras(texto) {
+  return String(texto == null ? '' : texto)
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim().split(' ')
+    .filter(function (x) { return !!x; });
+}
+
+/* El slug de Biwenger sin el numero que le pone a los repetidos:
+   `diego-lopez-2` es Diego Lopez. */
+function slugEnPalabras(slug) {
+  const partes = enPalabras(slug);
+  if (partes.length > 1 && /^\d+$/.test(partes[partes.length - 1])) partes.pop();
+  return partes;
+}
+
+/**
+ * Los veinte equipos de FotMob emparejados con los de Biwenger, uno a uno.
+ *
+ * No vale mirar si un nombre contiene al otro: FotMob llama «Deportivo Alaves»
+ * al Alaves y «Deportivo A Coruna» al Depor, asi que «Deportivo» encaja con los
+ * dos. Y quitando las palabras genericas es peor: «Atletico Madrid» se queda en
+ * «Madrid» y acaba en el Real Madrid, con lo que los veinte futbolistas del
+ * Atletico se buscaban en la plantilla equivocada.
+ *
+ * Lo que si funciona es pesar cada palabra por lo ESPECIFICA que es: «alaves»
+ * sale en un equipo y «deportivo» en dos, asi que «Deportivo Alaves» va al
+ * Alaves; y «atletico» es mas raro que «madrid», asi que el Atletico va al
+ * Atletico. Medido: los veinte encajan.
+ */
+function equiposEmparejados(nombresFm, equiposBiw) {
+  const cuenta = function (nombres) {
+    const c = {};
+    nombres.forEach(function (n) {
+      const vistas = {};
+      enPalabras(n).forEach(function (w) {
+        if (vistas[w]) return;
+        vistas[w] = true;
+        c[w] = (c[w] || 0) + 1;
+      });
+    });
+    return c;
+  };
+  const nombresBiw = Object.keys(equiposBiw).map(function (k) { return equiposBiw[k]; });
+  const frecFm = cuenta(nombresFm);
+  const frecBiw = cuenta(nombresBiw);
+  const peso = function (w) { return 1 / ((frecFm[w] || 1) * (frecBiw[w] || 1)); };
+
+  const mapa = {};
+  nombresFm.forEach(function (fmn) {
+    const suyas = enPalabras(fmn);
+    let mejor = null;
+    Object.keys(equiposBiw).forEach(function (id) {
+      const otras = enPalabras(equiposBiw[id]);
+      let puntos = 0;
+      suyas.forEach(function (w) { if (otras.indexOf(w) !== -1) puntos += peso(w); });
+      if (puntos > 0 && (mejor === null || puntos > mejor.puntos)) mejor = { puntos: puntos, id: id };
+    });
+    if (mejor) mapa[fmn] = mejor.id;
+  });
+  return mapa;
+}
+
+/**
+ * Un futbolista de FotMob, buscado entre los de Biwenger. Sin alias a mano.
+ *
+ * Por orden de fiabilidad: su slug o su nombre exactos; todas las palabras del
+ * suyo dentro del de FotMob —«Ez Abde» es `abdessamad-ezzalzouli`, «Fermin» es
+ * `fermin-lopez`, «Vinicius Jr» es `vinicius-junior`—; y un apellido que solo
+ * lleve uno de su plantilla («Manu» es `manu-hernando` en el Racing).
+ *
+ * Y si en su equipo no aparece, se busca por slug exacto en TODA la liga: los
+ * dos que quedaban son fichajes que las dos webs colocan en clubes distintos.
+ */
+function futbolistaEmparejado(nombreFm, plantilla, porSlug) {
+  const suyas = enPalabras(nombreFm);
+  const clave = suyas.join(' ');
+  if (!clave) return null;
+
+  for (let i = 0; i < plantilla.length; i++) {
+    const p = plantilla[i];
+    if (slugEnPalabras(p.slug).join(' ') === clave) return p;
+    if (enPalabras(p.name).join(' ') === clave) return p;
+  }
+  const dentro = function (partes) {
+    return partes.length > 0 && partes.every(function (w) { return suyas.indexOf(w) !== -1; });
+  };
+  for (let i = 0; i < plantilla.length; i++) {
+    if (dentro(slugEnPalabras(plantilla[i].slug))) return plantilla[i];
+    if (dentro(enPalabras(plantilla[i].name))) return plantilla[i];
+  }
+  const comunes = plantilla.filter(function (p) {
+    return slugEnPalabras(p.slug).some(function (w) { return suyas.indexOf(w) !== -1; });
+  });
+  if (comunes.length === 1) return comunes[0];
+
+  /* Fuera de su equipo, solo el slug exacto: cualquier otra regla a nivel de
+     liga acabaria dando el xG de un futbolista a otro. */
+  return porSlug[clave] || null;
+}
+
+/** Un ranking de FotMob, recortado a lo que se usa. */
+async function rankingDeFotmob(cual) {
+  const url = FOTMOB_DATOS + '/stats/' + FOTMOB_LIGA + '/season/' + FOTMOB_TEMPORADA +
+    '/' + cual + '.json';
+  const r = await fetch(url, {
+    headers: {
+      'user-agent': UA,
+      'accept': 'application/json',
+      'accept-language': 'es-ES,es;q=0.9,en;q=0.8',
+      'referer': 'https://www.fotmob.com/'
+    }
+  }).catch(function () { return null; });
+  if (!r || !r.ok) return [];
+  const cuerpo = await r.json().catch(function () { return {}; });
+  const listas = cuerpo.TopLists || [];
+  return (listas[0] && listas[0].StatList) || [];
+}
+
+/**
+ * xG y xA de la temporada, por futbolista de Biwenger.
+ *
+ * Se guarda en el KV con el sello de la jornada: esto solo cambia cuando se
+ * juega, asi que entre jornada y jornada no se le pregunta nada a FotMob.
+ */
+async function golesEsperados(env, names) {
+  /* La clave lleva EL DIA, no la jornada.
+
+     Con `cache.round` seria mas fino, pero esa es memoria del isolate y en Deno
+     los isolates mueren entre peticiones: en uno recien arrancado valdria cero,
+     la clave seria la misma para todas las jornadas y se quedaria sirviendo una
+     foto vieja para siempre. Por dia caduca sola y FotMob recibe dos consultas
+     diarias como mucho. */
+  const clave = 'xg-v1-' + new Date().toISOString().slice(0, 10);
+
+  if (JORNADAS) {
+    try {
+      const crudo = await JORNADAS.get(clave);
+      if (crudo) return JSON.parse(crudo);
+    } catch (error) { /* se arma abajo */ }
+  }
+
+  const [deXg, deXa] = await Promise.all([
+    rankingDeFotmob('expected_goals'),
+    rankingDeFotmob('expected_assists')
+  ]);
+  if (!deXg.length && !deXa.length) return null;
+
+  /* La plantilla de cada equipo y el indice por slug, del indice de Biwenger. */
+  const equiposBiw = {};
+  const plantillas = {};
+  const porSlug = {};
+  Object.keys(names).forEach(function (k) {
+    if (k.indexOf('team:') === 0) equiposBiw[k.slice(5)] = names[k];
+  });
+  Object.keys(names).forEach(function (k) {
+    if (k.indexOf(':') !== -1) return;
+    const p = {
+      id: k,
+      name: names[k],
+      slug: names[k + ':slug'] || '',
+      team: names[k + ':team'] != null ? String(names[k + ':team']) : null
+    };
+    if (p.team != null) {
+      if (!plantillas[p.team]) plantillas[p.team] = [];
+      plantillas[p.team].push(p);
+    }
+    const s = slugEnPalabras(p.slug).join(' ');
+    if (s && !porSlug[s]) porSlug[s] = p;
+  });
+
+  const nombresFm = [];
+  const vistos = {};
+  [deXg, deXa].forEach(function (lista) {
+    lista.forEach(function (x) {
+      const n = x.TeamName || '';
+      if (n && !vistos[n]) { vistos[n] = true; nombresFm.push(n); }
+    });
+  });
+  const mapaEquipos = equiposEmparejados(nombresFm, equiposBiw);
+
+  const salida = {};
+  const meter = function (lista, campo) {
+    lista.forEach(function (x) {
+      const plantilla = plantillas[String(mapaEquipos[x.TeamName])] || [];
+      const suyo = futbolistaEmparejado(x.ParticipantName, plantilla, porSlug);
+      if (!suyo) return;
+      const ficha = salida[suyo.id] || (salida[suyo.id] = {});
+      ficha[campo] = x.StatValue != null ? x.StatValue : null;
+      if (x.MinutesPlayed != null) ficha.minutos = x.MinutesPlayed;
+      if (x.MatchesPlayed != null) ficha.partidos = x.MatchesPlayed;
+    });
+  };
+  meter(deXg, 'xg');
+  meter(deXa, 'xa');
+
+  const datos = { jugadores: salida, updatedAt: new Date().toISOString() };
+  if (JORNADAS) {
+    /* Dos argumentos y nada mas: este almacen no admite caducidad, y la clave
+       ya lleva la jornada, asi que las viejas dejan de leerse solas. */
+    try { await JORNADAS.put(clave, JSON.stringify(datos)); }
+    catch (error) { /* da igual: es velocidad, no un dato que haya que conservar */ }
+  }
+  return datos;
 }
 
 /** Próxima jornada: número, hora del primer partido y los partidos uno a uno. */
