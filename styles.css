@@ -4227,6 +4227,9 @@ main.wrap { padding-top: 1.15rem; padding-bottom: 3.5rem; }
    fuente y conviene que se vea que no salen de Biwenger. */
 .xg {
   display: flex; align-items: stretch; gap: .4rem; flex-wrap: wrap;
+  /* Centrado: son dos o tres cifras sueltas y pegadas a la izquierda
+     parecian el principio de una fila que no llega. */
+  justify-content: center;
   margin-top: .5rem; padding-top: .5rem;
   border-top: 1px solid var(--border);
 }
@@ -4241,10 +4244,7 @@ main.wrap { padding-top: 1.15rem; padding-bottom: 3.5rem; }
 .xg__dato--alto strong { color: var(--marca); }
 /* Le deben goles: candidato a subir. */
 .xg__dato--bajo strong { color: var(--pos); }
-.xg__fuente {
-  align-self: center; margin-left: auto;
-  font-size: .6rem; color: var(--text-faint);
-}
+
 
 /* ---------- La suerte, en la tarjeta del futbolista ----------
    Una linea mas dentro de la tarjeta, que es un flex en columna: no descuadra

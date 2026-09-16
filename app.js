@@ -8687,7 +8687,6 @@
           '<span class="xg__rotulo">' + c.rotulo + '</span>' +
         '</span>';
       }).join('') +
-      '<span class="xg__fuente" title="Lo mide FotMob; Biwenger no publica estos datos">FotMob</span>' +
     '</div>';
   }
 
