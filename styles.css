@@ -4190,3 +4190,13 @@ main.wrap { padding-top: 1.15rem; padding-bottom: 3.5rem; }
   background: transparent; border: 1px solid var(--border-strong);
   color: var(--text-soft); font-variant-numeric: tabular-nums;
 }
+
+/* Las marcas dentro de la comparativa de dos futbolistas.
+   Cada lado es un flex con `space-between`, asi que las chapas tienen que
+   poder encogerse: sin esto empujaban el marcador y la nota fuera de su
+   mitad y las dos columnas dejaban de estar alineadas. */
+.versus-part__lado .marcas { flex: 0 1 auto; min-width: 0; overflow: hidden; }
+.versus-part__lado .marca { font-size: .56rem; padding: .05em .3em; }
+/* En el lado derecho las chapas tambien van en espejo, para que la nota
+   quede siempre pegada a su borde de fuera. */
+.versus-part__fila > .versus-part__lado:last-child .marcas { flex-direction: row-reverse; }

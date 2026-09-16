@@ -11290,7 +11290,8 @@
     }
 
     /* El lado de uno: su rival de esa jornada y lo que hizo. */
-    const lado = function (juego) {
+    /* El puesto de cada uno, para la chapa de porteria a cero. */
+    const lado = function (juego, puesto) {
       if (!juego) return '<span class="versus-part__vacio">—</span>';
       const rivalId = juego.enCasa ? juego.awayId : juego.homeId;
       const rival = juego.enCasa ? juego.away : juego.home;
@@ -11311,6 +11312,7 @@
           (jugado ? suyos + '–' + otros : '–') + '</span>' +
         '<span class="versus-part__lances">' + lances + '</span>' +
         (minutos ? '<span class="versus-part__min">' + minutos + '</span>' : '') +
+        marcasDePartido(juego, puesto) +
         (juego.alineado ? notaDePartido(juego.points) : '<span class="nota nota--sin"></span>') +
       '</span>';
     };
@@ -11319,9 +11321,9 @@
       /* Sin cabecera: las caras y los nombres ya van arriba, grandes. */
       '<div class="versus-part">' + jornadas.map(function (n) {
         return '<div class="versus-part__fila">' +
-          lado(a[n]) +
+          lado(a[n], uno.position) +
           '<span class="versus-part__jornada">J' + n + '</span>' +
-          lado(b[n]) +
+          lado(b[n], otro.position) +
         '</div>';
       }).join('') + '</div>' +
     '</div>';
