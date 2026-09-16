@@ -7896,22 +7896,6 @@
     return goles - esperado.xg;
   }
 
-  /* La marca de la tarjeta. Solo cuando la diferencia es de verdad: con
-     quinientas y pico tarjetas, marcarlas todas seria no marcar ninguna. */
-  function marcaDeSuerte(id, puesto) {
-    /* Al portero no se le mide: sus goles son cero y el dato no dice nada. */
-    if (puesto === 1) return '';
-    const suerte = suerteDe(id);
-    if (suerte == null || Math.abs(suerte) < SUERTE_MINIMA) return '';
-    const debe = suerte < 0;
-    const cifra = (suerte > 0 ? '+' : '') + suerte.toFixed(1).replace('.', ',');
-    return '<span class="suerte' + (debe ? ' suerte--debe' : ' suerte--sobra') + '"' +
-      ' title="' + (debe
-        ? 'Le deben ' + Math.abs(suerte).toFixed(1).replace('.', ',') + ' goles: remata mejor de lo que marca, deberia subir'
-        : 'Ha metido ' + suerte.toFixed(1).replace('.', ',') + ' goles mas de lo esperado: ojo, eso rara vez se mantiene') +
-      '">' + cifra + '</span>';
-  }
-
   function renderJugadores() {
     const caja = $('jugadores-body');
     if (!caja) return;
@@ -7999,7 +7983,6 @@
         crestOf(jugador, 'crest--ghost') +
         caraConChapas(jugador, 'pitch__face') +
         '<span class="jugador-card__nombre player-name">' + escapeHtml(comoSeLlama(jugador)) + '</span>' +
-        marcaDeSuerte(jugador.id, puestoDe(jugador)) +
       '</button>';
     }).join('');
 
