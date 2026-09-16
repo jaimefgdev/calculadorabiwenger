@@ -223,7 +223,7 @@ const CDN = 'https://cf.biwenger.com/api/v2';
    navegador normal y las cabeceras que este mandaría. */
 /* Marca de versión: se sube en cada cambio y se consulta con ?version=1.
    Sirve para saber desde fuera si el despliegue ha entrado o no. */
-const VERSION = '2026-09-16 · deno 174';
+const VERSION = '2026-09-16 · deno 175';
 
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ' +
   '(KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36';
@@ -4504,7 +4504,10 @@ async function partidosDeJugador(env, id) {
   /* `v2` a propósito: las copias guardadas antes de sacar el club de los
      informes llevan `teamName` a nulo, y sin cambiar el nombre se servirían
      así durante horas. Cambiando la clave caducan solas. */
-  const claveKv = 'partidos-v3-' + clave + '-' + score;
+  /* v4: lo guardado con v3 no lleva la nota de SofaScore, ni el MVP, ni las
+     asistencias, ni la porteria a cero, y se servia igual durante horas.
+     Subiendo la clave caduca sola, como se hizo con el detalle de jornada. */
+  const claveKv = 'partidos-v4-' + clave + '-' + score;
   if (JORNADAS) {
     try {
       const crudo = await JORNADAS.get(claveKv);
