@@ -4248,44 +4248,6 @@ main.wrap { padding-top: 1.15rem; padding-bottom: 3.5rem; }
 
 
 
-/* ---------- Mapa de remates ----------
-   Medio campo: la linea del medio a la izquierda y la porteria a la derecha.
-   Los dos equipos se pintan sobre el mismo campo para poder compararlos; el
-   del visitante se distingue por el borde, no por el sitio. */
-.tiros { margin: .2rem 0 .9rem; }
-.tiros__cab {
-  display: grid; grid-template-columns: 1fr auto 1fr; align-items: center;
-  gap: .5rem; margin-bottom: .35rem;
-}
-.tiros__lado { font-size: .7rem; color: var(--text-soft); }
-.tiros__lado--visita { text-align: right; }
-.tiros__titulo {
-  font-size: .66rem; color: var(--text-faint);
-  text-transform: uppercase; letter-spacing: .04em;
-}
-.tiros__campo { display: block; width: 100%; height: auto; border-radius: var(--radius-sm); }
-.tiros__cesped { fill: var(--bg-surface); }
-.tiros__linea { fill: none; stroke: var(--border-hover); stroke-width: .3; }
-.tiro { stroke-width: .45; stroke: transparent; }
-/* El visitante, con borde: asi no hace falta pintar dos campos. */
-.tiro--visita { stroke: var(--text); stroke-width: .5; }
-.tiro--gol { fill: var(--pos); }
-.tiro--propia { fill: var(--neg); }
-.tiro--parada { fill: var(--marca); }
-.tiro--palo { fill: #2563eb; }
-.tiro--fuera { fill: var(--text-faint); fill-opacity: .55; }
-.tiros__leyenda {
-  display: flex; flex-wrap: wrap; gap: .25rem .7rem; align-items: center;
-  margin-top: .4rem; font-size: .64rem; color: var(--text-faint);
-}
-.tiros__leyenda span { display: inline-flex; align-items: center; gap: .25rem; }
-.tiros__leyenda i { width: .6rem; height: .6rem; border-radius: 50%; display: inline-block; }
-.tiros__leyenda .tiro--gol { background: var(--pos); }
-.tiros__leyenda .tiro--parada { background: var(--marca); }
-.tiros__leyenda .tiro--palo { background: #2563eb; }
-.tiros__leyenda .tiro--fuera { background: var(--text-faint); opacity: .55; }
-.tiros__nota { margin-left: auto; }
-
 /* ---------- Ficha de equipo: racha con escudo y jornada ---------- */
 .racha { align-items: flex-start; gap: .45rem; }
 .racha__item { display: grid; justify-items: center; gap: .15rem; }

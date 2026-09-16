@@ -223,7 +223,7 @@ const CDN = 'https://cf.biwenger.com/api/v2';
    navegador normal y las cabeceras que este mandaría. */
 /* Marca de versión: se sube en cada cambio y se consulta con ?version=1.
    Sirve para saber desde fuera si el despliegue ha entrado o no. */
-const VERSION = '2026-09-16 · deno 181';
+const VERSION = '2026-09-17 · deno 182';
 
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ' +
   '(KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36';
@@ -365,14 +365,6 @@ const app = {
         });
       }
 
-      const tiros = url.searchParams.get('tiros');
-      if (tiros) {
-        const data = await tirosDelPartido(tiros);
-        if (!data) return fail(502, 'No se han podido leer los tiros.', origin);
-        return new Response(JSON.stringify(data), {
-          headers: Object.assign({ 'content-type': 'application/json; charset=utf-8' }, cors(origin))
-        });
-      }
 
       /* ?xg=1 devuelve los goles y las asistencias esperadas de la temporada,
          ya emparejados con el id de cada futbolista de Biwenger. */
@@ -2295,143 +2287,6 @@ async function golesEsperados(env, names) {
 }
 
 /* ============================================================
-   El mapa de tiros de un partido
-   ============================================================
-   FotMob da cada remate con su sitio en el campo, su minuto y su xG. Biwenger
-   no da nada de eso: solo quien marco y en que minuto.
-
-   El problema es emparejar los partidos, porque los numeros no coinciden: el
-   Rayo-Espanyol es el 50769 en Biwenger y el 5868069 en FotMob. Se hace por el
-   DIA y por los EQUIPOS, que es lo unico que comparten. */
-const FOTMOB_WEB = 'https://www.fotmob.com';
-
-async function deFotmob(ruta) {
-  const r = await fetch((ruta.indexOf('/stats/') === 0 ? FOTMOB_DATOS : FOTMOB_WEB) + ruta, {
-    headers: {
-      'user-agent': UA,
-      'accept': 'application/json',
-      'accept-language': 'es-ES,es;q=0.9,en;q=0.8',
-      'referer': 'https://www.fotmob.com/'
-    }
-  }).catch(function () { return null; });
-  if (!r || !r.ok) return null;
-  return await r.json().catch(function () { return null; });
-}
-
-/** El mismo partido en FotMob: se busca entre los de su dia, por equipos. */
-async function partidoEnFotmob(dia, local, visitante) {
-  const cuerpo = await deFotmob('/api/data/matches?date=' + dia);
-  if (!cuerpo) return null;
-
-  /* De las setenta y pico ligas de ese dia, solo LaLiga. */
-  const liga = (cuerpo.leagues || []).filter(function (L) {
-    return String(L.primaryId) === String(FOTMOB_LIGA);
-  })[0];
-  if (!liga) return null;
-
-  const partidos = liga.matches || [];
-  const nombres = [];
-  partidos.forEach(function (m) {
-    [(m.home || {}).name, (m.away || {}).name].forEach(function (n) {
-      if (n && nombres.indexOf(n) === -1) nombres.push(n);
-    });
-  });
-  /* El mismo emparejador que los xG: pesa cada palabra por lo especifica que
-     es, que es lo unico que distingue «Deportivo Alaves» de «Deportivo A
-     Coruna». */
-  const mapa = equiposEmparejados(nombres, { local: local, visitante: visitante });
-
-  for (let i = 0; i < partidos.length; i++) {
-    const m = partidos[i];
-    if (mapa[(m.home || {}).name] === 'local' && mapa[(m.away || {}).name] === 'visitante') {
-      return m.id;
-    }
-  }
-  return null;
-}
-
-/**
- * Los tiros de un partido, recortados.
- *
- * El detalle entero de FotMob son 300 KB; los tiros, tres. Se guardan en el KV
- * porque un partido acabado ya no cambia.
- */
-async function tirosDelPartido(id) {
-  const clave = 'tiros-v1-' + id;
-  if (JORNADAS) {
-    try {
-      const crudo = await JORNADAS.get(clave);
-      if (crudo) return JSON.parse(crudo);
-    } catch (error) { /* se arma abajo */ }
-  }
-
-  /* Del partido de Biwenger salen el dia y los dos equipos. */
-  const respuesta = await fetch(CDN + '/matches/la-liga/' + encodeURIComponent(id) + '?lang=es',
-    { headers: NAVEGADOR }).catch(function () { return null; });
-  if (!respuesta || !respuesta.ok) return null;
-  const suyo = ((await respuesta.json().catch(function () { return {}; })).data) || {};
-  if (!suyo.home || !suyo.away || !suyo.date) return null;
-
-  const cuando = new Date(suyo.date * 1000);
-  const dia = cuando.getFullYear() +
-    String(cuando.getMonth() + 1).padStart(2, '0') +
-    String(cuando.getDate()).padStart(2, '0');
-
-  const suId = await partidoEnFotmob(dia, suyo.home.name, suyo.away.name);
-  if (suId == null) return { id: String(id), tiros: [], sinEmparejar: true };
-
-  const detalle = await deFotmob('/api/data/matchDetails?matchId=' + suId);
-  const crudos = (((detalle || {}).content || {}).shotmap || {}).shots || [];
-
-  /* Que equipo de FotMob es el local: sus tiros se pintan de un lado. */
-  const idsFm = {};
-  crudos.forEach(function (x) { if (x.teamId != null) idsFm[String(x.teamId)] = true; });
-
-  const tiros = crudos.map(function (x) {
-    return {
-      quien: x.playerName || null,
-      minuto: x.min != null ? x.min : null,
-      anadido: x.minAdded != null ? x.minAdded : null,
-      /* Goal, AttemptSaved, Miss, Post, y el gol en propia. */
-      tipo: x.isOwnGoal ? 'OwnGoal' : (x.eventType || null),
-      xg: x.expectedGoals != null ? Math.round(x.expectedGoals * 1000) / 1000 : null,
-      /* Su sitio en el campo, tal cual lo da FotMob: el ataque va hacia la x
-         alta, asi que con esto se dibuja medio campo. */
-      x: x.x != null ? Math.round(x.x * 10) / 10 : null,
-      y: x.y != null ? Math.round(x.y * 10) / 10 : null,
-      dentro: !!x.isFromInsideBox,
-      aPuerta: !!x.isOnTarget,
-      jugada: x.situation || null,
-      fmTeam: x.teamId != null ? String(x.teamId) : null
-    };
-  });
-
-  /* Cual de los dos equipos de FotMob es el local de Biwenger: se decide por
-     el que mas tiros tiene en cada mitad no, que eso es adivinar. Se mira el
-     propio detalle, que trae los dos equipos en orden. */
-  const general = (detalle || {}).general || {};
-  const localFm = general.homeTeam && general.homeTeam.id != null ? String(general.homeTeam.id) : null;
-
-  const datos = {
-    id: String(id),
-    fotmob: String(suId),
-    localFm: localFm,
-    home: suyo.home.name || null,
-    away: suyo.away.name || null,
-    homeId: suyo.home.id != null ? suyo.home.id : null,
-    awayId: suyo.away.id != null ? suyo.away.id : null,
-    tiros: tiros,
-    updatedAt: new Date().toISOString()
-  };
-
-  /* Solo se guarda lo de un partido ACABADO: el de en curso sigue creciendo. */
-  if (JORNADAS && suyo.status === 'finished' && tiros.length) {
-    try { await JORNADAS.put(clave, JSON.stringify(datos)); } catch (error) { /* da igual */ }
-  }
-  return datos;
-}
-
-/* ============================================================
    Los partidos de UN equipo, con su jornada, y su entrenador
    ============================================================
    Para la ficha de equipo. ESPN da el calendario pero NO el numero de jornada,
@@ -3324,6 +3179,13 @@ async function matchDay(roundId, score, names, primas, env) {
         altPositions: otrosPuestos(names, jugador.id),
         points: sinTerminar ? null
           : (delIndice[String(jugador.id)] != null ? delIndice[String(jugador.id)] : null),
+        /* Sin nota y en el once: no es que no haya jugado —esta en el informe
+           de ESTE partido, asi que jugo—, es que Biwenger aun no ha publicado
+           su ficha con esta jornada. Sin esto se pintaba un guion fijo, como si
+           fuera un cero seguro, en vez de la interrogacion de "todavia no se
+           sabe". Visto el 17 de septiembre: Barcelona-Racing en "finished"
+           con las fichas de sus jugadores paradas en la J5. */
+        pending: sinTerminar || delIndice[String(jugador.id)] == null,
         star: !!informe.star,
         events: lances
       };
