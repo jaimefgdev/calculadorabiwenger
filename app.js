@@ -9055,6 +9055,141 @@
       '\u00ba de LaLiga">' + puesto + '\u00ba</span>';
   }
 
+  /* ---------- El mapa de remates ----------
+     FotMob da cada remate con su sitio en el campo, su minuto y su xG; Biwenger
+     no da nada de eso. El proxy los sirve ya recortados —tres KB por partido— y
+     emparejando el partido por dia y equipos, que los numeros no coinciden.
+
+     Solo se piden de los partidos ACABADOS: del que rueda, la lista crece sola
+     y no hay mapa que ensenar todavia. */
+  function ensureTiros(id) {
+    const config = loadSyncConfig();
+    if (!config.url || !config.key || id == null) return;
+    if (!state.tiros) state.tiros = {};
+    if (state.tiros[String(id)] !== undefined) return;
+
+    const guardado = cacheLeer('tiros:' + id);
+    if (guardado && (guardado.tiros || []).length) {
+      state.tiros[String(id)] = guardado;
+      renderPartidos();
+      return;
+    }
+
+    state.tiros[String(id)] = 'pidiendo';
+    fetch(config.url.replace(/\/+$/, '') + '/?key=' + encodeURIComponent(config.key) +
+      '&tiros=' + encodeURIComponent(id), { headers: { 'accept': 'application/json' } })
+      .then(function (respuesta) { return respuesta.json(); })
+      .then(function (payload) {
+        const datos = (payload && !payload.error) ? payload : null;
+        state.tiros[String(id)] = datos;
+        /* Una lista vacia no se guarda: seria dar por cerrado un partido del
+           que aun no hay remates publicados. */
+        if (datos && (datos.tiros || []).length) cacheGuardar('tiros:' + id, datos);
+        renderPartidos();
+      })
+      .catch(function () {
+        state.tiros[String(id)] = null;
+        renderPartidos();
+      });
+  }
+
+  /* El color dice como acabo el remate; el tamano, lo claro que era. */
+  const TIRO_COLOR = {
+    Goal: 'tiro--gol',
+    OwnGoal: 'tiro--propia',
+    AttemptSaved: 'tiro--parada',
+    Post: 'tiro--palo',
+    Miss: 'tiro--fuera'
+  };
+  const TIRO_NOMBRE = {
+    Goal: 'Gol',
+    OwnGoal: 'Gol en propia',
+    AttemptSaved: 'La paró el portero',
+    Post: 'Al palo',
+    Miss: 'Fuera'
+  };
+
+  function mapaDeTiros(juego) {
+    const datos = (state.tiros || {})[String(juego.id)];
+    if (datos === 'pidiendo') return '<p class="muted">Cargando los remates…</p>';
+    if (!datos || !(datos.tiros || []).length) return '';
+
+    /* FotMob mide el campo de 0 a 105 de largo y de 0 a 68 de ancho, y SIEMPRE
+       ataca hacia la x alta. Se dibuja medio campo —de la mitad a la porteria—
+       y los dos equipos van sobre el MISMO campo, para poder compararlos: se
+       distinguen por el borde, no por el sitio. */
+    const ANCHO = 68;
+    const MEDIO = 52.5;
+
+    const punto = function (tiro) {
+      const local = datos.localFm != null && String(tiro.fmTeam) === String(datos.localFm);
+      /* El radio sale de la RAIZ del xG: asi un 0,40 ocupa el cuadruple de area
+         que un 0,10, que es la proporcion de verdad entre los dos. */
+      const xg = tiro.xg == null ? 0 : tiro.xg;
+      const r = 1.1 + Math.sqrt(xg) * 3.2;
+      const cx = (tiro.x == null ? MEDIO : tiro.x) - MEDIO;
+      const cy = tiro.y == null ? ANCHO / 2 : tiro.y;
+      const minuto = tiro.minuto == null ? '' :
+        (tiro.minuto + (tiro.anadido ? '+' + tiro.anadido : '') + "'");
+      const titulo = (tiro.quien || '') + ' · ' + minuto + ' · ' +
+        (TIRO_NOMBRE[tiro.tipo] || tiro.tipo || '') +
+        (tiro.xg == null ? '' : ' · xG ' + tiro.xg.toFixed(2).replace('.', ','));
+      return '<circle class="tiro ' + (TIRO_COLOR[tiro.tipo] || 'tiro--fuera') +
+        (local ? '' : ' tiro--visita') + '"' +
+        ' cx="' + cx.toFixed(1) + '" cy="' + cy.toFixed(1) + '" r="' + r.toFixed(2) + '">' +
+        '<title>' + escapeHtml(titulo) + '</title></circle>';
+    };
+
+    /* Los gordos primero, para que los chicos queden encima y no se pierdan. */
+    const ordenados = datos.tiros.slice().sort(function (a, b) {
+      return (b.xg || 0) - (a.xg || 0);
+    });
+
+    const cuenta = function (esLocal) {
+      const suyos = datos.tiros.filter(function (x) {
+        const local = datos.localFm != null && String(x.fmTeam) === String(datos.localFm);
+        return local === esLocal;
+      });
+      return {
+        tiros: suyos.length,
+        xg: suyos.reduce(function (a, x) { return a + (x.xg || 0); }, 0)
+      };
+    };
+    const casa = cuenta(true);
+    const visita = cuenta(false);
+    const cifra = function (v) { return v.toFixed(2).replace('.', ','); };
+
+    return '<div class="tiros">' +
+      '<div class="tiros__cab">' +
+        '<span class="tiros__lado"><strong>' + casa.tiros + '</strong> remates · ' +
+          cifra(casa.xg) + ' xG</span>' +
+        '<span class="tiros__titulo">Mapa de remates</span>' +
+        '<span class="tiros__lado tiros__lado--visita"><strong>' + visita.tiros +
+          '</strong> remates · ' + cifra(visita.xg) + ' xG</span>' +
+      '</div>' +
+      '<svg class="tiros__campo" viewBox="0 0 ' + (105 - MEDIO) + ' ' + ANCHO + '"' +
+        ' role="img" aria-label="Mapa de remates del partido">' +
+        '<rect class="tiros__cesped" x="0" y="0" width="' + (105 - MEDIO) + '" height="' + ANCHO + '"/>' +
+        /* El circulo central, partido por el borde izquierdo. */
+        '<circle class="tiros__linea" cx="0" cy="' + (ANCHO / 2) + '" r="9.15"/>' +
+        /* Area grande: 16,5 de fondo y 40,3 de ancho. */
+        '<rect class="tiros__linea" x="' + (105 - MEDIO - 16.5) + '" y="' + ((ANCHO - 40.3) / 2) + '"' +
+          ' width="16.5" height="40.3"/>' +
+        /* Area pequena: 5,5 de fondo y 18,3 de ancho. */
+        '<rect class="tiros__linea" x="' + (105 - MEDIO - 5.5) + '" y="' + ((ANCHO - 18.3) / 2) + '"' +
+          ' width="5.5" height="18.3"/>' +
+        ordenados.map(punto).join('') +
+      '</svg>' +
+      '<div class="tiros__leyenda">' +
+        '<span><i class="tiro--gol"></i>Gol</span>' +
+        '<span><i class="tiro--parada"></i>La paró el portero</span>' +
+        '<span><i class="tiro--palo"></i>Al palo</span>' +
+        '<span><i class="tiro--fuera"></i>Fuera</span>' +
+        '<span class="tiros__nota">El tamaño es el xG. Los del visitante, con borde. Lo mide FotMob.</span>' +
+      '</div>' +
+    '</div>';
+  }
+
   function renderPartidos() {
     const caja = $('jornada-partidos');
     if (!caja) return;
@@ -9082,6 +9217,8 @@
         ? '<p class="muted">Esta jornada todav\u00eda no tiene calendario.</p>'
         : '<div class="partidos">' + partidos.map(function (juego) {
             const abierto = state.partidoAbierto === juego.id;
+            /* Los remates, solo del que se abre y solo si ya acabo. */
+            if (abierto && juego.status === 'finished') ensureTiros(juego.id);
             const acabado = juego.status === 'finished';
             /* Mientras rueda manda ESPN: mueve el marcador antes que Biwenger. */
             const vivo = acabado ? null : marcadorEnVivo(juego.home.name, juego.away.name);
@@ -9155,6 +9292,7 @@
                       '</div>';
                     })() +
                     estadisticasDePartido(juego) +
+                    (acabado ? mapaDeTiros(juego) : '') +
                     '<div class="alineaciones">' +
                       (state.vistaPartido === 'campo'
                         ? campoDePartido(juego.home, juego.home.name) + campoDePartido(juego.away, juego.away.name)
