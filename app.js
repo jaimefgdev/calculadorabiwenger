@@ -12716,8 +12716,6 @@
     { titulo: 'M\u00e1s ocasiones claras falladas', campo: 'falladas', sufijo: '' },
     { titulo: 'M\u00e1s ocasiones claras creadas',  campo: 'creadas',  sufijo: '' },
     { titulo: 'Mejor nota media',    campo: 'nota',    sufijo: '', decimal: true, minimo: 3 },
-    /* Cuanto rinde por lo que cuesta. Lo trae el propio recuento. */
-    { titulo: 'Puntos por mill\u00f3n',  campo: 'pointsPerMillion', sufijo: '', decimal: true, minimo: 2 }
   ];
 
   /** El recuento del ámbito que se esté mirando. */
@@ -13017,12 +13015,13 @@
     const FILAS = [
       ['goals', 'golesMasAsistencias', 'assists'],
       ['minutesPerGoal', 'falladas', 'creadas'],
+      /* La nota media va con los minutos: las dos dicen cuanto y como juega. */
+      ['nota', 'minutes'],
+      ['subsOut', 'subsIn'],
       ['yellow', 'red'],
-      ['minutes', 'subsOut', 'subsIn'],
       /* Portería: lo de Biwenger y lo que solo tiene FotMob. */
       ['cleanSheets', 'conceded'],
-      ['paradas', 'paradasPorcentaje', 'golesEvitados'],
-      ['nota', 'pointsPerMillion']
+      ['paradas', 'paradasPorcentaje', 'golesEvitados']
     ];
 
     caja.innerHTML = FILAS.map(function (fila) {
