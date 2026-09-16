@@ -8729,80 +8729,56 @@
   }
 
   /* ---------- La ficha de un equipo ----------
-     Se abre pulsando su fila en la clasificacion de LaLiga y trae tres cosas:
-     su plantilla (de quien es cada futbolista en TU liga, lo que puntua y lo
-     que vale), su racha y sus proximos rivales con la dificultad de cada uno.
+     Se abre pulsando su fila en la clasificacion de LaLiga: su racha, sus
+     proximos rivales y su plantilla con el entrenador.
 
-     El calendario lo da ESPN, que abre CORS: los jugados en
-     /teams/<id>/schedule y los que quedan en el mismo sitio con
-     ?fixture=true. El id de ESPN NO hace falta pedirlo: viene dentro de la
-     clasificacion que ya se descarga (su /teams no abre CORS). */
-  const ESPN_EQUIPO = 'https://site.api.espn.com/apis/site/v2/sports/soccer/esp.1/teams/';
+     Los partidos salen de Biwenger, no de ESPN: ESPN no da el numero de
+     jornada ni el entrenador, y el proxy ya tiene las dos cosas guardadas. */
 
-  /* La temporada como la numera ESPN: la 26/27 es la 2027. */
-  const TEMPORADA_ESPN = 2027;
+  /* De la fila de la tabla (id de ESPN) al id de Biwenger, que es el de los
+     escudos y el de los partidos. */
+  function idBiwDeEspn(idEspn) {
+    const fila = (state.tabla || []).filter(function (f) {
+      return String(f.idEspn) === String(idEspn);
+    })[0];
+    return fila ? idDeEquipo(fila.completo) : null;
+  }
 
-  function ensureCalendarioDe(idEspn) {
-    if (idEspn == null) return;
-    const clave = String(idEspn);
-    if (!state.calendarios) state.calendarios = {};
-    if (state.calendarios[clave] || state.calendarioCargando === clave) return;
+  function ensureEquipoDe(idEspn) {
+    const id = idBiwDeEspn(idEspn);
+    const config = loadSyncConfig();
+    if (id == null || !config.url || !config.key) return;
+    if (!state.equipos) state.equipos = {};
+    if (state.equipos[String(id)] !== undefined) return;
 
-    const guardado = cacheLeer('calendario-' + clave);
-    if (guardado) {
-      state.calendarios[clave] = guardado;
+    const guardado = cacheLeer('equipo:' + id);
+    if (guardado && (guardado.partidos || []).length) {
+      state.equipos[String(id)] = guardado;
       renderTablaLaLiga();
       return;
     }
 
-    state.calendarioCargando = clave;
-    /* Dos peticiones: lo jugado y lo que queda. ESPN no los da juntos. */
-    Promise.all([
-      fetch(ESPN_EQUIPO + clave + '/schedule').then(function (r) { return r.ok ? r.json() : null; }),
-      fetch(ESPN_EQUIPO + clave + '/schedule?fixture=true&season=' + TEMPORADA_ESPN)
-        .then(function (r) { return r.ok ? r.json() : null; })
-    ]).then(function (dos) {
-      const partidos = []
-        .concat(partidosDeEspn(dos[0]))
-        .concat(partidosDeEspn(dos[1]))
-        .sort(function (a, b) { return String(a.cuando).localeCompare(String(b.cuando)); });
-      state.calendarioCargando = null;
-      if (!partidos.length) return;
-      state.calendarios[clave] = partidos;
-      cacheGuardar('calendario-' + clave, partidos);
-      renderTablaLaLiga();
-    }).catch(function () {
-      state.calendarioCargando = null;
-    });
+    state.equipos[String(id)] = 'pidiendo';
+    fetch(config.url.replace(/\/+$/, '') + '/?key=' + encodeURIComponent(config.key) +
+      '&equipo=' + encodeURIComponent(id), { headers: { 'accept': 'application/json' } })
+      .then(function (respuesta) { return respuesta.json(); })
+      .then(function (payload) {
+        const datos = (payload && !payload.error) ? payload : null;
+        state.equipos[String(id)] = datos;
+        if (datos && (datos.partidos || []).length) cacheGuardar('equipo:' + id, datos);
+        renderTablaLaLiga();
+      })
+      .catch(function () {
+        state.equipos[String(id)] = null;
+        renderTablaLaLiga();
+      });
   }
 
-  function partidosDeEspn(cuerpo) {
-    return ((cuerpo && cuerpo.events) || []).map(function (evento) {
-      const enfrentamiento = (evento.competitions || [])[0] || {};
-      const lados = enfrentamiento.competitors || [];
-      const suyo = lados.filter(function (l) { return l.homeAway === 'home'; })[0] || lados[0] || {};
-      const otro = lados.filter(function (l) { return l !== suyo; })[0] || {};
-      const marcador = function (lado) {
-        const s = lado && lado.score;
-        if (s == null) return null;
-        const v = typeof s === 'object' ? s.value : s;
-        return v == null ? null : Number(v);
-      };
-      const estado = (((enfrentamiento.status || {}).type) || {}).name || '';
-      return {
-        cuando: evento.date || null,
-        acabado: estado === 'STATUS_FULL_TIME',
-        local: { id: (suyo.team || {}).id || null, nombre: (suyo.team || {}).displayName || '', goles: marcador(suyo) },
-        visitante: { id: (otro.team || {}).id || null, nombre: (otro.team || {}).displayName || '', goles: marcador(otro) }
-      };
-    });
-  }
-
-  /* El puesto de cada equipo, para medir la dificultad de un rival. */
-  function puestoEnLaTabla(idEspn) {
+  /* El puesto de un equipo de Biwenger en la clasificacion de LaLiga. */
+  function puestoDeEquipoBiw(idBiw) {
     const filas = state.tabla || [];
-    for (let i = 0; i < filas.length; i++) {
-      if (String(filas[i].idEspn) === String(idEspn)) return i + 1;
+    for (let k = 0; k < filas.length; k++) {
+      if (String(idDeEquipo(filas[k].completo)) === String(idBiw)) return k + 1;
     }
     return null;
   }
@@ -8817,6 +8793,7 @@
 
   function fichaDeEquipo(fila) {
     const idBiw = idDeEquipo(fila.completo);
+
     /* La plantilla sale del indice que la web ya tiene: no cuesta una consulta. */
     const suyos = (state.jugadores || []).filter(function (j) {
       return idBiw != null && String(j.team) === String(idBiw);
@@ -8831,63 +8808,78 @@
         suyos.map(function (j) {
           const dueno = duenoDe(j.id);
           return '<tr>' +
-            '<td class="detail-rank">' + (j.position != null && POSITION_NAMES[j.position] ? POSITION_NAMES[j.position] : '\u2014') + '</td>' +
+            '<td class="detail-rank">' + (j.position != null && POSITION_NAMES[j.position] ? POSITION_NAMES[j.position] : '—') + '</td>' +
             '<td>' + escapeHtml(j.name || '') + '</td>' +
-            '<td class="num">' + (j.points == null ? '\u2014' : j.points) + '</td>' +
-            '<td class="num">' + (j.marketValue == null ? '\u2014' : money(j.marketValue)) + '</td>' +
+            '<td class="num">' + (j.points == null ? '—' : j.points) + '</td>' +
+            '<td class="num">' + (j.marketValue == null ? '—' : money(j.marketValue)) + '</td>' +
             '<td>' + (dueno ? escapeHtml(dueno) : '<span class="sub">libre</span>') + '</td>' +
           '</tr>';
         }).join('') + '</tbody></table>';
 
-    /* El calendario: lo ultimo jugado y lo que viene. */
-    const calendario = (state.calendarios || {})[String(fila.idEspn)];
+    const datos = idBiw == null ? null : (state.equipos || {})[String(idBiw)];
     let racha = '';
     let proximos = '';
-    if (!calendario) {
-      proximos = '<p class="muted">Cargando el calendario\u2026</p>';
-    } else {
-      const jugados = calendario.filter(function (p) { return p.acabado; }).slice(-5);
-      const quedan = calendario.filter(function (p) { return !p.acabado; }).slice(0, 5);
+    let entrenador = '';
 
-      racha = !jugados.length ? '' : '<div class="racha">' + jugados.map(function (p) {
-        const enCasa = String(p.local.id) === String(fila.idEspn);
-        const mios = enCasa ? p.local.goles : p.visitante.goles;
-        const suyos2 = enCasa ? p.visitante.goles : p.local.goles;
-        const rival = enCasa ? p.visitante : p.local;
-        const signo = mios == null || suyos2 == null ? '' : (mios > suyos2 ? 'G' : (mios < suyos2 ? 'P' : 'E'));
-        return '<span class="racha__uno racha--' + (signo || 'x').toLowerCase() + '"' +
-          ' title="' + escapeHtml((enCasa ? '' : 'en ') + rival.nombre + ' \u00b7 ' + mios + '-' + suyos2) + '">' +
-          (signo || '\u2014') + '</span>';
+    if (datos === 'pidiendo' || datos === undefined) {
+      proximos = '<p class="muted">Cargando el calendario…</p>';
+    } else if (!datos) {
+      proximos = '<p class="muted">No se ha podido traer el calendario.</p>';
+    } else {
+      const partidos = datos.partidos || [];
+      const jugados = partidos.filter(function (x) { return x.status === 'finished'; }).slice(-5);
+      const quedan = partidos.filter(function (x) { return x.status !== 'finished'; }).slice(0, 5);
+
+      if (datos.entrenador) {
+        entrenador = '<span class="equipo__tecnico">Entrenador <strong>' +
+          escapeHtml(datos.entrenador) + '</strong></span>';
+      }
+
+      /* Cada partido: el resultado, al lado el escudo del rival y debajo la
+         jornada, que es como se ubica un partido de un vistazo. */
+      racha = !jugados.length ? '' : '<div class="racha">' + jugados.map(function (x) {
+        const signo = x.favor == null || x.contra == null ? ''
+          : (x.favor > x.contra ? 'G' : (x.favor < x.contra ? 'P' : 'E'));
+        const titulo = (x.enCasa ? '' : 'en ') + (x.rival || '') + ' · ' +
+          x.favor + '-' + x.contra + (x.jornada ? ' · Jornada ' + x.jornada : '');
+        return '<span class="racha__item" title="' + escapeHtml(titulo) + '">' +
+          '<span class="racha__fila">' +
+            '<span class="racha__uno racha--' + (signo || 'x').toLowerCase() + '">' + (signo || '—') + '</span>' +
+            crestOf({ team: x.rivalId, teamName: x.rival }, 'crest--badge racha__escudo') +
+          '</span>' +
+          '<span class="racha__jornada">' + (x.jornada ? 'J' + x.jornada : '') + '</span>' +
+        '</span>';
       }).join('') + '</div>';
 
+      /* Los proximos, con el escudo del rival de fondo y semitransparente. */
       proximos = !quedan.length ? '<p class="muted">No queda calendario por delante.</p>'
-        : '<div class="proximos">' + quedan.map(function (p) {
-            const enCasa = String(p.local.id) === String(fila.idEspn);
-            const rival = enCasa ? p.visitante : p.local;
-            const puesto = puestoEnLaTabla(rival.id);
-            const cuando = p.cuando ? new Date(p.cuando) : null;
+        : '<div class="proximos">' + quedan.map(function (x) {
+            const puesto = puestoDeEquipoBiw(x.rivalId);
+            const cuando = x.start ? new Date(x.start) : null;
             return '<span class="proximo' + claseDeRival(puesto) + '"' +
-              ' title="' + escapeHtml((puesto ? puesto + '\u00ba de la tabla' : 'sin puesto')) + '">' +
-              '<span class="proximo__dia">' + (cuando ? escapeHtml(diaSinAno.format(cuando)) : '') + '</span>' +
-              /* Donde juega, con el mismo icono que usa «En juego»: la casita
-                 si es en casa y el avion si sale fuera. Antes ponia «en» y el
-                 nombre, que se leia peor y ademas descuadraba las tarjetas. */
+              ' title="' + escapeHtml((puesto ? puesto + 'º de la tabla' : 'sin puesto')) + '">' +
+              '<span class="proximo__fondo" aria-hidden="true" style="background-image:url(\'' +
+                crestUrl(x.rivalId) + '\')"></span>' +
+              '<span class="proximo__dia">' + (cuando ? escapeHtml(diaSinAno.format(cuando)) : '') +
+                (x.jornada ? ' · J' + x.jornada : '') + '</span>' +
               '<span class="proximo__quien">' +
-                '<span class="proximo__donde" title="' + (enCasa ? 'En casa' : 'Fuera') + '"' +
-                  ' aria-label="' + (enCasa ? 'En casa' : 'Fuera') + '">' +
-                  (enCasa ? CASITA : AVION) + '</span>' +
-                escapeHtml(rival.nombre) +
+                '<span class="proximo__donde" title="' + (x.enCasa ? 'En casa' : 'Fuera') + '"' +
+                  ' aria-label="' + (x.enCasa ? 'En casa' : 'Fuera') + '">' +
+                  (x.enCasa ? CASITA : AVION) + '</span>' +
+                escapeHtml(x.rival || '') +
               '</span>' +
-              (puesto ? '<span class="proximo__puesto">' + puesto + '\u00ba</span>' : '') +
+              (puesto ? '<span class="proximo__puesto">' + puesto + 'º</span>' : '') +
             '</span>';
           }).join('') + '</div>';
     }
 
     return '<tr class="detail-row"><td class="detail-cell" colspan="10">' +
       '<div class="detail">' +
-        (racha ? '<h3 class="detail__titulo">\u00daltimos partidos</h3>' + racha : '') +
-        '<h3 class="detail__titulo">Pr\u00f3ximos rivales</h3>' + proximos +
-        '<h3 class="detail__titulo">Plantilla</h3>' + plantilla +
+        (racha ? '<h3 class="detail__titulo">Últimos partidos</h3>' + racha : '') +
+        '<h3 class="detail__titulo">Próximos rivales</h3>' + proximos +
+        /* El entrenador, arriba a la derecha de la plantilla. */
+        '<div class="detail__cab"><h3 class="detail__titulo">Plantilla</h3>' + entrenador + '</div>' +
+        plantilla +
       '</div>' +
     '</td></tr>';
   }
@@ -15042,7 +15034,7 @@
         if (!boton) return;
         const cual = boton.getAttribute('data-equipo');
         state.equipoAbierto = String(state.equipoAbierto) === String(cual) ? null : cual;
-        if (state.equipoAbierto) ensureCalendarioDe(state.equipoAbierto);
+        if (state.equipoAbierto) ensureEquipoDe(state.equipoAbierto);
         renderTablaLaLiga();
       });
     }

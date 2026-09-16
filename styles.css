@@ -4304,3 +4304,26 @@ main.wrap { padding-top: 1.15rem; padding-bottom: 3.5rem; }
 .tiros__leyenda .tiro--palo { background: #2563eb; }
 .tiros__leyenda .tiro--fuera { background: var(--text-faint); opacity: .55; }
 .tiros__nota { margin-left: auto; }
+
+/* ---------- Ficha de equipo: racha con escudo y jornada ---------- */
+.racha { align-items: flex-start; gap: .45rem; }
+.racha__item { display: grid; justify-items: center; gap: .15rem; }
+.racha__fila { display: inline-flex; align-items: center; gap: .2rem; }
+.racha__escudo { width: 18px; height: 18px; }
+.racha__jornada { font-size: .6rem; color: var(--text-faint); line-height: 1; }
+
+/* Plantilla con el entrenador arriba a la derecha. */
+.detail__cab { display: flex; align-items: baseline; justify-content: space-between; gap: .5rem; }
+.equipo__tecnico { font-size: .72rem; color: var(--text-faint); white-space: nowrap; }
+.equipo__tecnico strong { color: var(--text); font-weight: 700; }
+
+/* Proximos: el escudo del rival de fondo, semitransparente. */
+.proximo { position: relative; overflow: hidden; }
+.proximo > span:not(.proximo__fondo) { position: relative; z-index: 1; }
+.proximo__fondo {
+  position: absolute; z-index: 0; pointer-events: none;
+  right: -.4rem; top: 50%; transform: translateY(-50%);
+  width: 3.4rem; height: 3.4rem;
+  background: center / contain no-repeat;
+  opacity: .16;
+}

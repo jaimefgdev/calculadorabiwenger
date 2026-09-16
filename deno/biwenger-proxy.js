@@ -223,7 +223,7 @@ const CDN = 'https://cf.biwenger.com/api/v2';
    navegador normal y las cabeceras que este mandaría. */
 /* Marca de versión: se sube en cada cambio y se consulta con ?version=1.
    Sirve para saber desde fuera si el despliegue ha entrado o no. */
-const VERSION = '2026-09-16 · deno 180';
+const VERSION = '2026-09-16 · deno 181';
 
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ' +
   '(KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36';
@@ -355,6 +355,16 @@ const app = {
          corta, la web tiene los datos de Biwenger como respaldo.
          Solo se dejan pasar las rutas que se usan, no cualquier cosa. */
       /* ?tiros=<partido> devuelve los remates de ese partido con su xG. */
+      /* ?equipo=<id> devuelve los partidos de ese equipo con su jornada, y su
+         entrenador. */
+      const equipoPedido = url.searchParams.get('equipo');
+      if (equipoPedido) {
+        const data = await partidosDelEquipo(env, equipoPedido);
+        return new Response(JSON.stringify(data), {
+          headers: Object.assign({ 'content-type': 'application/json; charset=utf-8' }, cors(origin))
+        });
+      }
+
       const tiros = url.searchParams.get('tiros');
       if (tiros) {
         const data = await tirosDelPartido(tiros);
@@ -2419,6 +2429,63 @@ async function tirosDelPartido(id) {
     try { await JORNADAS.put(clave, JSON.stringify(datos)); } catch (error) { /* da igual */ }
   }
   return datos;
+}
+
+/* ============================================================
+   Los partidos de UN equipo, con su jornada, y su entrenador
+   ============================================================
+   Para la ficha de equipo. ESPN da el calendario pero NO el numero de jornada,
+   y tampoco el entrenador; Biwenger tiene las dos cosas en lo que este proxy
+   ya guarda: el calendario de la temporada partido a partido y el detalle de
+   cada jornada, que lleva el entrenador de cada lado. Ni una consulta nueva. */
+async function partidosDelEquipo(env, equipoId) {
+  const score = await sistemaDeLaLiga(env);
+  const rondas = await fixturesDeLaTemporada(score).catch(function () { return {}; }) || {};
+  const calendario = await seasonRounds().catch(function () { return []; });
+
+  /* El numero de cada ronda. Solo las de parte 1: las aplazadas repiten los
+     mismos partidos y ya estan dentro de su jornada. */
+  const numero = {};
+  calendario.forEach(function (j) {
+    if ((j.part || 1) === 1) numero[String(j.id)] = j.number;
+  });
+
+  const partidos = [];
+  Object.keys(rondas).forEach(function (rid) {
+    ((rondas[rid] || {}).matches || []).forEach(function (m) {
+      const enCasa = String(m.homeId) === String(equipoId);
+      if (!enCasa && String(m.awayId) !== String(equipoId)) return;
+      partidos.push({
+        ronda: rid,
+        jornada: numero[rid] != null ? numero[rid] : null,
+        start: m.start || null,
+        status: m.status || null,
+        enCasa: enCasa,
+        rivalId: enCasa ? m.awayId : m.homeId,
+        rival: enCasa ? m.away : m.home,
+        favor: enCasa ? m.homeScore : m.awayScore,
+        contra: enCasa ? m.awayScore : m.homeScore
+      });
+    });
+  });
+  partidos.sort(function (a, b) { return String(a.start).localeCompare(String(b.start)); });
+
+  /* El entrenador, del ultimo partido que jugo: si hay cambio de banquillo,
+     sale el nuevo. Se prueba con los tres ultimos por si alguno no lo trae. */
+  let entrenador = null;
+  const jugados = partidos.filter(function (x) { return x.status === 'finished'; });
+  for (let i = jugados.length - 1; i >= 0 && i >= jugados.length - 3 && !entrenador; i--) {
+    const d = await roundDetail(jugados[i].ronda, score).catch(function () { return null; });
+    ((d && d.crudo) || []).forEach(function (juego) {
+      [juego.home, juego.away].forEach(function (lado) {
+        if (!entrenador && lado && String(lado.id) === String(equipoId) && lado.coach) {
+          entrenador = lado.coach;
+        }
+      });
+    });
+  }
+
+  return { equipo: String(equipoId), entrenador: entrenador, partidos: partidos };
 }
 
 /** Próxima jornada: número, hora del primer partido y los partidos uno a uno. */
