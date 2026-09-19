@@ -223,7 +223,7 @@ const CDN = 'https://cf.biwenger.com/api/v2';
    navegador normal y las cabeceras que este mandaría. */
 /* Marca de versión: se sube en cada cambio y se consulta con ?version=1.
    Sirve para saber desde fuera si el despliegue ha entrado o no. */
-const VERSION = '2026-09-17 · deno 182';
+const VERSION = '2026-09-19 · deno 183';
 
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ' +
   '(KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36';
@@ -1976,6 +1976,43 @@ async function finDeLaUltimaJornada() {
   } catch (error) { return null; }
 }
 
+/**
+ * ¿Le queda a esta jornada algun partido por jugar PRONTO?
+ *
+ * LaLiga adelanta partidos varios dias —hasta unos doce— por los
+ * compromisos europeos, y eso es normal: sigue siendo la misma semana de
+ * liga. Lo que no es normal es un aplazamiento de verdad: un partido sin
+ * fecha cercana, movido semanas mas alla porque ha pasado algo. Ese caso ya
+ * no cuenta como que la jornada 'sigue en juego': la vida de la liga sigue
+ * por la siguiente hasta que a ese partido le toque su fecha real.
+ *
+ * Medido el 19 de septiembre: a la jornada 6 solo le faltaba el
+ * Levante-Athletic, aplazado al 21 de octubre —34 dias despues de su ultimo
+ * partido, el Malaga-Villarreal del 17 de septiembre—. Sin este filtro,
+ * jornadaEnJuego() y jornadaActualEfectiva() se quedaban pegadas a la
+ * jornada 6 todo ese mes solo por ese partido suelto, con Inicio y
+ * Jornadas ignorando que la 7 ya estaba en marcha.
+ */
+const APLAZADO_LEJOS = 15 * 24 * 3600e3;
+
+function tienePartidoCercano(detalle) {
+  const partidos = (detalle && detalle.matches) || [];
+  const jugadas = partidos
+    .filter(function (m) { return m.status === 'finished'; })
+    .map(function (m) { return Date.parse(m.start); })
+    .filter(function (t) { return !isNaN(t); });
+  /* Sin ninguno jugado no hay con que comparar: se deja pasar, que ese caso
+     ya lo descarta el 'jugados > 0' de quien llama a esto. */
+  if (!jugadas.length) return true;
+  const referencia = Math.max.apply(null, jugadas);
+  return partidos.some(function (m) {
+    if (m.status === 'finished') return false;
+    const t = Date.parse(m.start);
+    if (isNaN(t)) return true;   // sin fecha todavia: no se sabe, se deja pasar
+    return (t - referencia) <= APLAZADO_LEJOS;
+  });
+}
+
 /** La jornada activa, si ya ha empezado y todavía le quedan partidos. */
 async function jornadaEnJuego() {
   const calendario = await seasonRounds().catch(function () { return []; });
@@ -2010,7 +2047,9 @@ async function jornadaEnJuego() {
     const suyo = await roundDetail(candidatas[i].id, null).catch(function () { return null; });
     if (!suyo) continue;
     const jugados = suyo.played || 0;
-    if (jugados > 0 && jugados < (suyo.games || 0)) { ficha = candidatas[i]; detalle = suyo; }
+    if (jugados > 0 && jugados < (suyo.games || 0) && tienePartidoCercano(suyo)) {
+      ficha = candidatas[i]; detalle = suyo;
+    }
   }
   if (!ficha || !detalle) return null;
 
@@ -2367,7 +2406,9 @@ async function proximaJornada() {
   for (let i = 0; i < candidatas.length; i++) {
     const suyo = await roundDetail(candidatas[i].id, null).catch(function () { return null; });
     if (!suyo) continue;
-    if ((suyo.played || 0) < (suyo.games || 0)) { enJuego = candidatas[i]; break; }
+    if ((suyo.played || 0) < (suyo.games || 0) && tienePartidoCercano(suyo)) {
+      enJuego = candidatas[i]; break;
+    }
   }
 
   const url = enJuego
@@ -2471,11 +2512,17 @@ async function jornadaActualEfectiva() {
      eso la pestaña se quedaba en la 2 con la 1 en juego.
 
      Las que ni han empezado se descartan sin consultarlas, que cada una es una
-     petición; con cuatro sobra para encontrarla. */
+     petición; con cuatro sobra para encontrarla.
+
+     LAS CUATRO ULTIMAS, no las cuatro primeras —mismo fallo que se corrigió en
+     jornadaEnJuego() el 14 de septiembre, pero que aqui se quedo sin aplicar.
+     Con `.slice(0, 4)` esta funcion solo miraba J1-J4, y en cuanto la liga
+     paso de ahi la pestaña de Jornadas se quedo clavada sin enterarse nunca
+     de la 5, la 6 ni la 7. */
   const candidatas = calendario
     .filter(function (r) { return (r.part || 1) === 1 && r.status !== 'pending'; })
     .sort(function (a, b) { return (a.number || 0) - (b.number || 0); })
-    .slice(0, 4);
+    .slice(-4);
 
   /* De paso se apunta la última que ya tiene TODOS sus partidos jugados. Hace
      falta porque Biwenger deja jornadas en «active» mucho después de acabarlas:
@@ -2487,7 +2534,7 @@ async function jornadaActualEfectiva() {
     if (!suyo) continue;
     const jugados = suyo.played || 0;
     const total = suyo.games || 0;
-    if (jugados > 0 && jugados < total) return candidatas[i].id;
+    if (jugados > 0 && jugados < total && tienePartidoCercano(suyo)) return candidatas[i].id;
     if (total > 0 && jugados >= total) ultima = candidatas[i];
   }
 
